@@ -11,8 +11,9 @@
     "stripI18n": true,
     "minifyCss": true,
     "minifyMarkup": true,
-    "mangleProps": false,
+    "mangleProps": "max",
+    "inlineChrome": true,
     "roadroller": true,
-    "roadrollerOptimize": 0
+    "roadrollerOptimize": 1
   }
 }

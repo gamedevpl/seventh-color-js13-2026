@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { transform } from 'esbuild';
 import { minify as terserMinify } from 'terser';
+import { tokenizer } from 'acorn';
 import { Packer } from 'roadroller';
 import { extractBundle, minifyMarkup, stripI18nAttributes } from './lib/extract.mjs';
 import { inlineSynthesizedAudio } from './lib/audio-inline.mjs';
@@ -32,6 +33,18 @@ const source = JSON.parse(readFileSync(path.join(sourceDir, 'SOURCE.json'), 'utf
 const steps = [];
 const note = (label, bytes, detail = '') => steps.push({ label, bytes, detail });
 
+function collectStringTokens(source) {
+  const names = new Set();
+  const keep = (text) => {
+    if (typeof text === 'string' && /^[A-Za-z_$][\w$]*$/.test(text)) names.add(text);
+  };
+  for (const token of tokenizer(source, { ecmaVersion: 'latest' })) {
+    if (token.type.label === 'string') keep(token.value);
+    if (token.type.label === 'template') keep(token.value);
+  }
+  return [...names];
+}
+
 const bundle = extractBundle(html);
 note('assembled bundle', html.length, `${source.branch} @ ${source.commit.slice(0, 8)}`);
 
@@ -56,24 +69,52 @@ if (on('minifyCss')) {
 js = (await transform(js, { loader: 'js', minify: true, target: 'es2020', legalComments: 'none' })).code;
 note('  − esbuild minify', js.length);
 
+// mangleProps: false | "underscore" (/^_/ only) | "max" (every property not
+// referenced by a quoted string; terser's builtin list protects DOM names).
+// "max" renames both sides of every internal access consistently because the
+// engine and the game are one program here — verify is the gate that proves it.
+const mangleMode = off('mangleProps') ? false : config.transforms.mangleProps;
+// Any identifier-shaped string literal is reserved: dynamic property access
+// (steps[name], state[kind]) always names its key as a literal somewhere, and
+// renaming only the dotted side of such a pair is how mangling breaks. Tokenised
+// with acorn, not a regex — an apostrophe inside prose desyncs any quote-parity
+// scan and silently drops every capture after it.
+const reserved = collectStringTokens(js);
+const mangle =
+  mangleMode === 'max' ? { properties: { keep_quoted: 'strict', reserved } }
+  : mangleMode === 'underscore' ? { properties: { regex: /^_/ } }
+  : true;
 const tersed = await terserMinify(js, {
   ecma: 2020,
   compress: { passes: 3, unsafe: true, unsafe_arrows: true, unsafe_math: true, pure_getters: true },
-  mangle: on('mangleProps') ? { properties: { regex: /^_/ } } : true,
+  mangle,
   format: { comments: false },
 });
 if (tersed.code && tersed.code.length < js.length) {
   js = tersed.code;
-  note('  − terser', js.length);
+  note(`  − terser${mangleMode === 'max' ? ' + property mangle' : ''}`, js.length);
+}
+
+// Fold the page chrome into the script so roadroller's context models compress
+// markup, css and code as one stream instead of three. The shell keeps an
+// explicit <body> so the injection has somewhere to land before the game runs.
+if (on('inlineChrome')) {
+  const esc = (text) => JSON.stringify(text).replace(/<\//g, '<\\/');
+  js = `document.head.insertAdjacentHTML("beforeend","<style>"+${esc(css)}+"</style>");`
+    + `document.body.insertAdjacentHTML("afterbegin",${esc(markup)});\n${js}`;
+  css = '';
+  markup = '';
+  note('  + chrome folded into payload', js.length);
 }
 
 const shellFor = (script) =>
   `<!doctype html><meta charset=utf-8><title>${bundle.title}</title>`
-  + `<style>${css}</style>${markup}<script>${script}</script>`;
+  + `${css ? `<style>${css}</style>` : ''}${markup || '<body>'}<script>${script}</script>`;
 
 let payload = js;
 if (on('roadroller')) {
-  const level = Number(config.transforms.roadrollerOptimize) || 0;
+  const cli = args.find((a) => /^--O\d$/.test(a));
+  const level = cli ? Number(cli.slice(3)) : Number(config.transforms.roadrollerOptimize) || 0;
   process.stdout.write(`  roadroller (-O${level}, ${js.length.toLocaleString('en-US')} bytes in)… `);
   const started = Date.now();
   const packer = new Packer([{ data: js, type: 'js', action: 'eval' }], { maxMemoryMB: 512 });

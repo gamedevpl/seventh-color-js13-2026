@@ -10,9 +10,10 @@ Source: `claude/seventh-color-cast-prototype-a0yz66` @ `da6d270e`
 | &nbsp;&nbsp;javascript | 710,224 |  |
 | &nbsp;&nbsp;− inlined WAVs → runtime synth | 475,954 | 238459 → 4189 bytes of prelude |
 | &nbsp;&nbsp;− esbuild minify | 279,068 |  |
-| &nbsp;&nbsp;− terser | 266,336 |  |
-| &nbsp;&nbsp;− roadroller | 87,877 |  |
-| final index.html | 97,419 | css 8005 + markup 1438 |
-| index.zip | 69,156 | deflate 69038 |
+| &nbsp;&nbsp;− terser + property mangle | 239,940 |  |
+| &nbsp;&nbsp;+ chrome folded into payload | 249,588 |  |
+| &nbsp;&nbsp;− roadroller | 87,488 |  |
+| final index.html | 87,578 | css 0 + markup 0 |
+| index.zip | 65,907 | deflate 65789 |
 
-**Zip: 69,156 bytes** against a 13,312 byte budget — **55,844 over** (5.20× budget).
+**Zip: 65,907 bytes** against a 13,312 byte budget — **52,595 over** (4.95× budget).

@@ -69,17 +69,24 @@ contains the English text, so `GameKit`'s localise pass simply finds nothing to 
 **`minifyCss`**, **`minifyMarkup`** — esbuild for the stylesheet, a conservative squeeze for
 the markup (comments out, whitespace between tags collapsed).
 
-**`mangleProps`** — off, and measurement says leave it off. Mangling every property cuts
-30,189 bytes of minified source (11%) and **2,873 bytes off the archive (4%)** — roadroller
-is a context-mixing compressor, so the 400th `lineWidth` already costs a fraction of a bit
-and shortening it buys almost nothing. It is also unsafe: the game passes canvas property
-names through its own option objects, so a blanket mangle renames one side of that and not
-the other. Bad trade twice over.
+**`mangleProps: "max"`** — whole-program property renaming, made safe by construction
+rather than by hope. Every string literal in the bundle that is shaped like an identifier
+is collected with acorn and passed to terser as reserved, because dynamic property access
+(`steps[name]`, `state[kind]`) always names its key as a literal somewhere — so anything
+reachable by string keeps its name, and everything else is renamed consistently on both
+sides. Terser's builtin list protects DOM names. Two hard-won details live in the code:
+the literals must be *tokenised*, not regex-scanned (an apostrophe inside prose desyncs a
+quote-parity scan and silently drops every capture after it), and the engine+game must be
+one program when terser runs, or the rename maps diverge. A scan confirms the codebase
+never builds a key by concatenation, which is the one pattern this cannot protect.
 
-The same measurement is the reason to distrust minified size generally. Effective
-compression is already 3.78× (266,336 minified → 70,435 zipped) against 3.05× for gzip
-alone, and `roadrollerOptimize: 1` buys a further 671 bytes for 56 seconds. There is
-roughly 5% left in the compression chain, total.
+Worth ~1.9 KB off the archive. The gross rename is 27 KB of minified source, but
+roadroller already prices the 400th `lineWidth` at a fraction of a bit — which is also why
+minified size is a poor proxy for archive size throughout.
+
+**`inlineChrome`** — folds the page markup and stylesheet into the packed script (injected
+via `insertAdjacentHTML` before the game boots, shell reduced to doctype+title+`<body>`).
+One compression model over markup+css+code beats three separate streams: ~1.3 KB.
 
 **`roadroller`** — packs the script into a self-extracting blob. `roadrollerOptimize` picks
 the search level: `0` is a few seconds, `2` searches parameters and takes far longer. The
@@ -94,8 +101,14 @@ same input always produces the same archive.
 
 Three of the stages rewrite code the game never expected to be rewritten. `npm run verify`
 unzips the archive that would actually be submitted, boots it in Chromium, and fails on any
-page error, failed request, or missing canvas. It also writes `build/verify.png`, which is
-the fastest way to see that a size win did not quietly cost a scene.
+page error, failed request, or missing canvas. It then plays the opening scene — advances
+dialogue, walks both directions, opens and closes the cast and story overlays — because a
+boot-only check would pass a build whose input handling the transforms broke. It writes
+`build/verify.png`, the fastest way to see that a size win did not quietly cost a scene.
+
+Verify is what turned `mangleProps: "max"` from reckless to routine: its first run caught
+the engine's required-step check (`steps[name]` over a quoted list) breaking, and its
+interaction pass is the regression net for every transform added since.
 
 ## Pricing a cut
 

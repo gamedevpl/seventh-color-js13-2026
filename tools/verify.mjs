@@ -45,6 +45,21 @@ page.on('requestfailed', (request) => problems.push(`requestfailed: ${request.ur
 await page.goto(pathToFileURL(pagePath).href, { waitUntil: 'load' });
 await page.waitForTimeout(seconds * 1000);
 
+// Boot alone would pass a build whose input handling or scene logic the
+// transforms broke, so drive the first scene a little: advance dialogue, walk
+// both ways, open and close the overlays the shell buttons reach.
+const canvasBox = await page.evaluate(() => {
+  const canvas = document.querySelector('canvas');
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+});
+if (canvasBox) await page.mouse.click(canvasBox.x, canvasBox.y);
+for (const key of [' ', ' ', 'ArrowRight', 'ArrowRight', ' ', 'ArrowLeft', 'g', 'ArrowRight', 'g', 's', 's', ' ']) {
+  await page.keyboard.press(key === ' ' ? 'Space' : key);
+  await page.waitForTimeout(350);
+}
+
 const probe = await page.evaluate(() => {
   const canvas = document.querySelector('canvas');
   return {

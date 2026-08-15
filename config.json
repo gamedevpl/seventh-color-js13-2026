@@ -14,6 +14,19 @@
     "mangleProps": "max",
     "inlineChrome": true,
     "roadroller": true,
-    "roadrollerOptimize": 1
-  }
+    "roadrollerOptimize": 1,
+    "treeShake": true
+  },
+  "treeShakeKeep": [
+    "createRenderer",
+    "createInput",
+    "createAudio",
+    "createParticles",
+    "createShake",
+    "defineGame",
+    "presentFrame",
+    "getRenderContext",
+    "t",
+    "localize"
+  ]
 }

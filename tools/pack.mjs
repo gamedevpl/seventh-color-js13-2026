@@ -9,6 +9,7 @@ import { tokenizer } from 'acorn';
 import { Packer } from 'roadroller';
 import { extractBundle, minifyMarkup, stripI18nAttributes } from './lib/extract.mjs';
 import { inlineSynthesizedAudio } from './lib/audio-inline.mjs';
+import { shakeEngine } from './lib/shake.mjs';
 import { zipSingleFile } from './lib/zip.mjs';
 import { renderLedger, writeSizeLedger } from './lib/report.mjs';
 
@@ -55,6 +56,40 @@ if (on('synthAudio')) {
   const swapped = inlineSynthesizedAudio(js, catalog, manifest.audio.sounds);
   js = swapped.js;
   note('  − inlined WAVs → runtime synth', js.length, `${swapped.before} → ${swapped.after} bytes of prelude`);
+}
+
+// GameKit publishes itself onto a global, so no bundler can shake it. We do it
+// by hand from the staged per-module sources — but only after proving that
+// recomposing those parts unshaken reproduces the assembled bundle exactly. If
+// that assert ever fails, the parts have drifted from what gamedev.pl ships and
+// the shaken build would be measuring a different program.
+if (on('treeShake')) {
+  const engineDir = path.join(sourceDir, 'engine');
+  const order = JSON.parse(readFileSync(path.join(engineDir, 'ORDER.json'), 'utf8'));
+  const modules = Object.fromEntries(
+    order.map((name) => [name, readFileSync(path.join(engineDir, `${name}.js`), 'utf8')]),
+  );
+  const gameJs = readFileSync(path.join(sourceDir, 'game.js'), 'utf8');
+
+  // Splice the engine region in place rather than recomposing the whole bundle:
+  // the prelude carries music tracks and other lines that are none of our
+  // business, and rebuilding around them is how you silently drop one. If the
+  // unshaken region is not found verbatim, the staged parts have drifted from
+  // what the assembler produced and the shaken build would be a different
+  // program — so that is a hard stop, not a warning.
+  const assembled = order.map((name) => modules[name]).join('\n') + '\nObject.freeze(window.GameKit);';
+  if (!js.includes(assembled)) {
+    throw new Error('staged engine parts do not match the assembled bundle — re-run pull');
+  }
+
+  const shaken = shakeEngine(modules, gameJs, { keep: config.treeShakeKeep ?? [] });
+  const shakenEngine = order.map((name) => shaken.modules[name]).join('\n') + '\nObject.freeze(window.GameKit);';
+  js = js.replace(assembled, () => shakenEngine);
+  note(
+    '  \u2212 tree-shook GameKit',
+    js.length,
+    `${shaken.removed.surface.length} surface + ${shaken.removed.published.length} published dropped`,
+  );
 }
 
 let markup = bundle.markup;

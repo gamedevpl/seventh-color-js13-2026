@@ -5,7 +5,8 @@
 // repo's own `npm run build` for the bundle, then copy the few inputs the
 // transforms read directly (the audio catalog, the game manifest).
 
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { buildSync, transformSync } from 'esbuild';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
@@ -50,6 +51,42 @@ mkdirSync(outDir, { recursive: true });
 copyFileSync(path.join(gamesDir, 'dist', 'games', config.slug, 'index.html'), path.join(outDir, 'index.html'));
 copyFileSync(path.join(gamesDir, 'shared', 'audio', 'sounds.json'), path.join(outDir, 'sounds.json'));
 copyFileSync(path.join(gamesDir, 'games', config.slug, 'GAME.json'), path.join(outDir, 'GAME.json'));
+
+// Stage the engine one module at a time and the game on its own, because the
+// tree-shaker needs the seams the assembled bundle has already welded shut.
+// These are transpiled exactly as tools/lib/assemble.ts does — same target,
+// same format, same comment handling — so recomposing them reproduces the
+// shipped bundle byte for byte. pack.mjs asserts that.
+const TARGET = 'safari16';
+const engineDir = path.join(outDir, 'engine');
+rmSync(engineDir, { recursive: true, force: true });
+mkdirSync(engineDir, { recursive: true });
+const manifest = JSON.parse(readFileSync(path.join(gamesDir, 'games', config.slug, 'GAME.json'), 'utf8'));
+const moduleNames = ['core', ...manifest.engine.modules];
+for (const name of moduleNames) {
+  const modulePath = path.join(gamesDir, 'shared', 'modules', `${name}.ts`);
+  const compiled = transformSync(readFileSync(modulePath, 'utf8'), {
+    sourcefile: path.relative(gamesDir, modulePath),
+    loader: 'ts',
+    target: TARGET,
+    format: 'iife',
+    legalComments: 'inline',
+  }).code;
+  writeFileSync(path.join(engineDir, `${name}.js`), compiled);
+}
+writeFileSync(path.join(outDir, 'engine', 'ORDER.json'), `${JSON.stringify(moduleNames)}\n`);
+
+const gameBundle = buildSync({
+  absWorkingDir: gamesDir,
+  entryPoints: [path.join(gamesDir, 'games', config.slug, 'game.ts')],
+  bundle: true,
+  write: false,
+  platform: 'browser',
+  target: TARGET,
+  format: 'iife',
+  legalComments: 'inline',
+}).outputFiles[0].text;
+writeFileSync(path.join(outDir, 'game.js'), gameBundle);
 
 writeFileSync(
   path.join(outDir, 'SOURCE.json'),

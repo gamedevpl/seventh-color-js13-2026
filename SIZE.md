@@ -9,11 +9,12 @@ Source: `claude/seventh-color-cast-prototype-a0yz66` @ `da6d270e`
 | assembled bundle | 727,503 | claude/seventh-color-cast-prototype-a0yz66 @ da6d270e |
 | &nbsp;&nbsp;javascript | 710,224 |  |
 | &nbsp;&nbsp;− inlined WAVs → runtime synth | 475,954 | 238459 → 4189 bytes of prelude |
-| &nbsp;&nbsp;− esbuild minify | 279,068 |  |
-| &nbsp;&nbsp;− terser + property mangle | 239,940 |  |
-| &nbsp;&nbsp;+ chrome folded into payload | 249,588 |  |
-| &nbsp;&nbsp;− roadroller | 87,488 |  |
-| final index.html | 87,578 | css 0 + markup 0 |
-| index.zip | 65,907 | deflate 65789 |
+| &nbsp;&nbsp;− tree-shook GameKit | 473,078 | 11 surface + 32 published dropped |
+| &nbsp;&nbsp;− esbuild minify | 277,398 |  |
+| &nbsp;&nbsp;− terser + property mangle | 230,368 |  |
+| &nbsp;&nbsp;+ chrome folded into payload | 240,016 |  |
+| &nbsp;&nbsp;− roadroller | 83,537 |  |
+| final index.html | 83,627 | css 0 + markup 0 |
+| index.zip | 62,942 | deflate 62824 |
 
-**Zip: 65,907 bytes** against a 13,312 byte budget — **52,595 over** (4.95× budget).
+**Zip: 62,942 bytes** against a 13,312 byte budget — **49,630 over** (4.73× budget).

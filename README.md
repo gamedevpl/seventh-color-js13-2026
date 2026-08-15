@@ -31,6 +31,7 @@ www.gamedev.pl-games                    seventh-color-js13-2026
 | `npm run weigh` | per-file table of what is costing bytes, so cuts can be aimed |
 | `npm run probe` | price each candidate cut in bytes off the *archive* |
 | `npm run probe -- --floor` | what the engine costs with no game, and the game with no engine |
+| `node tools/pack.mjs --O2` | override the roadroller search level for one run |
 | `npm run size:fast` | pack without roadroller — quicker, for A/B-ing a single change |
 
 `npm run pack -- --strict` exits non-zero when the zip is over budget. Nothing uses it yet,
@@ -87,6 +88,30 @@ minified size is a poor proxy for archive size throughout.
 **`inlineChrome`** — folds the page markup and stylesheet into the packed script (injected
 via `insertAdjacentHTML` before the game boots, shell reduced to doctype+title+`<body>`).
 One compression model over markup+css+code beats three separate streams: ~1.3 KB.
+
+**`treeShake`** — GameKit publishes itself onto a global (`Object.assign(GameKit, {…})`
+per module), so no bundler can shake it: esbuild sees a property write and keeps every
+function named in it. This does the reachability by hand, over two seams that cascade.
+The `draw` surface is an object literal of thin delegators — `panel` forwards to
+`GameKit.drawPanel`, `ship` to `GameKit.drawShip` — so a game that never calls `draw.panel`
+still pays for the whole panel painter; drop the unused surface methods and their targets
+lose their last reference. Then published members nobody names are removed **to a
+fixpoint**, because each removal strands more. Terser deletes the orphaned bodies, which is
+where the bytes come from: we remove references, the compressor removes code.
+
+For this game that is 11 surface methods and 32 published members — GameKit drops from 67
+exported members to 35 — worth **~3.0 KB** off the archive.
+
+Two safety rails. Ranges come from acorn, never regex: these literals contain nested
+braces, template strings and regexes, and a brace-counting scan gets them wrong in ways
+that still parse. And `pack` refuses to run unless the staged per-module sources splice
+back into the assembled bundle **verbatim** — if the parts have drifted from what the
+assembler produced, the shaken build would be a different program, so it is a hard stop.
+
+The reference check is deliberately loose (any `.name` access keeps a method, not just a
+call), which over-keeps: `subtitle` survives on two `win.subtitle` config fields despite
+having zero call sites. Tightening it was measured at 69 bytes and declined — over-keeping
+costs bytes, over-pruning costs a working submission.
 
 **`roadroller`** — packs the script into a self-extracting blob. `roadrollerOptimize` picks
 the search level: `0` is a few seconds, `2` searches parameters and takes far longer. The

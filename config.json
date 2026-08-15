@@ -1,0 +1,18 @@
+{
+  "slug": "seventh-color",
+  "budget": 13312,
+  "source": {
+    "repo": "https://github.com/gamedevpl/www.gamedev.pl-games.git",
+    "branch": "codex/seventh-color-cast-prototype",
+    "localCheckout": "../www.gamedev.pl-games"
+  },
+  "transforms": {
+    "synthAudio": true,
+    "stripI18n": true,
+    "minifyCss": true,
+    "minifyMarkup": true,
+    "mangleProps": false,
+    "roadroller": true,
+    "roadrollerOptimize": 0
+  }
+}

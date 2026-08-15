@@ -1,0 +1,22 @@
+{
+  "name": "seventh-color-js13-2026",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "js13kGames 2026 build pipeline for The Seventh Color",
+  "scripts": {
+    "pull": "node tools/pull.mjs",
+    "pack": "node tools/pack.mjs",
+    "verify": "node tools/verify.mjs",
+    "weigh": "node tools/weigh.mjs",
+    "size": "npm run pull && npm run pack && npm run verify",
+    "size:fast": "node tools/pack.mjs --no-roadroller"
+  },
+  "devDependencies": {
+    "@gfx/zopfli": "1.0.15",
+    "esbuild": "0.24.2",
+    "playwright-core": "1.56.1",
+    "roadroller": "2.1.0",
+    "terser": "5.50.0"
+  }
+}

@@ -1,0 +1,53 @@
+name: size
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Games-repo branch to pack
+        required: false
+        default: codex/seventh-color-cast-prototype
+  push:
+    branches: [main]
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The games repo is private, so this needs a token with read access to it.
+      # Add it as the GAMES_REPO_TOKEN secret; without it the checkout fails and
+      # the job says so rather than packing something stale.
+      - uses: actions/checkout@v4
+        with:
+          repository: gamedevpl/www.gamedev.pl-games
+          ref: ${{ github.event.inputs.branch || 'codex/seventh-color-cast-prototype' }}
+          token: ${{ secrets.GAMES_REPO_TOKEN }}
+          path: games-repo
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+        working-directory: games-repo
+
+      # playwright-core ships no downloader; borrow the matching full package's.
+      - run: npx --yes playwright@1.56.1 install --with-deps chromium
+
+      - run: node tools/pull.mjs --games ./games-repo
+      - run: node tools/pack.mjs
+      - run: node tools/verify.mjs
+
+      - name: Publish the ledger
+        run: cat SIZE.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: seventh-color-js13
+          path: |
+            build/index.zip
+            build/verify.png
+            SIZE.md

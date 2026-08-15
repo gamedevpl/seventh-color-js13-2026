@@ -69,9 +69,17 @@ contains the English text, so `GameKit`'s localise pass simply finds nothing to 
 **`minifyCss`**, **`minifyMarkup`** — esbuild for the stylesheet, a conservative squeeze for
 the markup (comments out, whitespace between tags collapsed).
 
-**`mangleProps`** — off. Terser property mangling breaks the moment the game reaches a
-property by string, and the engine does. If it is ever turned on, `npm run verify` is the
-only thing standing between it and a broken submission.
+**`mangleProps`** — off, and measurement says leave it off. Mangling every property cuts
+30,189 bytes of minified source (11%) and **2,873 bytes off the archive (4%)** — roadroller
+is a context-mixing compressor, so the 400th `lineWidth` already costs a fraction of a bit
+and shortening it buys almost nothing. It is also unsafe: the game passes canvas property
+names through its own option objects, so a blanket mangle renames one side of that and not
+the other. Bad trade twice over.
+
+The same measurement is the reason to distrust minified size generally. Effective
+compression is already 3.78× (266,336 minified → 70,435 zipped) against 3.05× for gzip
+alone, and `roadrollerOptimize: 1` buys a further 671 bytes for 56 seconds. There is
+roughly 5% left in the compression chain, total.
 
 **`roadroller`** — packs the script into a self-extracting blob. `roadrollerOptimize` picks
 the search level: `0` is a few seconds, `2` searches parameters and takes far longer. The

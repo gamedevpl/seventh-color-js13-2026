@@ -10,7 +10,8 @@
     "verify": "node tools/verify.mjs",
     "weigh": "node tools/weigh.mjs",
     "size": "npm run pull && npm run pack && npm run verify",
-    "size:fast": "node tools/pack.mjs --no-roadroller"
+    "size:fast": "node tools/pack.mjs --no-roadroller",
+    "probe": "node tools/probe.mjs"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",

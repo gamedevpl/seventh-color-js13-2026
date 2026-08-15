@@ -29,6 +29,8 @@ www.gamedev.pl-games                    seventh-color-js13-2026
 | `npm run pack` | run the transforms, write `build/index.html` + `build/index.zip`, update `SIZE.md` |
 | `npm run verify` | unzip the archive, boot it in headless Chromium, fail on any page error |
 | `npm run weigh` | per-file table of what is costing bytes, so cuts can be aimed |
+| `npm run probe` | price each candidate cut in bytes off the *archive* |
+| `npm run probe -- --floor` | what the engine costs with no game, and the game with no engine |
 | `npm run size:fast` | pack without roadroller — quicker, for A/B-ing a single change |
 
 `npm run pack -- --strict` exits non-zero when the zip is over budget. Nothing uses it yet,
@@ -86,6 +88,19 @@ Three of the stages rewrite code the game never expected to be rewritten. `npm r
 unzips the archive that would actually be submitted, boots it in Chromium, and fails on any
 page error, failed request, or missing canvas. It also writes `build/verify.png`, which is
 the fastest way to see that a size win did not quietly cost a scene.
+
+## Pricing a cut
+
+`weigh` ranks files by minified size, which is a bad guide to what removing one
+would save — prose and data tables compress several times better than code. `probe`
+settles it by building the bundle with chosen files stubbed out and running the real
+compression chain over each variant. Probe builds are deliberately broken; they
+measure, they do not run.
+
+`--floor` is the one to run before planning any cut at all. It prices the engine
+with no game and the game with no engine, which is how we learned that
+`core+gfx+drawing+input` is 13,352 bytes zipped on its own — the entire budget,
+before a line of this game.
 
 ## Current standing
 

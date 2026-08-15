@@ -1,6 +1,5 @@
 // Minimal deterministic ZIP writer: one stored-or-deflated entry, no extra fields.
 import zlib from 'node:zlib';
-import { gzip as zopfliGzip } from '@gfx/zopfli';
 
 const CRC_TABLE = (() => {
   const table = new Int32Array(256);
@@ -20,7 +19,10 @@ function crc32(buffer) {
 
 // Zopfli only emits gzip/zlib/deflate streams through this binding; peel the
 // 10-byte gzip header and 8-byte trailer back off to get the raw deflate body.
-function zopfliRaw(buffer, iterations) {
+// Loaded on demand — the emscripten build is noisy on stdout at import time,
+// and probe runs skip it entirely.
+async function zopfliRaw(buffer, iterations) {
+  const { gzip: zopfliGzip } = await import('@gfx/zopfli');
   return new Promise((resolve) => {
     zopfliGzip(buffer, { numiterations: iterations }, (error, output) => {
       if (error || !output) return resolve(null);
@@ -41,8 +43,10 @@ export async function bestDeflate(buffer, { zopfliIterations = 200 } = {}) {
   for (const strategy of [zlib.constants.Z_DEFAULT_STRATEGY, zlib.constants.Z_FILTERED, zlib.constants.Z_RLE]) {
     candidates.push(zlib.deflateRawSync(buffer, { level: 9, memLevel: 9, strategy, windowBits: 15 }));
   }
-  const zopfli = await zopfliRaw(buffer, zopfliIterations);
-  if (zopfli) candidates.push(zopfli);
+  if (zopfliIterations > 0) {
+    const zopfli = await zopfliRaw(buffer, zopfliIterations);
+    if (zopfli) candidates.push(zopfli);
+  }
   return candidates.reduce((best, next) => (next.length < best.length ? next : best));
 }
 

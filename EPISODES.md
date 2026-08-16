@@ -202,10 +202,10 @@ material for what a compressed transition line needs to imply.
 | --- | --- | --- | --- | --- | ---: |
 | 1 | **Winter Falls** | `shadow-council`, `frozen-pond` (rewritten) | `jacks-glade`, `blindfold-path`, `unicorn-stream` | Ice Rain (built) | shipping at 13,303, headroom 9 |
 | 2 | **Into the Bog** | `bog-cottage`, `meg-encounter` | `gumps-judgment`, `surviving-mare`, `faerie-council`, `hollow-armory`, `rescue-vow` | dual-puzzle → Meg's set piece, both real (thick) minigames | 17,719, over by 4,407 — in progress |
-| 3 | **The Root Door** | `castle-descent`, `iron-cage` | `dark-kitchen` (its stealth minigame and the party split compressed into a rewritten line opening episode 4) | cage-escape (send Luna through the bars) | 18,366, over by 5,054 — not started |
+| 3 | **The Root Door** | `castle-descent`, `iron-cage` | `dark-kitchen` (its stealth minigame; the party split it triggers is implied, not explained — `living-gown` reads fine without it, tested) | cage-escape (send Luna through the bars) | 18,376, over by 5,064 — cold open verified, no further trims tried |
 | 4 | **The Gown That Breathes** | `living-gown` alone | `dark-kitchen`'s split (recap line), `dungeon-viaduct`, `reflection-plan`, `plate-vault`, `reflector-chain` | Lili/Darkness confrontation — a real riddle scene, cast-light (just her and Darkness) | 14,085 at -O2, over by 773 — best remaining gap by far, needs a recap line + final trims |
-| 5 | **The Last Turn** | `false-yield`, `false-sacrifice`, `final-beam`, `throne-pursuit`, `last-stand` — all five, unreduced | — (measured: dropping `false-yield`+`false-sacrifice` only saved 251 bytes once the cast floor is paid, so cutting Lili's own agency beats from her climax bought almost nothing) | the villain's actual defeat + the collapsing-causeway chase | 18,941, over by 5,629 — not started |
-| 6 | **The Seventh Color** | `spring-remembers`, `ring-pond`, `forest-vow` | — | three payoff minigames back to back, epilogue reunion | 18,714, over by 5,402 — not started |
+| 5 | **The Last Turn** | `false-yield`, `false-sacrifice`, `final-beam`, `throne-pursuit`, `last-stand` — all five, unreduced | — (measured: dropping `false-yield`+`false-sacrifice` only saved 251 bytes once the cast floor is paid, so cutting Lili's own agency beats from her climax bought almost nothing) | the villain's actual defeat + the collapsing-causeway chase | 18,743, over by 5,431 — cold open verified (needed no rewrite — Darkness's own opening line stands alone), 198B cheaper from the throne-climax split |
+| 6 | **The Seventh Color** | `spring-remembers`, `ring-pond`, `forest-vow` | — | three payoff minigames back to back, epilogue reunion | 18,696, over by 5,384 — cold open verified, no rewrite needed |
 
 This table is a plan, not a commitment — each episode gets the same treatment
 Episode 1 got: build it, measure it against the real pipeline, cut what the
@@ -358,14 +358,18 @@ those scenes.
 | # | title | status |
 | --- | --- | --- |
 | 1 | Winter Falls | **shipping** — 13,280 B, headroom 32, gap-closing work paused at 2,618 over on the un-narrowed original 4-scene cut, superseded by the narrower 2-scene build documented above |
-| 2 | Into the Bog | in progress — 17,719, over by 4,407 |
-| 3 | The Root Door | scoped, not started — baseline 18,366 (castle-descent+iron-cage), over by 5,054 |
+| 2 | Into the Bog | in progress — 17,719, over by 4,407 — cast trims done, plays correctly |
+| 3 | The Root Door | in progress — 18,376, over by 5,064 — cold open written and verified, no cast/art trims tried yet |
 | 4 | The Gown That Breathes | in progress — 14,085 at -O2, over by 773, closest to done |
-| 5 | The Last Turn | scoped, not started — baseline 18,941, over by 5,629 |
-| 6 | The Seventh Color | scoped, not started — baseline 18,714, over by 5,402 |
+| 5 | The Last Turn | in progress — 18,743, over by 5,431 — verified playable as-is, no trims tried yet |
+| 6 | The Seventh Color | in progress — 18,696, over by 5,384 — verified playable as-is, no trims tried yet |
 
 None of episodes 2–6 are ready to submit. Every number above is a real,
-pipeline-measured, `VERIFY OK`-checked baseline — not an estimate — but
-"measured and under active work" is different from "ready." The prologue
-(episode 1) is the only one that is actually done: built, under budget,
-verified, and stable across every commit in this session.
+pipeline-measured, `VERIFY OK`-checked baseline confirmed by screenshot, not
+an estimate — every episode in the series has now been built at least once
+and shown to boot, render, and play through its own window correctly. That's
+different from "ready": 3, 5, and 6 haven't had a single byte cut yet beyond
+what the automatic folds already do, so their real numbers after a trimming
+pass are still unknown. The prologue (episode 1) is the only one that is
+actually done: built, under budget, verified, and stable across every commit
+in this session.

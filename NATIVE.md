@@ -575,6 +575,81 @@ Cost: **7,671 bytes** worst-of-5, up from 6,519. The mechanics rework,
 the juice layer and the on-screen controls together cost ~1,150 bytes and
 left 5,641 of the 13,312 budget unused.
 
+## M7 - content restored, and the mechanics made into puzzles
+
+Two passes, both paid for out of the headroom the native floor bought.
+
+**Restored from the original GameKit build (12 beats -> 16).** The cut
+opened on Darkness gloating and jumped straight to "Lili is gone under the
+ice": the player never met Lili, never saw a unicorn whole, and never
+watched winter begin. Restored using the original's own prose - the glade,
+the unicorn stream and its inciting incident, the Champion's Hollow, and
+the vow at the vision pool. The blindfold-path scene was folded into the
+glade rather than given a second location: the lines were the content, the
+second location was not.
+
+**All eight composed tracks, ported note-for-note** as 16-step tracker
+patterns behind a lookahead scheduler on the audio clock - 579 bytes for
+the lot. A region now plays across its beats; restarting the bar at every
+beat boundary was what made the old per-beat drone read as a buzzer.
+
+**Then the mechanics stopped being reflex tests.** Every one of them
+measured dexterity - timing, balance, memory - and none asked the player to
+work anything out.
+
+| | was | is |
+| --- | --- | --- |
+| `dial` (x3) | balance a drifting needle | **`beam`** - route a beam through mirrors you set to `/` or `\` |
+| `icerain` | hit the lit thing in time | **`crack`** - a strike splits the pane *and both neighbours*: 1D Lights Out |
+| `lights` | repeat a demonstrated order | **deduction** - name an order, learn how many you placed right |
+| `chase` | jump the holes | holes to leap **and** arches you must not jump under |
+
+The chase stays an action beat on purpose - the story's climax should not
+pause for a puzzle - but it now needs a decision per obstacle rather than
+one reflex.
+
+### The layouts are data, and data can be wrong
+
+An unsolvable beam layout looks exactly like a hard one until someone gives
+up. `tools/check-puzzles.mjs` brute-forces every mirror configuration of
+every beam beat and reports whether a solution exists, whether the start is
+already solved, and how many configurations work. It immediately caught
+`spring-remembers` shipping at **0/16 solutions** - authored by hand,
+traced by hand, and wrong.
+
+All three now have exactly one solution, which is what makes them deduction
+rather than fiddling:
+
+| beat | mirrors | solutions | min flips |
+| --- | ---: | ---: | ---: |
+| megs-looking-glass | 3 | 1/8 | 2 |
+| spring-remembers | 4 | 1/16 | 4 |
+| final-beam | 5 | 1/32 | 3 |
+
+Crack boards are scrambled by real strikes, so they are solvable by
+construction - but **solvability is not difficulty**. Measured over 20
+runs, one board in four was falling to a single strike, so the shortest
+solution is now computed at init (128 subsets, once) and any board that
+gives itself away is thrown back. Every board now needs 3 or 5 strikes;
+the parity is visible in that there are no even answers. The lights
+deduction lands in 1-4 guesses over the same sample.
+
+One measurement changed meaning here and is worth stating plainly: the
+solver times in `play-native.mjs` are *execution* times, not thinking
+times. A solver computes the answer instantly, so "crack 1.3s" means "five
+moves once you already know the answer" - it proves the puzzle is
+solvable and bounds the input cost, and says nothing about how long a
+player will stare at it. `--sloppy` keeps its old job of proving nothing
+becomes unwinnable: 0 stalls in 45 runs up to 50% dropped inputs.
+
+`npm run native:gate` now proves every puzzle solvable before it measures
+a single byte.
+
+Cost: **9,774 bytes** worst-of-5 - the whole of M7 (four restored beats, a
+new painter, eight music tracks with a sequencer, a stillness mechanic, a
+cutscene phase, and four mechanics rebuilt as puzzles) came to ~2,100
+bytes and left 3,538 of the 13,312 budget unused.
+
 ## Decision: this is the submission
 
 The user's call: **"We need full story."** The native rewrite in this
@@ -583,10 +658,11 @@ all twelve beats in one HTML document; the episode series covered the
 same story only in fragments across separate compo entries, which is
 exactly the gap this rewrite closed.
 
-Final locked build, after the M6 mechanics rework: `node tools/native.mjs
---O1 --rolls=5` → **7,671 bytes** worst-of-5 zipped, 10,095 bytes
-uncompressed inside, against the 13,312-byte budget - **5,641 bytes
-(42%) of headroom unused**, comfortably under the 13,162 ceiling.
+Final locked build, after M7: `node tools/native.mjs --O1 --rolls=5` →
+**9,774 bytes** worst-of-5 zipped against the 13,312-byte budget -
+**3,538 bytes (27%) of headroom unused**, comfortably under the 13,162
+ceiling. Sixteen beats, five mechanics (four of them puzzles), eight
+music tracks.
 `unzip -l build/native/index.zip` confirms the archive holds exactly one
 file, `index.html`, at the root - the shape js13kGames requires.
 `tools/verify-native.mjs` reports a clean boot (no console errors,

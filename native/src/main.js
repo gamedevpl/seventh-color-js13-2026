@@ -4,7 +4,7 @@ import { paintFace } from './faces.js';
 import { GAMES } from './games.js';
 import { BEATS } from './data.js';
 import { makeRound, currentBeat, tick, press, moveChoice, P } from './story.js';
-import { initAudio, setDrone, sfxTap, sfxYes, sfxNo, sfxWin } from './audio.js';
+import { initAudio, setMusic, sfxTap, sfxYes, sfxNo, sfxWin } from './audio.js';
 import { fxUpdate, fxBegin, fxEnd } from './fx.js';
 
 const VW = 320, VH = 156;
@@ -22,22 +22,23 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-let acted = false, left = false, right = false, heldLeft = false, heldRight = false;
+let acted = false, left = false, right = false, heldLeft = false, heldRight = false, heldAct = false;
 addEventListener('keydown', (e) => {
-  if (e.key === ' ' || e.key === 'Enter') acted = true;
+  if (e.key === ' ' || e.key === 'Enter') { acted = true; heldAct = true; }
   else if (e.key === 'ArrowLeft' || e.key === 'a') { left = heldLeft = true; }
   else if (e.key === 'ArrowRight' || e.key === 'd') { right = heldRight = true; }
 });
 addEventListener('keyup', (e) => {
-  if (e.key === 'ArrowLeft' || e.key === 'a') heldLeft = false;
+  if (e.key === ' ' || e.key === 'Enter') heldAct = false;
+  else if (e.key === 'ArrowLeft' || e.key === 'a') heldLeft = false;
   else if (e.key === 'ArrowRight' || e.key === 'd') heldRight = false;
 });
-canvas.addEventListener('pointerdown', () => { acted = true; });
+canvas.addEventListener('pointerdown', () => { acted = heldAct = true; });
+canvas.addEventListener('pointerup', () => { heldAct = false; });
 
 let mode = 'title';
 let round = null;
 let last = 0;
-let droneBeat = null;
 
 function box(y, h) { rect(0, y, VW, h, { fill: '#0008' }); }
 
@@ -95,18 +96,33 @@ function frame(now) {
     bloom(160, 120, now / 1000, 8, 3);
     text('THE SEVENTH COLOR', VW / 2, 68, { fill: '#e8b923', font: 'bold 16px system-ui', align: 'center' });
     text('tap or press space', VW / 2, 92, { fill: '#a89', font: '9px system-ui', align: 'center' });
-    if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; droneBeat = null; }
+    if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; }
   } else {
     const b = currentBeat(round);
-    if (b.id !== droneBeat) { setDrone(b.drone); droneBeat = b.id; }
+    setMusic(b.music);
     const before = round.phase;
-    tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, heldLeft, heldRight });
+    tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, heldLeft, heldRight, heldAct });
     if (before === P.GAME && round.phase !== P.GAME) sfxWin();
 
     // A press that finishes a mechanic must not also advance the story -
     // otherwise the same space bar that lands the last hit eats the whole
     // success line and jumps straight to the next beat.
     const justFinished = before === P.GAME && round.phase !== P.GAME;
+
+    // The cutscene: the scene keeps running, the HUD steps aside, and the
+    // player cannot press past it. Held moments are the only thing the
+    // story machine does that the player does not drive.
+    if (round.phase === P.CUT) {
+      fxBegin();
+      SCENES[b.bg](round.elapsed);
+      for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, false, false);
+      const fade = Math.min(1, round.cut * 2) * Math.min(1, (b.cutscene.seconds - round.cut) * 2);
+      rect(0, 0, VW, VH, { fill: `rgba(6,4,10,${.55 * fade})` });
+      text(b.cutscene.text, VW / 2, 130, { fill: `rgba(243,234,214,${fade})`, font: '10px system-ui', align: 'center' });
+      fxEnd();
+      requestAnimationFrame(frame);
+      return;
+    }
 
     if (round.phase === P.END) {
       SCENES[b.bg](round.elapsed);

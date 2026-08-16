@@ -11,7 +11,7 @@ import { GAMES } from '../native/src/games.js';
 import { makeRound, currentBeat, tick, press, moveChoice, P } from '../native/src/story.js';
 
 const DT = 1 / 60;
-const NONE = { act: false, pressLeft: false, pressRight: false, heldLeft: false, heldRight: false };
+const NONE = { act: false, pressLeft: false, pressRight: false, heldLeft: false, heldRight: false, heldAct: false };
 const input = (o) => ({ ...NONE, ...o });
 
 // Each solver sees (state, beat) and returns the input a player would give.
@@ -44,6 +44,11 @@ const SOLVERS = {
     if (g.cursor === want) return input({ act: true });
     const n = g.n, right = (want - g.cursor + n) % n, left = (g.cursor - want + n) % n;
     return input(right <= left ? { pressRight: true } : { pressLeft: true });
+  },
+  stillness(g, b) {
+    // Read the drifting calm band the gauge draws and breathe toward it.
+    const zone = .5 + Math.sin(g.t * .7) * (b.g.drift ?? .22);
+    return input({ heldAct: g.level < zone });
   },
   chase(g, b) {
     const w = b.g.width ?? .035;
@@ -92,6 +97,14 @@ while (round.phase !== P.END && guard++ < 400000) {
     if (b.successDialogue && round.phase !== P.SUCCESS) throw new Error(`${b.id}: success dialogue skipped on completion`);
     const cost = started.sealed ?? started.wake ?? started.falls ?? 0;
     report.push(`  ${b.id.padEnd(20)} ${b.game.padEnd(8)} ${(frames / 60).toFixed(1)}s  mistakes:${cost}`);
+    continue;
+  }
+
+  if (round.phase === P.CUT) {
+    let cf = 0;
+    while (round.phase === P.CUT && cf++ < 60 * 30) tick(round, DT, NONE);
+    if (round.phase === P.CUT) throw new Error(`${b.id}: cutscene never ended`);
+    report.push(`  ${b.id.padEnd(20)} ${'cutscene'.padEnd(8)} ${(cf / 60).toFixed(1)}s  (unskippable)`);
     continue;
   }
 

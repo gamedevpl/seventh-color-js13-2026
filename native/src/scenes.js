@@ -73,6 +73,20 @@ export const SCENES = {
     for (let i = 0; i < 6; i++) line(160, 40, 40 + i * 48, 156, { stroke: '#1a120a', lineWidth: 3 });
     rect(0, 140, 320, 16, { fill: '#0a0704' });
   },
+  glade: (t) => {
+    clear(320, 156, '#0c1524');
+    circle(52, 30, 15, { fill: '#e8e4d0' });
+    for (let i = 0; i < 22; i++) circle((i * 71 + 13) % 320, (i * 37) % 58, i % 4 ? 1 : 1.5, { fill: '#cfd8f0aa' });
+    for (let i = 0; i < 9; i++) {
+      const x = -14 + i * 42, h = 34 + (i % 3) * 16;
+      poly([x, 156, x - 16, h, x, h - 22, x + 16, h], { fill: i % 2 ? '#12291f' : '#173324', stroke: '#0a1a12', lineWidth: 2 });
+    }
+    rect(0, 118, 320, 38, { fill: '#16301f' });
+    for (let i = 0; i < 12; i++) {
+      const x = (i * 61 + t * 7) % 340 - 10, y = 74 + (i * 29) % 44;
+      circle(x, y, i % 3 ? 1 : 1.6, { fill: '#e8c96a99' });
+    }
+  },
   stream: (t) => {
     clear(320, 156, '#132a20');
     for (let i = 0; i < 8; i++) {

@@ -47,7 +47,17 @@ await page.goto(pathToFileURL(pagePath).href, { waitUntil: 'load' });
 await page.waitForTimeout(seconds * 1000);
 
 for (let i = 0; i < keys.length; i++) {
-  await page.keyboard.press(KEY_MAP[keys[i]] || keys[i]);
+  // `space:1200` holds the key for 1200ms instead of tapping it - hold-based
+  // mechanics (stillness) cannot be driven by presses at all.
+  const [name, holdMs] = keys[i].split(':');
+  const key = KEY_MAP[name] || name;
+  if (holdMs) {
+    await page.keyboard.down(key);
+    await page.waitForTimeout(Number(holdMs));
+    await page.keyboard.up(key);
+  } else {
+    await page.keyboard.press(key);
+  }
   await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(root, 'build', 'native', `verify-${i + 1}.png`) });
 }

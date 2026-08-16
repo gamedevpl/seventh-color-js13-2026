@@ -1,4 +1,5 @@
 import { circle, line, rect, poly } from './draw.js';
+import { paintFace } from './faces.js';
 import { kick, burst } from './fx.js';
 import { sfxHit, sfxNo, sfxJump } from './audio.js';
 
@@ -256,9 +257,39 @@ function chaseRender(g, b) {
   rect(10 + 300 * Math.max(0, g.edge), 4, 2, 8, { fill: '#e8735a' });
 }
 
+// --- stillness: breathe, and let them come to you ----------------------
+// Ported from the original build's observe-choice scene, which asked the
+// player to hold ACT to remain perfectly still while the unicorns
+// approached. One button, one value: holding raises the breath, releasing
+// lets it fall, and the calm band drifts - so it is modulation rather than
+// the steering every other mechanic asks for. The payoff is drawn, not
+// described: the unicorn walks closer the longer you hold your nerve.
+function stillInit() { return { level: .5, near: 0, t: 0, calm: false }; }
+function stillUpdate(g, b, dt, input) {
+  g.t += dt;
+  g.level = Math.max(0, Math.min(1, g.level + (input.heldAct ? .62 : -.55) * dt));
+  const zone = .5 + Math.sin(g.t * .7) * (b.g.drift ?? .22);
+  g.calm = Math.abs(g.level - zone) <= (b.g.band ?? .13);
+  g.near = Math.max(0, g.near + (g.calm ? dt * .42 : -dt * .3));
+  if (g.calm && Math.random() < dt * 6) burst(150 + Math.random() * 40, 70, 1, '#e8d9a0', 20);
+  return g.near >= 1;
+}
+function stillRender(g, b) {
+  // The unicorn is the meter: it is nearer when you are calmer.
+  paintFace('unicorn', 250 - g.near * 60, 92 - g.near * 14, .3 + g.near * .34, g.t, false, true);
+  const x = 22, top = 34, h = 74;
+  const zone = .5 + Math.sin(g.t * .7) * (b.g.drift ?? .22), band = b.g.band ?? .13;
+  rect(x, top, 7, h, { fill: '#0009' });
+  rect(x, top + h * (1 - zone - band), 7, h * band * 2, { fill: g.calm ? '#fff0a066' : '#c9975a44' });
+  rect(x - 2, top + h * (1 - g.level) - 1, 11, 3, { fill: g.calm ? '#fff0a0' : '#e8b923' });
+  strip();
+  meter(10, 6, 300, g.near, g.calm ? '#fff0a0' : '#8a7a5a');
+}
+
 export const GAMES = {
   icerain: { init: icerainInit, update: icerainUpdate, render: icerainRender, hint: '← → move    SPACE strike' },
   dial: { init: dialInit, update: dialUpdate, render: dialRender, hint: '← → steer - hold it steady to charge' },
   lights: { init: lightsInit, update: lightsUpdate, render: lightsRender, hint: '← → choose    SPACE silence' },
   chase: { init: chaseInit, update: chaseUpdate, render: chaseRender, hint: 'SPACE jump - you cannot stop running' },
+  stillness: { init: stillInit, update: stillUpdate, render: stillRender, hint: 'hold SPACE to breathe - keep the mark in the light' },
 };

@@ -4,16 +4,43 @@
 // and tense through the castle, warmer once the color returns.
 export const BEATS = [
   {
-    id: 'shadow-council', bg: 'shadow-council', drone: 82,
+    id: 'shadow-council', bg: 'shadow-council', music: 'shadow',
     faces: [{ key: 'darkness', x: 160, y: 62, scale: 1 }],
     dialogue: [
       { who: 'darkness', text: 'Winter answers to no one but me.' },
       { who: 'darkness', text: 'Let them search. The light I took will not be found.' },
     ],
+    next: 'jacks-glade',
+  },
+  {
+    id: 'jacks-glade', bg: 'glade', music: 'wonder',
+    faces: [{ key: 'jack', x: 96, y: 68, scale: .72 }, { key: 'lili', x: 220, y: 64, scale: .72 }],
+    dialogue: [
+      { who: 'lili', text: 'You hide better than any fox, Jack.' },
+      { who: 'jack', text: 'The forest tells me when you are near.' },
+      { who: 'lili', text: 'Then show me what it has been whispering about.' },
+      { who: 'lili', text: 'A blindfold is a strange gift for a princess.' },
+      { who: 'jack', text: 'Trust the hand, not the road.' },
+    ],
+    next: 'unicorn-stream',
+  },
+  {
+    id: 'unicorn-stream', bg: 'stream', music: 'wonder',
+    faces: [{ key: 'jack', x: 76, y: 62, scale: .66 }, { key: 'lili', x: 140, y: 60, scale: .66 }],
+    dialogue: [
+      { who: 'jack', text: 'Keep still. They come to the water at moonrise.' },
+      { who: 'lili', text: 'I only want them to know I mean no harm.' },
+    ],
+    game: 'stillness', g: { band: .13, drift: .22 },
+    gamePrompt: 'Breathe with them. Move, and they are gone.',
+    successDialogue: [
+      { who: 'lili', text: 'It let me touch it. Jack, it let me -' },
+    ],
+    cutscene: { text: 'A hidden bow answers first.', seconds: 3.6 },
     next: 'winter-falls',
   },
   {
-    id: 'winter-falls', bg: 'pond', drone: 110,
+    id: 'winter-falls', bg: 'pond', music: 'winter',
     faces: [{ key: 'jack', x: 74, y: 62, scale: .72 }],
     dialogue: [
       { who: 'jack', text: "Lili? The ice wasn't broken when we crossed." },
@@ -24,10 +51,40 @@ export const BEATS = [
     successDialogue: [
       { who: 'jack', text: 'The ice breaks - but her footprints end here.' },
     ],
+    next: 'hollow-armory',
+  },
+  {
+    id: 'hollow-armory', bg: 'roots', music: 'trail',
+    faces: [{ key: 'gump', x: 84, y: 70, scale: .64 }, { key: 'jack', x: 232, y: 66, scale: .68 }],
+    dialogue: [
+      { who: 'gump', text: 'Three alcoves. Three kinds of courage.' },
+      { who: 'gump', text: 'Shadow fears no blade. It fears light shown where it hides.' },
+    ],
+    choice: {
+      question: 'What will you carry against living shadow?',
+      options: ['Thorn Blade', 'Mirror Buckler', 'Bell Seed'],
+      correct: 1,
+      retry: 'Blades cut vines; seeds wake roots. Neither opens a road through dark.',
+    },
+    successDialogue: [
+      { who: 'jack', text: 'The buckler. Small, bright, and stubborn - like its bearer.' },
+    ],
+    next: 'rescue-vow',
+  },
+  {
+    id: 'rescue-vow', bg: 'roots', music: 'shadow',
+    faces: [{ key: 'gump', x: 88, y: 72, scale: .62 }, { key: 'jack', x: 228, y: 66, scale: .68 }],
+    dialogue: [
+      { who: 'gump', text: 'The hoofprints turn north - but another trail was dragged beside them.' },
+      { who: 'gump', text: "Lili's winter garland. Cut by a goblin blade." },
+      { who: 'jack', text: 'I led her to wonder, then left her to shadow.' },
+      { who: 'gump', text: 'Guilt is a chain. Choice is a road.' },
+      { who: 'jack', text: 'Then we take the road. We bring her home.' },
+    ],
     next: 'bog-road',
   },
   {
-    id: 'bog-road', bg: 'bog', drone: 98,
+    id: 'bog-road', bg: 'bog', music: 'marsh',
     faces: [{ key: 'gump', x: 32, y: 66, scale: .58 }, { key: 'jack', x: 284, y: 62, scale: .66 }],
     dialogue: [
       { who: 'gump', text: 'Three warning lights guard the causeway.' },
@@ -41,7 +98,7 @@ export const BEATS = [
     next: 'megs-looking-glass',
   },
   {
-    id: 'megs-looking-glass', bg: 'cottage', drone: 104,
+    id: 'megs-looking-glass', bg: 'cottage', music: 'marsh',
     faces: [{ key: 'meg', x: 224, y: 58, scale: .82 }, { key: 'jack', x: 96, y: 78, scale: .68 }],
     dialogue: [
       { who: 'meg', text: 'What soft little champion wanders into my supper?' },
@@ -56,7 +113,7 @@ export const BEATS = [
     next: 'root-door',
   },
   {
-    id: 'root-door', bg: 'roots', drone: 90,
+    id: 'root-door', bg: 'roots', music: 'castle',
     faces: [{ key: 'gump', x: 92, y: 70, scale: .68 }, { key: 'jack', x: 214, y: 78, scale: .7 }],
     dialogue: [
       { who: 'gump', text: 'Four stone mouths, and nowhere onward.' },
@@ -74,7 +131,7 @@ export const BEATS = [
     next: 'gown-that-breathes',
   },
   {
-    id: 'gown-that-breathes', bg: 'hall', drone: 86,
+    id: 'gown-that-breathes', bg: 'hall', music: 'castle',
     faces: [
       { key: 'darkness', x: 232, y: 56, scale: .68 },
       { key: 'lili', x: 88, y: 62, scale: .68 },
@@ -96,7 +153,7 @@ export const BEATS = [
     next: 'hidden-hand',
   },
   {
-    id: 'hidden-hand', bg: 'throne', drone: 78,
+    id: 'hidden-hand', bg: 'throne', music: 'throne',
     faces: [
       { key: 'darkness', x: 226, y: 56, scale: .74 },
       { key: 'jack', x: 96, y: 78, scale: .66 },
@@ -117,7 +174,7 @@ export const BEATS = [
     next: 'false-sacrifice',
   },
   {
-    id: 'false-sacrifice', bg: 'throne', drone: 74,
+    id: 'false-sacrifice', bg: 'throne', music: 'throne',
     faces: [
       { key: 'darkness', x: 226, y: 56, scale: .74 },
       { key: 'lili', x: 96, y: 78, scale: .66 },
@@ -138,7 +195,7 @@ export const BEATS = [
     next: 'final-beam',
   },
   {
-    id: 'final-beam', bg: 'throne', drone: 70,
+    id: 'final-beam', bg: 'throne', music: 'throne',
     faces: [
       { key: 'darkness', x: 226, y: 56, scale: .74 },
       { key: 'jack', x: 96, y: 78, scale: .66 },
@@ -155,7 +212,7 @@ export const BEATS = [
     next: 'edge-of-world',
   },
   {
-    id: 'edge-of-world', bg: 'causeway', drone: 60,
+    id: 'edge-of-world', bg: 'causeway', music: 'pursuit',
     faces: [{ key: 'jack', x: 160, y: 70, scale: .75 }],
     dialogue: [
       { who: 'jack', text: 'The floor is giving way behind us!' },
@@ -169,7 +226,7 @@ export const BEATS = [
     next: 'spring-remembers',
   },
   {
-    id: 'spring-remembers', bg: 'stream', drone: 130,
+    id: 'spring-remembers', bg: 'stream', music: 'wonder',
     faces: [{ key: 'gump', x: 78, y: 82, scale: .58 }, { key: 'jack', x: 158, y: 76, scale: .68 }, { key: 'unicorn', x: 240, y: 92, scale: .5 }],
     dialogue: [
       { who: 'gump', text: 'The stallion still waits beneath the winter spell.' },
@@ -183,7 +240,7 @@ export const BEATS = [
     next: 'seventh-color',
   },
   {
-    id: 'seventh-color', bg: 'forest', drone: 220, ending: true,
+    id: 'seventh-color', bg: 'forest', music: 'wonder', ending: true,
     faces: [
       { key: 'jack', x: 108, y: 62, scale: .68 },
       { key: 'lili', x: 212, y: 62, scale: .68 },

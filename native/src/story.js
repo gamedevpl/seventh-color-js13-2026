@@ -7,10 +7,10 @@ import { GAMES } from './games.js';
 // field. A mechanic (games.js) owns its own play-state but never its own
 // copy of the surrounding dialogue/success/next plumbing.
 
-export const P = { DIALOGUE: 0, CHOICE: 1, RETRY: 2, SUCCESS: 3, END: 4, GAME: 5 };
+export const P = { DIALOGUE: 0, CHOICE: 1, RETRY: 2, SUCCESS: 3, END: 4, GAME: 5, CUT: 6 };
 
 export function makeRound(beats, startId) {
-  return { beats, id: startId, phase: P.DIALOGUE, line: 0, choiceIndex: 0, elapsed: 0, g: null };
+  return { beats, id: startId, phase: P.DIALOGUE, line: 0, choiceIndex: 0, elapsed: 0, g: null, cut: 0 };
 }
 
 export function currentBeat(r) {
@@ -26,6 +26,10 @@ function afterDialogue(r, b) {
 }
 
 function finish(r, b) {
+  // A cutscene is a held moment the player cannot press through - the one
+  // place the story takes the controls back. It runs on the same machine as
+  // everything else: one more phase, one more data field, no new plumbing.
+  if (b.cutscene && r.phase !== P.CUT) { r.phase = P.CUT; r.cut = 0; return; }
   if (b.ending) { r.phase = P.END; return; }
   r.id = b.next;
   r.phase = P.DIALOGUE;
@@ -39,6 +43,12 @@ function finish(r, b) {
 // other phases.
 export function tick(r, dt, input) {
   r.elapsed += dt;
+  if (r.phase === P.CUT) {
+    r.cut += dt;
+    const b = currentBeat(r);
+    if (r.cut >= b.cutscene.seconds) finish(r, b);
+    return;
+  }
   if (r.phase !== P.GAME) return;
   const b = currentBeat(r);
   if (GAMES[b.game].update(r.g, b, dt, input)) {
@@ -65,7 +75,7 @@ export function press(r) {
     return;
   }
   if (r.phase === P.RETRY) { r.phase = P.CHOICE; return; }
-  if (r.phase === P.GAME) return; // GAME completes via tick(), not press()
+  if (r.phase === P.GAME || r.phase === P.CUT) return; // GAME completes via tick(), not press()
   if (++r.line < b.successDialogue.length) return;
   r.line = 0;
   finish(r, b);

@@ -9,14 +9,14 @@ Source: `claude/seventh-color-cast-prototype-a0yz66` @ `da6d270e`
 | assembled bundle | 727,503 | claude/seventh-color-cast-prototype-a0yz66 @ da6d270e |
 | &nbsp;&nbsp;javascript | 710,224 |  |
 | &nbsp;&nbsp;− inlined WAVs → runtime synth | 475,954 | 238459 → 4189 bytes of prelude |
-| &nbsp;&nbsp;− tree-shook GameKit | 473,078 | 11 surface + 32 published dropped |
-| &nbsp;&nbsp;− dropped dev features | 421,299 | 7 modules stubbed |
-| &nbsp;&nbsp;− Polish strings | 419,585 | 57 literals, 1714 bytes |
-| &nbsp;&nbsp;− esbuild minify | 245,199 |  |
-| &nbsp;&nbsp;− terser + property mangle | 191,681 |  |
-| &nbsp;&nbsp;+ chrome folded into payload | 201,329 |  |
-| &nbsp;&nbsp;− roadroller | 67,627 |  |
-| final index.html | 67,717 | css 0 + markup 0 |
-| index.zip | 50,986 | deflate 50868 |
+| &nbsp;&nbsp;− tree-shook GameKit | 466,504 | 11 surface + 32 published dropped, save shimmed |
+| &nbsp;&nbsp;− dropped dev features | 414,725 | 7 modules stubbed |
+| &nbsp;&nbsp;− Polish strings | 413,011 | 57 literals, 1714 bytes |
+| &nbsp;&nbsp;− esbuild minify | 242,435 |  |
+| &nbsp;&nbsp;− terser + property mangle | 189,160 |  |
+| &nbsp;&nbsp;+ chrome folded into payload | 198,808 |  |
+| &nbsp;&nbsp;− roadroller | 66,794 |  |
+| final index.html | 66,884 | css 0 + markup 0 |
+| index.zip | 50,354 | deflate 50236 |
 
-**Zip: 50,986 bytes** against a 13,312 byte budget — **37,674 over** (3.83× budget).
+**Zip: 50,354 bytes** against a 13,312 byte budget — **37,042 over** (3.78× budget).

@@ -84,12 +84,26 @@ if (on('treeShake')) {
   }
 
   const shaken = shakeEngine(modules, gameJs, { keep: config.treeShakeKeep ?? [] });
-  const shakenEngine = order.map((name) => shaken.modules[name]).join('\n') + '\nObject.freeze(window.GameKit);';
+
+  // Whole engine modules the entry does not need. Each is replaced by a shim
+  // that keeps the shape its callers expect — dropping `save` removes the
+  // persistence, not the in-run memory that story-progress routes through it.
+  // Shims go in before the freeze, or GameKit is sealed without them.
+  const dropped = config.dropEngineModules ?? [];
+  const kept = order.filter((name) => !dropped.includes(name));
+  const shims = dropped.map((name) => {
+    const shimPath = path.join(root, 'tools', 'stubs', `engine-${name}.js`);
+    if (!existsSync(shimPath)) throw new Error(`dropEngineModules names "${name}" but tools/stubs/engine-${name}.js is missing`);
+    return readFileSync(shimPath, 'utf8');
+  });
+  const shakenEngine = [...kept.map((name) => shaken.modules[name]), ...shims].join('\n')
+    + '\nObject.freeze(window.GameKit);';
   js = js.replace(assembled, () => shakenEngine);
   note(
     '  \u2212 tree-shook GameKit',
     js.length,
-    `${shaken.removed.surface.length} surface + ${shaken.removed.published.length} published dropped`,
+    `${shaken.removed.surface.length} surface + ${shaken.removed.published.length} published dropped`
+    + (dropped.length ? `, ${dropped.join('/')} shimmed` : ''),
   );
 }
 

@@ -51,5 +51,8 @@
       "find": "        { keys: ['g'], label: GameKit.t({ en: 'CAST', pl: 'OBSADA' }) },\n        { keys: ['s'], label: GameKit.t({ en: 'STORY', pl: 'FABU\u0141A' }) },\n",
       "replace": ""
     }
+  ],
+  "dropEngineModules": [
+    "save"
   ]
 }

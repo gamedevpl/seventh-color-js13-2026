@@ -1,6 +1,7 @@
 import { initDraw, clear, rect, text } from './draw.js';
 import { SCENES } from './scenes.js';
 import { paintFace } from './faces.js';
+import { GAMES } from './games.js';
 import { BEATS } from './data.js';
 import { makeRound, currentBeat, tick, press, moveChoice, P } from './story.js';
 
@@ -19,11 +20,15 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-let acted = false, left = false, right = false;
+let acted = false, left = false, right = false, heldLeft = false, heldRight = false;
 addEventListener('keydown', (e) => {
   if (e.key === ' ' || e.key === 'Enter') acted = true;
-  else if (e.key === 'ArrowLeft' || e.key === 'a') left = true;
-  else if (e.key === 'ArrowRight' || e.key === 'd') right = true;
+  else if (e.key === 'ArrowLeft' || e.key === 'a') { left = heldLeft = true; }
+  else if (e.key === 'ArrowRight' || e.key === 'd') { right = heldRight = true; }
+});
+addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft' || e.key === 'a') heldLeft = false;
+  else if (e.key === 'ArrowRight' || e.key === 'd') heldRight = false;
 });
 canvas.addEventListener('pointerdown', () => { acted = true; });
 
@@ -34,6 +39,11 @@ let last = 0;
 function box(y, h) { rect(0, y, VW, h, { fill: '#0008' }); }
 
 function paintHud(b) {
+  if (round.phase === P.GAME) {
+    box(128, 28);
+    text(b.gamePrompt, 10, 146, { fill: '#cdbfa0', font: '9px system-ui' });
+    return null;
+  }
   const speak = round.phase === P.SUCCESS ? b.successDialogue[round.line] : b.dialogue[round.line];
   if (round.phase === P.DIALOGUE || round.phase === P.SUCCESS) {
     box(128, 28);
@@ -69,7 +79,7 @@ function frame(now) {
     if (doAct) { round = makeRound(BEATS, BEATS[0].id); mode = 'play'; }
   } else {
     const b = currentBeat(round);
-    tick(round, dt);
+    tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, heldLeft, heldRight });
 
     if (round.phase === P.END) {
       SCENES[b.bg](round.elapsed);
@@ -83,6 +93,7 @@ function frame(now) {
     SCENES[b.bg](round.elapsed);
     const talker = paintHud(b);
     for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, f.key === talker, f.key === 'unicorn');
+    if (round.phase === P.GAME) GAMES[b.game].render(round.g, b, round.elapsed);
 
     if (round.phase === P.CHOICE) {
       if (doLeft) moveChoice(round, -1);

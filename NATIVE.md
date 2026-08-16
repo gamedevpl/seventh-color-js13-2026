@@ -139,9 +139,18 @@ choice/retry/success machine phases, 2 more beats, choice UI) landed at
 Still bundled, not force-split further — this is a positive-drift result,
 not a warning, but the ledger's job is to catch the day it goes the other
 way, so it stays a measured cumulative rather than an assumed one.
-**9,743 bytes remain against the 13,312 ceiling for M3 (mechanics), M4
-(remaining painters, beats, audio), and M5 (polish)** — comfortable given
-the per-unit costs measured so far.
+
+M3 (3 mechanics — `icerain`, `dial`, `lights` — 5 more painters, 5 more
+beats) landed at **5,152 cumulative, +1,583 over M2**. `dial` alone covers
+what was planned as two mechanics (`aim`/`align`), so this bought 3
+mechanics' worth of interaction plus 5 painters plus 5 beats in less than
+M2's single increment cost for roughly a third as much new *content*
+per byte — the sharpest positive drift yet, consistent with mechanics
+being pure code (cheap to compress, per design rule 1) while painters and
+data are what actually cost.
+
+**8,160 bytes remain against the 13,312 ceiling for M4 (beats 7-10, the
+chase decision below, music) and M5 (polish).**
 
 ## Build and measurement harness
 
@@ -263,3 +272,67 @@ choice, correct selection, success line, mouth-animation correctly follows
 the current speaker) → beat 12 (2 lines, choice, success) → the `forest`
 ending screen (its own composed backdrop, not just title text over black) →
 back to title. Screenshotted at every step.
+
+### M3 — three mechanics (not four), five painters, five beats: PASS
+
+Planned as four mechanics (Ice Rain timing, `aim`, `align`, `lights`);
+built as three. `aim` (turn the mirror on Meg) and `align` (turn the
+alicorn's horn) turned out to be the identical interaction - rotate toward
+a target angle within a tolerance, confirm - before a line of either was
+written. Collapsed into one `dial`, parameterized per beat (`games.js`).
+Design rule 2 applied to the *plan* this time, not retroactively to code
+the way the old pipeline's mode-unification finding worked.
+
+`games.js`: `icerain` (timing taps, reused from the episode-series design),
+`dial` (continuous turn + confirm, used by beats 4 and 11), `lights`
+(ordered-selection puzzle - the non-walking redesign of the old
+`bog-cottage` dual-puzzle, resolving the mechanic-redesign question the
+episode series left open rather than a walking simulation). `story.js`
+gained a `P.GAME` phase: dialogue hands off to a mechanic's own
+init/update/render, which owns success but never the surrounding
+dialogue/success/next plumbing - a mechanic failing is feedback handled
+inside the mechanic (a reset, a color change), never a modal phase switch.
+5 new painters (`pond`, `bog`, `cottage`, `roots`, `stream`) and 5 new
+beats (2, 3, 4, 5, 11), chaining `1→2→3→4→5→6→11→12` - beats 7-10 (the
+castle interior + the chase decision) slot in at M4 by data.js edits alone.
+
+`esbuild` bundle 23,072 → terser+mangle 13,854 → **zip 5,152**, worst of 5
+`-O1` rolls 5,151. **Ceiling 9,500 — 4,349 bytes of margin.**
+
+Two real bugs caught and fixed, both by the same discipline: drive it and
+look, don't trust that code compiling means code working.
+
+1. **`paintHud` checked `if (b.game)` instead of `if (round.phase ===
+   P.GAME)`.** Any beat carrying a mechanic never showed its own dialogue
+   text at all - it jumped straight to the game prompt from the first
+   frame, even while still in `P.DIALOGUE`. Caught because a screenshot
+   mid-dialogue showed the game prompt where a dialogue line should have
+   been; the mechanic's own visual elements (Ice Rain's falling shard, its
+   hit-progress dots) were correctly invisible at that point too, since
+   `round.phase` genuinely wasn't `P.GAME` yet - both symptoms had the one
+   root cause once traced.
+2. **The verify harness's own key-counting was off by one**, at M2 - the
+   first `space` in a scripted sequence starts the game from the title
+   screen, so it doesn't advance beat 1's dialogue. Documented under M2;
+   recorded again here because the *same class* of harness bug (confusing
+   a mechanic's runtime state with the beat's config - `r.g.target` when
+   the target lives on `b.g.target`, `r.g` only ever holds `{angle,
+   aligned}`) showed up a second time while writing a full-chain
+   integration test, and produced an identical-looking symptom: a
+   plausible-looking infinite loop that read exactly like a real product
+   bug (`dial` stuck turning the wrong way against the clamp) until
+   isolated with a minimal reproduction. Two data points is a pattern -
+   test-code bugs that mimic product bugs are the recurring failure mode
+   for this kind of driven verification, not a one-off.
+
+Verified past individual mechanics: a Node-level integration test drives
+`story.js` + `games.js` directly (no browser needed, fully deterministic -
+`icerain`'s internal timing window doesn't survive Playwright's real
+wall-clock key-press intervals reliably, so this is the more honest way to
+prove a timing-sensitive mechanic converges) through the entire built
+chain - all three mechanics solved correctly, both choices answered
+correctly, ending at `P.END` on `seventh-color`. Each mechanic's render
+also confirmed visually via targeted screenshots (a temporary debug start-
+point edit, reverted before committing): `lights`' three selectable dots,
+`dial`'s needle-and-ring, `icerain`'s falling shard and hit-progress dots
+all read clearly against their scenes.

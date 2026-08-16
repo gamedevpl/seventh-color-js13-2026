@@ -1,5 +1,5 @@
 {
-  "name": "M2",
-  "description": "6 portraits + full story machine; beats 1, 6, 12 playable start-to-finish (the spine)",
-  "ceilingBytes": 6500
+  "name": "M3",
+  "description": "3 micro-mechanics (aim/align collapsed into one 'dial') + chase go/no-go; beats 2, 3, 4, 5, 11 playable",
+  "ceilingBytes": 9500
 }

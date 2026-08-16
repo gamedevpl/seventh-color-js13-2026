@@ -31,4 +31,58 @@ export const SCENES = {
     }
     rect(0, 130, 320, 26, { fill: '#0a1b13' });
   },
+  pond: (t) => {
+    clear(320, 156, '#0f1c28');
+    rect(0, 60, 320, 96, { fill: '#1a3244' });
+    for (let i = 0; i < 9; i++) {
+      const x = i * 40 - 10;
+      line(x, 60, x + 26, 156, { stroke: '#2a4a5e', lineWidth: 2 });
+    }
+    circle(258, 26, 20, { fill: '#cfe0e8' });
+    for (let i = 0; i < 14; i++) {
+      const x = (i * 47 + t * 4) % 330 - 10, y = 65 + (i * 23) % 85;
+      circle(x, y, 1, { fill: '#dff0fa88' });
+    }
+  },
+  bog: (t) => {
+    clear(320, 156, '#111d14');
+    for (let i = 0; i < 10; i++) {
+      const x = -6 + i * 34;
+      line(x, 156, x + 6 + Math.sin(i + t * 0.4) * 4, 60, { stroke: '#1c3020', lineWidth: 4 });
+    }
+    rect(0, 118, 320, 38, { fill: '#0c1a10' });
+    for (let i = 0; i < 10; i++) {
+      const x = (i * 61 + t * 3) % 330 - 10, y = 122 + (i * 13) % 26;
+      circle(x, y, i % 4 ? 1 : 2, { fill: '#3a5a30' });
+    }
+  },
+  cottage: (t) => {
+    clear(320, 156, '#0c1712');
+    for (let i = 0; i < 6; i++) {
+      const x = 6 + i * 54;
+      poly([x, 156, x - 8, 30, x, 6, x + 8, 30], { fill: i % 2 ? '#0e2018' : '#122a1e', stroke: '#1c3a28', lineWidth: 2 });
+    }
+    rect(0, 132, 320, 24, { fill: '#081410' });
+  },
+  roots: (t) => {
+    clear(320, 156, '#160f0a');
+    for (let i = 0; i < 5; i++) {
+      const x = 20 + i * 70;
+      poly([x, 156, x - 24, 60, x - 6, 20, x + 6, 20, x + 24, 60], { fill: i % 2 ? '#241a10' : '#2c2013', stroke: '#120c08', lineWidth: 2 });
+    }
+    for (let i = 0; i < 6; i++) line(160, 40, 40 + i * 48, 156, { stroke: '#1a120a', lineWidth: 3 });
+    rect(0, 140, 320, 16, { fill: '#0a0704' });
+  },
+  stream: (t) => {
+    clear(320, 156, '#132a20');
+    for (let i = 0; i < 8; i++) {
+      const x = -10 + i * 44;
+      poly([x, 0, x + 22, 0, x + 30, 118, x - 8, 118], { fill: i % 2 ? '#173628' : '#1e422f', stroke: '#0a1a12', lineWidth: 2 });
+    }
+    rect(0, 112, 320, 44, { fill: '#1a3a42' });
+    for (let i = 0; i < 10; i++) {
+      const x = (i * 53 + t * 12) % 330 - 10, y = 118 + (i * 7) % 30;
+      line(x, y, x + 12, y, { stroke: '#4a7a82', lineWidth: 1 });
+    }
+  },
 };

@@ -200,7 +200,7 @@ material for what a compressed transition line needs to imply.
 
 | # | title | scenes kept | compresses | lead mechanic | measured baseline |
 | --- | --- | --- | --- | --- | ---: |
-| 1 | **Winter Falls** | `shadow-council`, `frozen-pond` (rewritten) | `jacks-glade`, `blindfold-path`, `unicorn-stream` | Ice Rain (built) | shipping at 13,303, headroom 9 |
+| 1 | **Winter Falls** | `shadow-council`, `frozen-pond` (rewritten) | `jacks-glade`, `blindfold-path`, `unicorn-stream` | Ice Rain (built) | **over by 2,636** at 15,948 — only the 1-scene prologue cut fits (13,284) |
 | 2 | **Into the Bog** | `bog-cottage`, `meg-encounter` | `gumps-judgment`, `surviving-mare`, `faerie-council`, `hollow-armory`, `rescue-vow` | dual-puzzle → Meg's set piece, both real (thick) minigames | 17,719, over by 4,407 — in progress |
 | 3 | **The Root Door** | `castle-descent`, `iron-cage` | `dark-kitchen` (its stealth minigame; the party split it triggers is implied, not explained — `living-gown` reads fine without it, tested) | cage-escape (send Luna through the bars) | 17,919, over by 4,607 — Brown Tom (decorative, no lines in this window) trimmed |
 | 4 | **The Gown That Breathes** | `living-gown` alone | `dark-kitchen`'s split (recap line), `dungeon-viaduct`, `reflection-plan`, `plate-vault`, `reflector-chain` | Lili/Darkness confrontation — a real riddle scene, cast-light (just her and Darkness) | 14,085 at -O2, over by 773 — best remaining gap by far, needs a recap line + final trims |
@@ -357,19 +357,21 @@ those scenes.
 
 | # | title | status |
 | --- | --- | --- |
-| 1 | Winter Falls | **shipping** — 13,280 B, headroom 32, gap-closing work paused at 2,618 over on the un-narrowed original 4-scene cut, superseded by the narrower 2-scene build documented above |
+| 1 | Winter Falls | **prologue alone is shipping** — `shadow-council` only, 13,284 B, headroom 28. The 2-scene "Winter Falls" that adds `frozen-pond` + Ice Rain is **15,948, over by 2,636** and has never fitted — see the correction below, this row previously conflated the two |
 | 2 | Into the Bog | in progress — 17,719, over by 4,407 — cast trims done, plays correctly |
 | 3 | The Root Door | in progress — 17,919, over by 4,607 — cold open + Brown Tom trim done |
-| 4 | The Gown That Breathes | in progress — 14,085 at -O2, over by 773, closest to done |
+| 4 | The Gown That Breathes | **shipping** — 12,297 B, headroom 1,015 — closed by staging Lili as a portrait, which drops the whole body rig (see below) |
 | 5 | The Last Turn | in progress — 18,120, over by 4,808 — Luna trim done |
 | 6 | The Seventh Color | in progress — 17,963, over by 4,651 — ring-pond skipped, biggest single cut in the series so far |
 
-None of episodes 2–6 are ready to submit. Every number above is a real,
+Episodes 2, 3, 5 and 6 are not ready to submit. Every number above is a real,
 pipeline-measured, `VERIFY OK`-checked baseline confirmed by screenshot, not
 an estimate — every episode in the series has now been built at least once
-and shown to boot, render, and play through its own window correctly. The
-prologue (episode 1) is the only one that is actually done: built, under
-budget, verified, and stable across every commit in this session.
+and shown to boot, render, and play through its own window correctly. Two
+builds are actually done — built, under budget, verified: the **one-scene
+prologue** (13,284, headroom 28) and **episode 4** (12,297, headroom 1,015).
+Both are single-location, small-cast scenes, which is not a coincidence but
+the rule derived at the end of this document.
 
 **A pattern worth naming, found while trimming 2, 3, and 5:** a scene's
 declared `cast` array is not evidence a character is load-bearing there —
@@ -483,3 +485,97 @@ job better than a manual pass can. Cast trims, structural code-sharing
 fixes, and scene cuts (all three: whole-thing removals) accounted for every
 real byte saved in episodes 2, 3, 5, and 6 this session. Optimizing the
 mechanic code itself was the one hypothesis tested and found empty-handed.
+
+## The body rig is the single biggest line item — and it is all-or-nothing
+
+Acting on that conclusion (remove whole things, not slack) pointed at the one
+whole thing never priced: `cast-actor-rig.ts`, the articulated body used by
+every `actor()` call. It is ~7 KB of source, and — unlike faces, which fold
+per character `id`, and unlike rig *kinds*, which fold per `kind` — the biped
+rig survives if **any single** `actor()` call in the whole build reaches it.
+
+Episode 4 was the only episode where that count was one. `paintLivingGown`
+drew Darkness as a portrait and Lili as a rigged figure standing at frame
+left, small enough that the articulation never read at that scale anyway.
+Staging her as a portrait too — mirroring Darkness, making the confrontation
+the subject of the frame — leaves the episode reaching no `actor()` call at
+all.
+
+| episode 4 (`living-gown` alone) | zip | vs budget |
+| --- | ---: | ---: |
+| before, Lili rigged | 14,084 | +772 over |
+| after, Lili as a portrait | 12,297 | **−1,015 under** |
+
+**−1,787 bytes from one staging decision.** That is more than every cast
+trim, code-sharing fix and scene cut in this document put together, and it
+closed the gap with 1 KB to spare. Episode 4 ships.
+
+### What this says about the other four
+
+The rig lever is spent, not repeatable: episodes 2, 3, 5 and 6 are built on
+walking, chases and party scenes where the body *is* the gameplay
+readability. But pricing it exposed the cost model the whole series obeys,
+and the numbers are worth stating together:
+
+All five rebuilt today against the same code state, so the deltas are real
+rather than cross-session:
+
+| build | scenes | cast | rig? | zip |
+| --- | ---: | ---: | --- | ---: |
+| `living-gown` alone, portraits | 1 | 2 | no | **12,297** |
+| `shadow-council` alone (the shipping prologue) | 1 | 3 | yes | **13,284** |
+| `living-gown` alone, Lili rigged | 1 | 2 | yes | 14,084 |
+| `shadow-council`+`frozen-pond` ("Winter Falls") | 2 | 4 | yes | 15,948 |
+| `false-yield`→`final-beam` | 3 | 4 | yes + unicorn | 16,390 |
+
+**A correction this table forced, before anything else in it is used.** An
+earlier draft of this section claimed marginal scenes were nearly free, on
+the strength of the status table below reading "episode 1 — shipping, 13,280
+B". That number is the **prologue alone**, one scene. "Winter Falls" as
+designed — prologue plus `frozen-pond` and its Ice Rain minigame — measures
+15,948, over by 2,636, matching the 2,618 the episode-1 log recorded when
+that work was paused. Adding one scene cost **+2,664 bytes, not zero.**
+Episode 1 has never shipped as a two-scene episode; what is under budget is
+the one-scene prologue. The status table below is corrected to say so.
+
+So the line items, all measured:
+
+- **The body rig: ~1,790 B.** The `living-gown` pair isolates it exactly —
+  same scene, same cast, same prose, staging the only variable.
+- **A scene bringing its own art *and* mode: ~2,650 B.** `frozen-pond` adds a
+  painter, the `breakout` mode, Ice Rain, and a fourth cast member.
+- **A scene sharing an existing art and mode: ~1,000 B.** The throne trio is
+  three scenes on one `art`/`mode`, and lands 3,106 over the one-scene
+  prologue while *also* paying for the unicorn rig kind and two extra faces.
+- **Each rig kind beyond the first: ~1 KB.** Unicorn, fairy, hag.
+
+Against a floor of ~12.3 KB — engine, shell, presentation, one close-up
+scene, two faces — the budget leaves **about 1 KB of discretionary room.**
+That is less than the body rig costs, and well under half a new scene. Which
+gives the rule both shipping entries satisfy and every other build breaks:
+
+> An episode is **one location, one mechanic, a small cast** — and it may buy
+> *either* the body rig *or* a second scene, never both.
+
+The prologue spends its allowance on the rig and stages one room. Episode 4
+spends nothing on either and has 1,015 B left over — the only build in this
+document with real headroom. Everything else carries the rig *and* multiple
+scenes *and* two or more dedicated mechanics, which is why they land 2.6–5 KB
+over and why no amount of trimming has moved them: the overage is the
+subsystems, and the subsystems are the episodes.
+
+The encouraging half of that rule is the throne-trio number. Extra scenes on
+an art and mode the build already pays for cost ~1 KB, not ~2.7 KB — so
+episode 4's headroom is genuinely spendable on **two or three more beats in
+the same room**, which is a real episode rather than a vignette. That, not a
+narrower window onto an existing set piece, is the shape to build toward.
+
+This also retires the earlier "would more, smaller episodes fit?" finding as
+under-diagnosed. Splitting doesn't help *because a thick scene alone is
+already over budget* — correct, and reconfirmed above. But the reason isn't
+that the scene is irreducibly complex; it's that a dedicated logic/render
+file pair costs 1.5–2 KB when the whole discretionary budget is ~1 KB. The
+fix is not a smaller window onto the same scene. It is to rebuild those beats
+around inline mechanics in the shape Ice Rain and the portrait riddle proved
+twice, and to stop treating the existing set-piece code as something to carry
+across.

@@ -10,11 +10,13 @@ Source: `claude/seventh-color-cast-prototype-a0yz66` @ `da6d270e`
 | &nbsp;&nbsp;javascript | 710,224 |  |
 | &nbsp;&nbsp;− inlined WAVs → runtime synth | 475,954 | 238459 → 4189 bytes of prelude |
 | &nbsp;&nbsp;− tree-shook GameKit | 473,078 | 11 surface + 32 published dropped |
-| &nbsp;&nbsp;− esbuild minify | 277,398 |  |
-| &nbsp;&nbsp;− terser + property mangle | 230,368 |  |
-| &nbsp;&nbsp;+ chrome folded into payload | 240,016 |  |
-| &nbsp;&nbsp;− roadroller | 83,537 |  |
-| final index.html | 83,627 | css 0 + markup 0 |
-| index.zip | 62,942 | deflate 62824 |
+| &nbsp;&nbsp;− dropped dev features | 421,299 | 7 modules stubbed |
+| &nbsp;&nbsp;− Polish strings | 419,585 | 57 literals, 1714 bytes |
+| &nbsp;&nbsp;− esbuild minify | 245,199 |  |
+| &nbsp;&nbsp;− terser + property mangle | 191,681 |  |
+| &nbsp;&nbsp;+ chrome folded into payload | 201,329 |  |
+| &nbsp;&nbsp;− roadroller | 67,627 |  |
+| final index.html | 67,717 | css 0 + markup 0 |
+| index.zip | 50,986 | deflate 50868 |
 
-**Zip: 62,942 bytes** against a 13,312 byte budget — **49,630 over** (4.73× budget).
+**Zip: 50,986 bytes** against a 13,312 byte budget — **37,674 over** (3.83× budget).

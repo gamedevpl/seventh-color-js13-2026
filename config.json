@@ -9,13 +9,15 @@
   "transforms": {
     "synthAudio": true,
     "stripI18n": true,
+    "englishOnly": true,
     "minifyCss": true,
     "minifyMarkup": true,
     "mangleProps": "max",
     "inlineChrome": true,
     "roadroller": true,
     "roadrollerOptimize": 1,
-    "treeShake": true
+    "treeShake": true,
+    "dropFeatures": true
   },
   "treeShakeKeep": [
     "createRenderer",
@@ -28,5 +30,26 @@
     "getRenderContext",
     "t",
     "localize"
+  ],
+  "dropFeatures": [
+    "cast-vector-runtime.ts",
+    "cast-editor-state.ts",
+    "cast-editor-render.ts",
+    "cast-editor-input.ts",
+    "scene-director-render.ts",
+    "scene-director-input.ts",
+    "cast-gallery.ts"
+  ],
+  "patches": [
+    {
+      "file": "game/runtime.ts",
+      "find": "      if (kit.input.consume('g') || castButton) {\n        round.galleryOpen = !round.galleryOpen;",
+      "replace": "      if ((kit.input.consume('g') || castButton) && false) {\n        round.galleryOpen = !round.galleryOpen;"
+    },
+    {
+      "file": "game/runtime.ts",
+      "find": "        { keys: ['g'], label: GameKit.t({ en: 'CAST', pl: 'OBSADA' }) },\n        { keys: ['s'], label: GameKit.t({ en: 'STORY', pl: 'FABU\u0141A' }) },\n",
+      "replace": ""
+    }
   ]
 }

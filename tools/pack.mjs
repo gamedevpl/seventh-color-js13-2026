@@ -10,6 +10,7 @@ import { Packer } from 'roadroller';
 import { extractBundle, minifyMarkup, stripI18nAttributes } from './lib/extract.mjs';
 import { inlineSynthesizedAudio } from './lib/audio-inline.mjs';
 import { shakeEngine } from './lib/shake.mjs';
+import { stripPolish } from './lib/english.mjs';
 import { zipSingleFile } from './lib/zip.mjs';
 import { renderLedger, writeSizeLedger } from './lib/report.mjs';
 
@@ -90,6 +91,31 @@ if (on('treeShake')) {
     js.length,
     `${shaken.removed.surface.length} surface + ${shaken.removed.published.length} published dropped`,
   );
+}
+
+// Swap the game region for the feature-dropped build. The bundle is
+// prelude + engine + freeze + '\n' + game, so the game is everything after the
+// freeze line — and we assert it matches the plain staged bundle before
+// swapping, for the same reason the engine splice does.
+if (on('dropFeatures') && (config.dropFeatures ?? []).length) {
+  const FREEZE = '\nObject.freeze(window.GameKit);\n';
+  const at = js.lastIndexOf(FREEZE);
+  if (at < 0) throw new Error('cannot find the engine/game seam in the assembled bundle');
+  const gamePlain = readFileSync(path.join(sourceDir, 'game.js'), 'utf8');
+  const gameCut = readFileSync(path.join(sourceDir, 'game-cut.js'), 'utf8');
+  if (js.slice(at + FREEZE.length) !== gamePlain) {
+    throw new Error('staged game bundle does not match the assembled one — re-run pull');
+  }
+  js = js.slice(0, at + FREEZE.length) + gameCut;
+  note('  − dropped dev features', js.length, `${config.dropFeatures.length} modules stubbed`);
+}
+
+// One language ships, so the Polish half of every { en, pl } literal is weight
+// with no reader. `t({ en })` still resolves — this deletes data, not mechanism.
+if (on('englishOnly')) {
+  const stripped = stripPolish(js);
+  js = stripped.source;
+  note('  − Polish strings', js.length, `${stripped.removed} literals, ${stripped.bytes} bytes`);
 }
 
 let markup = bundle.markup;

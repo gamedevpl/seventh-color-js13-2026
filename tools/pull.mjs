@@ -6,7 +6,7 @@
 // transforms read directly (the audio catalog, the game manifest).
 
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { buildSync, transformSync } from 'esbuild';
+import { build, buildSync, transformSync } from 'esbuild';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
@@ -76,17 +76,56 @@ for (const name of moduleNames) {
 }
 writeFileSync(path.join(outDir, 'engine', 'ORDER.json'), `${JSON.stringify(moduleNames)}\n`);
 
-const gameBundle = buildSync({
-  absWorkingDir: gamesDir,
-  entryPoints: [path.join(gamesDir, 'games', config.slug, 'game.ts')],
-  bundle: true,
-  write: false,
-  platform: 'browser',
-  target: TARGET,
-  format: 'iife',
-  legalComments: 'inline',
-}).outputFiles[0].text;
-writeFileSync(path.join(outDir, 'game.js'), gameBundle);
+async function bundleGame(stubs) {
+  const result = await build({
+    absWorkingDir: gamesDir,
+    entryPoints: [path.join(gamesDir, 'games', config.slug, 'game.ts')],
+    bundle: true,
+    write: false,
+    platform: 'browser',
+    target: TARGET,
+    format: 'iife',
+    legalComments: 'inline',
+    plugins: stubs.length ? [{
+      name: 'drop-features',
+      setup(pluginBuild) {
+        pluginBuild.onResolve({ filter: /\.ts$/ }, (found) => {
+          const base = path.basename(found.path);
+          return stubs.includes(base) ? { path: path.join(stubDir, base) } : undefined;
+        });
+        // Stubbing a subsystem is only half the job: the buttons that opened it
+        // still work, and a no-op renderer behind a live button is a black
+        // screen the player can get into. These patches close the doors. Each
+        // must match exactly once — a silent miss would ship that black screen.
+        pluginBuild.onLoad({ filter: /\.ts$/ }, (found) => {
+          const patches = (config.patches ?? []).filter((p) => found.path.endsWith(p.file));
+          if (!patches.length) return undefined;
+          let text = readFileSync(found.path, 'utf8');
+          for (const patch of patches) {
+            const hits = text.split(patch.find).length - 1;
+            if (hits !== 1) {
+              throw new Error(`patch for ${patch.file} matched ${hits} times, expected 1 — the source moved`);
+            }
+            text = text.replace(patch.find, patch.replace);
+          }
+          return { contents: text, loader: 'ts' };
+        });
+      },
+    }] : [],
+  });
+  return result.outputFiles[0].text;
+}
+
+// Two bundles: the untouched one, which pack asserts against so it knows the
+// staged parts still match what the assembler ships, and the feature-dropped
+// one it actually packs. Keeping both is what lets the drop be verified rather
+// than assumed.
+const stubDir = path.join(root, 'tools', 'stubs');
+writeFileSync(path.join(outDir, 'game.js'), await bundleGame([]));
+
+const drops = config.dropFeatures ?? [];
+writeFileSync(path.join(outDir, 'game-cut.js'), await bundleGame(drops));
+if (drops.length) console.log(`staged a feature-dropped game bundle (${drops.length} modules stubbed)`);
 
 writeFileSync(
   path.join(outDir, 'SOURCE.json'),

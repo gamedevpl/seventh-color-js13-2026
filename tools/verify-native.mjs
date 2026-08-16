@@ -1,7 +1,8 @@
 // Boot the native build's own zip in a real browser and fail on anything the
-// console says. Unlike verify.mjs (the GameKit-episode path) this drives no
-// specific input scheme yet - each milestone adds its own interaction check
-// here as the story machine and mechanics come online.
+// console says. --presses=N presses Space N times (350ms apart), screenshotting
+// after each - each milestone extends this as the story machine and mechanics
+// come online, the same "drive it a little, not just boot" discipline as the
+// GameKit-episode verify.mjs.
 
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,6 +14,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const args = process.argv.slice(2);
 const seconds = Number(args.find((a) => /^\d+$/.test(a)) || 3);
+const presses = Number(args.find((a) => /^--presses=/.test(a))?.split('=')[1] || 0);
 
 const archive = readFileSync(path.join(root, 'build', 'native', 'index.zip'));
 const nameLength = archive.readUInt16LE(26);
@@ -40,6 +42,12 @@ page.on('requestfailed', (request) => problems.push(`requestfailed: ${request.ur
 
 await page.goto(pathToFileURL(pagePath).href, { waitUntil: 'load' });
 await page.waitForTimeout(seconds * 1000);
+
+for (let i = 0; i < presses; i++) {
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: path.join(root, 'build', 'native', `verify-${i + 1}.png`) });
+}
 
 const probe = await page.evaluate(() => {
   const canvas = document.querySelector('canvas');

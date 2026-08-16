@@ -1,5 +1,5 @@
 {
-  "name": "M0",
-  "description": "boot floor: canvas + prims + loop, one animated shape",
-  "ceilingBytes": 1500
+  "name": "M1",
+  "description": "story machine + 1 portrait + 1 painter + title card",
+  "ceilingBytes": 4000
 }

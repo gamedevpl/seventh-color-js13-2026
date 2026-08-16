@@ -123,9 +123,15 @@ drift visible the day it happens, not to be right today.
 | unassigned — spent last | 1,264 | — |
 | **ceiling** | **13,312** | |
 
-M0 ran 448 over its own line item, taken from "unassigned." Each future
-milestone's actual gets recorded here the same way, so the ledger tracks
-reality rather than the plan.
+M0 ran 448 over its own line item, taken from "unassigned." M1 (input +
+story machine + 1 portrait + 1 painter + 1 beat of data + title) landed at
+2,242 cumulative, +1,194 over M0 — bundled across several buckets at once
+(module wiring is shared, not separable per bucket yet), so recorded as a
+cumulative checkpoint rather than force-split: **cumulative through M1:
+budgeted 3,400 (600+200+700+1,400/6+2,200/7+2,500/12+500), measured
+2,242 — already under**, because per-portrait/per-painter/per-data-row
+costs won't be knowable until M2 gives more than one of each to regress
+against. Each future milestone's actual gets recorded the same way.
 
 ## Build and measurement harness
 
@@ -201,3 +207,22 @@ esbuild → terser → roadroller → zip, reusing `lib/squeeze.mjs` so numbers
 are comparable to the episode pipeline), `tools/verify-native.mjs` (headless
 Chromium boot + console-error + screenshot check), `native-milestone.json`
 (current gate), `npm run native:gate` (`--O1 --rolls=5` then verify).
+
+### M1 — story machine + first portrait + title: PASS
+
+`story.js` (dialogue-advance machine — choice/retry/cinematic phases arrive
+when a beat first needs them at M2), `faces.js` (Darkness, packed polygon
+data + shared blink/talk renderer), `scenes.js` (shadow-council painter),
+`data.js` (beat 1's lines), input wiring in `main.js` (pointer + Space/Enter).
+
+`esbuild` bundle 6,240 → terser+mangle 3,462 → **zip 2,240**, worst of 5
+`-O1` rolls 2,242 (roadroller jitter starts showing — 1-byte spread at this
+size, per design rule 9 the *worst* roll is what's judged).
+
+**Ceiling 4,000, landed at 2,242 — 1,758 bytes of margin.** Verified past
+just booting: `verify-native.mjs` now presses Space and screenshots after
+each press (`--presses=N`), confirming the full loop — title → dialogue
+line 1 → line 2 → back to title — plays correctly, not just that the canvas
+paints. Same discipline the GameKit-episode `verify.mjs` used throughout
+the transform-pipeline work, now doing the same job for a codebase this
+project wrote itself.

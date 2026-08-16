@@ -493,6 +493,88 @@ is a complete, verified, theme-integrated, comfortably-under-budget js13k
 2026 entry telling the whole story in one submission, which is what the
 episode series was always working around not being able to do.
 
+## M6 - the mechanics were not games
+
+The build passed every byte gate and told the whole story, and the
+mechanics were still bad. Played rather than measured, all four failed in
+the same way: **nothing could be lost, so nothing could be learned.**
+
+| | what it actually was | why it failed |
+| --- | --- | --- |
+| `dial` (used 3x) | hold a key until the needle turns yellow, press space | literally could not be failed - a third of all mechanic encounters were a no-op |
+| `lights` | guess a permutation stored in `data.js` | the answer was never on screen; not a puzzle, a lock with no key |
+| `icerain` | one dot, fixed position, one button | a QTE - no spatial dimension, no cost for missing |
+| `chase` | hold right to advance | nothing was chasing you; you could stop and think forever |
+
+What they are now, keeping the visual language intact:
+
+- **`dial`** - an unstable equilibrium. Small deviations accelerate away,
+  so the player balances rather than parks, and alignment has to be *held*
+  to fill a charge rather than merely touched. The target sways; the
+  tolerance wedge is drawn, so the thing you are aiming at is visible.
+- **`lights`** - the marsh-fire demonstrates the safe order, then replays
+  it after a slip. A memory test the player can actually pass, instead of
+  brute force over permutations.
+- **`icerain`** - weak points open across the ice on a visible sealing
+  timer, up to three at once, and the chisel has to be carried to them.
+  The skill is triage: which one can you still reach?
+- **`chase`** - the run is automatic and accelerating, the collapse is a
+  real object on screen closing the gap whenever you stumble, and the jump
+  arc is tight enough that it has to be aimed.
+
+Plus a shared juice layer (`fx.js`: screen shake, particle bursts) called
+by all four rather than four private feedback systems, and the controls
+printed under every prompt - a mechanic nobody knows how to drive is
+indistinguishable from one that does not work.
+
+### Tuning by measurement, not by feel
+
+`tools/play-native.mjs` plays the whole game at module level. Its solvers
+are written as a *competent human*: they use only what the renderer puts
+on screen - mark positions, the drawn tolerance wedge, the demonstrated
+sequence, the gaps ahead - never `data.js`. `--sloppy=N` then models an
+imperfect player: decisions arrive four frames late and a fraction of
+inputs are dropped outright.
+
+That sweep is what made the tuning honest, and it caught three real
+faults that no amount of reading the code would have:
+
+1. **`final-beam` was unwinnable for a lagged player.** Charge drained at
+   0.8/s and filled at 1.0/s, so a scrappy player netted ~zero and the
+   beat never ended. Drain is now 0.45/s - the meter is ground gained,
+   still losable, no longer futile.
+2. **`spring-remembers` stalled before it began.** With runaway drift
+   proportional to distance, a needle starting 2.1 rad out generated 1.57
+   rad/s of drift against 1.7 rad/s of steering - the two nearly cancelled
+   and the needle crawled. Drift is now capped well under the steer rate,
+   which keeps the instability where it matters (near the target) and
+   makes the far field recoverable.
+3. **The causeway read as a ladder.** Fixing hole width for fairness had
+   made holes 47% of the floor. Narrowing them fixed the read but removed
+   the challenge (zero stumbles even at 35% dropped inputs), so the jump
+   arc was tightened instead: same readable floor, timing back in.
+
+Final band, worst case over repeated runs:
+
+| player | mechanics | outcome |
+| --- | --- | --- |
+| perfect | 2.3 - 6.0s each | clean |
+| 20% dropped | barely slower | clean |
+| 35% dropped | stumbles and seals appear | always completes |
+| 50% dropped | real struggle | always completes |
+
+0 stalls in 30+ runs. The design target: failure is visible and costs
+ground, recovery always exists, nobody is ever stuck.
+
+One bug surfaced on the way and is now guarded by the test: the press
+that completed a mechanic was *also* fed to `press()`, which consumed the
+entire success line and jumped straight to the next beat - so every
+mechanic beat silently skipped its own payoff line.
+
+Cost: **7,671 bytes** worst-of-5, up from 6,519. The mechanics rework,
+the juice layer and the on-screen controls together cost ~1,150 bytes and
+left 5,641 of the 13,312 budget unused.
+
 ## Decision: this is the submission
 
 The user's call: **"We need full story."** The native rewrite in this
@@ -501,11 +583,10 @@ all twelve beats in one HTML document; the episode series covered the
 same story only in fragments across separate compo entries, which is
 exactly the gap this rewrite closed.
 
-Final locked build, verified after the decision (not just at the M5
-gate): `node tools/native.mjs --O1` → **6,523 bytes** zipped, 8,591 bytes
-uncompressed inside, against the 13,312-byte budget - **6,789 bytes
-(51%) of headroom unused**. Worst-of-5 rolls at `--O1` ranged
-6,516-6,522 bytes, all comfortably under the 13,162 ceiling.
+Final locked build, after the M6 mechanics rework: `node tools/native.mjs
+--O1 --rolls=5` → **7,671 bytes** worst-of-5 zipped, 10,095 bytes
+uncompressed inside, against the 13,312-byte budget - **5,641 bytes
+(42%) of headroom unused**, comfortably under the 13,162 ceiling.
 `unzip -l build/native/index.zip` confirms the archive holds exactly one
 file, `index.html`, at the root - the shape js13kGames requires.
 `tools/verify-native.mjs` reports a clean boot (no console errors,

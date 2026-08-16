@@ -114,9 +114,13 @@ having zero call sites. Tightening it was measured at 69 bytes and declined — 
 costs bytes, over-pruning costs a working submission.
 
 **`roadroller`** — packs the script into a self-extracting blob. `roadrollerOptimize` picks
-the search level: `0` is a few seconds, `2` searches parameters and takes far longer. The
-zip is still worth taking afterwards, because the markup and stylesheet sit outside the
-packed blob.
+the search level: `0` is a few seconds, `1` (the default) about a minute, and `--O2` a full
+parameter search — measured at 145 bytes over `-O1` for ~35 minutes, so it is worth running
+exactly once, on the final submission pack, and never during iteration. The final zip still
+matters even with everything folded into the payload: roadroller emits an ASCII-safe stream
+(97 distinct byte values, ~6.05 bits/byte), and deflate recovers precisely that encoding
+overhead — measured, the whole chain lands at the model's own entropy, so there is no
+headroom hiding between the two stages.
 
 The zip writer is ours rather than `zip -9`: one entry, no extra fields, zeroed timestamps,
 and it tries three zlib strategies plus zopfli and keeps the smallest. Reproducible — the

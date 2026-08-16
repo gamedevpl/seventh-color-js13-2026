@@ -13,8 +13,8 @@ Source: `claude/seventh-color-cast-prototype-a0yz66` @ `da6d270e`
 | &nbsp;&nbsp;− esbuild minify | 190,797 |  |
 | &nbsp;&nbsp;− terser + property mangle | 151,273 |  |
 | &nbsp;&nbsp;+ chrome folded into payload | 155,686 |  |
-| &nbsp;&nbsp;− roadroller | 51,722 |  |
-| final index.html | 51,812 | css 0 + markup 0 |
-| index.zip | 39,033 | deflate 38915 |
+| &nbsp;&nbsp;− roadroller | 51,653 |  |
+| final index.html | 51,743 | css 0 + markup 0 |
+| index.zip | 38,973 | deflate 38855 |
 
-**Zip: 39,033 bytes** against a 13,312 byte budget — **25,721 over** (2.93× budget).
+**Zip: 38,973 bytes** against a 13,312 byte budget — **25,661 over** (2.93× budget).

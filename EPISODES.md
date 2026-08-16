@@ -224,12 +224,31 @@ Working forward from 18,538 B / over by 5,226:
 
 **Honest read on the rate:** a real, screenshot-verified, visually-lossless trim
 bought 100 bytes. Closing the remaining 5,126 at that rate is ~50 more passes of
-this size — jack, lili, and the unicorn each have room for one or two more
-(unexamined so far: the unicorn's front-facing paint path, `paintFrontUnicorn`,
-never fires in this episode since every `actor()` call here uses yaw ±90°, but
-the scope dial has no way to prove a runtime yaw value unreachable the way it
-proves a scene mode unreachable — that would need new tooling, not just an edit).
-Past the easy visual trims, the remaining gap is prose (narrative cost) or a
-genuine engine-level cut (none found yet — see the retracted rig lever above).
-Next step is the user's call: keep grinding per-character trims, accept a
-narrower episode window, or take the prologue-drop trade after all.
+this size — not a reasonable ask of one session. Reassessed instead of grinding.
+
+**Reassessment.** Measured a narrower window: `shadow-council` + `frozen-pond`
+only (drop `jacks-glade` and `unicorn-stream` too, not just `blindfold-path`) —
+**15,905 B, over by 2,593**, less than half the 4-scene gap. The catch:
+`frozen-pond`'s dialogue assumed the player just watched Lili vanish in
+`unicorn-stream`. Rewritten (games repo, episodes branch, commit `d24ca1ab`) to
+pay off shadow-council's threat directly — "Winter will answer" from the council
+scene becomes "Winter falls where no season called it. Lili is gone." opening
+frozen-pond — instead of assuming a scene this build no longer contains. Screenshot-
+verified end to end: chapter title, dialogue, and Ice Rain all read correctly
+with no prior context. Final measured state after the rewrite:
+
+```
+node tools/pull.mjs --endAt frozen-pond --skip blindfold-path,jacks-glade,unicorn-stream
+node tools/pack.mjs
+```
+
+**15,930 B, over by 2,618** (4 cast: darkness, blix, pox, jack — no Lili or
+unicorn staged, only named). More than half of the original 5,226-byte gap
+closed by narrowing scope plus the jack/lili art trim, without touching the
+prose density of what remains. The unicorn-stream/rainbow beat and Lili's
+on-screen presence are gone from episode 1 as a result — a real narrative
+cost, accepted in exchange for a tractable remaining gap. Closing the last
+2,618 is the same toolkit as before (character-art trims, prose, or the
+unproven yaw-unreachability tooling) — paused here for the user to weigh back
+in, since each further character trim or the yaw investment is diminishing-
+return work at this point, not a clear win.

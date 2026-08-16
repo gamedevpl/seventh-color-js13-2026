@@ -38,12 +38,21 @@ function paintJack(t, talking) {
   mouth(0, 20, 7, 1.5, 4, '#5a2f26', talking, t);
 }
 
-function paintLili(t, talking) {
+// `variant` blindfolds her. Jack hands her the blindfold in the glade and
+// takes it off when the unicorns arrive, so the cloth has to actually be
+// on her face in between - a line about a blindfold with no blindfold on
+// screen reads as a bug, because it is one.
+function paintLili(t, talking, variant) {
   poly(HUMAN_HEAD, { fill: '#e8cdb0', stroke: '#2a1f3a', lineWidth: 2 });
   poly([-22, -30, -30, 10, -22, 48, -14, 10, -22, -6], { fill: '#241d38' });
   poly([22, -30, 30, 10, 22, 48, 14, 10, 22, -6], { fill: '#241d38' });
   poly([-24, -26, -16, -48, 0, -54, 16, -48, 24, -26, 12, -34, 0, -38, -12, -34], { fill: '#241d38' });
-  eyes(-9, 9, -4, 3.4, '#241812', t, 2);
+  if (variant) {
+    poly([-21, -12, 21, -12, 21, 2, -21, 2], { fill: '#8a6f4a', stroke: '#5e4a30', lineWidth: 1 });
+    poly([21, -10, 30, -4, 28, 4, 21, 0], { fill: '#7a6142' });
+  } else {
+    eyes(-9, 9, -4, 3.4, '#241812', t, 2);
+  }
   mouth(0, 20, 7, 1.5, 4, '#7a3a44', talking, t);
 }
 
@@ -81,6 +90,6 @@ function paintUnicorn(t, talking, horned) {
 
 const PAINTERS = { darkness: paintDarkness, jack: paintJack, lili: paintLili, gump: paintGump, meg: paintMeg, unicorn: paintUnicorn };
 
-export function paintFace(key, x, y, scale, t, talking, horned) {
-  withTransform({ x, y, scale }, () => PAINTERS[key](t, talking, horned));
+export function paintFace(key, x, y, scale, t, talking, variant) {
+  withTransform({ x, y, scale }, () => PAINTERS[key](t, talking, variant));
 }

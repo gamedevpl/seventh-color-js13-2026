@@ -141,8 +141,16 @@ function frame(now) {
     // decoration: hornless through this beat's dialogue and its game
     // phase, restored only once that game resolves into SUCCESS. Beats
     // with no game of their own (a later cameo) show it already restored.
+    // One idea, two faces: the beat's payoff has or has not landed yet.
+    // The horn returns on it; the blindfold comes off on it. `blind` names
+    // the dialogue line the cloth goes on, so the glade can hand it over
+    // mid-scene rather than having her wear it from the first word.
     const restored = !b.game || round.phase === P.SUCCESS;
-    for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, f.key === talker, f.key === 'unicorn' ? restored : undefined);
+    for (const f of b.faces) {
+      const variant = f.key === 'unicorn' ? restored
+        : f.blind != null && round.phase !== P.SUCCESS && (round.phase !== P.DIALOGUE || round.line >= f.blind);
+      paintFace(f.key, f.x, f.y, f.scale, round.elapsed, f.key === talker, variant);
+    }
     if (round.phase === P.GAME) GAMES[b.game].render(round.g, b, round.elapsed);
     fxEnd();
 

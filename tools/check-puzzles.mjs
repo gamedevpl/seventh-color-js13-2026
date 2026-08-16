@@ -13,9 +13,12 @@ let bad = 0;
 for (const b of BEATS.filter((x) => x.game === 'beam')) {
   const n = b.g.mirrors.length, total = 2 ** n;
   const wins = [];
+  let reach = 0;
   for (let m = 0; m < total; m++) {
     const orient = Array.from({ length: n }, (_, i) => (m >> i) & 1);
-    if (beamTrace(b.g, orient).hit) wins.push(orient.join(''));
+    const t = beamTrace(b.g, orient);
+    if (t.reach) reach++;
+    if (t.hit) wins.push(orient.join(''));
   }
   const startSolved = beamTrace(b.g, b.g.start).hit;
   const minFlips = wins.length
@@ -24,7 +27,8 @@ for (const b of BEATS.filter((x) => x.game === 'beam')) {
   const ok = wins.length > 0 && !startSolved;
   if (!ok) bad++;
   console.log(
-    `${ok ? 'OK  ' : 'FAIL'} ${b.id.padEnd(20)} ${n} mirrors  ${String(wins.length).padStart(2)}/${total} solve` +
+    `${ok ? 'OK  ' : 'FAIL'} ${b.id.padEnd(20)} ${n} mirrors ${(b.g.waypoints || []).length} lanterns  ` +
+    `${String(reach).padStart(2)}/${total} reach the target, ${wins.length} light everything` +
     `  min ${minFlips} flips${startSolved ? '  <-- STARTS SOLVED' : ''}${wins.length ? '' : '  <-- UNSOLVABLE'}`
   );
   if (wins.length && wins.length <= 4) console.log(`      solutions: ${wins.join(' ')}`);

@@ -109,8 +109,9 @@ function crackRender(g) {
 // Mirror Buckler Jack chose in the Hollow, finally doing something.
 //
 // Grid geometry is shared so every layout reads the same way.
-const CELL = 18, OX = 100, OY = 32;
-const cx = (c) => OX + c * CELL + CELL / 2;
+const CELL = 18, OY = 30;
+const ox = (bg) => 160 - bg.cols * CELL / 2;
+const cx = (bg, c) => ox(bg) + c * CELL + CELL / 2;
 const cy = (r) => OY + r * CELL + CELL / 2;
 
 // Deterministic trace: walk cell to cell, turning at mirrors, stopping at
@@ -131,7 +132,8 @@ export function beamTrace(bg, orient) {
     if (bg.blocks && bg.blocks.some(([bc, br]) => bc === c && br === r)) { pts.push([c, r]); break; }
     pts.push([c, r]);
   }
-  return { pts, hit };
+  const lit = (bg.waypoints || []).map(([wc, wr]) => pts.some(([c, r]) => c === wc && r === wr));
+  return { pts, reach: hit, lit, hit: hit && lit.every(Boolean) };
 }
 
 function beamInit(b) {
@@ -151,30 +153,36 @@ function beamUpdate(g, b, dt, input) {
     g.orient[g.sel] ^= 1;
     g.moves++;
     Object.assign(g, beamTrace(b.g, g.orient));
-    if (g.hit) { kick(1.2); burst(cx(b.g.target[0]), cy(b.g.target[1]), 16, '#fff0a0', 90); }
+    if (g.hit) { kick(1.2); burst(cx(b.g, b.g.target[0]), cy(b.g.target[1]), 16, '#fff0a0', 90); }
     else { sfxHit(); }
   }
   return false;
 }
 function beamRender(g, b) {
-  const bg = b.g;
-  rect(OX - 4, OY - 4, bg.cols * CELL + 8, bg.rows * CELL + 8, { fill: '#0b0a14cc' });
-  for (let c = 0; c < bg.cols; c++) for (let r = 0; r < bg.rows; r++) circle(cx(c), cy(r), 1, { fill: '#3a3450' });
-  // The beam, drawn before the pieces so mirrors sit on top of it.
+  const bg = b.g, X = ox(bg);
+  rect(X - 4, OY - 4, bg.cols * CELL + 8, bg.rows * CELL + 8, { fill: '#0b0a14cc' });
+  for (let c = 0; c < bg.cols; c++) for (let r = 0; r < bg.rows; r++) circle(cx(bg, c), cy(r), 1, { fill: '#3a3450' });
   for (let i = 1; i < g.pts.length; i++) {
     const a = g.pts[i - 1], p = g.pts[i];
-    line(cx(a[0]), cy(a[1]), cx(p[0]), cy(p[1]), { stroke: g.hit ? '#fff0a0' : '#e8b92399', lineWidth: g.hit ? 3 : 2 });
+    line(cx(bg, a[0]), cy(a[1]), cx(bg, p[0]), cy(p[1]), { stroke: g.hit ? '#fff0a0' : '#e8b92399', lineWidth: g.hit ? 3 : 2 });
   }
-  for (const [c, r] of bg.blocks || []) rect(cx(c) - 7, cy(r) - 7, 14, 14, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
+  for (const [c, r] of bg.blocks || []) rect(cx(bg, c) - 7, cy(r) - 7, 14, 14, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
+  // Lanterns. Reaching the target is easy; reaching it having lit all of
+  // these is the puzzle, and it is why flipping one mirror at a time to
+  // see what happens stops being a strategy.
+  (bg.waypoints || []).forEach(([c, r], i) => {
+    circle(cx(bg, c), cy(r), 5, { fill: g.lit[i] ? '#fff0a0' : '#2a2438', stroke: g.lit[i] ? '#fff0a0' : '#6a5a8a', lineWidth: 1 });
+  });
   bg.mirrors.forEach(([c, C], i) => {
-    const x = cx(c), y = cy(C), d = 6, sel = i === g.sel;
+    const x = cx(bg, c), y = cy(C), d = 6, sel = i === g.sel;
     if (sel) circle(x, y, 11, { stroke: '#e8b923', lineWidth: 1 });
     line(x - d, y + (g.orient[i] ? -d : d), x + d, y + (g.orient[i] ? d : -d), { stroke: sel ? '#fff' : '#9fd4f0', lineWidth: 3 });
   });
   const [tc, tr] = bg.target;
-  circle(cx(tc), cy(tr), g.hit ? 8 : 6, { stroke: g.hit ? '#fff0a0' : '#c9975a', lineWidth: 2 });
+  circle(cx(bg, tc), cy(tr), g.hit ? 8 : 6, { stroke: g.hit ? '#fff0a0' : g.reach ? '#e8735a' : '#c9975a', lineWidth: 2 });
   strip();
-  text(`mirror ${g.sel + 1}/${bg.mirrors.length}    moves ${g.moves}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
+  const n = (bg.waypoints || []).length;
+  text(`mirror ${g.sel + 1}/${bg.mirrors.length}    lanterns ${g.lit.filter(Boolean).length}/${n}    moves ${g.moves}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
 }
 
 // --- lights: work out the order, do not memorise it ---------------------
@@ -328,39 +336,59 @@ function chaseRender(g, b) {
   rect(10 + 300 * Math.max(0, g.edge), 4, 2, 8, { fill: '#e8735a' });
 }
 
-// --- stillness: breathe, and let them come to you ----------------------
-// Ported from the original build's observe-choice scene, which asked the
-// player to hold ACT to remain perfectly still while the unicorns
-// approached. One button, one value: holding raises the breath, releasing
-// lets it fall, and the calm band drifts - so it is modulation rather than
-// the steering every other mechanic asks for. The payoff is drawn, not
-// described: the unicorn walks closer the longer you hold your nerve.
-function stillInit() { return { level: .5, near: 0, t: 0, calm: false }; }
+// --- stillness: move only when the whole herd is grazing ----------------
+// The first version drew a calm band and asked you to keep a marker inside
+// it, which is a following exercise, not a watching one. The herd version
+// asks the actual question the scene asks: *when is it safe to move?* Each
+// unicorn lifts its head on its own rhythm, and Lili may only creep
+// forward while every head is down - so the player has to read three
+// clocks at once and find the window where they agree. The heads telegraph
+// before they lift; that tell is the whole skill.
+const HERD = [[2.4, .72, 0], [3.3, .68, .8], [4.1, .74, 1.9]];
+const headUp = (u, t) => ((t / u[0] + u[2]) % 1) >= u[1];
+const rising = (u, t) => !headUp(u, t) && ((t / u[0] + u[2]) % 1) >= u[1] - .12;
+
+function stillInit() { return { near: 0, t: 0, spooked: 0, moving: false }; }
 function stillUpdate(g, b, dt, input) {
   g.t += dt;
-  g.level = Math.max(0, Math.min(1, g.level + (input.heldAct ? .62 : -.55) * dt));
-  const zone = .5 + Math.sin(g.t * .7) * (b.g.drift ?? .22);
-  g.calm = Math.abs(g.level - zone) <= (b.g.band ?? .13);
-  g.near = Math.max(0, g.near + (g.calm ? dt * .42 : -dt * .3));
-  if (g.calm && Math.random() < dt * 6) burst(150 + Math.random() * 40, 70, 1, '#e8d9a0', 20);
+  g.spooked = Math.max(0, g.spooked - dt);
+  const safe = !HERD.some((u) => headUp(u, g.t));
+  g.moving = input.heldAct && !g.spooked;
+  if (g.moving) {
+    if (safe) {
+      g.near += dt * .55;
+      if (Math.random() < dt * 8) burst(60 + g.near * 90, 96, 1, '#e8d9a0', 22);
+    } else {
+      g.spooked = 1.2;
+      g.near = Math.max(0, g.near - .2);
+      kick(1.7);
+      sfxNo();
+    }
+  }
   return g.near >= 1;
 }
-function stillRender(g, b) {
-  // The unicorn is the meter: it is nearer when you are calmer.
-  paintFace('unicorn', 250 - g.near * 60, 92 - g.near * 14, .3 + g.near * .34, g.t, false, true);
-  const x = 22, top = 34, h = 74;
-  const zone = .5 + Math.sin(g.t * .7) * (b.g.drift ?? .22), band = b.g.band ?? .13;
-  rect(x, top, 7, h, { fill: '#0009' });
-  rect(x, top + h * (1 - zone - band), 7, h * band * 2, { fill: g.calm ? '#fff0a066' : '#c9975a44' });
-  rect(x - 2, top + h * (1 - g.level) - 1, 11, 3, { fill: g.calm ? '#fff0a0' : '#e8b923' });
+function stillRender(g) {
+  const safe = !HERD.some((u) => headUp(u, g.t));
+  // The herd reads at a glance: head down is safe, head up is caught, and
+  // the amber lean in between is the warning you learn to move off.
+  HERD.forEach((u, i) => {
+    const up = headUp(u, g.t), warn = rising(u, g.t);
+    const y = 96 - (up ? 18 : 0);
+    paintFace('unicorn', 148 + i * 58, y, .34, g.t, false, true);
+    circle(148 + i * 58, y + 22, 3, { fill: up ? '#e8735a' : warn ? '#e8b923' : '#7cb56a' });
+  });
+  // Lili, closing the distance she has earned.
+  circle(46 + g.near * 88, 104, 4, { fill: g.spooked ? '#e8735a' : '#e8cdb0' });
+  rect(0, 116, 320, 2, { fill: safe ? '#7cb56a55' : '#e8735a55' });
   strip();
-  meter(10, 6, 300, g.near, g.calm ? '#fff0a0' : '#8a7a5a');
+  meter(10, 6, 240, g.near, g.spooked ? '#e8735a' : safe ? '#fff0a0' : '#8a7a5a');
+  text(safe ? 'still' : 'watching', 268, 11, { fill: safe ? '#7cb56a' : '#e8735a', font: '8px system-ui' });
 }
 
 export const GAMES = {
   crack: { init: crackInit, update: crackUpdate, render: crackRender, hint: '← → choose a pane    SPACE strike' },
-  beam: { init: beamInit, update: beamUpdate, render: beamRender, hint: '← → pick a mirror    SPACE turn it' },
+  beam: { init: beamInit, update: beamUpdate, render: beamRender, hint: '← → pick a mirror    SPACE turn it - light every lantern' },
   lights: { init: lightsInit, update: lightsUpdate, render: lightsRender, hint: '← → choose    SPACE add to the order' },
   chase: { init: chaseInit, update: chaseUpdate, render: chaseRender, hint: 'SPACE jumps the holes - but never under an arch' },
-  stillness: { init: stillInit, update: stillUpdate, render: stillRender, hint: 'hold SPACE to breathe - keep the mark in the light' },
+  stillness: { init: stillInit, update: stillUpdate, render: stillRender, hint: 'hold SPACE to creep closer - only while every head is down' },
 };

@@ -72,10 +72,12 @@ const SOLVERS = {
     const pick = viable[0] || perms[0];
     return toCursor(g.cursor, pick[g.guess.length], g.n);
   },
-  stillness(g, b) {
-    // Read the drifting calm band the gauge draws and breathe toward it.
-    const zone = .5 + Math.sin(g.t * .7) * (b.g.drift ?? .22);
-    return input({ heldAct: g.level < zone });
+  stillness(g) {
+    // Watch the same three heads the player does, and move only when they
+    // all agree - including not starting a move a head is about to end.
+    const herd = [[2.4, .72, 0], [3.3, .68, .8], [4.1, .74, 1.9]];
+    const up = (u, t) => ((t / u[0] + u[2]) % 1) >= u[1];
+    return input({ heldAct: !herd.some((u) => up(u, g.t) || up(u, g.t + .08)) });
   },
   chase(g, b) {
     // Holes want a jump, arches want the opposite - so look at what is

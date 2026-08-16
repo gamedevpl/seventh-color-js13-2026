@@ -14,7 +14,7 @@ export const BEATS = [
   },
   {
     id: 'jacks-glade', bg: 'glade', music: 'wonder',
-    faces: [{ key: 'jack', x: 96, y: 68, scale: .72 }, { key: 'lili', x: 220, y: 64, scale: .72 }],
+    faces: [{ key: 'jack', x: 96, y: 68, scale: .72 }, { key: 'lili', x: 220, y: 64, scale: .72, blind: 3 }],
     dialogue: [
       { who: 'lili', text: 'You hide better than any fox, Jack.' },
       { who: 'jack', text: 'The forest tells me when you are near.' },
@@ -26,13 +26,13 @@ export const BEATS = [
   },
   {
     id: 'unicorn-stream', bg: 'stream', music: 'wonder',
-    faces: [{ key: 'jack', x: 76, y: 62, scale: .66 }, { key: 'lili', x: 140, y: 60, scale: .66 }],
+    faces: [{ key: 'jack', x: 30, y: 58, scale: .48 }, { key: 'lili', x: 84, y: 58, scale: .48, blind: 0 }],
     dialogue: [
       { who: 'jack', text: 'Keep still. They come to the water at moonrise.' },
       { who: 'lili', text: 'I only want them to know I mean no harm.' },
     ],
-    game: 'stillness', g: { band: .13, drift: .22 },
-    gamePrompt: 'Breathe with them. Move, and they are gone.',
+    game: 'stillness', g: {},
+    gamePrompt: 'Three of them, three rhythms. Wait for the moment they agree.',
     successDialogue: [
       { who: 'lili', text: 'It let me touch it. Jack, it let me -' },
     ],
@@ -106,10 +106,12 @@ export const BEATS = [
       { who: 'meg', text: 'Magnificent? Say that again, morsel.' },
     ],
     game: 'beam', g: {
-      cols: 7, rows: 4, entry: [0, 1, 1, 0], target: [5, 0],
-      mirrors: [[2, 1], [2, 3], [5, 3]], start: [0, 0, 0],
+      cols: 7, rows: 4, entry: [0, 1, 1, 0], target: [3, 3],
+      mirrors: [[3, 0], [5, 1], [3, 1], [5, 0]],
+      waypoints: [[4, 0], [4, 1]],
+      start: [1, 1, 0, 0],
     },
-    gamePrompt: 'Bend the moonlight onto Meg. Turn each mirror.',
+    gamePrompt: 'Light every lantern on the way to Meg - not just Meg.',
     successDialogue: [
       { who: 'jack', text: 'My knees shook. My hand did not.' },
     ],
@@ -208,11 +210,12 @@ export const BEATS = [
       { who: 'darkness', text: 'A parlor trick will not unmake me, child.' },
     ],
     game: 'beam', g: {
-      cols: 7, rows: 4, entry: [0, 0, 1, 0], target: [6, 2],
-      mirrors: [[1, 0], [1, 3], [4, 3], [4, 1], [6, 1]], blocks: [[3, 0], [5, 2]],
-      start: [0, 1, 0, 1, 0],
+      cols: 8, rows: 4, entry: [4, 0, 0, 1], target: [1, 3],
+      mirrors: [[1, 2], [4, 3], [6, 1], [6, 3], [0, 1], [0, 2]],
+      waypoints: [[5, 3], [6, 2], [5, 1]],
+      start: [0, 0, 0, 0, 0, 0],
     },
-    gamePrompt: 'Turn his own light back on him. Every mirror counts.',
+    gamePrompt: 'Every lantern, then him. Reaching him alone is his trick.',
     successDialogue: [
       { who: 'jack', text: 'You were never the night. You were only its shadow.' },
     ],
@@ -240,11 +243,12 @@ export const BEATS = [
       { who: 'jack', text: 'Then the stolen light must remember where it belongs.' },
     ],
     game: 'beam', g: {
-      cols: 7, rows: 4, entry: [0, 2, 1, 0], target: [6, 3],
-      mirrors: [[2, 2], [2, 0], [4, 0], [4, 3]], blocks: [[5, 1]],
-      start: [1, 1, 0, 0],
+      cols: 8, rows: 4, entry: [0, 0, 1, 0], target: [5, 3],
+      mirrors: [[2, 0], [5, 1], [2, 3], [0, 1], [0, 3]],
+      waypoints: [[1, 3], [0, 2]],
+      start: [0, 0, 0, 0, 0],
     },
-    gamePrompt: 'Thread the light back into the horn.',
+    gamePrompt: 'Gather every spark, then thread it into the horn.',
     successDialogue: [
       { who: 'gump', text: 'The stallion rises. Spring has found the forest again.' },
     ],

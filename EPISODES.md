@@ -177,7 +177,7 @@ Three episodes, each led by its strongest mechanic, each with its own theme hook
 
 | # | title | window (distilled) | lead mechanic | measured / starting gap |
 | --- | --- | --- | --- | ---: |
-| 1 | **The Frozen Pond** | shadow-council → frozen-pond, skipping blindfold-path | Ice Rain (built) | 18,538 B, over by 5,226 — floor diet next |
+| 1 | **The Frozen Pond** | shadow-council → frozen-pond, skipping blindfold-path | Ice Rain (built) | 18,438 B, over by 5,126 — see progress log below |
 | 2 | **The Dark Castle** | castle-descent → dark-kitchen, recap card for ch III | kitchen stealth + cage escape | measured 23,238 undistilled; the deep-cut episode |
 | 3 | **The Last Ray** | reflector-chain → forest-vow, heavy cast trim | reflector relay + last stand | measured window subsets 18–22 KB undistilled |
 
@@ -212,3 +212,24 @@ a greeting line, never as a gate.
 - **Time.** Three episodes in four weeks means roughly a week per episode plus
   slack, and the prologue took most of a week. The scope dial, folds, and this
   measurement harness are the reason to believe the later episodes go faster.
+
+## Episode 1 progress log
+
+Prologue kept (user decision, weighing narrative legibility against 1,569 bytes).
+Working forward from 18,538 B / over by 5,226:
+
+| cut | zip | delta |
+| --- | ---: | ---: |
+| jack/lili hair detail invisible at ~15px body scale (curl counts, headband, highlight ellipses) | 18,438 | −100 |
+
+**Honest read on the rate:** a real, screenshot-verified, visually-lossless trim
+bought 100 bytes. Closing the remaining 5,126 at that rate is ~50 more passes of
+this size — jack, lili, and the unicorn each have room for one or two more
+(unexamined so far: the unicorn's front-facing paint path, `paintFrontUnicorn`,
+never fires in this episode since every `actor()` call here uses yaw ±90°, but
+the scope dial has no way to prove a runtime yaw value unreachable the way it
+proves a scene mode unreachable — that would need new tooling, not just an edit).
+Past the easy visual trims, the remaining gap is prose (narrative cost) or a
+genuine engine-level cut (none found yet — see the retracted rig lever above).
+Next step is the user's call: keep grinding per-character trims, accept a
+narrower episode window, or take the prologue-drop trade after all.

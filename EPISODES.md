@@ -362,9 +362,9 @@ those scenes.
 | 3 | The Root Door | in progress — 17,919, over by 4,607 — cold open + Brown Tom trim done |
 | 4 | The Gown That Breathes | **shipping** — 12,297 B, headroom 1,015 — closed by staging Lili as a portrait, which drops the whole body rig (see below) |
 | 5 | The Last Turn | in progress — 18,120, over by 4,808 — Luna trim done |
-| 6 | The Seventh Color | in progress — 17,963, over by 4,651 — ring-pond skipped, biggest single cut in the series so far |
+| 6 | The Seventh Color | in progress — this row is superseded, see "Status after episode 6's redesign" near the end of this document for the current, portrait-staged number |
 
-Episodes 2, 3, 5 and 6 are not ready to submit. Every number above is a real,
+Episodes 2, 3 and 5 are not ready to submit. Every number above is a real,
 pipeline-measured, `VERIFY OK`-checked baseline confirmed by screenshot, not
 an estimate — every episode in the series has now been built at least once
 and shown to boot, render, and play through its own window correctly. Two
@@ -626,3 +626,66 @@ this trades away the stallion's healing rise, the visual payoff the whole
 restoration mechanic exists to deliver. That is a real narrative cost this
 document isn't positioned to accept on its own; flagged for the user rather
 than built.
+
+## The bespoke-animation hypothesis: built, and it worked
+
+Went ahead and built it. The stallion's rise became a horn returning on an
+otherwise-still portrait — `paintUnicornFrontFace`'s existing `horned`
+toggle, the same reveal-through-a-face language `living-gown` already uses.
+Luna was cut outright rather than staged: her only line in this stretch is
+in `ring-pond`, which the episode already skips, so she was decorative in
+both remaining scenes. Every `actor()` call is gone from both files.
+
+| episode 6 (`spring-remembers`→`forest-vow`, `ring-pond` skipped) | zip | over budget |
+| --- | ---: | ---: |
+| rig-based, as originally built | 17,966 | +4,654 |
+| portraits, both rig modules folded | 13,880 | **+568** |
+
+**−4,086 bytes.** Bigger than episode 4's win, because two rig modules
+(human biped and creature) folded here instead of one. Confirmed booting and
+rendering correctly at both ends of the window — the aiming mechanic reads
+as attached to the unicorn's snout, the reunion portraits read as an
+ensemble around the bloom effect, nothing was left visually orphaned.
+
+A handful of small follow-on cuts closed some of the rest: dropping two
+purely-decorative flourish loops (background sparkle/shimmer that added
+nothing the mechanics needed) and one halo left over from the pre-portrait
+jack position saved another 139 bytes combined, and `-O2` roadroller (the
+same lever episode 4 used) found 29 more over several rolls. None of it
+came from touching dialogue — prose remains untouched, consistent with the
+earlier finding that it isn't where the bytes are.
+
+**568 bytes remain, and this document is stopping the squeeze here rather
+than chasing them.** Both scenes independently fit inside budget alone
+(12,599 and 12,703 respectively) — the residual is genuinely the second
+scene's own mode/dispatch cost (`'epilogue'` next to `'restoration'`, plus
+`choiceFromClick`'s machinery, which no other scene in this window needs),
+not a mistake sitting in the code waiting to be found. Closing it further
+means either a real merge into one mode (the `runtime.ts` scene-index risk
+flagged earlier, still unresolved) or a genuine content cut — and 568 bytes
+against a 4,654-byte start is a result worth stopping to report rather than
+grinding toward zero.
+
+**The generalized lesson, stated plainly:** the portrait trick isn't
+specific to `living-gown`. It applies to *any* scene where the cast's actual
+motion is decorative to the mechanic rather than load-bearing to it — which
+turned out to include a scene built around an aim-and-aligning-a-body
+mechanic, not just a static riddle. The tell is checking each `actor()`
+call's `motion` argument: if everyone is `'stand'` except the one moment a
+mechanic's payoff needs, that moment can very often be redrawn bespoke
+instead, and the whole rig goes with it.
+
+## Status after episode 6's redesign
+
+| # | title | status |
+| --- | --- | --- |
+| 1 | Winter Falls | prologue alone shipping — 13,270 B, headroom 42 |
+| 4 | The Gown That Breathes | shipping — 12,297 B, headroom 1,015 |
+| 6 | The Seventh Color | **not yet shipping — 13,880 B, over by 568**, down from 4,654 |
+
+Episodes 2, 3 and 5 haven't been re-attempted with the portrait lens yet.
+Whether it generalizes further depends on the same tell above — `castle-
+descent`/`throne-pursuit`, both built around walking and running, look like
+worse candidates than `iron-cage`/`meg-encounter`, which read more like
+confrontations than chases. Not measured; flagged for whichever gets picked
+up next.

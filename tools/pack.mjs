@@ -171,6 +171,10 @@ const mangleMode = off('mangleProps') ? false : config.transforms.mangleProps;
 // with acorn, not a regex — an apostrophe inside prose desyncs any quote-parity
 // scan and silently drops every capture after it.
 const reserved = collectStringTokens(js);
+// toplevel mangling was tried here and measured at zero effect: esbuild's own
+// bundler already renames every top-level binding to a short name during the
+// minify step above (bundling in iife format with no export surface makes
+// that safe for esbuild too), so terser finds nothing left to shorten.
 const mangle =
   mangleMode === 'max' ? { properties: { keep_quoted: 'strict', reserved } }
   : mangleMode === 'underscore' ? { properties: { regex: /^_/ } }

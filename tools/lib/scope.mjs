@@ -87,19 +87,34 @@ export const MODE_MODULES = {
   epilogue: ['epilogue-logic.ts', 'epilogue-render.ts'],
 };
 
-export function planScope(scenes, endAt) {
+export function planScope(scenes, endAt, startAt = null) {
   const index = scenes.all.findIndex((s) => s.id === endAt);
   if (index < 0) {
     throw new Error(`scope: no scene "${endAt}". Known ids:\n  ${scenes.all.map((s) => s.id).join('\n  ')}`);
   }
-  const kept = scenes.all.slice(0, index + 1);
+  // The other end of the dial: an episode that begins mid-story. The game
+  // boots from STORY_SCENES[0] (entry position, opening music) and advances
+  // by nextSceneId link, with no cross-scene inventory to carry — verified by
+  // scan, not assumed — so dropping the scenes before `startAt` makes the
+  // first kept scene the cold open with no further surgery.
+  const startIndex = startAt ? scenes.all.findIndex((s) => s.id === startAt) : 0;
+  if (startIndex < 0) {
+    throw new Error(`scope: no scene "${startAt}". Known ids:\n  ${scenes.all.map((s) => s.id).join('\n  ')}`);
+  }
+  if (startIndex > index) throw new Error(`scope: startAt "${startAt}" comes after endAt "${endAt}"`);
+  const kept = scenes.all.slice(startIndex, index + 1);
   const modes = new Set(kept.map((s) => s.mode).filter(Boolean));
   const dropped = [];
   for (const [mode, files] of Object.entries(MODE_MODULES)) if (!modes.has(mode)) dropped.push(...files);
+  const mainEnd = Math.min(index + 1, scenes.main.length);
+  const skipMain = Math.min(startIndex, scenes.main.length);
+  const skipFinale = Math.max(0, startIndex - scenes.main.length);
   return {
     kept,
-    keepMain: Math.min(kept.length, scenes.main.length),
-    keepFinale: Math.max(0, kept.length - scenes.main.length),
+    keepMain: Math.max(0, mainEnd - skipMain),
+    skipMain,
+    keepFinale: Math.max(0, index + 1 - scenes.main.length - skipFinale),
+    skipFinale,
     lastSceneId: kept[kept.length - 1].id,
     modes: [...modes],
     music: [...new Set(kept.map((s) => s.music).filter(Boolean))],
@@ -117,13 +132,13 @@ export function planScope(scenes, endAt) {
  * left exactly as written — this only rewrites a scene that would otherwise
  * link to somewhere the build no longer contains.
  */
-export function truncateAndClose(js, name, keep, { dropSpread, closeLast, outcome = 'won', delayFrames = 8 }) {
+export function truncateAndClose(js, name, keep, { skip = 0, dropSpread, closeLast, outcome = 'won', delayFrames = 8 }) {
   const array = findArray(js, name);
   const objects = array.elements.filter((e) => e.type === 'ObjectExpression');
   const spread = array.elements.find((e) => e.type === 'SpreadElement');
-  if (keep > objects.length) throw new Error(`scope: ${name} holds ${objects.length} scenes, cannot keep ${keep}`);
+  if (skip + keep > objects.length) throw new Error(`scope: ${name} holds ${objects.length} scenes, cannot keep ${skip}+${keep}`);
 
-  const pieces = objects.slice(0, keep).map((node, i) => {
+  const pieces = objects.slice(skip, skip + keep).map((node, i) => {
     let text = js.slice(node.start, node.end);
     if (!(closeLast && i === keep - 1)) return text;
     const facts = sceneFacts(node, js);

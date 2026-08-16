@@ -125,12 +125,12 @@ async function bundleGame(stubs, applyScope = false) {
             const close = { outcome: config.scope?.outcome ?? 'won', delayFrames: config.scope?.delayFrames ?? 8 };
             if (base === 'story-slice-data.ts') {
               return { contents: truncateAndClose(js(), 'STORY_SCENES', scope.keepMain, {
-                dropSpread: scope.keepFinale === 0, closeLast: scope.keepFinale === 0, ...close,
+                skip: scope.skipMain, dropSpread: scope.keepFinale === 0, closeLast: scope.keepFinale === 0, ...close,
               }), loader: 'js' };
             }
             if (base === 'story-slice-finale-data.ts') {
               return { contents: truncateAndClose(js(), 'FINAL_STORY_SCENES', scope.keepFinale, {
-                dropSpread: false, closeLast: scope.keepFinale > 0, ...close,
+                skip: scope.skipFinale, dropSpread: false, closeLast: scope.keepFinale > 0, ...close,
               }), loader: 'js' };
             }
             if (cast?.droppedIds.length) {
@@ -216,7 +216,8 @@ if (flag('scenes')) {
   process.exit(0);
 }
 const endAt = flag('endAt') || config.scope?.endAt || null;
-const scope = endAt ? planScope(scenes, endAt) : null;
+const startAt = flag('startAt') || config.scope?.startAt || null;
+const scope = endAt ? planScope(scenes, endAt, startAt) : null;
 // Cast the scoped story never stages. Their art is unreachable, so the
 // comparisons that select it fold to constants and terser clears the rest.
 const castJs = asJs(path.join(gameSrcDir, 'cast-data.ts'));
@@ -242,7 +243,7 @@ if (sceneFields) {
   console.log(`  scene painters folded out: ${deadArt} art, ${deadModes} modes`);
 }
 if (scope) {
-  console.log(`scope: ending at "${scope.lastSceneId}" — ${scope.kept.length}/${scope.totalScenes} scenes,`
+  console.log(`scope: ${startAt ? `"${scope.kept[0].id}" through` : 'ending at'} "${scope.lastSceneId}" — ${scope.kept.length}/${scope.totalScenes} scenes,`
     + ` ${scope.modes.length} modes, ${scope.music.length} tracks, ${scope.cast.length} cast`);
   if (scope.droppedModules.length) console.log(`  unreachable minigames stubbed: ${scope.droppedModules.length / 2}`);
   if (cast?.droppedIds.length) console.log(`  cast never staged, art folded out: ${cast.droppedIds.join(', ')}`);

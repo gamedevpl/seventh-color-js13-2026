@@ -36,6 +36,7 @@ www.gamedev.pl-games                    seventh-color-js13-2026
 | `node tools/scene-weight.mjs --curve` | cumulative zip size by story chapter (scene arrays truncated at real boundaries) |
 | `node tools/pull.mjs --scenes` | list every scene id the scope dial can be set to |
 | `node tools/pull.mjs --endAt <id>` | build as if the story ended at that scene |
+| `node tools/pull.mjs --startAt <id> --endAt <id>` | build a standalone mid-story episode (see [`EPISODES.md`](./EPISODES.md)) |
 | `npm run size:fast` | pack without roadroller — quicker, for A/B-ing a single change |
 
 `npm run pack -- --strict` exits non-zero when the zip is over budget. Nothing uses it yet,

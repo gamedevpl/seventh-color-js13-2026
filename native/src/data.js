@@ -170,7 +170,7 @@ export const BEATS = [
   },
   {
     id: 'spring-remembers', bg: 'stream', drone: 130,
-    faces: [{ key: 'gump', x: 78, y: 82, scale: .58 }, { key: 'jack', x: 158, y: 76, scale: .68 }],
+    faces: [{ key: 'gump', x: 78, y: 82, scale: .58 }, { key: 'jack', x: 158, y: 76, scale: .68 }, { key: 'unicorn', x: 240, y: 92, scale: .5 }],
     dialogue: [
       { who: 'gump', text: 'The stallion still waits beneath the winter spell.' },
       { who: 'jack', text: 'Then the stolen light must remember where it belongs.' },
@@ -187,6 +187,7 @@ export const BEATS = [
     faces: [
       { key: 'jack', x: 108, y: 62, scale: .68 },
       { key: 'lili', x: 212, y: 62, scale: .68 },
+      { key: 'unicorn', x: 280, y: 108, scale: .32 },
     ],
     dialogue: [
       { who: 'lili', text: 'The forest remembers spring - and I remember your hand.' },

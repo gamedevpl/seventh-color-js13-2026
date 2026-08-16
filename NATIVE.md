@@ -163,6 +163,12 @@ all in under 2.3 KB combined.
 integration, polish). The whole twelve-beat story, every mechanic, and
 audio all fit in under half the budget.
 
+M5 (the rainbow bloom, the unicorn's restoration actually staged, final
+gate) landed at **6,523 final, +126 over M4**. **Ship state: 6,523 zipped
+against a 13,312 ceiling — 6,789 bytes of headroom, 52% of the budget
+unused**, with every milestone gate passed on the worst of at least one
+`-O1` roadroller roll and the final one checked against the worst of 5.
+
 ## Build and measurement harness
 
 - `tools/native.mjs`: esbuild `src/main.js` → terser (reusing
@@ -415,3 +421,78 @@ four mechanics across all twelve beats (icerain, lights, dial ×2, chase)
 plus every choice - reaches `P.END` at `seventh-color` cleanly. Each new
 painter confirmed visually via targeted screenshots (temporary debug
 start-points, reverted before committing, same as M3).
+
+### M5 — the theme, made literal; the unicorn actually restored: SHIP
+
+The 2026 theme arrived mid-build: **rainbows and unicorns**, with the user
+noting the resemblance to *Legend* (1985) — a unicorn, a Lord of Darkness,
+color stolen from the world — which the story had already been telling for
+three sessions before the theme was known. Nothing about the plot needed
+changing; what needed doing was making the theme *legible*, not just present.
+
+Two additions, one shared visual:
+
+1. **A rainbow bloom** - seven concentric rings, seven colors, one
+   function (`bloom()` in `main.js`) used at both the title screen (a
+   small accent, a promise) and the ending (full-size, the promise kept).
+   Not two effects; one, parameterized by position and radius, the same
+   "one thing, not two" instinct this whole rewrite has run on. +137 bytes.
+2. **The unicorn's restoration, actually staged.** Caught in review, not
+   requested: `spring-remembers` - the beat literally about restoring the
+   unicorn's horn - never showed the unicorn. Added it, anchored exactly
+   on the `dial` mechanic's own coordinates so the turning needle reads as
+   *the player aligning the horn itself*, not a coincidence of two things
+   sharing a scene. Wired `horned` to the beat's actual mechanic state
+   (`!b.game || phase === P.SUCCESS`) rather than a fixed flag - hornless
+   through the dialogue and the attempt, restored the instant the mechanic
+   resolves, so the visual payoff is earned, not decorative. Also gave the
+   unicorn a small cameo in the finale, confirming the restoration held.
+   Caught one bug in this same pass: the first version of the `horned`
+   condition (`phase !== P.GAME`) was true during the *pre-attempt*
+   dialogue too, showing a restored horn before the player had done
+   anything - a screenshot at that exact moment caught it, fixed by
+   requiring `phase === P.SUCCESS` specifically. +20 bytes.
+
+`esbuild` bundle 31,102 → terser+mangle 18,795 → **zip 6,523**. Ship gate
+was ≤13,312 with ≥150 headroom on the worst of 5 `-O1` rolls; actual worst
+of 5 was 6,524, best 6,517 - **6,789 bytes of headroom, 52% of the entire
+budget unused.**
+
+Verified the same two ways as every milestone: the Node-level integration
+test (all four mechanics, all twelve beats, every choice, reaches `P.END`)
+re-run clean after every change in this pass, and targeted screenshots for
+each visual claim - the bloom at both the title and the ending, the
+unicorn hornless during dialogue, hornless mid-`dial`, and horned in the
+finale cameo. Nothing shipped on "it should work."
+
+## Where this leaves the project
+
+Five milestones, five gates, all passed with real margin:
+
+| | ceiling | worst-of-N | margin |
+| --- | ---: | ---: | ---: |
+| M0 - boot floor | 1,500 | 1,048 | 452 |
+| M1 - story machine + 1 portrait | 4,000 | 2,242 | 1,758 |
+| M2 - 6 portraits, full machine, spine | 6,500 | 3,569 | 2,931 |
+| M3 - 3 mechanics (not 4), chase priced | 9,500 | 5,151 | 4,349 |
+| M4 - all 12 beats, audio, chase shipped | 12,100 | 6,408 | 5,692 |
+| M5 - theme, ship | 13,162 | 6,524 | 6,788 |
+
+The premise the plan opened with - that a native floor would land two
+orders of magnitude below the transform pipeline's ~12.3 KB inherited
+floor - held at every single gate, not just at M0. The whole twelve-beat
+story, four working mechanics (one of them reused twice by design), six
+animated portraits, seven location painters, a full audio layer, and
+theme-integrated polish together cost **less than half** what the old
+pipeline's engine-and-harness alone cost before a single scene shipped.
+
+Per the plan's risk structure: the episode series (episodes 1, 2, and 4,
+all shipping, all under budget, all still committed and pushed) remains
+the fallback that needed no rescuing. This rewrite is not a fallback - it
+is a complete, verified, theme-integrated, comfortably-under-budget js13k
+2026 entry telling the whole story in one submission, which is what the
+episode series was always working around not being able to do. The
+decision of which one becomes the actual competition submission - the
+whole story native, or the episode series as several entries - is the
+user's, not this document's; both now exist as real, working, measured
+artifacts rather than one plan and one compromise.

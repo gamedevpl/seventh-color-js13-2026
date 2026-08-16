@@ -1,4 +1,4 @@
-import { initDraw, clear, rect, text } from './draw.js';
+import { initDraw, clear, rect, circle, text } from './draw.js';
 import { SCENES } from './scenes.js';
 import { paintFace } from './faces.js';
 import { GAMES } from './games.js';
@@ -40,6 +40,17 @@ let droneBeat = null;
 
 function box(y, h) { rect(0, y, VW, h, { fill: '#0008' }); }
 
+// The theme, made literal rather than left implicit in a color-restoration
+// plot: seven concentric rings, seven colors, the same bloom both at the
+// title (a promise) and the ending (the promise kept) - one shared visual
+// for both, not two, per the project's running "one thing, not two" rule.
+const RAINBOW = ['#c9524f', '#d98a4a', '#d9c14f', '#7cb56a', '#5a9bb0', '#6b7ec9', '#9a6bc4'];
+function bloom(cx, cy, t, r0, spread) {
+  for (let i = 0; i < RAINBOW.length; i++) {
+    circle(cx, cy, r0 + i * spread + Math.sin(t * 1.5 + i) * 1.5, { stroke: RAINBOW[i], lineWidth: 2 });
+  }
+}
+
 function paintHud(b) {
   if (round.phase === P.GAME) {
     box(128, 28);
@@ -76,6 +87,7 @@ function frame(now) {
 
   if (mode === 'title') {
     clear(VW, VH, '#0a0710');
+    bloom(160, 120, now / 1000, 8, 3);
     text('THE SEVENTH COLOR', VW / 2, 68, { fill: '#e8b923', font: 'bold 16px system-ui', align: 'center' });
     text('tap or press space', VW / 2, 92, { fill: '#a89', font: '9px system-ui', align: 'center' });
     if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; droneBeat = null; }
@@ -88,8 +100,9 @@ function frame(now) {
 
     if (round.phase === P.END) {
       SCENES[b.bg](round.elapsed);
+      bloom(160, 58, round.elapsed, 12, 5);
       text('THE SEVENTH COLOR', VW / 2, 70, { fill: '#e8b923', font: 'bold 15px system-ui', align: 'center' });
-      text('tap or press space', VW / 2, 92, { fill: '#cba', font: '9px system-ui', align: 'center' });
+      text('tap or press space', VW / 2, 108, { fill: '#eee', font: '9px system-ui', align: 'center' });
       if (doAct) mode = 'title';
       requestAnimationFrame(frame);
       return;
@@ -97,7 +110,12 @@ function frame(now) {
 
     SCENES[b.bg](round.elapsed);
     const talker = paintHud(b);
-    for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, f.key === talker, f.key === 'unicorn');
+    // The horn returns as the mechanic's actual payoff, not a fixed
+    // decoration: hornless through this beat's dialogue and its game
+    // phase, restored only once that game resolves into SUCCESS. Beats
+    // with no game of their own (a later cameo) show it already restored.
+    const restored = !b.game || round.phase === P.SUCCESS;
+    for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, f.key === talker, f.key === 'unicorn' ? restored : undefined);
     if (round.phase === P.GAME) GAMES[b.game].render(round.g, b, round.elapsed);
 
     if (round.phase === P.CHOICE) {

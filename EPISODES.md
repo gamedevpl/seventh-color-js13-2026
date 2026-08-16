@@ -443,3 +443,43 @@ audited for a 13KB one. That's genuinely untried territory: not decoration
 to trim, but logic and rendering code that may have real structural slack —
 redundant math, over-parameterized state, unrolled loops doing what a
 smaller loop could. Pursuing this next.
+
+## Mechanic-code compaction: tried, retracted — same lesson as the rig diet
+
+Tested on `castle-descent` (cheapest single thick scene, +2,529 baseline),
+two genuinely different techniques, both measured honestly rather than
+assumed:
+
+- **DRY the state-machine logic.** Its three phase-transition blocks
+  (`storyPhase` 0/1/2) all repeat a "pressed + in range, then branch"
+  check. Factored into one `site()` helper. Net effect: **byte-neutral**
+  — `castle-descent` alone measured 15,846 → 15,826 (a 20B improvement,
+  itself within normal roadroller `-O1` jitter), but rebuilding the full
+  episode 3 (`castle-descent`+`iron-cage`) twice with the same change
+  landed at 17,965 then 17,918 — a 47-byte spread from nothing but
+  re-running the same build. The "saving" doesn't survive a second
+  measurement. Kept as a readability improvement, not a size win.
+- **Reduce background-loop density**, the same "fewer decorative elements"
+  technique that worked repeatedly on character faces (Lili's hair curls,
+  Meg's locks, Gump's spikes), applied instead to `roots()`'s environment
+  loops (8→6 root beams, 13→9 floor cracks, spacing adjusted to preserve
+  full-canvas coverage). Measured **flat to worse** (+18B vs. the
+  logic-only change). The reason clarifies the earlier wins rather than
+  contradicting them: the character-face trims cut *unrolled arrays of
+  coordinate literals* — real, redundant source text. These background
+  loops are already procedural (`x = 18 + i * 48`), generated from a
+  single loop variable — there was never unrolled data here to remove.
+  Changing the iteration count only edits one digit; there was nothing to
+  save. Reverted.
+
+**Conclusion, stated as plainly as the rig-diet retraction earlier in this
+document:** "compact the mechanic code" does not have the slack either the
+plan or intuition suggested, at least not via these two natural approaches.
+The pattern holds across every real win this whole session — removing
+*whole things* (a character's entire rig, a whole unreachable code branch,
+a whole scene) pays off; restructuring or thinning what's left of code that
+survives the fold does not, because terser and roadroller already do that
+job better than a manual pass can. Cast trims, structural code-sharing
+fixes, and scene cuts (all three: whole-thing removals) accounted for every
+real byte saved in episodes 2, 3, 5, and 6 this session. Optimizing the
+mechanic code itself was the one hypothesis tested and found empty-handed.

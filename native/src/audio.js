@@ -25,6 +25,8 @@ function tone(freq, dur, type, gain) {
 }
 
 export function sfxTap() { tone(420, 0.06, 'square', 0.06); }
+export function sfxHit() { tone(920, 0.07, 'square', 0.09); }
+export function sfxJump() { tone(280, 0.09, 'triangle', 0.07); }
 export function sfxYes() { tone(660, 0.12, 'triangle', 0.12); setTimeout(() => tone(880, 0.16, 'triangle', 0.1), 70); }
 export function sfxNo() { tone(150, 0.18, 'sawtooth', 0.1); }
 export function sfxWin() { tone(523, 0.1, 'triangle', 0.12); setTimeout(() => tone(659, 0.1, 'triangle', 0.12), 90); setTimeout(() => tone(784, 0.22, 'triangle', 0.14), 180); }

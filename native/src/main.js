@@ -5,6 +5,7 @@ import { GAMES } from './games.js';
 import { BEATS } from './data.js';
 import { makeRound, currentBeat, tick, press, moveChoice, P } from './story.js';
 import { initAudio, setDrone, sfxTap, sfxYes, sfxNo, sfxWin } from './audio.js';
+import { fxUpdate, fxBegin, fxEnd } from './fx.js';
 
 const VW = 320, VH = 156;
 
@@ -53,8 +54,11 @@ function bloom(cx, cy, t, r0, spread) {
 
 function paintHud(b) {
   if (round.phase === P.GAME) {
-    box(128, 28);
-    text(b.gamePrompt, 10, 146, { fill: '#cdbfa0', font: '9px system-ui' });
+    box(126, 30);
+    text(b.gamePrompt, 10, 138, { fill: '#cdbfa0', font: '9px system-ui' });
+    // The controls belong on screen. A mechanic nobody knows how to drive
+    // is indistinguishable from a mechanic that does not work.
+    text(GAMES[b.game].hint, 10, 150, { fill: '#7a6e5c', font: '8px system-ui' });
     return null;
   }
   const speak = round.phase === P.SUCCESS ? b.successDialogue[round.line] : b.dialogue[round.line];
@@ -84,6 +88,7 @@ function frame(now) {
 
   const doAct = acted, doLeft = left, doRight = right;
   acted = left = right = false;
+  fxUpdate(dt);
 
   if (mode === 'title') {
     clear(VW, VH, '#0a0710');
@@ -98,6 +103,11 @@ function frame(now) {
     tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, heldLeft, heldRight });
     if (before === P.GAME && round.phase !== P.GAME) sfxWin();
 
+    // A press that finishes a mechanic must not also advance the story -
+    // otherwise the same space bar that lands the last hit eats the whole
+    // success line and jumps straight to the next beat.
+    const justFinished = before === P.GAME && round.phase !== P.GAME;
+
     if (round.phase === P.END) {
       SCENES[b.bg](round.elapsed);
       bloom(160, 58, round.elapsed, 12, 5);
@@ -108,6 +118,7 @@ function frame(now) {
       return;
     }
 
+    fxBegin();
     SCENES[b.bg](round.elapsed);
     const talker = paintHud(b);
     // The horn returns as the mechanic's actual payoff, not a fixed
@@ -117,12 +128,13 @@ function frame(now) {
     const restored = !b.game || round.phase === P.SUCCESS;
     for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, f.key === talker, f.key === 'unicorn' ? restored : undefined);
     if (round.phase === P.GAME) GAMES[b.game].render(round.g, b, round.elapsed);
+    fxEnd();
 
     if (round.phase === P.CHOICE) {
       if (doLeft) moveChoice(round, -1);
       if (doRight) moveChoice(round, 1);
     }
-    if (doAct) {
+    if (doAct && !justFinished) {
       const beforePress = round.phase;
       press(round);
       if (beforePress === P.CHOICE) round.phase === P.RETRY ? sfxNo() : sfxYes();

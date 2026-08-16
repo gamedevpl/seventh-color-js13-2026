@@ -14,13 +14,13 @@ export const BEATS = [
   },
   {
     id: 'winter-falls', bg: 'pond', drone: 110,
-    faces: [{ key: 'jack', x: 160, y: 68, scale: .8 }],
+    faces: [{ key: 'jack', x: 74, y: 62, scale: .72 }],
     dialogue: [
       { who: 'jack', text: "Lili? The ice wasn't broken when we crossed." },
       { who: 'jack', text: 'Something pulled her under the frost.' },
     ],
-    game: 'icerain', g: {},
-    gamePrompt: 'Strike the ice before her trail is lost!',
+    game: 'icerain', g: { need: 6 },
+    gamePrompt: 'Break the ice where it is thin - before the frost seals it.',
     successDialogue: [
       { who: 'jack', text: 'The ice breaks - but her footprints end here.' },
     ],
@@ -28,13 +28,13 @@ export const BEATS = [
   },
   {
     id: 'bog-road', bg: 'bog', drone: 98,
-    faces: [{ key: 'gump', x: 90, y: 78, scale: .62 }, { key: 'jack', x: 210, y: 70, scale: .72 }],
+    faces: [{ key: 'gump', x: 32, y: 66, scale: .58 }, { key: 'jack', x: 284, y: 62, scale: .66 }],
     dialogue: [
       { who: 'gump', text: 'Three warning lights guard the causeway.' },
       { who: 'gump', text: 'Silence them out of order and the bog wakes.' },
     ],
-    game: 'lights', g: { order: [1, 2, 0] },
-    gamePrompt: 'Silence the lights: they do not want the obvious order.',
+    game: 'lights', g: { seq: [1, 2, 0, 1], lights: 3 },
+    gamePrompt: 'The marsh-fire shows the safe order once. Repeat it.',
     successDialogue: [
       { who: 'gump', text: 'The bog sleeps. Onward, before it stirs again.' },
     ],
@@ -48,8 +48,8 @@ export const BEATS = [
       { who: 'jack', text: 'One too humble for a lady as magnificent as you.' },
       { who: 'meg', text: 'Magnificent? Say that again, morsel.' },
     ],
-    game: 'dial', g: { target: .35, tolerance: .12, x: 160, y: 108, start: -1.3 },
-    gamePrompt: 'Turn the mirror; catch the moonlight on Meg.',
+    game: 'dial', g: { target: .35, tolerance: .17, x: 160, y: 108, start: -1.3, drift: .5, hold: 1.1 },
+    gamePrompt: 'Hold the moonlight on Meg - the mirror is heavy.',
     successDialogue: [
       { who: 'jack', text: 'My knees shook. My hand did not.' },
     ],
@@ -147,8 +147,8 @@ export const BEATS = [
       { who: 'jack', text: 'Meg taught me something about mirrors and vanity.' },
       { who: 'darkness', text: 'A parlor trick will not unmake me, child.' },
     ],
-    game: 'dial', g: { target: -.2, tolerance: .1, x: 160, y: 108, start: 1.4 },
-    gamePrompt: 'Turn the light; let him see only himself.',
+    game: 'dial', g: { target: -.2, tolerance: .16, x: 160, y: 108, start: 1.4, drift: .8, sway: .8, swayAmp: .18, hold: 1.35 },
+    gamePrompt: 'Hold the beam on him - he will not stand still.',
     successDialogue: [
       { who: 'jack', text: 'You were never the night. You were only its shadow.' },
     ],
@@ -161,8 +161,8 @@ export const BEATS = [
       { who: 'jack', text: 'The floor is giving way behind us!' },
       { who: 'jack', text: "Don't stop - jump where the light still holds." },
     ],
-    game: 'chase', g: { gaps: [.3, .55, .8], window: .1 },
-    gamePrompt: 'Run - and leap the gaps as they open.',
+    game: 'chase', g: { gaps: [.15, .29, .44, .58, .72, .87], width: .022, speed: .21 },
+    gamePrompt: 'The causeway is falling. Jump, and do not look back.',
     successDialogue: [
       { who: 'jack', text: 'Clear. The castle groans shut behind us.' },
     ],
@@ -175,8 +175,8 @@ export const BEATS = [
       { who: 'gump', text: 'The stallion still waits beneath the winter spell.' },
       { who: 'jack', text: 'Then the stolen light must remember where it belongs.' },
     ],
-    game: 'dial', g: { target: -.9, tolerance: .1, x: 240, y: 92, start: 1.2 },
-    gamePrompt: "Turn the alicorn; align its living grain.",
+    game: 'dial', g: { target: -.9, tolerance: .15, x: 240, y: 92, start: .8, drift: .75, sway: .6, swayAmp: .12, hold: 1.3 },
+    gamePrompt: 'Hold the light steady on the horn until it takes.',
     successDialogue: [
       { who: 'gump', text: 'The stallion rises. Spring has found the forest again.' },
     ],

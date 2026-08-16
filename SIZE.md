@@ -7,13 +7,13 @@ Source: `claude/seventh-color-cast-prototype-a0yz66` @ `da6d270e`
 | stage | bytes | note |
 | --- | ---: | --- |
 | assembled bundle | 727,503 | claude/seventh-color-cast-prototype-a0yz66 @ da6d270e |
-| &nbsp;&nbsp;micro-engine + game | 304,679 | engine 32284 + game 272394 |
-| &nbsp;&nbsp;− Polish strings | 303,417 | 44 literals, 1262 bytes |
+| &nbsp;&nbsp;micro-engine + game | 304,555 | engine 32284 + game 272270 |
+| &nbsp;&nbsp;− Polish strings | 289,959 | 325 literals, 14596 bytes |
 | &nbsp;&nbsp;− site chrome → entry shell | 7,231 | css+markup remaining, pre-minify |
-| &nbsp;&nbsp;− esbuild minify | 190,820 |  |
-| &nbsp;&nbsp;− terser + property mangle | 151,221 |  |
-| &nbsp;&nbsp;+ chrome folded into payload | 155,634 |  |
-| final index.html | 155,724 | css 0 + markup 0 |
-| index.zip | 47,980 | deflate 47862 |
+| &nbsp;&nbsp;− esbuild minify | 177,744 |  |
+| &nbsp;&nbsp;− terser + property mangle | 151,273 |  |
+| &nbsp;&nbsp;+ chrome folded into payload | 155,686 |  |
+| final index.html | 155,776 | css 0 + markup 0 |
+| index.zip | 50,116 | deflate 49998 |
 
-**Zip: 47,980 bytes** against a 13,312 byte budget — **34,668 over** (3.60× budget).
+**Zip: 50,116 bytes** against a 13,312 byte budget — **36,804 over** (3.76× budget).

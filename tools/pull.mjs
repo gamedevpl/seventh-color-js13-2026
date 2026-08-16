@@ -7,6 +7,7 @@
 
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { build, buildSync, transformSync } from 'esbuild';
+import { readSelectedPatches } from './lib/audio-inline.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
@@ -126,6 +127,34 @@ writeFileSync(path.join(outDir, 'game.js'), await bundleGame([]));
 const drops = config.dropFeatures ?? [];
 writeFileSync(path.join(outDir, 'game-cut.js'), await bundleGame(drops));
 if (drops.length) console.log(`staged a feature-dropped game bundle (${drops.length} modules stubbed)`);
+
+// The bespoke micro-engine: bundled separately from GameKit entirely. Sound
+// patch definitions and music track data are embedded as literals — esbuild's
+// `define` substitutes the free variables tools/engine/audio.mjs references,
+// so the bundle needs no import seam or asset-loading step at all.
+const soundCatalog = JSON.parse(readFileSync(path.join(gamesDir, 'shared', 'audio', 'sounds.json'), 'utf8'));
+const musicPath = path.join(gamesDir, 'games', config.slug, 'music.json');
+const musicCatalog = JSON.parse(readFileSync(musicPath, 'utf8'));
+const usedTrackNames = [manifest.audio.music, ...(manifest.audio.musicTracks ?? [])];
+const usedTracks = Object.fromEntries(usedTrackNames.map((name) => [name, musicCatalog.tracks[name]]));
+const soundPatches = readSelectedPatches(soundCatalog, manifest.audio.sounds);
+
+const microEngine = (await build({
+  absWorkingDir: root,
+  entryPoints: [path.join(root, 'tools', 'engine', 'index.mjs')],
+  bundle: true,
+  write: false,
+  platform: 'browser',
+  target: TARGET,
+  format: 'iife',
+  legalComments: 'inline',
+  define: {
+    SOUND_PATCHES: JSON.stringify(soundPatches),
+    MUSIC_TRACKS: JSON.stringify(usedTracks),
+  },
+})).outputFiles[0].text;
+writeFileSync(path.join(outDir, 'micro-engine.js'), microEngine);
+console.log(`staged the micro-engine (${microEngine.length.toLocaleString('en-US')} bytes, ${Object.keys(soundPatches).length} sounds, ${usedTrackNames.length} tracks)`);
 
 writeFileSync(
   path.join(outDir, 'SOURCE.json'),

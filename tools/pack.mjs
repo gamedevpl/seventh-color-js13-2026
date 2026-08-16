@@ -50,10 +50,25 @@ function collectStringTokens(source) {
 const bundle = extractBundle(html);
 note('assembled bundle', html.length, `${source.branch} @ ${source.commit.slice(0, 8)}`);
 
-let js = bundle.js;
-note('  javascript', js.length);
+let js;
+if (on('microEngine')) {
+  // Bypass GameKit entirely: a bespoke renderer/input/audio/loop (tools/engine/)
+  // sized to what this one game calls, bundled by pull.mjs with its sound
+  // patches and music tracks embedded. No splicing, no shaking — there is no
+  // GameKit region to prove drift against, because none ships.
+  const microEngine = readFileSync(path.join(sourceDir, 'micro-engine.js'), 'utf8');
+  const gamePlain = readFileSync(path.join(sourceDir, 'game.js'), 'utf8');
+  const gameJs = on('dropFeatures') && (config.dropFeatures ?? []).length
+    ? readFileSync(path.join(sourceDir, 'game-cut.js'), 'utf8')
+    : gamePlain;
+  js = `${microEngine}\n${gameJs}`;
+  note('  micro-engine + game', js.length, `engine ${microEngine.length} + game ${gameJs.length}`);
+} else {
+  js = bundle.js;
+  note('  javascript', js.length);
+}
 
-if (on('synthAudio')) {
+if (!on('microEngine') && on('synthAudio')) {
   const swapped = inlineSynthesizedAudio(js, catalog, manifest.audio.sounds);
   js = swapped.js;
   note('  − inlined WAVs → runtime synth', js.length, `${swapped.before} → ${swapped.after} bytes of prelude`);
@@ -64,7 +79,7 @@ if (on('synthAudio')) {
 // recomposing those parts unshaken reproduces the assembled bundle exactly. If
 // that assert ever fails, the parts have drifted from what gamedev.pl ships and
 // the shaken build would be measuring a different program.
-if (on('treeShake')) {
+if (!on('microEngine') && on('treeShake')) {
   const engineDir = path.join(sourceDir, 'engine');
   const order = JSON.parse(readFileSync(path.join(engineDir, 'ORDER.json'), 'utf8'));
   const modules = Object.fromEntries(
@@ -110,8 +125,9 @@ if (on('treeShake')) {
 // Swap the game region for the feature-dropped build. The bundle is
 // prelude + engine + freeze + '\n' + game, so the game is everything after the
 // freeze line — and we assert it matches the plain staged bundle before
-// swapping, for the same reason the engine splice does.
-if (on('dropFeatures') && (config.dropFeatures ?? []).length) {
+// swapping, for the same reason the engine splice does. Skipped in
+// microEngine mode: that path already picked game.js vs game-cut.js above.
+if (!on('microEngine') && on('dropFeatures') && (config.dropFeatures ?? []).length) {
   const FREEZE = '\nObject.freeze(window.GameKit);\n';
   const at = js.lastIndexOf(FREEZE);
   if (at < 0) throw new Error('cannot find the engine/game seam in the assembled bundle');

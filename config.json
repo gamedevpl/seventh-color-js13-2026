@@ -17,7 +17,8 @@
     "roadroller": true,
     "roadrollerOptimize": 1,
     "treeShake": true,
-    "dropFeatures": true
+    "dropFeatures": true,
+    "microEngine": true
   },
   "treeShakeKeep": [
     "createRenderer",

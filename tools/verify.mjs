@@ -65,7 +65,11 @@ const probe = await page.evaluate(() => {
   return {
     kit: typeof window.GameKit,
     modules: window.GameKit ? Object.keys(window.GameKit).length : 0,
-    sounds: Object.keys(window.__GAME_AUDIO_ASSETS__ || {}).length,
+    // The micro-engine renders sfx straight to an AudioBuffer with no asset
+    // registry to count, so this reports whichever shape is live rather than
+    // asserting one — a real audio check is "no console errors" from the
+    // interaction pass above, which presses ACT and triggers kit.audio.play.
+    sounds: Object.keys(window.__GAME_AUDIO_ASSETS__ || {}).length || 'n/a (micro-engine)',
     canvas: canvas ? `${canvas.width}x${canvas.height}` : null,
     painted: canvas ? canvas.width > 0 && canvas.height > 0 : false,
   };

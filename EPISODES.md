@@ -205,7 +205,7 @@ material for what a compressed transition line needs to imply.
 | 3 | **The Root Door** | `castle-descent`, `iron-cage` | `dark-kitchen` (its stealth minigame; the party split it triggers is implied, not explained — `living-gown` reads fine without it, tested) | cage-escape (send Luna through the bars) | 17,919, over by 4,607 — Brown Tom (decorative, no lines in this window) trimmed |
 | 4 | **The Gown That Breathes** | `living-gown` alone | `dark-kitchen`'s split (recap line), `dungeon-viaduct`, `reflection-plan`, `plate-vault`, `reflector-chain` | Lili/Darkness confrontation — a real riddle scene, cast-light (just her and Darkness) | 14,085 at -O2, over by 773 — best remaining gap by far, needs a recap line + final trims |
 | 5 | **The Last Turn** | `false-yield`, `false-sacrifice`, `final-beam`, `throne-pursuit`, `last-stand` — all five, unreduced | — (measured: dropping `false-yield`+`false-sacrifice` only saved 251 bytes once the cast floor is paid, so cutting Lili's own agency beats from her climax bought almost nothing) | the villain's actual defeat + the collapsing-causeway chase | 18,120, over by 4,808 — Luna (silent, no gameplay role, the episode's only fairy-kind character) trimmed, folding her whole rig |
-| 6 | **The Seventh Color** | `spring-remembers`, `ring-pond`, `forest-vow` | — | three payoff minigames back to back, epilogue reunion | 18,696, over by 5,384 — cold open verified, no rewrite needed |
+| 6 | **The Seventh Color** | `spring-remembers`, `forest-vow` | `ring-pond` (the Explore-agent read flagged it as personal/optional, not load-bearing for the main plot; `forest-vow`'s opening line rewritten to drop its one callback) | two payoff minigames, epilogue reunion | 17,963, over by 4,651 — the single biggest cut since the throne-climax split |
 
 This table is a plan, not a commitment — each episode gets the same treatment
 Episode 1 got: build it, measure it against the real pipeline, cut what the
@@ -362,7 +362,7 @@ those scenes.
 | 3 | The Root Door | in progress — 17,919, over by 4,607 — cold open + Brown Tom trim done |
 | 4 | The Gown That Breathes | in progress — 14,085 at -O2, over by 773, closest to done |
 | 5 | The Last Turn | in progress — 18,120, over by 4,808 — Luna trim done |
-| 6 | The Seventh Color | in progress — 18,696, over by 5,384 — verified playable as-is, no trims tried yet |
+| 6 | The Seventh Color | in progress — 17,963, over by 4,651 — ring-pond skipped, biggest single cut in the series so far |
 
 None of episodes 2–6 are ready to submit. Every number above is a real,
 pipeline-measured, `VERIFY OK`-checked baseline confirmed by screenshot, not
@@ -388,3 +388,19 @@ regardless, only his own data entry and draw calls went away. Episode 6 was
 checked against the same pattern and came up empty — every character there
 speaks somewhere in the kept window, so their rig cost is unavoidable, not a
 missed cut.
+
+**Prose trimming was tried and abandoned as a lever.** A blanket blank-and-
+measure test (the same technique `scene-weight.mjs --floor` uses internally)
+was blocked by the session's own safety classifier — reasonably: it would
+have overwritten both story-data files' text in place before measuring,
+exactly the kind of bulk destructive edit the auto-mode guardrails exist to
+catch. Rather than work around that, the numbers already on record made the
+case on their own: whole-game prose blanking (every string ≥12 characters,
+losing all meaning) was measured earlier in this project at 4,107 marginal
+bytes across all 28 scenes. The actual dialogue is already terse — short,
+punchy lines, no padding — so an editorially-honest tightening pass (keeping
+meaning, not gutting it) would recover a small fraction of even that ceiling,
+spread thin across many scenes. Not a good trade against the writing quality
+for the bytes on offer. Skipping `ring-pond` instead — a whole scene, not a
+sentence — outperformed it by an order of magnitude for less narrative risk,
+since the Explore-agent read had already flagged it as non-essential.

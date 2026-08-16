@@ -208,7 +208,14 @@ const painterStaging = (() => {
 })();
 
 // Recast first, so the plan below sees the staging this build will actually use.
-const recast = config.scope?.recast ?? {};
+// --recast 'sceneId:id1,id2;sceneId2:id3' overrides config for a one-off trial.
+const recastFlag = flag('recast');
+const recast = recastFlag
+  ? Object.fromEntries(String(recastFlag).split(';').filter(Boolean).map((part) => {
+    const [sceneId, ids] = part.split(':');
+    return [sceneId, ids.split(',').filter(Boolean)];
+  }))
+  : (config.scope?.recast ?? {});
 const hasRecast = Object.keys(recast).length > 0;
 const withRecast = (js, name) => (hasRecast ? recastScenes(js, name, recast, painterStaging) : js);
 // Scenes to drop from the middle of the window (relinked, not just deleted) —

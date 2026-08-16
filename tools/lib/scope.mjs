@@ -40,10 +40,43 @@ function findArray(js, name) {
   return found;
 }
 
+/**
+ * Top-level `const NAME = {...}` object literals in a file, keyed by name.
+ *
+ * Some scenes share boilerplate via `...THRONE` rather than repeating
+ * `mode`/`art`/`music` on every object — `false-yield`, `false-sacrifice` and
+ * `final-beam` all spread a shared `THRONE` constant. Resolving that here is
+ * what makes their `mode`/`art` visible to the fold at all; without it those
+ * scenes look mode-less and `foldAbsentSceneFields` could strip a painter
+ * they still need.
+ */
+function topLevelObjectLiterals(js) {
+  const tree = parse(js, { ecmaVersion: 'latest', sourceType: 'module' });
+  const map = new Map();
+  for (const statement of tree.body) {
+    const declarations = statement.type === 'VariableDeclaration' ? statement.declarations
+      : statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'VariableDeclaration'
+        ? statement.declaration.declarations : [];
+    for (const d of declarations) {
+      if (d.id.type === 'Identifier' && d.init?.type === 'ObjectExpression') map.set(d.id.name, d.init);
+    }
+  }
+  return map;
+}
+
 /** Literal-valued fields of one scene object, ignoring anything computed. */
-function sceneFacts(objectNode, js) {
+function sceneFacts(objectNode, js, topLevel = topLevelObjectLiterals(js)) {
   const facts = { cast: [] };
+  const properties = [];
   for (const property of objectNode.properties) {
+    if (property.type === 'SpreadElement' && property.argument.type === 'Identifier') {
+      const spread = topLevel.get(property.argument.name);
+      if (spread) properties.push(...spread.properties);
+      continue;
+    }
+    properties.push(property);
+  }
+  for (const property of properties) {
     const key = propertyName(property);
     if (!key) continue;
     const value = property.value;
@@ -66,10 +99,12 @@ function sceneFacts(objectNode, js) {
  * it splices in. Read from the sources so the dial cannot drift out of sync.
  */
 export function readScenes(mainJs, finaleJs) {
+  const mainTop = topLevelObjectLiterals(mainJs);
+  const finaleTop = topLevelObjectLiterals(finaleJs);
   const main = findArray(mainJs, 'STORY_SCENES').elements
-    .filter((e) => e.type === 'ObjectExpression').map((e) => sceneFacts(e, mainJs));
+    .filter((e) => e.type === 'ObjectExpression').map((e) => sceneFacts(e, mainJs, mainTop));
   const finale = findArray(finaleJs, 'FINAL_STORY_SCENES').elements
-    .filter((e) => e.type === 'ObjectExpression').map((e) => sceneFacts(e, finaleJs));
+    .filter((e) => e.type === 'ObjectExpression').map((e) => sceneFacts(e, finaleJs, finaleTop));
   return { main, finale, all: [...main, ...finale] };
 }
 

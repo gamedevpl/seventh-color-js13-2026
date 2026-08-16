@@ -759,3 +759,95 @@ bog-crossing puzzle is not part of this compo entry for now; picking it back
 up later means the `bog-cottage` mechanic redesign above, treated as
 separate, optional follow-on work rather than a blocker on shipping episode
 2 today.
+
+## Diffing as an architecture: probed, and the compressor already owns it
+
+Question raised: could scenes and mechanics be stored as a base (the
+prologue) plus *diffs*, rather than as whole code paths? Worth separating
+into three layers, because two of them already exist and only the third was
+ever open.
+
+**Layer 1 — build-time diffing: already the architecture.** The two-repo
+pipeline *is* this idea. One source of truth (the 28-scene game), and every
+episode is a declarative diff over it: `--startAt/--endAt/--skip/--recast`
+plus config. No episode stores its own copy of anything. Nothing to build
+here; it is what the scope dial has been doing all along.
+
+**Layer 2 — byte-level diffing: roadroller already does it, better.**
+Deflate and especially roadroller (a context-mixing compressor) *are* diff
+engines — repeated structure is stored once and each near-copy costs only
+its differences. This is the mechanism behind almost every null result in
+this document: DRY-ing repeated logic measured byte-neutral, prose blanking
+had a tiny ceiling, and scenes sharing an `art`/`mode` cost ~1 KB against
+~2.65 KB for a scene bringing its own. A hand-rolled diff encoding would
+spend real bytes on a patch-applier to remove redundancy the compressor
+already models, and can *lose* — verbose repetitive data is a context
+mixer's best case, and pre-deduplicating it destroys the patterns it feeds
+on. Same lesson the bytecode-VM prediction learned earlier in this project.
+
+**Layer 3 — unifying near-clone modes: the one open question. Probed.**
+`riddle`, `finale` and `epilogue` are near-clones of one machine (dialogue →
+choice → retry → cinematic beats → success dialogue), each with its own
+logic/render pair and its own `Round` fields. Collapsing them into one
+parameterized "confrontation" mode would make each such scene pure data —
+the scene *is* the diff.
+
+First, a structural check by measurement rather than assumption — unifying
+near-clones only pays in an episode carrying **two or more** of them:
+
+| episode | modes carried | near-clones among them |
+| --- | --- | --- |
+| 2 (`meg-encounter`) | 1 | 1 — nothing to unify against |
+| 4 (`living-gown`) | 1 (`riddle`) | 1 — nothing to unify against |
+| 6 (`spring-remembers`→`forest-vow`) | 2 | 1 (`epilogue`; `restoration` is aim-and-align, a genuinely different machine) |
+| 5 (`false-yield`→`last-stand`) | 3 | **2** (`riddle` + `finale`) |
+
+So episode 5 is the only build in the series where unification could pay
+anything at all. Probed it there — gutted `updateLastStand` down to just its
+unique cinematic delta (the `finaleBeat` audio-cue phase), deleting the
+shared dialogue/choice/retry phases outright as if a unified handler had
+absorbed them, then `git checkout` reverted. Deleting them outright makes
+this an **upper bound**: a real parameterized handler would cost some of it
+back in branches and config.
+
+| episode 5 (`false-yield`→`last-stand`) | source bytes | zip |
+| --- | ---: | ---: |
+| baseline | 722,030 | 18,736 |
+| finale's duplicated state machine removed | 720,867 | 18,640 |
+
+**96 bytes, against a 5,424-byte gap.** And the ratio is the real finding:
+**1,163 bytes of source removed yielded 96 zipped bytes** — roadroller was
+already storing the entire duplicated state machine at about 8% of its
+source size. That is layer 2 measured directly rather than argued: the
+compressor had already diffed the near-clones against each other, and
+hand-unifying them only reclaims the ~8% it hadn't.
+
+Not worth building. It cannot rescue episode 5 (blocked for a design
+reason — motion is the mechanic in `throne-pursuit` and `last-stand`, which
+no representation change touches), it is worth nothing in episodes 2, 4 and
+6, and it would touch `model.ts`/`runtime.ts` round fields and telemetry —
+the shared-state risk this document has flagged and avoided throughout — to
+buy under 100 bytes in the one place it applies.
+
+### Where the instinct is right: diffs forward, not backward
+
+The cost model says new content is nearly free *when it is already a diff*:
+a beat reusing an art and mode the build has paid for costs ~1 KB; one
+bringing its own mode costs ~2.65 KB. So the payoff is not re-encoding
+existing episodes as diffs — it is **authoring all future content as diffs
+by construction**. Concretely, as a rule for spending the headroom the
+shipping episodes now have:
+
+> New beats are new **data rows** on mechanics already in the build. A new
+> `*-logic.ts`/`*-render.ts` pair is a ~2 KB decision and needs to justify
+> itself as the episode's *lead* mechanic, never as a way to add a scene.
+
+Episode 4's 1,015 bytes buys two or three more beats in the audience hall on
+the `riddle` mode it already carries. Episode 2's 309 buys a short extra
+exchange with Meg on the mode it already carries. Neither buys a new
+mechanic — and by this rule, neither should try to.
+
+One hard wall no diff scheme crosses, worth stating so it is not
+rediscovered: js13k entries are standalone zips. The ~12.3 KB engine and
+harness floor must be re-shipped inside every entry. A shared base can exist
+in *source* — it already does — but never across the submitted artifacts.

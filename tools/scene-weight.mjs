@@ -193,6 +193,48 @@ async function measure(variant) {
   return archive.length;
 }
 
+
+// --combo answers the compound question the leave-one-out table cannot: those
+// deltas overlap, so "cut graphics AND prose" is not the sum of two rows. Each
+// row here is one measured build. All are deliberately broken — stubbing a
+// painter does not fix its callers — so they price, they do not run.
+if (process.argv.includes('--combo')) {
+  const CAST_ART = ['cast-actor-rig.ts', 'cast-actor-heads.ts', 'cast-creature-actor-rig.ts',
+    'cast-creature-faces.ts', 'cast-faces.ts', 'cast-profile-faces.ts', 'cast-face-expression.ts',
+    'cast-face-primitives.ts', 'cast-rig-geometry.ts', 'cast-rig-state.ts', 'cast-scene-actions.ts'];
+  // Per-scene painters. story-slice-render is the dispatch hub, not scene art,
+  // so it stays — dropping it strands the whole game and flatters the number.
+  const SCENE_ART = ['castle-parallel-render.ts', 'bog-cottage-render.ts', 'quest-scene-render.ts',
+    'castle-descent-render.ts', 'cage-escape-render.ts', 'kitchen-stealth-render.ts',
+    'meg-encounter-render.ts', 'ring-recovery-render.ts', 'last-stand-render.ts',
+    'throne-pursuit-render.ts', 'spring-restoration-render.ts', 'epilogue-render.ts',
+    'story-actor-render.ts', 'living-ink-cells.ts'];
+
+  const microEngineJs = readFileSync(path.join(root, 'build', 'source', 'micro-engine.js'), 'utf8');
+  const engineMin = (await transform(microEngineJs, { loader: 'js', minify: true, target: 'es2020', legalComments: 'none' })).code;
+  const enginePacker = new Packer([{ data: engineMin, type: 'js', action: 'eval' }], { maxMemoryMB: 512 });
+  const engineDec = enginePacker.makeDecoder();
+  const engineDoc = `<!doctype html><meta charset=utf-8><title>x</title><body><script>${engineDec.firstLine + engineDec.secondLine}</script>`;
+  const engineOnly = (await zipSingleFile('index.html', engineDoc, { zopfliIterations: 0 })).archive.length;
+
+  const ROWS = [
+    ['whole game (baseline)', {}],
+    ['\u2212 prose only', { proseOnly: true }],
+    ['\u2212 cast art only', { dropFiles: CAST_ART }],
+    ['\u2212 cast art \u2212 prose', { dropFiles: CAST_ART, proseOnly: true }],
+    ['\u2212 cast art \u2212 scene art', { dropFiles: [...CAST_ART, ...SCENE_ART] }],
+    ['\u2212 ALL graphics \u2212 ALL prose', { dropFiles: [...CAST_ART, ...SCENE_ART], proseOnly: true }],
+  ];
+  console.log(`  ${'variant'.padEnd(30)} ${'zip'.padStart(8)}  ${'vs budget'.padStart(9)}   verdict`);
+  for (const [label, variant] of ROWS) {
+    const zipped = await measure(variant);
+    const over = zipped - 13312;
+    console.log(`  ${label.padEnd(30)} ${num(zipped).padStart(8)}  ${(zipped / 13312).toFixed(2).padStart(8)}\u00d7   ${over > 0 ? '+' + num(over) + ' OVER' : num(-over) + ' under'}`);
+  }
+  console.log(`\n  ${'micro-engine alone, no game'.padEnd(30)} ${num(engineOnly).padStart(8)}  ${(engineOnly / 13312).toFixed(2).padStart(8)}\u00d7   hard floor`);
+  process.exit(0);
+}
+
 const base = await measure({});
 console.log(`baseline (this probe's chain): ${num(base)} zipped — deltas below are marginal bytes\n`);
 

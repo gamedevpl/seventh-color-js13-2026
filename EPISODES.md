@@ -204,7 +204,7 @@ material for what a compressed transition line needs to imply.
 | 2 | **Into the Bog** | `bog-cottage`, `meg-encounter` | `gumps-judgment`, `surviving-mare`, `faerie-council`, `hollow-armory`, `rescue-vow` | dual-puzzle → Meg's set piece, both real (thick) minigames | 17,719, over by 4,407 — in progress |
 | 3 | **The Root Door** | `castle-descent`, `iron-cage` | `dark-kitchen` (its stealth minigame; the party split it triggers is implied, not explained — `living-gown` reads fine without it, tested) | cage-escape (send Luna through the bars) | 17,919, over by 4,607 — Brown Tom (decorative, no lines in this window) trimmed |
 | 4 | **The Gown That Breathes** | `living-gown` alone | `dark-kitchen`'s split (recap line), `dungeon-viaduct`, `reflection-plan`, `plate-vault`, `reflector-chain` | Lili/Darkness confrontation — a real riddle scene, cast-light (just her and Darkness) | 14,085 at -O2, over by 773 — best remaining gap by far, needs a recap line + final trims |
-| 5 | **The Last Turn** | `false-yield`, `false-sacrifice`, `final-beam`, `throne-pursuit`, `last-stand` — all five, unreduced | — (measured: dropping `false-yield`+`false-sacrifice` only saved 251 bytes once the cast floor is paid, so cutting Lili's own agency beats from her climax bought almost nothing) | the villain's actual defeat + the collapsing-causeway chase | 18,743, over by 5,431 — cold open verified (needed no rewrite — Darkness's own opening line stands alone), 198B cheaper from the throne-climax split |
+| 5 | **The Last Turn** | `false-yield`, `false-sacrifice`, `final-beam`, `throne-pursuit`, `last-stand` — all five, unreduced | — (measured: dropping `false-yield`+`false-sacrifice` only saved 251 bytes once the cast floor is paid, so cutting Lili's own agency beats from her climax bought almost nothing) | the villain's actual defeat + the collapsing-causeway chase | 18,120, over by 4,808 — Luna (silent, no gameplay role, the episode's only fairy-kind character) trimmed, folding her whole rig |
 | 6 | **The Seventh Color** | `spring-remembers`, `ring-pond`, `forest-vow` | — | three payoff minigames back to back, epilogue reunion | 18,696, over by 5,384 — cold open verified, no rewrite needed |
 
 This table is a plan, not a commitment — each episode gets the same treatment
@@ -361,15 +361,30 @@ those scenes.
 | 2 | Into the Bog | in progress — 17,719, over by 4,407 — cast trims done, plays correctly |
 | 3 | The Root Door | in progress — 17,919, over by 4,607 — cold open + Brown Tom trim done |
 | 4 | The Gown That Breathes | in progress — 14,085 at -O2, over by 773, closest to done |
-| 5 | The Last Turn | in progress — 18,743, over by 5,431 — verified playable as-is, no trims tried yet |
+| 5 | The Last Turn | in progress — 18,120, over by 4,808 — Luna trim done |
 | 6 | The Seventh Color | in progress — 18,696, over by 5,384 — verified playable as-is, no trims tried yet |
 
 None of episodes 2–6 are ready to submit. Every number above is a real,
 pipeline-measured, `VERIFY OK`-checked baseline confirmed by screenshot, not
 an estimate — every episode in the series has now been built at least once
-and shown to boot, render, and play through its own window correctly. That's
-different from "ready": 3, 5, and 6 haven't had a single byte cut yet beyond
-what the automatic folds already do, so their real numbers after a trimming
-pass are still unknown. The prologue (episode 1) is the only one that is
-actually done: built, under budget, verified, and stable across every commit
-in this session.
+and shown to boot, render, and play through its own window correctly. The
+prologue (episode 1) is the only one that is actually done: built, under
+budget, verified, and stable across every commit in this session.
+
+**A pattern worth naming, found while trimming 2, 3, and 5:** a scene's
+declared `cast` array is not evidence a character is load-bearing there —
+check whether they actually speak (`dialogue`/`successDialogue` entries) and
+whether the painter draws them unconditionally with no other role. Brown Tom
+and Screwball were purely decorative in `meg-encounter`; Brown Tom again in
+`castle-descent`/`iron-cage`; Luna in `throne-pursuit`/`last-stand`. Each cut
+needed the painter edited too (recast alone refuses if the painter still
+hardcodes the id), same safety rule the very first cast-fold work in this
+project established. The win compounds when the dropped character is the *only* one of their
+`kind` in the episode — Luna was the only fairy in episode 5, so removing her
+folded her whole fairy-rig code, not just two draw calls (-623B). Brown Tom's
+cut in episode 3 was smaller (-457B) precisely because he shares the human
+rig with Jack, Gump, and Screwball, who all stay — the rig code was paid for
+regardless, only his own data entry and draw calls went away. Episode 6 was
+checked against the same pattern and came up empty — every character there
+speaks somewhere in the kept window, so their rig cost is unavoidable, not a
+missed cut.

@@ -114,12 +114,24 @@ The gap per naive episode (5–10 KB) is the size of the entire squeeze campaign
 got the prologue under budget. So an episode is not "configure the dial and zip" —
 each one is a design project. Three levers, in order of leverage:
 
-**1. Floor diet — pays in every episode.** Bytes cut from the story/dialogue
-machinery, the shared rig, or the micro-engine are cut from *all* episodes at once.
-The shared leg/arm IK simplification (deferred earlier because it changes every
-character's animation) is now worth doing on the episodes branch: with 3–5 episodes
-it pays 3–5×. Same for the dialogue UI and `story-slice` machinery — `scene-weight`
-prices these groups individually so the diet can be aimed.
+**1. Floor diet — pays in every episode, but measure before cutting.** The premise
+was that the deferred shared leg/arm rig simplification is a big lever now that it
+pays across three episodes instead of one. Measured and **retracted**:
+`cast-actor-rig.ts` + `cast-rig-geometry.ts` are 3,698 bytes minified, combined, for
+every humanoid character's full walk/run/stand motion, costuming, and hands —
+already dense, already terse, no padding found. Leave-one-out on the whole game
+puts "cast art: human rigs" at 4,576 marginal bytes, which is the cost of the rig
+*existing*, not the cost of its current level of detail — no slack visible to cut
+without visibly degrading the animation. Same lesson as the derived-palette and
+bytecode-VM predictions earlier in this project: intuition about what looks
+"expensive" and measured compressed cost keep disagreeing, so a lever gets built
+only after `scene-weight`/`weigh` say it's there, not before.
+
+What *did* measure real: dropping episode 1's prologue entirely (`--startAt
+jacks-glade`, no shadow-council/darkness/blix/pox) saves **1,569 bytes** (18,538 →
+16,969, still 3,657 over). That is a narrative call, not a free technical one — it
+trades the villain-council cold open, which gives a standalone entry its stakes on
+first read, for headroom. Left to the user rather than decided here.
 
 **2. Mechanic-led episodes, not chapter transcriptions.** This is the re-ideation:
 invert the gameplay:story ratio. A js13k entry is rated as a *game*; a 90% dialogue

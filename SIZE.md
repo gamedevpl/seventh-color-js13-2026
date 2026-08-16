@@ -13,8 +13,8 @@ Source: `claude/seventh-color-js13k-episodes` @ `ea2e6298`
 | &nbsp;&nbsp;− esbuild minify | 44,552 |  |
 | &nbsp;&nbsp;− terser + property mangle | 35,466 |  |
 | &nbsp;&nbsp;+ chrome folded into payload | 38,047 |  |
-| &nbsp;&nbsp;− roadroller | 17,478 |  |
-| final index.html | 17,568 | css 0 + markup 0 |
-| index.zip | 13,287 | deflate 13169 |
+| &nbsp;&nbsp;− roadroller | 17,477 |  |
+| final index.html | 17,567 | css 0 + markup 0 |
+| index.zip | 13,288 | deflate 13170 |
 
-**Zip: 13,287 bytes** against a 13,312 byte budget — 25 to spare.
+**Zip: 13,288 bytes** against a 13,312 byte budget — 24 to spare.

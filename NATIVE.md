@@ -491,8 +491,31 @@ all shipping, all under budget, all still committed and pushed) remains
 the fallback that needed no rescuing. This rewrite is not a fallback - it
 is a complete, verified, theme-integrated, comfortably-under-budget js13k
 2026 entry telling the whole story in one submission, which is what the
-episode series was always working around not being able to do. The
-decision of which one becomes the actual competition submission - the
-whole story native, or the episode series as several entries - is the
-user's, not this document's; both now exist as real, working, measured
-artifacts rather than one plan and one compromise.
+episode series was always working around not being able to do.
+
+## Decision: this is the submission
+
+The user's call: **"We need full story."** The native rewrite in this
+repo - not the episode series - is the js13kGames 2026 entry. It tells
+all twelve beats in one HTML document; the episode series covered the
+same story only in fragments across separate compo entries, which is
+exactly the gap this rewrite closed.
+
+Final locked build, verified after the decision (not just at the M5
+gate): `node tools/native.mjs --O1` → **6,523 bytes** zipped, 8,591 bytes
+uncompressed inside, against the 13,312-byte budget - **6,789 bytes
+(51%) of headroom unused**. Worst-of-5 rolls at `--O1` ranged
+6,516-6,522 bytes, all comfortably under the 13,162 ceiling.
+`unzip -l build/native/index.zip` confirms the archive holds exactly one
+file, `index.html`, at the root - the shape js13kGames requires.
+`tools/verify-native.mjs` reports a clean boot (no console errors,
+warnings, pageerrors, or failed requests) and the Node-level integration
+test walks all twelve beats start to finish:
+`shadow-council -> winter-falls -> bog-road -> megs-looking-glass ->
+root-door -> gown-that-breathes -> hidden-hand -> false-sacrifice ->
+final-beam -> edge-of-world -> spring-remembers -> seventh-color`,
+ending in `P.END`.
+
+What's left is outside this repo's reach: creating the actual js13k
+2026 competition entry at js13kgames.com is a manual step on the
+compo's own site, gated by the user's own account.

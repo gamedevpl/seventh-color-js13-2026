@@ -2,7 +2,7 @@ import { initDraw, clear, rect, text } from './draw.js';
 import { SCENES } from './scenes.js';
 import { paintFace } from './faces.js';
 import { BEATS } from './data.js';
-import { makeRound, currentBeat, tick, press } from './story.js';
+import { makeRound, currentBeat, tick, press, moveChoice, P } from './story.js';
 
 const VW = 320, VH = 156;
 
@@ -19,26 +19,48 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-let acted = false;
-const act = () => { acted = true; };
-addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') act(); });
-canvas.addEventListener('pointerdown', act);
+let acted = false, left = false, right = false;
+addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') acted = true;
+  else if (e.key === 'ArrowLeft' || e.key === 'a') left = true;
+  else if (e.key === 'ArrowRight' || e.key === 'd') right = true;
+});
+canvas.addEventListener('pointerdown', () => { acted = true; });
 
 let mode = 'title';
 let round = null;
 let last = 0;
 
-function paintDialogueBox(line) {
-  rect(0, 128, VW, 28, { fill: '#0008' });
-  text(line, 10, 146, { fill: '#f3ead6', font: '9px system-ui' });
+function box(y, h) { rect(0, y, VW, h, { fill: '#0008' }); }
+
+function paintHud(b) {
+  const speak = round.phase === P.SUCCESS ? b.successDialogue[round.line] : b.dialogue[round.line];
+  if (round.phase === P.DIALOGUE || round.phase === P.SUCCESS) {
+    box(128, 28);
+    text(speak.text, 10, 146, { fill: '#f3ead6', font: '9px system-ui' });
+    return speak.who;
+  }
+  if (round.phase === P.CHOICE || round.phase === P.RETRY) {
+    box(96, 60);
+    if (round.phase === P.RETRY) {
+      text(b.choice.retry, 10, 116, { fill: '#e08a7a', font: '9px system-ui' });
+      return null;
+    }
+    text(b.choice.question, 10, 110, { fill: '#f3ead6', font: '9px system-ui' });
+    b.choice.options.forEach((o, i) => {
+      text((i === round.choiceIndex ? '> ' : '  ') + o, 10, 126 + i * 12, { fill: i === round.choiceIndex ? '#e8b923' : '#c8bfae', font: '9px system-ui' });
+    });
+    return null;
+  }
+  return null;
 }
 
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000 || 0);
   last = now;
 
-  const doAct = acted;
-  acted = false;
+  const doAct = acted, doLeft = left, doRight = right;
+  acted = left = right = false;
 
   if (mode === 'title') {
     clear(VW, VH, '#0a0710');
@@ -48,10 +70,25 @@ function frame(now) {
   } else {
     const b = currentBeat(round);
     tick(round, dt);
+
+    if (round.phase === P.END) {
+      SCENES[b.bg](round.elapsed);
+      text('THE SEVENTH COLOR', VW / 2, 70, { fill: '#e8b923', font: 'bold 15px system-ui', align: 'center' });
+      text('tap or press space', VW / 2, 92, { fill: '#cba', font: '9px system-ui', align: 'center' });
+      if (doAct) mode = 'title';
+      requestAnimationFrame(frame);
+      return;
+    }
+
     SCENES[b.bg](round.elapsed);
-    paintFace(b.face, VW / 2, 62, 1, round.elapsed, true);
-    paintDialogueBox(b.dialogue[round.line]);
-    if (doAct && press(round)) mode = 'title';
+    const talker = paintHud(b);
+    for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, f.key === talker, f.key === 'unicorn');
+
+    if (round.phase === P.CHOICE) {
+      if (doLeft) moveChoice(round, -1);
+      if (doRight) moveChoice(round, 1);
+    }
+    if (doAct) press(round);
   }
 
   requestAnimationFrame(frame);

@@ -125,13 +125,23 @@ drift visible the day it happens, not to be right today.
 
 M0 ran 448 over its own line item, taken from "unassigned." M1 (input +
 story machine + 1 portrait + 1 painter + 1 beat of data + title) landed at
-2,242 cumulative, +1,194 over M0 — bundled across several buckets at once
-(module wiring is shared, not separable per bucket yet), so recorded as a
-cumulative checkpoint rather than force-split: **cumulative through M1:
-budgeted 3,400 (600+200+700+1,400/6+2,200/7+2,500/12+500), measured
-2,242 — already under**, because per-portrait/per-painter/per-data-row
-costs won't be knowable until M2 gives more than one of each to regress
-against. Each future milestone's actual gets recorded the same way.
+2,242 cumulative, +1,194 over M0. M2 (5 more portraits, 2 more painters,
+choice/retry/success machine phases, 2 more beats, choice UI) landed at
+**3,569 cumulative, +1,327 over M1** — first real per-unit data:
+
+- 5 portraits, sharing the blink/mouth helpers built for the first one,
+  cost markedly less than the 1,400-budget/6-faces ≈ 233/face estimate.
+- 2 more painters (`hall`, `forest`) similarly undershot 2,200/7 ≈ 314/painter.
+- Choice/retry/success + arrow-key input + 2 beats of data all fit in the
+  same 1,327 as the above, well inside the combined provisional budget for
+  all of it (~1,400×5/6 + 2,200×2/7 + machine + 2 more data rows ≈ 2,700+).
+
+Still bundled, not force-split further — this is a positive-drift result,
+not a warning, but the ledger's job is to catch the day it goes the other
+way, so it stays a measured cumulative rather than an assumed one.
+**9,743 bytes remain against the 13,312 ceiling for M3 (mechanics), M4
+(remaining painters, beats, audio), and M5 (polish)** — comfortable given
+the per-unit costs measured so far.
 
 ## Build and measurement harness
 
@@ -226,3 +236,30 @@ line 1 → line 2 → back to title — plays correctly, not just that the canva
 paints. Same discipline the GameKit-episode `verify.mjs` used throughout
 the transform-pipeline work, now doing the same job for a codebase this
 project wrote itself.
+
+### M2 — six portraits + story spine: PASS
+
+Extended `story.js` to the full machine: `P.CHOICE` (arrow-key select +
+confirm), `P.RETRY` (wrong answer, press to return to `P.CHOICE`),
+`P.SUCCESS` (post-choice dialogue), `P.END` (terminal, for `ending: true`
+beats). Added `jack`, `lili`, `gump`, `meg`, `unicorn` to `faces.js` (all
+six now built), `hall` and `forest` painters to `scenes.js`, and beats 6
+(`gown-that-breathes`) and 12 (`seventh-color`) to `data.js`, chained
+directly off beat 1 for now (`1 -> 6 -> 12`) — the missing beats slot in at
+M3/M4 by editing only `data.js`.
+
+`esbuild` bundle 13,977 → terser+mangle 8,225 → **zip 3,555**, worst of 5
+`-O1` rolls 3,569. **Ceiling 6,500 — 2,931 bytes of margin.**
+
+Verified the whole spine, not just that it boots: extended
+`verify-native.mjs` with `--keys=` (named keys, not just Space) to drive
+arrow-key choice selection. Caught one real bug in the *test* along the
+way — the first `space` in a sequence starts the game from the title
+screen, so it doesn't count toward beat 1's dialogue; a naive key count was
+off by one and made it look like arrow-key input wasn't registering when
+it was actually the harness's press-counting that was wrong. Confirmed with
+a full correct-answer run: title → beat 1 (2 lines) → beat 6 (3 lines,
+choice, correct selection, success line, mouth-animation correctly follows
+the current speaker) → beat 12 (2 lines, choice, success) → the `forest`
+ending screen (its own composed backdrop, not just title text over black) →
+back to title. Screenshotted at every step.

@@ -1,8 +1,10 @@
 // Boot the native build's own zip in a real browser and fail on anything the
-// console says. --presses=N presses Space N times (350ms apart), screenshotting
-// after each - each milestone extends this as the story machine and mechanics
-// come online, the same "drive it a little, not just boot" discipline as the
-// GameKit-episode verify.mjs.
+// console says. --keys=space,space,right,space presses named keys 350ms apart,
+// screenshotting after each - each milestone extends the script as the story
+// machine and mechanics come online, the same "drive it a little, not just
+// boot" discipline as the GameKit-episode verify.mjs.
+
+const KEY_MAP = { space: 'Space', left: 'ArrowLeft', right: 'ArrowRight', enter: 'Enter' };
 
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,7 +16,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const args = process.argv.slice(2);
 const seconds = Number(args.find((a) => /^\d+$/.test(a)) || 3);
-const presses = Number(args.find((a) => /^--presses=/.test(a))?.split('=')[1] || 0);
+const keysArg = args.find((a) => /^--keys=/.test(a))?.split('=')[1] || '';
+const keys = keysArg ? keysArg.split(',') : [];
 
 const archive = readFileSync(path.join(root, 'build', 'native', 'index.zip'));
 const nameLength = archive.readUInt16LE(26);
@@ -43,8 +46,8 @@ page.on('requestfailed', (request) => problems.push(`requestfailed: ${request.ur
 await page.goto(pathToFileURL(pagePath).href, { waitUntil: 'load' });
 await page.waitForTimeout(seconds * 1000);
 
-for (let i = 0; i < presses; i++) {
-  await page.keyboard.press('Space');
+for (let i = 0; i < keys.length; i++) {
+  await page.keyboard.press(KEY_MAP[keys[i]] || keys[i]);
   await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(root, 'build', 'native', `verify-${i + 1}.png`) });
 }

@@ -1,5 +1,5 @@
 {
-  "name": "M1",
-  "description": "story machine + 1 portrait + 1 painter + title card",
-  "ceilingBytes": 4000
+  "name": "M2",
+  "description": "6 portraits + full story machine; beats 1, 6, 12 playable start-to-finish (the spine)",
+  "ceilingBytes": 6500
 }

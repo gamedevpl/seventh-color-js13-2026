@@ -5,14 +5,14 @@
 // repo's own `npm run build` for the bundle, then copy the few inputs the
 // transforms read directly (the audio catalog, the game manifest).
 
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { build, buildSync, transformSync } from 'esbuild';
 import { readSelectedPatches } from './lib/audio-inline.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
 import { readScenes, planScope, truncateAndClose, stubFor, recastScenes, pruneModeTable } from './lib/scope.mjs';
-import { planCast, foldAbsentMembers, pruneCastTable, reachableCastIds, readCast, foldAbsentSceneFields } from './lib/cast.mjs';
+import { planCast, foldAbsentMembers, pruneCastTable, reachableCastIds, readCast, foldAbsentSceneFields, foldFalseReads } from './lib/cast.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -156,6 +156,12 @@ async function bundleGame(stubs, applyScope = false) {
                 text2 = pruneModeTable(text2, 'PROMPT_KEYS', sceneFields.keptModes, sceneFields.allModes);
                 text2 = pruneModeTable(text2, 'labels', sceneFields.keptVerbs, sceneFields.allVerbs);
               }
+              // With save shimmed, no checkpoint ever loads, so the resume
+              // dialog is unreachable: its reads fold to false and terser
+              // deletes the dialog, its input handling, and its painter.
+              if ((config.dropEngineModules ?? []).includes('save')) {
+                text2 = foldFalseReads(text2, ['resumeOpen']);
+              }
               return { contents: text2, loader: 'js' };
             }
           }
@@ -262,7 +268,20 @@ const usedTrackNames = scope
   ? allTrackNames.filter((name) => scope.music.includes(name) || name === scope.kept[0].music)
   : allTrackNames;
 const usedTracks = Object.fromEntries(usedTrackNames.map((name) => [name, musicCatalog.tracks[name]]));
-const soundPatches = readSelectedPatches(soundCatalog, manifest.audio.sounds);
+// Under scope, ship only the sounds the folded bundle can still name. The
+// scan runs over the cut game bundle and the engine's own sources — a sound
+// neither mentions is unreachable. Without scope, the full manifest ships.
+const cutBundle = readFileSync(path.join(outDir, 'game-cut.js'), 'utf8');
+const engineSources = readdirSync(path.join(root, 'tools', 'engine'))
+  .map((name) => readFileSync(path.join(root, 'tools', 'engine', name), 'utf8')).join('\n');
+const soundNames = scope
+  ? manifest.audio.sounds.filter((name) =>
+      cutBundle.includes(`"${name}"`) || cutBundle.includes(`'${name}'`) || engineSources.includes(`'${name}'`))
+  : manifest.audio.sounds;
+if (scope && soundNames.length < manifest.audio.sounds.length) {
+  console.log(`  sounds subset to scope: ${soundNames.join(', ')}`);
+}
+const soundPatches = readSelectedPatches(soundCatalog, soundNames);
 
 const microEngine = (await build({
   absWorkingDir: root,

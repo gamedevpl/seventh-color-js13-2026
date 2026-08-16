@@ -177,6 +177,38 @@ export function foldAbsentSceneFields(js, keptArt, keptModes, allArt, allModes) 
     .reduce((text, e) => text.slice(0, e.start) + e.text + text.slice(e.end), js);
 }
 
+/**
+ * Fold reads of a member field to `false`, leaving writes alone.
+ *
+ * For state that is provably never set under the current build shape — with
+ * the save module shimmed to `data: null`, `offerStoryResume` early-returns
+ * and `round.resumeOpen` can never become true — every read is a constant,
+ * and the branches behind it (the resume dialog, its input handling, its
+ * painter) are dead. Writes are preserved so the assignment sites stay valid;
+ * they become dead stores terser removes on its own.
+ */
+export function foldFalseReads(js, names) {
+  const tree = parse(js, { ecmaVersion: 'latest', sourceType: 'module' });
+  const writeTargets = new Set();
+  walk(tree, (n) => {
+    if (n.type === 'AssignmentExpression' && n.left.type === 'MemberExpression') {
+      writeTargets.add(`${n.left.start}:${n.left.end}`);
+    }
+    if (n.type === 'UpdateExpression' && n.argument.type === 'MemberExpression') {
+      writeTargets.add(`${n.argument.start}:${n.argument.end}`);
+    }
+  });
+  const edits = [];
+  walk(tree, (n) => {
+    if (n.type !== 'MemberExpression' || n.computed) return;
+    if (!names.includes(n.property.name)) return;
+    if (writeTargets.has(`${n.start}:${n.end}`)) return;
+    edits.push({ start: n.start, end: n.end, text: 'false' });
+  });
+  return edits.sort((a, b) => b.start - a.start)
+    .reduce((text, e) => text.slice(0, e.start) + e.text + text.slice(e.end), js);
+}
+
 export function planCast(castJs, sceneCastIds, painterIds = []) {
   const entries = readCast(castJs);
   const allIds = entries.map((e) => e.id).filter(Boolean);

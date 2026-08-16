@@ -7,14 +7,14 @@ Source: `claude/seventh-color-js13k-slim` @ `6f5d4186`
 | stage | bytes | note |
 | --- | ---: | --- |
 | assembled bundle | 722,960 | claude/seventh-color-js13k-slim @ 6f5d4186 |
-| &nbsp;&nbsp;micro-engine + game | 105,113 | engine 25886 + game 79226 |
-| &nbsp;&nbsp;− Polish strings | 103,701 | 44 literals, 1412 bytes |
+| &nbsp;&nbsp;micro-engine + game | 102,519 | engine 24461 + game 78057 |
+| &nbsp;&nbsp;− Polish strings | 101,107 | 44 literals, 1412 bytes |
 | &nbsp;&nbsp;− site chrome → entry shell | 4,541 | css+markup remaining, pre-minify |
-| &nbsp;&nbsp;− esbuild minify | 47,761 |  |
-| &nbsp;&nbsp;− terser + property mangle | 38,160 |  |
-| &nbsp;&nbsp;+ chrome folded into payload | 40,741 |  |
-| &nbsp;&nbsp;− roadroller | 18,269 |  |
-| final index.html | 18,359 | css 0 + markup 0 |
-| index.zip | 13,880 | deflate 13762 |
+| &nbsp;&nbsp;− esbuild minify | 44,552 |  |
+| &nbsp;&nbsp;− terser + property mangle | 35,466 |  |
+| &nbsp;&nbsp;+ chrome folded into payload | 38,047 |  |
+| &nbsp;&nbsp;− roadroller | 17,493 |  |
+| final index.html | 17,583 | css 0 + markup 0 |
+| index.zip | 13,300 | deflate 13182 |
 
-**Zip: 13,880 bytes** against a 13,312 byte budget — **568 over** (1.04× budget).
+**Zip: 13,300 bytes** against a 13,312 byte budget — 12 to spare.

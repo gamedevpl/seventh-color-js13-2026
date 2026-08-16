@@ -50,11 +50,14 @@ function sceneFacts(objectNode, js) {
     if (value.type === 'Literal') facts[key] = value.value;
     else if (key === 'cast' && value.type === 'ArrayExpression') {
       facts.cast = value.elements.filter((e) => e?.type === 'Literal').map((e) => e.value);
+    } else if (key === 'verbs' && value.type === 'ArrayExpression') {
+      facts.verbs = value.elements.filter((e) => e?.type === 'Literal').map((e) => e.value);
     }
     if (key === 'nextSceneId' || key === 'completion') facts[`${key}Range`] = { start: property.start, end: property.end };
   }
   facts.range = { start: objectNode.start, end: objectNode.end };
   facts.source = js.slice(objectNode.start, objectNode.end);
+  if (!facts.verbs) facts.verbs = [];
   return facts;
 }
 
@@ -100,6 +103,7 @@ export function planScope(scenes, endAt) {
     lastSceneId: kept[kept.length - 1].id,
     modes: [...modes],
     music: [...new Set(kept.map((s) => s.music).filter(Boolean))],
+    verbs: [...new Set(kept.flatMap((s) => s.verbs))],
     cast: [...new Set(kept.flatMap((s) => s.cast))],
     droppedModules: dropped,
     totalScenes: scenes.all.length,
@@ -151,6 +155,38 @@ export function truncateAndClose(js, name, keep, { dropSpread, closeLast, outcom
     }
   }
   return out;
+}
+
+/**
+ * Prune dead entries from an object literal keyed by mode name.
+ *
+ * `PROMPT_KEYS['dual-puzzle']` and similar tables carry one entry per
+ * minigame mode. A mode no kept scene uses is exactly as dead as the module
+ * `MODE_MODULES` stubs for it — this is the data-table half of the same fold.
+ * Unknown-shaped values (computed keys, spreads) are left in place rather than
+ * guessed at.
+ */
+export function pruneModeTable(js, varName, keptModes, allModes) {
+  const tree = parse(js, { ecmaVersion: 'latest', sourceType: 'module' });
+  let object = null;
+  walk(tree, (n) => {
+    if (n.type === 'VariableDeclarator' && n.id.name === varName && n.init?.type === 'ObjectExpression') object = n.init;
+  });
+  if (!object) return js;
+  const doomed = object.properties.filter((p) => {
+    const key = propertyName(p);
+    return key && allModes.includes(key) && !keptModes.includes(key);
+  });
+  if (!doomed.length) return js;
+  const ranges = doomed.map((p) => {
+    const index = object.properties.indexOf(p);
+    const previous = object.properties[index - 1];
+    return previous
+      ? { start: previous.end, end: p.end }
+      : { start: p.start, end: Math.min(p.end + 1, object.end - 1) };
+  });
+  return ranges.sort((a, b) => b.start - a.start)
+    .reduce((text, r) => text.slice(0, r.start) + text.slice(r.end), js);
 }
 
 /**

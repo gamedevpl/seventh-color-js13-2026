@@ -17,14 +17,10 @@ const KEEP = [
   /\.wrap\b/,
   /#game\b|canvas\b/,
   /\.sound-toggle\b/,
-  /\.gamekit-touch\b/,
-  /\.gamekit-touch-(pad|dir|nub|right|buttons|btn)\b/,
   /:root\b/,
   /@keyframes/,
 ];
 const DROP = [
-  /\.gamekit-touch-coach\b/,
-  /\.gamekit-touch-look\b/,
   /\.gamekit-restart\b/,
   /is-calling/,
   /\.legend\b|\.legend-|\.game-controls\b|\.hint\b|\.sr-only\b|#game-title\b|#game-desc\b|h1\b/,

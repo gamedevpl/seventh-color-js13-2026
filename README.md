@@ -143,6 +143,22 @@ Verify is what turned `mangleProps: "max"` from reckless to routine: its first r
 the engine's required-step check (`steps[name]` over a quoted list) breaking, and its
 interaction pass is the regression net for every transform added since.
 
+## Dropping the on-screen touch controls
+
+The D-pad and ACT button in `tools/engine/input.mjs` were built for the whole game, but
+a scoped build might not need them at all. `pressedAction()` in the game's own source
+already accepts a tap anywhere in the dialogue panel (`dialogueTap` checks the panel's
+y-range, not a specific button) — so for a scope whose only mode is `dialogue`, the
+on-screen button is decoration pointing at a click the panel already accepts, and the
+D-pad points at movement no reachable scene reads.
+
+This is checked, not assumed: `story-slice-movement.ts`'s arrow-key handling is only
+called from `moveStoryActor`, which only `walk-dialogue` and a handful of minigame modes
+invoke — none of which are in scope once the game ends at `shadow-council`. Removing
+`buildTouchControls()` and its `.gamekit-touch-*` CSS is a straight win for this scope
+(~700 B) — but it undoes itself the moment scope widens to a scene that walks or steers,
+which is called out in the file's own comment so it isn't rediscovered as a bug.
+
 ## The scope dial
 
 `scope.endAt` in `config.json` (or `--endAt <sceneId>` for a one-off) builds the game as

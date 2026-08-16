@@ -11,7 +11,7 @@ import { readSelectedPatches } from './lib/audio-inline.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
-import { readScenes, planScope, truncateAndClose, stubFor, recastScenes } from './lib/scope.mjs';
+import { readScenes, planScope, truncateAndClose, stubFor, recastScenes, pruneModeTable } from './lib/scope.mjs';
 import { planCast, foldAbsentMembers, pruneCastTable, reachableCastIds, readCast, foldAbsentSceneFields } from './lib/cast.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -152,6 +152,10 @@ async function bundleGame(stubs, applyScope = false) {
               let text2 = foldAbsentSceneFields(js(), sceneFields.keptArt, sceneFields.keptModes,
                 sceneFields.allArt, sceneFields.allModes);
               text2 = foldAbsentMembers(text2, cast.keptIds, cast.keptKinds, cast.allIds, cast.allKinds);
+              if (base === 'story-dialogue-render.ts') {
+                text2 = pruneModeTable(text2, 'PROMPT_KEYS', sceneFields.keptModes, sceneFields.allModes);
+                text2 = pruneModeTable(text2, 'labels', sceneFields.keptVerbs, sceneFields.allVerbs);
+              }
               return { contents: text2, loader: 'js' };
             }
           }
@@ -223,6 +227,8 @@ const sceneFields = scope ? {
   keptModes: scope.modes,
   allArt: [...new Set(scenes.all.map((s) => s.art).filter(Boolean))],
   allModes: [...new Set(scenes.all.map((s) => s.mode).filter(Boolean))],
+  keptVerbs: scope.verbs,
+  allVerbs: [...new Set(scenes.all.flatMap((s) => s.verbs ?? []))],
 } : null;
 if (sceneFields) {
   const deadArt = sceneFields.allArt.length - sceneFields.keptArt.length;

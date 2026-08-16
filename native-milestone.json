@@ -1,5 +1,5 @@
 {
-  "name": "M3",
-  "description": "3 micro-mechanics (aim/align collapsed into one 'dial') + chase go/no-go; beats 2, 3, 4, 5, 11 playable",
-  "ceilingBytes": 9500
+  "name": "M4",
+  "description": "all twelve beats (7-10 added: castle confrontations + the chase) + music + ending",
+  "ceilingBytes": 12100
 }

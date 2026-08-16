@@ -81,8 +81,28 @@ function lightsRender(g) {
   }
 }
 
+function chaseInit() { return { progress: 0, gapIndex: 0, jump: 0, fails: 0 }; }
+function chaseUpdate(g, b, dt, input) {
+  g.jump = Math.max(0, g.jump - dt * 2.5);
+  if (input.heldRight) g.progress = Math.min(1, g.progress + dt * 0.4);
+  const next = b.g.gaps[g.gapIndex];
+  if (next !== undefined && input.act) {
+    if (Math.abs(g.progress - next) <= b.g.window) { g.gapIndex++; g.jump = 1; }
+    else { g.fails++; g.progress = Math.max(0, g.progress - 0.08); }
+  }
+  if (next !== undefined && g.progress > next + b.g.window) { g.fails++; g.progress = Math.max(0, next - 0.1); }
+  return g.gapIndex >= b.g.gaps.length;
+}
+function chaseRender(g, b) {
+  const scroll = g.progress * 300;
+  for (let i = 0; i < 8; i++) { const x = (i * 40 - scroll) % 340 - 10; line(x, 156, x + 14, 128, { stroke: '#000a', lineWidth: 3 }); }
+  for (const gapP of b.g.gaps) { const x = 160 + (gapP - g.progress) * 300; if (x > -20 && x < 340) circle(x, 132, 4, { fill: g.gapIndex < b.g.gaps.length && Math.abs(gapP - g.progress) <= b.g.window ? '#fff0a0' : '#c95' }); }
+  circle(60, 130 - g.jump * 14, 5, { fill: '#e8b923' });
+}
+
 export const GAMES = {
   icerain: { init: icerainInit, update: icerainUpdate, render: icerainRender },
   dial: { init: dialInit, update: dialUpdate, render: dialRender },
   lights: { init: lightsInit, update: lightsUpdate, render: lightsRender },
+  chase: { init: chaseInit, update: chaseUpdate, render: chaseRender },
 };

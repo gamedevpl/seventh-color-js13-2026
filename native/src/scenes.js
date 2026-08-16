@@ -85,4 +85,26 @@ export const SCENES = {
       line(x, y, x + 12, y, { stroke: '#4a7a82', lineWidth: 1 });
     }
   },
+  throne: (t) => {
+    clear(320, 156, '#100810');
+    for (let i = 0; i < 6; i++) {
+      const x = 8 + i * 58;
+      poly([x, 156, x - 14, 46, x, 12, x + 14, 46], { fill: i % 2 ? '#1c0e1c' : '#241226', stroke: '#3a1a34', lineWidth: 2 });
+    }
+    poly([130, 156, 138, 66, 160, 44, 182, 66, 190, 156], { fill: '#0c0510', stroke: '#4a1e3a', lineWidth: 3 });
+    for (let i = 0; i < 5; i++) line(160, 44, 160 + Math.cos(i * 1.1 + t * 0.35) * 70, 44 + Math.sin(i * 1.1 + t * 0.35) * 24, { stroke: '#3a1428', lineWidth: 1 });
+    rect(0, 142, 320, 14, { fill: '#040208' });
+  },
+  causeway: (t) => {
+    clear(320, 156, '#050308');
+    for (let i = 0; i < 7; i++) {
+      const x = -10 + i * 48;
+      poly([x, 0, x + 20, 0, x + 8, 156, x - 22, 156], { fill: i % 2 ? '#0e0812' : '#150c18', stroke: '#040206', lineWidth: 2 });
+    }
+    poly([0, 118, 70, 108, 140, 122, 210, 106, 320, 120, 320, 156, 0, 156], { fill: '#1a1420', stroke: '#3a2a44', lineWidth: 3 });
+    for (let i = 0; i < 6; i++) {
+      const x = (i * 61 + t * 20) % 340 - 12;
+      line(x, 108 + (i % 3) * 4, x + 8, 156, { stroke: '#0a0610', lineWidth: 3 });
+    }
+  },
 };

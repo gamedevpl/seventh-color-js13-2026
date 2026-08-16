@@ -152,6 +152,17 @@ data are what actually cost.
 **8,160 bytes remain against the 13,312 ceiling for M4 (beats 7-10, the
 chase decision below, music) and M5 (polish).**
 
+M4 (beats 7-10 — 2 more painters, the committed `chase` mechanic, `audio.js`
+— all twelve beats, full chain) landed at **6,397 cumulative, +2,245 over
+M3's chase-reverted baseline**. Every remaining beat is real content shipped,
+not thin filler: 2 new painters, 4 new beats' dialogue and choices, a
+committed motion mechanic, and a full audio system (drone + 4 sfx voices)
+all in under 2.3 KB combined.
+
+**6,915 bytes remain against the 13,312 ceiling — for M5 alone** (theme
+integration, polish). The whole twelve-beat story, every mechanic, and
+audio all fit in under half the budget.
+
 ## Build and measurement harness
 
 - `tools/native.mjs`: esbuild `src/main.js` → terser (reusing
@@ -365,3 +376,42 @@ three for now — this was a pricing probe, not the real build; beat 10
 proper (its own painter, real dialogue, final gap tuning, wired into the
 actual chain in place of the `roots`-reusing placeholder) is M4 work,
 scoped there already since M4 covers all twelve beats.
+
+### M4 — all twelve beats, music, the chase for real: PASS
+
+Added the four remaining beats: `hidden-hand` and `false-sacrifice`
+(confrontation rows sharing a new `throne` painter — a pure diff each,
+same mode, different data, exactly the pattern design rule 2 predicts),
+`final-beam` (the design keystone realized: the `dial` mechanic Jack
+learned from Meg turned on Darkness himself, same code, a new target
+angle), and `edge-of-world` (the chase, committed for real this time, on
+a new `causeway` painter). Chain is now the full
+`1→2→3→4→5→6→7→8→9→10→11→12`, no skips.
+
+`audio.js`: one `tone()` primitive doing double duty as both the ambient
+drone (three detuned oscillators, `setDrone(freq)` per beat via a new
+`drone` field in beat data — low and tense through the castle, warm at
+the reunion and ending) and four short envelope blips (`sfxTap`,
+`sfxYes`/`sfxNo` for choices, `sfxWin` for mechanic completion). No note-
+sequence player, no tracker format — design rule 2 applied to audio the
+same way it was applied to the story machine and the mechanics: one
+mechanism, parameterized, not two systems.
+
+`esbuild` bundle 30,529 → terser+mangle 18,454 → **zip 6,397**, worst of 5
+`-O1` rolls 6,408. **Ceiling 12,100 — 5,692 bytes of margin.**
+
+One real bug caught and fixed before committing: `chase`'s render drew an
+opaque dark-green ground rect that visually clashed with the new
+`causeway` painter's purple palette, half-covering its own bridge art. A
+screenshot at the mechanic's first real outing (not the probe, which used
+a placeholder painter and never showed this) caught it; fixed by dropping
+the opaque rect and letting the causeway's own art show through the
+scrolling crack-lines, and adding the same "highlight the target in the
+window" cue `icerain`'s hit-dots already use, for a consistent feedback
+language across mechanics rather than one added ad hoc.
+
+Verified with the same Node-level integration test extended to solve all
+four mechanics across all twelve beats (icerain, lights, dial ×2, chase)
+plus every choice - reaches `P.END` at `seventh-color` cleanly. Each new
+painter confirmed visually via targeted screenshots (temporary debug
+start-points, reverted before committing, same as M3).

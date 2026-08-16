@@ -4,6 +4,7 @@ import { paintFace } from './faces.js';
 import { GAMES } from './games.js';
 import { BEATS } from './data.js';
 import { makeRound, currentBeat, tick, press, moveChoice, P } from './story.js';
+import { initAudio, setDrone, sfxTap, sfxYes, sfxNo, sfxWin } from './audio.js';
 
 const VW = 320, VH = 156;
 
@@ -35,6 +36,7 @@ canvas.addEventListener('pointerdown', () => { acted = true; });
 let mode = 'title';
 let round = null;
 let last = 0;
+let droneBeat = null;
 
 function box(y, h) { rect(0, y, VW, h, { fill: '#0008' }); }
 
@@ -76,10 +78,13 @@ function frame(now) {
     clear(VW, VH, '#0a0710');
     text('THE SEVENTH COLOR', VW / 2, 68, { fill: '#e8b923', font: 'bold 16px system-ui', align: 'center' });
     text('tap or press space', VW / 2, 92, { fill: '#a89', font: '9px system-ui', align: 'center' });
-    if (doAct) { round = makeRound(BEATS, BEATS[0].id); mode = 'play'; }
+    if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; droneBeat = null; }
   } else {
     const b = currentBeat(round);
+    if (b.id !== droneBeat) { setDrone(b.drone); droneBeat = b.id; }
+    const before = round.phase;
     tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, heldLeft, heldRight });
+    if (before === P.GAME && round.phase !== P.GAME) sfxWin();
 
     if (round.phase === P.END) {
       SCENES[b.bg](round.elapsed);
@@ -99,7 +104,12 @@ function frame(now) {
       if (doLeft) moveChoice(round, -1);
       if (doRight) moveChoice(round, 1);
     }
-    if (doAct) press(round);
+    if (doAct) {
+      const beforePress = round.phase;
+      press(round);
+      if (beforePress === P.CHOICE) round.phase === P.RETRY ? sfxNo() : sfxYes();
+      else if (beforePress === P.DIALOGUE || beforePress === P.SUCCESS || beforePress === P.RETRY) sfxTap();
+    }
   }
 
   requestAnimationFrame(frame);

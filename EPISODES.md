@@ -170,34 +170,57 @@ the new logic and paint code, not per-wave content. Measured: **+139 bytes**
 rendering correctly — falling shard, accumulating crack lines, updated prompt
 — across a full playthrough capture.
 
-## The proposed series
+## The whole story, in six episodes
 
-Three episodes, each led by its strongest mechanic, each with its own theme hook
-(the story *is* the rainbow's stolen seventh color; the unicorn features in 1 and 3):
+The story is a strict 28-scene chain, no branches — confirmed by reading both
+scene-data files in full. `choices`/`correctChoice` fields only gate
+retry-until-right puzzles; every scene has exactly one `nextSceneId`. That
+means an episode split is purely a question of where to cut and what to
+compress, never which branch to follow.
 
-| # | title | window (distilled) | lead mechanic | measured / starting gap |
-| --- | --- | --- | --- | ---: |
-| 1 | **The Frozen Pond** | shadow-council → frozen-pond, skipping blindfold-path | Ice Rain (built) | 18,438 B, over by 5,126 — see progress log below |
-| 2 | **The Dark Castle** | castle-descent → dark-kitchen, recap card for ch III | kitchen stealth + cage escape | measured 23,238 undistilled; the deep-cut episode |
-| 3 | **The Last Ray** | reflector-chain → forest-vow, heavy cast trim | reflector relay + last stand | measured window subsets 18–22 KB undistilled |
+Ten scenes carry real, dedicated minigame code (`bog-cottage`, `meg-encounter`,
+`castle-descent`, `iron-cage`, `dark-kitchen`, `throne-pursuit`, `last-stand`,
+`spring-remembers`, `ring-pond`, `forest-vow` — each has its own
+`*-logic.ts`/`*-render.ts`, unlike the inline "thin" modes `frozen-pond` turned
+out to be). They cluster in Act 2 and the resolution; Act 1 and the throne-room
+climax are dialogue/riddle/investigation scenes with real but modest
+interaction. Every episode below is built around at least one thick scene, so
+none of them read as a slideshow.
 
-The other two episodes carry the same lesson: audit what their scene's `mode`
-actually does — via `story-slice-logic.ts`, not the mode name — before
-promising an "expansion" of it. Kitchen stealth, cage escape, the reflector
-relay and last stand each have dedicated `*-logic.ts`/`*-render.ts` modules
-(unlike breakout's inline handling), which is a good sign they're real enough
-to build on rather than replace — but that should be confirmed, not assumed,
-before their budgets are planned around it.
+Twenty-eight scenes into thirteen-byte-budget episodes does not divide evenly,
+and per-episode floor cost (~11.5–12 KB before a line of content) makes
+splitting expensive — every additional episode re-pays that floor. Six
+episodes for a 28-scene story is the count that keeps each one recognizable as
+"a chapter" without either (a) so few episodes that each needs the kind of
+scene-starving Episode 1 needed, or (b) so many that the series reads as
+fragments. Getting there means most episodes compress several scenes into one
+or two kept ones — same technique as Episode 1's `frozen-pond` rewrite,
+applied at every act seam, using the Explore-agent story read as source
+material for what a compressed transition line needs to imply.
 
-Episode 1 first, end to end, before episode 2 begins — it has the smallest measured
-gap, it reuses the already-shipped prologue work, and the single-draft rule forces
-serial delivery anyway. Landing it validates the distillation levers with real
-numbers before the harder episodes commit to them. If the compo deadline (13 Sep)
-arrives mid-series, a finished episode 1 + 2 is a result; five half-episodes are not.
+| # | title | scenes kept | compresses | lead mechanic |
+| --- | --- | --- | --- | --- |
+| 1 | **Winter Falls** | `shadow-council`, `frozen-pond` (rewritten) | `jacks-glade`, `blindfold-path`, `unicorn-stream` | Ice Rain (built) — shipping, gap being closed |
+| 2 | **Into the Bog** | `bog-cottage`, `meg-encounter` | `gumps-judgment`, `surviving-mare`, `faerie-council`, `hollow-armory`, `rescue-vow` | dual-puzzle → Meg's set piece, both real (thick) minigames |
+| 3 | **The Dark Castle** | `castle-descent`, `iron-cage`, likely one of `dark-kitchen` cut or trimmed | — (all three are essential: enter stronghold, Blunder reveal, party split) | cage-escape, possibly kitchen-stealth if budget allows |
+| 4 | **Both Sides of the Dark** | `living-gown`, one rewritten reflector-relay beat | `dungeon-viaduct`, `reflection-plan`, `plate-vault`, most of `reflector-chain`'s connective content | Lili/Darkness confrontation + a real light-relay mechanic (reflector-chain's own logic, kept, not replaced — it already has real aim-the-mirror gameplay) |
+| 5 | **The Last Turn** | `final-beam`, `throne-pursuit`, `last-stand` | `false-yield`, `false-sacrifice` (their beats folded into final-beam's rewritten open) | the villain's actual defeat + the collapsing-causeway chase |
+| 6 | **The Seventh Color** | `spring-remembers`, `ring-pond`, `forest-vow` | — (all three are short, thick, cast-light — likely the easiest to fit) | three payoff minigames back to back, epilogue reunion |
 
-Cross-episode continuity ships in all of them from day one (write the token even if
-no earlier episode exists to read it): `localStorage['7c-ep<N>'] = outcome`, read as
-a greeting line, never as a gate.
+This table is a plan, not a commitment — each episode gets the same treatment
+Episode 1 got: build it, measure it against the real pipeline, cut what the
+numbers say to cut, and update this table with what actually shipped. Episode
+3 and 5 are flagged as likely needing a scene dropped or further trimmed
+(three thick scenes in a row is expensive — `castle-descent`+`iron-cage`+
+`dark-kitchen` was part of the original 23,238-byte "Dark Castle" measurement
+that started this whole reassessment).
+
+Building in story order, one at a time — the single-draft-at-a-time compo
+rule forces serial submission anyway, and each finished episode is a real
+result even if the series stops partway. Cross-episode continuity ships in
+all of them: `localStorage['7c-ep<N>'] = outcome`, read as a greeting line in
+the next episode, never as a gate — a player who never touched episode 1 can
+still play episode 4 cold.
 
 ## Risks, named
 

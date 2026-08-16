@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: Games-repo branch to pack
+        description: Games-repo branch to pack (defaults to config.json's source.branch)
         required: false
-        default: codex/seventh-color-cast-prototype
   push:
     branches: [main]
 
@@ -16,13 +15,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The branch to pack is config.json's source of truth (`source.branch`),
+      # not a hardcoded default here - one drifting out of sync with the other
+      # is exactly how this workflow spent a whole session failing every push,
+      # checking out a branch (codex/seventh-color-cast-prototype) that had
+      # since been renamed away and no longer existed at all. A manual dispatch
+      # can still override it for a one-off trial.
+      - name: Resolve games-repo branch
+        id: branch
+        run: echo "ref=${{ github.event.inputs.branch }}" >> "$GITHUB_OUTPUT"
+        if: github.event.inputs.branch != ''
+      - name: Resolve games-repo branch from config.json
+        id: branch-config
+        run: echo "ref=$(node -pe "require('./config.json').source.branch")" >> "$GITHUB_OUTPUT"
+        if: github.event.inputs.branch == ''
+
       # The games repo is private, so this needs a token with read access to it.
       # Add it as the GAMES_REPO_TOKEN secret; without it the checkout fails and
       # the job says so rather than packing something stale.
       - uses: actions/checkout@v4
         with:
           repository: gamedevpl/www.gamedev.pl-games
-          ref: ${{ github.event.inputs.branch || 'codex/seventh-color-cast-prototype' }}
+          ref: ${{ steps.branch.outputs.ref || steps.branch-config.outputs.ref }}
           token: ${{ secrets.GAMES_REPO_TOKEN }}
           path: games-repo
 

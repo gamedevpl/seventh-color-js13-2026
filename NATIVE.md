@@ -108,20 +108,24 @@ All numbers zipped, after the full chain. These are estimates to be
 *replaced by measurements* at each milestone; the ledger's job is to make
 drift visible the day it happens, not to be right today.
 
-| subsystem | budget |
-| --- | ---: |
-| boot + loop + shell + input | 600 |
-| draw prims | 500 |
-| audio synth + music + sfx | 900 |
-| story machine | 700 |
-| 6 portraits | 1,400 |
-| 7 location painters | 2,200 |
-| 4 micro-mechanics (+ chase option) | 1,300 |
-| story data + prose | 2,500 |
-| HUD, title, ending | 500 |
-| reserve (jitter + integration) | 1,200 |
-| unassigned — spent last | 1,512 |
-| **ceiling** | **13,312** |
+| subsystem | budget | measured |
+| --- | ---: | ---: |
+| boot + loop + shell + prims (M0) | 600 | **1,048** |
+| input (deferred to M1) | 200 | — |
+| audio synth + music + sfx | 900 | — |
+| story machine | 700 | — |
+| 6 portraits | 1,400 | — |
+| 7 location painters | 2,200 | — |
+| 4 micro-mechanics (+ chase option) | 1,300 | — |
+| story data + prose | 2,500 | — |
+| HUD, title, ending | 500 | — |
+| reserve (jitter + integration) | 1,200 | — |
+| unassigned — spent last | 1,264 | — |
+| **ceiling** | **13,312** | |
+
+M0 ran 448 over its own line item, taken from "unassigned." Each future
+milestone's actual gets recorded here the same way, so the ledger tracks
+reality rather than the plan.
 
 ## Build and measurement harness
 
@@ -173,3 +177,27 @@ that milestone* instead of a death march at the end.
 2. **Cast cut sign-off.** Six faces, Luna cut from the whole game (not
    just episodes) — flagged as the one narrative decision this plan makes
    that earlier work only made per-episode.
+
+## Milestone log
+
+### M0 — boot floor: PASS
+
+Canvas + letterbox/center-fit resize + rAF loop + draw prims (`rect`,
+`circle`, `ellipse`, `line`, `poly`, `text`, `withTransform`), one animated
+shape. `esbuild` bundle 1,199 → terser+mangle 594 → **zip 1,048**, worst of
+5 `-O1` rolls (roadroller converges deterministically at this size — no
+jitter to chase yet, that starts mattering once the payload is large enough
+for the optimizer's search space to matter).
+
+**Ceiling 1,500, landed at 1,048 — 452 bytes of margin, premise confirmed.**
+The native floor is two orders of magnitude below the ~12.3 KB inherited
+floor this document exists to escape. Caught and fixed one real bug before
+calling it done: the initial CSS didn't vertically center the canvas
+(pinned to the top of the body) — a screenshot at the verify step caught it,
+same discipline as every episode in the transform-pipeline work.
+
+Files: `native/src/{main,draw}.js`, `tools/native.mjs` (build:
+esbuild → terser → roadroller → zip, reusing `lib/squeeze.mjs` so numbers
+are comparable to the episode pipeline), `tools/verify-native.mjs` (headless
+Chromium boot + console-error + screenshot check), `native-milestone.json`
+(current gate), `npm run native:gate` (`--O1 --rolls=5` then verify).

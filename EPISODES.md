@@ -136,21 +136,46 @@ trims staged extras scene by scene (with the painter-safety check), prose diet o
 episode's scenes, painter simplification for its backdrops — all on the episodes
 branch in the games repo, where visual changes are allowed now.
 
-One more dial capability is needed for distillation: **`skipScenes`** — dropping
-scenes from the *middle* of an episode's window and relinking `nextSceneId` across
-the gap (e.g. episode 1 keeping glade → stream → pond but not blindfold-path). Same
-AST machinery as `truncateAndClose`, plus a relink and the same terminal self-check.
+Shipped: **`skipScenes`** — dropping scenes from the *middle* of an episode's
+window and relinking `nextSceneId` across the gap. Same AST machinery as
+`truncateAndClose`, plus a relink and a resolve-through-a-chain guard for
+skipping consecutive scenes. `--skip <id,...>` on the CLI, `scope.skip` in
+config. Episode 1 uses it to drop `blindfold-path`, saving 121 bytes (the
+window's cast was already staged for the surrounding scenes, so removing one
+walk-and-talk beat mostly just removes prose).
+
+**Correction to the original plan:** "breakout" in the scene data is not a
+brick-breaker — `frozen-pond` was a three-tap QTE (tap anywhere, three times,
+done in a few seconds), and the rest of episode 1's window is similarly light
+narrative interaction. There was no existing minigame to expand. Built instead:
+**Ice Rain**, a real timing mechanic — a shard falls toward the ice each beat,
+and only a tap timed to its arrival shatters it; the fall duration shortens
+each hit, so the window tightens as the ice nears breaking. Zero new scene
+data — fall duration and the hit window are a formula off `round.pondCracks`
+and the scene's own `sceneElapsed` clock, so three escalating waves cost only
+the new logic and paint code, not per-wave content. Measured: **+139 bytes**
+(18,399 → 18,538, `--endAt frozen-pond --skip blindfold-path`), verified
+rendering correctly — falling shard, accumulating crack lines, updated prompt
+— across a full playthrough capture.
 
 ## The proposed series
 
 Three episodes, each led by its strongest mechanic, each with its own theme hook
 (the story *is* the rainbow's stolen seventh color; the unicorn features in 1 and 3):
 
-| # | title | window (distilled) | lead mechanic | starting gap |
+| # | title | window (distilled) | lead mechanic | measured / starting gap |
 | --- | --- | --- | --- | ---: |
-| 1 | **The Frozen Pond** | shadow-council → frozen-pond, skipping blindfold-path | breakout, expanded to a full level arc | ~3.5–4 KB after distillation (est.) |
+| 1 | **The Frozen Pond** | shadow-council → frozen-pond, skipping blindfold-path | Ice Rain (built) | 18,538 B, over by 5,226 — floor diet next |
 | 2 | **The Dark Castle** | castle-descent → dark-kitchen, recap card for ch III | kitchen stealth + cage escape | measured 23,238 undistilled; the deep-cut episode |
 | 3 | **The Last Ray** | reflector-chain → forest-vow, heavy cast trim | reflector relay + last stand | measured window subsets 18–22 KB undistilled |
+
+The other two episodes carry the same lesson: audit what their scene's `mode`
+actually does — via `story-slice-logic.ts`, not the mode name — before
+promising an "expansion" of it. Kitchen stealth, cage escape, the reflector
+relay and last stand each have dedicated `*-logic.ts`/`*-render.ts` modules
+(unlike breakout's inline handling), which is a good sign they're real enough
+to build on rather than replace — but that should be confirmed, not assumed,
+before their budgets are planned around it.
 
 Episode 1 first, end to end, before episode 2 begins — it has the smallest measured
 gap, it reuses the already-shipped prologue work, and the single-draft rule forces

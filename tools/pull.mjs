@@ -11,7 +11,7 @@ import { readSelectedPatches } from './lib/audio-inline.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
-import { readScenes, planScope, truncateAndClose, stubFor, recastScenes, pruneModeTable } from './lib/scope.mjs';
+import { readScenes, planScope, truncateAndClose, stubFor, recastScenes, pruneModeTable, dropScenes } from './lib/scope.mjs';
 import { planCast, foldAbsentMembers, pruneCastTable, reachableCastIds, readCast, foldAbsentSceneFields, foldFalseReads } from './lib/cast.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -115,11 +115,16 @@ async function bundleGame(stubs, applyScope = false) {
           }
           if (scoped) {
             const js = () => {
-              const compiled = transformSync(text, { loader: 'ts' }).code;
-              if (!hasRecast) return compiled;
-              if (base === 'story-slice-data.ts') return recastScenes(compiled, 'STORY_SCENES', recast);
-              if (base === 'story-slice-finale-data.ts') return recastScenes(compiled, 'FINAL_STORY_SCENES', recast);
-              return compiled;
+              let out = transformSync(text, { loader: 'ts' }).code;
+              if (hasRecast) {
+                if (base === 'story-slice-data.ts') out = recastScenes(out, 'STORY_SCENES', recast);
+                if (base === 'story-slice-finale-data.ts') out = recastScenes(out, 'FINAL_STORY_SCENES', recast);
+              }
+              if (skipIds.length) {
+                if (base === 'story-slice-data.ts') out = dropScenes(out, 'STORY_SCENES', skipIds);
+                if (base === 'story-slice-finale-data.ts') out = dropScenes(out, 'FINAL_STORY_SCENES', skipIds);
+              }
+              return out;
             };
             if (scope.droppedModules.includes(base)) return { contents: stubFor(js()), loader: 'js' };
             const close = { outcome: config.scope?.outcome ?? 'won', delayFrames: config.scope?.delayFrames ?? 8 };
@@ -206,9 +211,25 @@ const painterStaging = (() => {
 const recast = config.scope?.recast ?? {};
 const hasRecast = Object.keys(recast).length > 0;
 const withRecast = (js, name) => (hasRecast ? recastScenes(js, name, recast, painterStaging) : js);
-const scenes = readScenes(
+// Scenes to drop from the middle of the window (relinked, not just deleted) —
+// applied after recast so the two folds compose the same way here as in the
+// per-file transform below, and before readScenes so planScope's indices
+// already reflect the gap.
+const skipFlag = flag('skip');
+const skipIds = (skipFlag ? String(skipFlag).split(',') : (config.scope?.skip ?? [])).filter(Boolean);
+const recastOnly = readScenes(
   withRecast(asJs(path.join(gameSrcDir, 'story-slice-data.ts')), 'STORY_SCENES'),
   withRecast(asJs(path.join(gameSrcDir, 'story-slice-finale-data.ts')), 'FINAL_STORY_SCENES'),
+);
+for (const id of skipIds) {
+  if (!recastOnly.all.some((s) => s.id === id)) {
+    throw new Error(`scope: --skip named "${id}". Known ids:\n  ${recastOnly.all.map((s) => s.id).join('\n  ')}`);
+  }
+}
+const withSkip = (js, name) => (skipIds.length ? dropScenes(js, name, skipIds) : js);
+const scenes = readScenes(
+  withSkip(withRecast(asJs(path.join(gameSrcDir, 'story-slice-data.ts')), 'STORY_SCENES'), 'STORY_SCENES'),
+  withSkip(withRecast(asJs(path.join(gameSrcDir, 'story-slice-finale-data.ts')), 'FINAL_STORY_SCENES'), 'FINAL_STORY_SCENES'),
 );
 if (flag('scenes')) {
   console.log(`${scenes.all.length} scenes, in play order:`);

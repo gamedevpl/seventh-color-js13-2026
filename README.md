@@ -37,6 +37,7 @@ www.gamedev.pl-games                    seventh-color-js13-2026
 | `node tools/pull.mjs --scenes` | list every scene id the scope dial can be set to |
 | `node tools/pull.mjs --endAt <id>` | build as if the story ended at that scene |
 | `node tools/pull.mjs --startAt <id> --endAt <id>` | build a standalone mid-story episode (see [`EPISODES.md`](./EPISODES.md)) |
+| `node tools/pull.mjs --skip <id,id,...>` | drop scenes from the middle of the window, relinking `nextSceneId` across the gap |
 | `npm run size:fast` | pack without roadroller — quicker, for A/B-ing a single change |
 
 `npm run pack -- --strict` exits non-zero when the zip is over budget. Nothing uses it yet,

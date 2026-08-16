@@ -126,6 +126,52 @@ export function planScope(scenes, endAt, startAt = null) {
 }
 
 /**
+ * Drop scenes out of the middle of one scene array, relinking `nextSceneId`
+ * across the gap so the chain still plays.
+ *
+ * A skipped scene's own `nextSceneId` is what the gap relinks to — chained
+ * through as many skipped scenes as necessary, so skipping two scenes in a
+ * row still lands on the next kept one. A skip that ends the chain without
+ * reaching a kept scene (the skipped scene is itself terminal, or the chain
+ * cycles) is refused rather than silently producing a scene that goes nowhere.
+ */
+export function dropScenes(js, name, skipIds) {
+  if (!skipIds.length) return js;
+  const array = findArray(js, name);
+  const objects = array.elements.filter((e) => e.type === 'ObjectExpression');
+  const spread = array.elements.find((e) => e.type === 'SpreadElement');
+  const facts = objects.map((node) => sceneFacts(node, js));
+  const byId = new Map(facts.map((f) => [f.id, f]));
+  // Scene tables are split across two arrays; an id this call is not
+  // carrying is simply not this array's problem — the caller checks that
+  // every requested id was found in at least one of the two.
+  const skip = new Set(skipIds.filter((id) => byId.has(id)));
+  if (!skip.size) return js;
+
+  const resolve = (id, seen = new Set()) => {
+    if (!skip.has(id)) return id;
+    if (seen.has(id)) throw new Error(`scope: skipScenes cycle at "${id}"`);
+    seen.add(id);
+    const next = byId.get(id).nextSceneId;
+    if (!next) throw new Error(`scope: skipped scene "${id}" has no nextSceneId to relink through — it is terminal, so skipping it would strand whatever led into it`);
+    return resolve(next, seen);
+  };
+
+  const pieces = facts.filter((f) => !skip.has(f.id)).map((f) => {
+    let text = js.slice(f.range.start, f.range.end);
+    if (f.nextSceneIdRange && skip.has(f.nextSceneId)) {
+      const target = resolve(f.nextSceneId);
+      const start = f.nextSceneIdRange.start - f.range.start;
+      const end = f.nextSceneIdRange.end - f.range.start;
+      text = text.slice(0, start) + `nextSceneId: ${JSON.stringify(target)}` + text.slice(end);
+    }
+    return text;
+  });
+  if (spread) pieces.push(js.slice(spread.start, spread.end));
+  return js.slice(0, array.start) + '[' + pieces.join(',\n') + ']' + js.slice(array.end);
+}
+
+/**
  * Truncate one scene array, and turn its final scene into an ending.
  *
  * A scene that already carries `completion` is the story's real finish and is

@@ -579,3 +579,50 @@ fix is not a smaller window onto the same scene. It is to rebuild those beats
 around inline mechanics in the shape Ice Rain and the portrait riddle proved
 twice, and to stop treating the existing set-piece code as something to carry
 across.
+
+## Testing whether the portrait trick generalizes to episode 6: mostly, no
+
+Episode 4's win came from one specific fact: `living-gown` reaches zero
+`actor()` calls once Lili is staged as a portrait, so the entire rig module
+tree-shakes away. The natural next question is whether merging episode 6's
+two scenes (`spring-remembers`, `forest-vow` — narratively adjacent, same
+day, same clearing) into one dedicated mechanic pair would buy something
+similar.
+
+Priced the ceiling before writing any merge (gutted `updateEpilogue`/
+`paintEpilogue` in place to their minimum viable bodies — a single
+tap-to-continue and one static portrait pose — measured, then `git checkout`
+reverted; no narrative decision was actually made):
+
+| episode 6 (`spring-remembers`→`forest-vow`, `ring-pond` skipped) | zip |
+| --- | ---: |
+| current, both mechanics intact | 17,966 |
+| `epilogue` mechanic gutted to a stub | 17,364 |
+
+**Ceiling: 602 bytes**, not the ~2,650 a whole second scene-with-its-own-
+art/mode was measured to cost in the episode-1 table above. The reason: this
+probe didn't eliminate the rig, because `spring-remembers` and `forest-vow`
+between them still call `actor()` for jack, gump, lili, luna and unicorn — a
+merge only removes one mode's dispatch scaffolding and one data block, not
+the thing that actually paid off in episode 4. Confirms, from a different
+angle, the same lesson as the mechanic-code-compaction retraction: the win
+was never "fewer scenes," it was "zero rig calls." Not a viable lever here
+without also solving the rig.
+
+**The sharper hypothesis this leaves on the table:** most of the `actor()`
+calls in both scenes already pose their subject as `'stand'` — jack, gump,
+and lili never move in either scene; only the unicorn does (`'walk'` during
+its restoration rise, and again crossing the ford), and Luna only hovers in
+place. If those two motions were replaced with bespoke, purpose-drawn
+animation — the way `frozen-pond`'s falling ice shard and `living-gown`'s
+gown are hand-drawn rather than rig-driven — no character in the episode
+would ever reach `actor()`, and *both* rig files could fold: `cast-actor-
+rig.ts` (human/elf/demon biped) and `cast-creature-actor-rig.ts` (unicorn/
+fairy/hag), not just the smaller of the two.
+
+Not attempted. Unlike episode 4 — where portraits were an improvement, not
+just a saving, because a face-off riddle scene reads better as two faces —
+this trades away the stallion's healing rise, the visual payoff the whole
+restoration mechanic exists to deliver. That is a real narrative cost this
+document isn't positioned to accept on its own; flagged for the user rather
+than built.

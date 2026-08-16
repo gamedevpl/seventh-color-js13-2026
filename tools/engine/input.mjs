@@ -127,11 +127,6 @@ function buildTouchControls(setKey) {
   pad.addEventListener('pointercancel', endPad);
   root.appendChild(pad);
 
-  const coach = document.createElement('p');
-  coach.className = 'gamekit-touch-coach';
-  coach.textContent = 'Touch to play';
-  root.appendChild(coach);
-
   const rightCluster = document.createElement('div');
   rightCluster.className = 'gamekit-touch-right';
   const buttonRow = document.createElement('div');

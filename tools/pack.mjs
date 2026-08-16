@@ -11,6 +11,7 @@ import { extractBundle, minifyMarkup, stripI18nAttributes } from './lib/extract.
 import { inlineSynthesizedAudio } from './lib/audio-inline.mjs';
 import { shakeEngine } from './lib/shake.mjs';
 import { stripPolish } from './lib/english.mjs';
+import { filterShellCss, BARE_MARKUP } from './lib/shell.mjs';
 import { zipSingleFile } from './lib/zip.mjs';
 import { renderLedger, writeSizeLedger } from './lib/report.mjs';
 
@@ -153,6 +154,13 @@ if (on('stripI18n')) markup = stripI18nAttributes(markup);
 if (on('minifyMarkup')) markup = minifyMarkup(markup);
 
 let css = bundle.css;
+// Entry shell: the game, the sound toggle, the touch controls — the site
+// page's header/legend/footer go, and the CSS is filtered to the survivors.
+if (on('bareShell')) {
+  css = filterShellCss(css);
+  markup = BARE_MARKUP;
+  note('  − site chrome → entry shell', css.length + markup.length, 'css+markup remaining, pre-minify');
+}
 if (on('minifyCss')) {
   css = (await transform(css, { loader: 'css', minify: true })).code.trim();
 }

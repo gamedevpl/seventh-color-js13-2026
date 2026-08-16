@@ -32,6 +32,8 @@ www.gamedev.pl-games                    seventh-color-js13-2026
 | `npm run probe` | price each candidate cut in bytes off the *archive* |
 | `npm run probe -- --floor` | what the engine costs with no game, and the game with no engine |
 | `node tools/pack.mjs --O2` | override the roadroller search level for one run |
+| `node tools/scene-weight.mjs` | marginal compressed cost of each scene-content group (leave-one-out) |
+| `node tools/scene-weight.mjs --curve` | cumulative zip size by story chapter (scene arrays truncated at real boundaries) |
 | `npm run size:fast` | pack without roadroller — quicker, for A/B-ing a single change |
 
 `npm run pack -- --strict` exits non-zero when the zip is over budget. Nothing uses it yet,

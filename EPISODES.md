@@ -198,22 +198,47 @@ or two kept ones — same technique as Episode 1's `frozen-pond` rewrite,
 applied at every act seam, using the Explore-agent story read as source
 material for what a compressed transition line needs to imply.
 
-| # | title | scenes kept | compresses | lead mechanic |
-| --- | --- | --- | --- | --- |
-| 1 | **Winter Falls** | `shadow-council`, `frozen-pond` (rewritten) | `jacks-glade`, `blindfold-path`, `unicorn-stream` | Ice Rain (built) — shipping, gap being closed |
-| 2 | **Into the Bog** | `bog-cottage`, `meg-encounter` | `gumps-judgment`, `surviving-mare`, `faerie-council`, `hollow-armory`, `rescue-vow` | dual-puzzle → Meg's set piece, both real (thick) minigames |
-| 3 | **The Dark Castle** | `castle-descent`, `iron-cage`, likely one of `dark-kitchen` cut or trimmed | — (all three are essential: enter stronghold, Blunder reveal, party split) | cage-escape, possibly kitchen-stealth if budget allows |
-| 4 | **Both Sides of the Dark** | `living-gown`, one rewritten reflector-relay beat | `dungeon-viaduct`, `reflection-plan`, `plate-vault`, most of `reflector-chain`'s connective content | Lili/Darkness confrontation + a real light-relay mechanic (reflector-chain's own logic, kept, not replaced — it already has real aim-the-mirror gameplay) |
-| 5 | **The Last Turn** | `final-beam`, `throne-pursuit`, `last-stand` | `false-yield`, `false-sacrifice` (their beats folded into final-beam's rewritten open) | the villain's actual defeat + the collapsing-causeway chase |
-| 6 | **The Seventh Color** | `spring-remembers`, `ring-pond`, `forest-vow` | — (all three are short, thick, cast-light — likely the easiest to fit) | three payoff minigames back to back, epilogue reunion |
+| # | title | scenes kept | compresses | lead mechanic | measured baseline |
+| --- | --- | --- | --- | --- | ---: |
+| 1 | **Winter Falls** | `shadow-council`, `frozen-pond` (rewritten) | `jacks-glade`, `blindfold-path`, `unicorn-stream` | Ice Rain (built) | shipping at 13,303, headroom 9 |
+| 2 | **Into the Bog** | `bog-cottage`, `meg-encounter` | `gumps-judgment`, `surviving-mare`, `faerie-council`, `hollow-armory`, `rescue-vow` | dual-puzzle → Meg's set piece, both real (thick) minigames | 17,719, over by 4,407 — in progress |
+| 3 | **The Root Door** | `castle-descent`, `iron-cage` | `dark-kitchen` (its stealth minigame and the party split compressed into a rewritten line opening episode 4) | cage-escape (send Luna through the bars) | 18,366, over by 5,054 — not started |
+| 4 | **The Gown That Breathes** | `living-gown` alone | `dark-kitchen`'s split (recap line), `dungeon-viaduct`, `reflection-plan`, `plate-vault`, `reflector-chain` | Lili/Darkness confrontation — a real riddle scene, cast-light (just her and Darkness) | 14,395, over by only 1,083 — not started, best remaining gap by far |
+| 5 | **The Last Turn** | `false-yield`, `false-sacrifice`, `final-beam`, `throne-pursuit`, `last-stand` — all five, unreduced | — (measured: dropping `false-yield`+`false-sacrifice` only saved 251 bytes once the cast floor is paid, so cutting Lili's own agency beats from her climax bought almost nothing) | the villain's actual defeat + the collapsing-causeway chase | 18,941, over by 5,629 — not started |
+| 6 | **The Seventh Color** | `spring-remembers`, `ring-pond`, `forest-vow` | — | three payoff minigames back to back, epilogue reunion | 18,714, over by 5,402 — not started |
 
 This table is a plan, not a commitment — each episode gets the same treatment
 Episode 1 got: build it, measure it against the real pipeline, cut what the
-numbers say to cut, and update this table with what actually shipped. Episode
-3 and 5 are flagged as likely needing a scene dropped or further trimmed
-(three thick scenes in a row is expensive — `castle-descent`+`iron-cage`+
-`dark-kitchen` was part of the original 23,238-byte "Dark Castle" measurement
-that started this whole reassessment).
+numbers say to cut, and update this table with what actually shipped.
+
+**Two real course-corrections from measuring instead of guessing:**
+
+- The original sketch put `dark-kitchen` in episode 3 alongside `castle-descent`
+  and `iron-cage`. Measured: those two alone are already 18,366 (barely less
+  than all three at 19,846 — cast, not scene count, dominates again), and this
+  chapter's cast (`jack, gump, luna, brown-tom, screwball, blunder`) is
+  load-bearing — Screwball and Blunder both carry real lines here, unlike
+  `meg-encounter`'s decorative extras, so there's no cheap character cut
+  available. Moved `dark-kitchen` out to keep episode 3 to two thick scenes
+  instead of three.
+- `living-gown`, measured alone, is dramatically cheaper than the original plan
+  assumed (14,395 vs. the 19,558 the whole `living-gown`→`reflector-chain`
+  window costs) — its cast is just Lili and Darkness, no party. It gets its own
+  episode instead of being bundled with the mirror-relay scenes, which was the
+  single best number to come out of the whole baseline sweep.
+
+Episode 5 was tested the other way — keeping the throne-room trio in full
+turned out to be *free* (251 bytes) rather than a cut worth making, so
+`false-yield` and `false-sacrifice` stay. Cutting them would have saved
+Lili's own climax agency for almost no byte return, which is the kind of
+trade the earlier sessions' "measure before cutting" rule exists to prevent.
+
+A structural bug surfaced while reading the throne-room scenes: they define
+`mode`/`art`/`music` via `...THRONE` object-spread rather than repeating them,
+which the scope dial's fact-reader couldn't see until fixed (see pipeline
+commit `a4ef77d`) — without that fix, an episode covering them could have had
+`foldAbsentSceneFields` silently strip the painter they still need. Fixed and
+verified before any episode-5 work begins, not after something broke.
 
 Building in story order, one at a time — the single-draft-at-a-time compo
 rule forces serial submission anyway, and each finished episode is a real

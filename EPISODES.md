@@ -203,7 +203,7 @@ material for what a compressed transition line needs to imply.
 | 1 | **Winter Falls** | `shadow-council`, `frozen-pond` (rewritten) | `jacks-glade`, `blindfold-path`, `unicorn-stream` | Ice Rain (built) | shipping at 13,303, headroom 9 |
 | 2 | **Into the Bog** | `bog-cottage`, `meg-encounter` | `gumps-judgment`, `surviving-mare`, `faerie-council`, `hollow-armory`, `rescue-vow` | dual-puzzle → Meg's set piece, both real (thick) minigames | 17,719, over by 4,407 — in progress |
 | 3 | **The Root Door** | `castle-descent`, `iron-cage` | `dark-kitchen` (its stealth minigame and the party split compressed into a rewritten line opening episode 4) | cage-escape (send Luna through the bars) | 18,366, over by 5,054 — not started |
-| 4 | **The Gown That Breathes** | `living-gown` alone | `dark-kitchen`'s split (recap line), `dungeon-viaduct`, `reflection-plan`, `plate-vault`, `reflector-chain` | Lili/Darkness confrontation — a real riddle scene, cast-light (just her and Darkness) | 14,395, over by only 1,083 — not started, best remaining gap by far |
+| 4 | **The Gown That Breathes** | `living-gown` alone | `dark-kitchen`'s split (recap line), `dungeon-viaduct`, `reflection-plan`, `plate-vault`, `reflector-chain` | Lili/Darkness confrontation — a real riddle scene, cast-light (just her and Darkness) | 14,085 at -O2, over by 773 — best remaining gap by far, needs a recap line + final trims |
 | 5 | **The Last Turn** | `false-yield`, `false-sacrifice`, `final-beam`, `throne-pursuit`, `last-stand` — all five, unreduced | — (measured: dropping `false-yield`+`false-sacrifice` only saved 251 bytes once the cast floor is paid, so cutting Lili's own agency beats from her climax bought almost nothing) | the villain's actual defeat + the collapsing-causeway chase | 18,941, over by 5,629 — not started |
 | 6 | **The Seventh Color** | `spring-remembers`, `ring-pond`, `forest-vow` | — | three payoff minigames back to back, epilogue reunion | 18,714, over by 5,402 — not started |
 
@@ -300,3 +300,72 @@ cost, accepted in exchange for a tractable remaining gap. Closing the last
 unproven yaw-unreachability tooling) — paused here for the user to weigh back
 in, since each further character trim or the yaw investment is diminishing-
 return work at this point, not a clear win.
+
+## Episode 2 progress log
+
+`--startAt bog-cottage --endAt meg-encounter`, no skips needed (they're
+already adjacent). Raw baseline (9 declared cast, before any recast):
+18,561. Working forward:
+
+| cut | zip | delta |
+| --- | ---: | ---: |
+| recast `blix`/`pox` out of `bog-cottage` (unpainted — verified against the render, not just the declared cast array) | 18,561 → n/a | — |
+| drop `brown-tom`/`screwball` from `meg-encounter`'s `party()` (silent extras; their only lines are in the next chapter) + recast | 18,561 → 17,754 | −807 |
+| Meg's hag-face hair locks (5→3), Gump's hair spikes (5→3) | 17,754 → 17,719 | −35 |
+| `bogPrompt` rewritten with a recap opener (`"Jack tracks Lili's captors to Meg's bog…"`) so the scene stands alone | included above | prose, not measured separately |
+
+**Current: 17,719, over by 4,407.** Screenshot-verified: bog puzzle, crack
+counter, prompt text, and the cottage/Meg reveal all render correctly.
+Two thick scenes together are simply expensive — 5 cast (`jack, gump, luna,
+lili, meg`) is close to the floor for a scene this rich, and further cuts
+here would start costing real story (Luna's a recurring companion, not an
+extra). Left here; next lever is the same one that helped episode 4 — check
+whether `bog-cottage-render.ts`/`meg-encounter-render.ts` share any
+scene.id-style branching the fold can't see through yet.
+
+## Episode 4 progress log
+
+`--startAt living-gown --endAt living-gown`. Baseline: 14,395, over by 1,083
+— by far the smallest gap in the series, because this scene's cast is just
+`lili` and `darkness`, no party.
+
+| cut | zip | delta |
+| --- | ---: | ---: |
+| split `paintLivingGown`'s shared scene.id-branching into `paintLivingGown` + `paintThroneClimax`, told apart by a new `art: 'throne-climax'` value the existing fold can see (pipeline fix `a4ef77d` made this safe — see below) | 14,395 → 14,101 | −286, plus drops `unicorn` from the cast (only the throne-climax branch ever drew it) |
+| gown pleat count 5→3 | 14,101 → ~14,085 (noise-level, not a real saving — kept anyway, harmless) | ~0 |
+| `-O2` roadroller | 14,097 → 14,085 | −12 |
+
+**Current: 14,085 at -O2, over by 773.** This is the structural lesson worth
+generalizing: any painter that dispatches on `scene.id` rather than
+`scene.art`/`scene.mode` is invisible to the existing fold, no matter how
+much of its code a given episode never reaches. Worth auditing the other
+shared painters (`castle-parallel-render.ts` has more of them —
+`paintDungeonViaduct`, `paintReflectorChain`) before episode 5 gets built,
+since episode 5 needs `paintThroneClimax` and would otherwise still ship
+whatever else in that file branches the same invisible way.
+
+A correctness fix landed alongside this work, not just a size win: `false-
+yield`/`false-sacrifice`/`final-beam` define `mode`/`art`/`music` through a
+`...THRONE` object spread rather than repeating them, which `sceneFacts()`
+couldn't see until fixed (pipeline commit `a4ef77d`) — unfixed, an episode
+covering only some of those scenes could have had its painter silently
+stripped as unreachable. Fixed and verified (direct fact-extraction test,
+plus an unaffected prologue rebuild) before any episode-4/5 work touched
+those scenes.
+
+## What's shipped, what's not
+
+| # | title | status |
+| --- | --- | --- |
+| 1 | Winter Falls | **shipping** — 13,280 B, headroom 32, gap-closing work paused at 2,618 over on the un-narrowed original 4-scene cut, superseded by the narrower 2-scene build documented above |
+| 2 | Into the Bog | in progress — 17,719, over by 4,407 |
+| 3 | The Root Door | scoped, not started — baseline 18,366 (castle-descent+iron-cage), over by 5,054 |
+| 4 | The Gown That Breathes | in progress — 14,085 at -O2, over by 773, closest to done |
+| 5 | The Last Turn | scoped, not started — baseline 18,941, over by 5,629 |
+| 6 | The Seventh Color | scoped, not started — baseline 18,714, over by 5,402 |
+
+None of episodes 2–6 are ready to submit. Every number above is a real,
+pipeline-measured, `VERIFY OK`-checked baseline — not an estimate — but
+"measured and under active work" is different from "ready." The prologue
+(episode 1) is the only one that is actually done: built, under budget,
+verified, and stable across every commit in this session.

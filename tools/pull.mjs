@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
 import { readScenes, planScope, truncateAndClose, stubFor } from './lib/scope.mjs';
+import { planCast, foldAbsentMembers, pruneCastTable } from './lib/cast.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -126,6 +127,18 @@ async function bundleGame(stubs, applyScope = false) {
                 dropSpread: false, closeLast: scope.keepFinale > 0, ...close,
               }), loader: 'js' };
             }
+            if (cast?.droppedIds.length) {
+              if (base === 'cast-data.ts') {
+                const pruned = pruneCastTable(js(), cast.keptIds);
+                return { contents: pruned.js, loader: 'js' };
+              }
+              if (/^cast-|^story-actor-render/.test(base)) {
+                return {
+                  contents: foldAbsentMembers(js(), cast.keptIds, cast.keptKinds, cast.allIds, cast.allKinds),
+                  loader: 'js',
+                };
+              }
+            }
           }
           return { contents: text, loader: 'ts' };
         });
@@ -157,10 +170,15 @@ if (flag('scenes')) {
 }
 const endAt = flag('endAt') || config.scope?.endAt || null;
 const scope = endAt ? planScope(scenes, endAt) : null;
+// Cast the scoped story never stages. Their art is unreachable, so the
+// comparisons that select it fold to constants and terser clears the rest.
+const castJs = asJs(path.join(gameSrcDir, 'cast-data.ts'));
+const cast = scope ? planCast(castJs, scope.cast) : null;
 if (scope) {
   console.log(`scope: ending at "${scope.lastSceneId}" — ${scope.kept.length}/${scope.totalScenes} scenes,`
     + ` ${scope.modes.length} modes, ${scope.music.length} tracks, ${scope.cast.length} cast`);
   if (scope.droppedModules.length) console.log(`  unreachable minigames stubbed: ${scope.droppedModules.length / 2}`);
+  if (cast?.droppedIds.length) console.log(`  cast never staged, art folded out: ${cast.droppedIds.join(', ')}`);
 }
 
 writeFileSync(path.join(outDir, 'game.js'), await bundleGame([]));

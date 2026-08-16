@@ -11,8 +11,8 @@ import { readSelectedPatches } from './lib/audio-inline.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
-import { readScenes, planScope, truncateAndClose, stubFor } from './lib/scope.mjs';
-import { planCast, foldAbsentMembers, pruneCastTable } from './lib/cast.mjs';
+import { readScenes, planScope, truncateAndClose, stubFor, recastScenes } from './lib/scope.mjs';
+import { planCast, foldAbsentMembers, pruneCastTable, reachableCastIds, readCast } from './lib/cast.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -114,7 +114,13 @@ async function bundleGame(stubs, applyScope = false) {
             text = text.replace(patch.find, patch.replace);
           }
           if (scoped) {
-            const js = () => transformSync(text, { loader: 'ts' }).code;
+            const js = () => {
+              const compiled = transformSync(text, { loader: 'ts' }).code;
+              if (!hasRecast) return compiled;
+              if (base === 'story-slice-data.ts') return recastScenes(compiled, 'STORY_SCENES', recast);
+              if (base === 'story-slice-finale-data.ts') return recastScenes(compiled, 'FINAL_STORY_SCENES', recast);
+              return compiled;
+            };
             if (scope.droppedModules.includes(base)) return { contents: stubFor(js()), loader: 'js' };
             const close = { outcome: config.scope?.outcome ?? 'won', delayFrames: config.scope?.delayFrames ?? 8 };
             if (base === 'story-slice-data.ts') {
@@ -159,9 +165,31 @@ const stubDir = path.join(root, 'tools', 'stubs');
 const gameSrcDir = path.join(gamesDir, 'games', config.slug, 'game');
 // acorn reads JavaScript, so every scope operation works on transpiled source.
 const asJs = (file) => transformSync(readFileSync(file, 'utf8'), { loader: 'ts' }).code;
+// Which ids each scene's painter stages by name. Needed before recasting, so a
+// recast that cannot actually work is refused with the reason rather than
+// silently keeping the member it was meant to drop.
+const painterStaging = (() => {
+  const castIds = readCast(asJs(path.join(gameSrcDir, 'cast-data.ts'))).map((e) => e.id).filter(Boolean);
+  const renderSrc = asJs(path.join(gameSrcDir, 'story-slice-render.ts'));
+  const raw = readScenes(
+    asJs(path.join(gameSrcDir, 'story-slice-data.ts')),
+    asJs(path.join(gameSrcDir, 'story-slice-finale-data.ts')),
+  );
+  const map = {};
+  for (const scene of raw.all) {
+    if (!scene.art) continue;
+    map[scene.id] = reachableCastIds(renderSrc, [scene.art], castIds).ids;
+  }
+  return map;
+})();
+
+// Recast first, so the plan below sees the staging this build will actually use.
+const recast = config.scope?.recast ?? {};
+const hasRecast = Object.keys(recast).length > 0;
+const withRecast = (js, name) => (hasRecast ? recastScenes(js, name, recast, painterStaging) : js);
 const scenes = readScenes(
-  asJs(path.join(gameSrcDir, 'story-slice-data.ts')),
-  asJs(path.join(gameSrcDir, 'story-slice-finale-data.ts')),
+  withRecast(asJs(path.join(gameSrcDir, 'story-slice-data.ts')), 'STORY_SCENES'),
+  withRecast(asJs(path.join(gameSrcDir, 'story-slice-finale-data.ts')), 'FINAL_STORY_SCENES'),
 );
 if (flag('scenes')) {
   console.log(`${scenes.all.length} scenes, in play order:`);
@@ -173,7 +201,12 @@ const scope = endAt ? planScope(scenes, endAt) : null;
 // Cast the scoped story never stages. Their art is unreachable, so the
 // comparisons that select it fold to constants and terser clears the rest.
 const castJs = asJs(path.join(gameSrcDir, 'cast-data.ts'));
-const cast = scope ? planCast(castJs, scope.cast) : null;
+const renderJs = asJs(path.join(gameSrcDir, 'story-slice-render.ts'));
+const allCastIds = readCast(castJs).map((e) => e.id).filter(Boolean);
+const painted = scope
+  ? reachableCastIds(renderJs, [...new Set(scope.kept.map((s) => s.art).filter(Boolean))], allCastIds)
+  : null;
+const cast = scope ? planCast(castJs, scope.cast, painted.ids) : null;
 if (scope) {
   console.log(`scope: ending at "${scope.lastSceneId}" — ${scope.kept.length}/${scope.totalScenes} scenes,`
     + ` ${scope.modes.length} modes, ${scope.music.length} tracks, ${scope.cast.length} cast`);

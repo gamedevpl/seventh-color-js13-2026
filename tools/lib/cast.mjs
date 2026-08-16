@@ -96,11 +96,65 @@ export function pruneCastTable(js, keptIds) {
   return { js: out, dropped: doomed.map((e) => e.id) };
 }
 
-export function planCast(castJs, sceneCastIds) {
+/**
+ * Cast ids the reachable painters name directly.
+ *
+ * `scene.cast` is metadata; it is not what gets drawn. `paintShadowCouncil`
+ * hardcodes `actor(draw, 'blunder', …)` whatever the cast array says. So the
+ * safe kept-set is the union of the cast arrays and every id literal inside a
+ * painter the kept scenes can reach — reachability being the `scene.art === 'x'`
+ * dispatch, followed transitively through helper calls.
+ *
+ * Without this the fold survives only because unreachable painters never run,
+ * which is true today and one scope change away from being false.
+ */
+export function reachableCastIds(renderJs, keptArt, allIds) {
+  const tree = parse(renderJs, { ecmaVersion: 'latest', sourceType: 'module' });
+  const functions = new Map();
+  walk(tree, (n) => { if (n.type === 'FunctionDeclaration' && n.id) functions.set(n.id.name, n); });
+
+  const dispatch = new Map();
+  walk(tree, (n) => {
+    if (n.type !== 'IfStatement' || !n.test) return;
+    const tests = [];
+    walk(n.test, (t) => {
+      if (t.type === 'BinaryExpression' && t.operator === '==='
+        && t.left.type === 'MemberExpression' && t.left.property?.name === 'art'
+        && t.right.type === 'Literal') tests.push(t.right.value);
+    });
+    if (!tests.length) return;
+    let painter = null;
+    walk(n.consequent, (c) => {
+      if (!painter && c.type === 'CallExpression' && c.callee.type === 'Identifier') painter = c.callee.name;
+    });
+    if (painter) for (const art of tests) if (!dispatch.has(art)) dispatch.set(art, painter);
+  });
+
+  const ids = new Set();
+  const seen = new Set();
+  const visit = (name) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    const fn = functions.get(name);
+    if (!fn) return;
+    walk(fn, (n) => {
+      if (n.type === 'Literal' && typeof n.value === 'string' && allIds.includes(n.value)) ids.add(n.value);
+      if (n.type === 'CallExpression' && n.callee.type === 'Identifier') visit(n.callee.name);
+    });
+  };
+  for (const art of keptArt) { const p = dispatch.get(art); if (p) visit(p); }
+  return { ids: [...ids], unmapped: keptArt.filter((a) => !dispatch.has(a)) };
+}
+
+export function planCast(castJs, sceneCastIds, painterIds = []) {
   const entries = readCast(castJs);
   const allIds = entries.map((e) => e.id).filter(Boolean);
   const allKinds = [...new Set(entries.map((e) => e.kind).filter(Boolean))];
-  const keptIds = allIds.filter((id) => sceneCastIds.includes(id));
+  // Union, not intersection: a member is kept if any kept scene casts them OR
+  // any reachable painter names them. Dropping one the painter still draws is
+  // an undefined lookup at runtime, so this side errs toward keeping.
+  const needed = new Set([...sceneCastIds, ...painterIds]);
+  const keptIds = allIds.filter((id) => needed.has(id));
   const keptKinds = [...new Set(entries.filter((e) => keptIds.includes(e.id)).map((e) => e.kind))];
   return { allIds, allKinds, keptIds, keptKinds, droppedIds: allIds.filter((id) => !keptIds.includes(id)) };
 }

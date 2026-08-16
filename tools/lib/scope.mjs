@@ -153,6 +153,44 @@ export function truncateAndClose(js, name, keep, { dropSpread, closeLast, outcom
   return out;
 }
 
+/**
+ * Rewrite a scene's `cast` list at build time.
+ *
+ * A prologue that stages five characters pays for five characters' art. Which
+ * of them are load-bearing is a staging judgement, and making it here — rather
+ * than editing the scene in the games repo — keeps this repo read-only over
+ * that branch and lets the choice be A/B'd against the ledger.
+ */
+export function recastScenes(js, name, recast, painterIds = {}) {
+  const array = findArray(js, name);
+  const edits = [];
+  for (const node of array.elements) {
+    if (node.type !== 'ObjectExpression') continue;
+    const facts = sceneFacts(node, js);
+    const wanted = recast[facts.id];
+    if (!wanted) continue;
+    const property = node.properties.find((p) => propertyName(p) === 'cast');
+    if (!property || property.value.type !== 'ArrayExpression') {
+      throw new Error(`scope: scene "${facts.id}" has no literal cast array to recast`);
+    }
+    const missing = wanted.filter((id) => !facts.cast.includes(id));
+    if (missing.length) {
+      throw new Error(`scope: recast of "${facts.id}" names ${missing.join(', ')}, who are not in its cast`);
+    }
+    // A scene's painter stages by hardcoded id, so removing someone from the
+    // cast array does not stop them being drawn — it only orphans the lookup.
+    // Refuse, with the reason, rather than shipping a crash.
+    const stillPainted = (painterIds[facts.id] ?? []).filter((id) => !wanted.includes(id));
+    if (stillPainted.length) {
+      throw new Error(`scope: cannot recast "${facts.id}" without ${stillPainted.join(', ')} — `
+        + `its painter draws them by name. Removing them needs an edit to the painter, not the cast list.`);
+    }
+    edits.push({ start: property.value.start, end: property.value.end, text: JSON.stringify(wanted) });
+  }
+  return edits.sort((a, b) => b.start - a.start)
+    .reduce((text, e) => text.slice(0, e.start) + e.text + text.slice(e.end), js);
+}
+
 /** A stub exporting every name the real module does, so importers still link. */
 export function stubFor(js) {
   const tree = parse(js, { ecmaVersion: 'latest', sourceType: 'module' });

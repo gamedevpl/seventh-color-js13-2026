@@ -60,6 +60,7 @@
   "scope": {
     "endAt": null,
     "outcome": "won",
-    "delayFrames": 8
+    "delayFrames": 8,
+    "recast": {}
   }
 }

@@ -358,7 +358,7 @@ those scenes.
 | # | title | status |
 | --- | --- | --- |
 | 1 | Winter Falls | **prologue alone is shipping** — `shadow-council` only, 13,284 B, headroom 28. The 2-scene "Winter Falls" that adds `frozen-pond` + Ice Rain is **15,948, over by 2,636** and has never fitted — see the correction below, this row previously conflated the two |
-| 2 | Into the Bog | in progress — 17,719, over by 4,407 — cast trims done, plays correctly |
+| 2 | Into the Bog | as two scenes, blocked — see "Checking episodes 2, 3 and 5 against the portrait tell" near the end of this document. `meg-encounter` alone is ~26–70 bytes over, `bog-cottage` needs a mechanic redesign to join it |
 | 3 | The Root Door | in progress — 17,919, over by 4,607 — cold open + Brown Tom trim done |
 | 4 | The Gown That Breathes | **shipping** — 12,297 B, headroom 1,015 — closed by staging Lili as a portrait, which drops the whole body rig (see below) |
 | 5 | The Last Turn | in progress — 18,120, over by 4,808 — Luna trim done |
@@ -689,3 +689,80 @@ descent`/`throne-pursuit`, both built around walking and running, look like
 worse candidates than `iron-cage`/`meg-encounter`, which read more like
 confrontations than chases. Not measured; flagged for whichever gets picked
 up next.
+
+## Checking episodes 2, 3 and 5 against the portrait tell
+
+Episode 6's rule generalized: check every `actor()` call's `motion` argument.
+If a scene's cast is all `'stand'` except a moment a mechanic's payoff needs,
+that moment can usually be redrawn bespoke and the rig folds. Checked all
+three remaining episodes against it directly, by reading each scene's own
+`*-logic.ts` for `moveStoryActor` (the walking-mechanic helper) rather than
+guessing from the render code:
+
+| scene | calls `moveStoryActor`? | tell |
+| --- | --- | --- |
+| `bog-cottage` (`dual-puzzle-logic.ts`) | yes, twice | walking **is** the puzzle — find bog sites, then cottage sites, in order, by walking to them |
+| `meg-encounter` (`meg-encounter-logic.ts`) | no | confrontation: dialogue, a choice, a mirror-aim mechanic, one strike — nobody moves |
+| `castle-descent` (`castle-descent-logic.ts`) | yes | phases 0–2 are walk-to-site-and-ACT, same pattern as `bog-cottage` |
+| `iron-cage`/`cage-escape` (`cage-escape-logic.ts`) | yes, twice | same |
+| `throne-pursuit` | no (uses its own `pursuitProgress`/keyboard-hold input, not `moveStoryActor`) | but the mechanic **is** running and jumping — motion is the whole point, just not through the shared walking helper |
+| `last-stand` | no | a cinematic confrontation, but jack/darkness/the mare all have real, continuously-animated motion (`impact` displaces their x/y every frame) |
+
+**Episodes 3 and 5 are blocked outright** — every scene in both has real
+motion as its actual mechanic (navigation, a chase, a fleeing mare), not
+staging layered on top of a mechanic that doesn't need it. Redoing these as
+portraits would mean replacing what the player *does*, not just how it's
+drawn — a materially different game, not a restaging. Not attempted.
+
+**Episode 2 is a mixed case, and `meg-encounter` alone passed the tell.**
+Built it: all three of its human/fairy cast (jack, gump, luna) portrait-
+staged, same as episode 6. Also found and fixed a second issue while there —
+`brown-tom` and `screwball` were cut from the painter earlier this session
+(the decorative-cast pattern) but never removed from the scene's declared
+`cast` array, so their rig/face code was still reachable through the stale
+declaration alone. Removing it was worth **520 bytes on its own**, more than
+several of the deliberate cuts elsewhere in this document.
+
+| meg-encounter alone | zip | over budget |
+| --- | ---: | ---: |
+| rig-based, as originally built | 16,564 | +3,252 |
+| portraits + stale-cast fix, best of ~20 `-O2`/`-O3` rolls | 13,338 | **+26** |
+| portraits + stale-cast fix, typical roll | 13,340–13,380 | +30 to +70 |
+
+**Within roadroller's own run-to-run jitter of fitting**, and closer than
+any episode in this document except the two already shipping. Verified
+booting and rendering correctly — Meg looming right, Jack held at center,
+Gump and Luna watching from the left, nothing clipped once a stale camera
+override tuned to the old rig positions (`story-presentation.ts`, centered
+at `x:192`, clipped the new left-side portraits) was removed in favor of the
+default full-canvas framing.
+
+Its opening line — Meg addressing Jack directly, "What soft little champion
+wanders into my supper?" — already reads as a cold open. It does not need
+`bog-cottage` to make sense.
+
+**What this doesn't solve: `bog-cottage` itself.** Its dual-puzzle — walk to
+three bog sites, then three cottage sites in a specific order — calls the
+walking helper directly; movement isn't decorating the mechanic, it *is* the
+mechanic. The only way to reach the same win for the paired episode is to
+redesign the puzzle itself around a non-walking interaction (e.g. selecting
+sites on a static layout rather than walking to them), which changes what
+the player *does* on the bog-cottage half, not just how it's drawn. That is
+a bigger creative call than any staging decision made so far in this
+document, and it isn't decided here.
+
+**The decision this leaves:** episode 2 as originally planned (`bog-cottage`
++ `meg-encounter`, two mechanics) is not close to fitting and the portrait
+trick can't reach `bog-cottage` without a mechanic redesign. `meg-encounter`
+alone, redesigned, is one dial-turn from fitting. Three ways to close it,
+not chosen here:
+
+1. Ship `meg-encounter` alone as episode 2 — a shorter, single-mechanic
+   episode, the same shape as the shipping prologue and episode 4. Loses
+   the bog-crossing puzzle from this compo entry entirely (for now).
+2. Redesign `bog-cottage`'s puzzle to drop the walking requirement, so both
+   scenes can ship together at full length. Real mechanic-design work with
+   its own risk, not a sure thing until built and measured.
+3. Leave episode 2 as documented backlog and move on — same posture as
+   episodes 3 and 5, which are blocked for a harder reason (motion is those
+   scenes' entire identity, not a redesignable side effect).

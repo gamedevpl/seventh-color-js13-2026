@@ -404,3 +404,42 @@ spread thin across many scenes. Not a good trade against the writing quality
 for the bytes on offer. Skipping `ring-pond` instead — a whole scene, not a
 sentence — outperformed it by an order of magnitude for less narrative risk,
 since the Explore-agent read had already flagged it as non-essential.
+
+## Would more, smaller episodes fit? Measured: no.
+
+Tested directly rather than assumed: every "thick" scene (dedicated
+`*-logic.ts`/`*-render.ts`), alone, minimal cast, nothing else in the build.
+
+| single scene alone | zip | over budget |
+| --- | ---: | ---: |
+| `castle-descent` | 15,841 | +2,529 |
+| `false-yield`→`final-beam` (3 scenes, one riddle-mode unit) | 16,349 | +3,037 |
+| `meg-encounter` | 16,529 | +3,217 |
+| `bog-cottage` | 16,616 | +3,304 |
+| `iron-cage` | 16,872 | +3,560 |
+| `throne-pursuit`+`last-stand` | 17,292 | +3,980 |
+
+None fit. Not close. The cheapest one, `castle-descent`, completely alone
+with nothing else in the build, is still 2,529 over. Splitting an episode
+in half turns one N-byte problem into two roughly-(N/1.3)-byte problems —
+smaller individually, since less total content, but the floor for a
+thick-mode scene was never really about how many scenes are bundled
+together. It's a cost each one pays alone: its own dedicated mechanic code,
+the one thing that can't be shared or folded away because it's what makes
+that scene unique. Splitting episode 2 (4,407 over combined) into two
+entries would trade it for two entries at 3,304 and 3,217 over — modestly
+smaller each, but now two entries needing the same unsolved kind of work,
+plus the compo overhead of an extra draft, extra repo, extra serialized
+submission. Worse trade under "don't split too much," for a gap that still
+doesn't close.
+
+**What this points to instead:** cast and scene-count are wrung dry. The
+remaining lever is the size of the mechanic code itself —
+`castle-descent-render.ts` (4,810B minified), `iron-cage`'s
+`cage-escape-render.ts` (4,170B), `dark-kitchen`'s `kitchen-stealth-
+render.ts` (4,224B), `meg-encounter-render.ts` (3,412B), `bog-cottage-
+render.ts` (3,736B) — all written for the original 200KB+ game, never
+audited for a 13KB one. That's genuinely untried territory: not decoration
+to trim, but logic and rendering code that may have real structural slack —
+redundant math, over-parameterized state, unrolled loops doing what a
+smaller loop could. Pursuing this next.

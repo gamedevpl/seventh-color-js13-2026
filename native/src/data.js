@@ -46,8 +46,8 @@ export const BEATS = [
       { who: 'jack', text: "Lili? The ice wasn't broken when we crossed." },
       { who: 'jack', text: 'Something pulled her under the frost.' },
     ],
-    game: 'icerain', g: { need: 6 },
-    gamePrompt: 'Break the ice where it is thin - before the frost seals it.',
+    game: 'crack', g: { cells: 7, scramble: 5 },
+    gamePrompt: 'Every pane must break. A strike splits its neighbours too.',
     successDialogue: [
       { who: 'jack', text: 'The ice breaks - but her footprints end here.' },
     ],
@@ -90,8 +90,8 @@ export const BEATS = [
       { who: 'gump', text: 'Three warning lights guard the causeway.' },
       { who: 'gump', text: 'Silence them out of order and the bog wakes.' },
     ],
-    game: 'lights', g: { seq: [1, 2, 0, 1], lights: 3 },
-    gamePrompt: 'The marsh-fire shows the safe order once. Repeat it.',
+    game: 'lights', g: { lights: 4 },
+    gamePrompt: 'Name an order. The bog will say how many you placed right.',
     successDialogue: [
       { who: 'gump', text: 'The bog sleeps. Onward, before it stirs again.' },
     ],
@@ -99,14 +99,17 @@ export const BEATS = [
   },
   {
     id: 'megs-looking-glass', bg: 'cottage', music: 'marsh',
-    faces: [{ key: 'meg', x: 224, y: 58, scale: .82 }, { key: 'jack', x: 96, y: 78, scale: .68 }],
+    faces: [{ key: 'meg', x: 274, y: 52, scale: .66 }, { key: 'jack', x: 44, y: 66, scale: .58 }],
     dialogue: [
       { who: 'meg', text: 'What soft little champion wanders into my supper?' },
       { who: 'jack', text: 'One too humble for a lady as magnificent as you.' },
       { who: 'meg', text: 'Magnificent? Say that again, morsel.' },
     ],
-    game: 'dial', g: { target: .35, tolerance: .17, x: 160, y: 108, start: -1.3, drift: .5, hold: 1.1 },
-    gamePrompt: 'Hold the moonlight on Meg - the mirror is heavy.',
+    game: 'beam', g: {
+      cols: 7, rows: 4, entry: [0, 1, 1, 0], target: [5, 0],
+      mirrors: [[2, 1], [2, 3], [5, 3]], start: [0, 0, 0],
+    },
+    gamePrompt: 'Bend the moonlight onto Meg. Turn each mirror.',
     successDialogue: [
       { who: 'jack', text: 'My knees shook. My hand did not.' },
     ],
@@ -197,15 +200,19 @@ export const BEATS = [
   {
     id: 'final-beam', bg: 'throne', music: 'throne',
     faces: [
-      { key: 'darkness', x: 226, y: 56, scale: .74 },
-      { key: 'jack', x: 96, y: 78, scale: .66 },
+      { key: 'darkness', x: 278, y: 50, scale: .58 },
+      { key: 'jack', x: 42, y: 66, scale: .56 },
     ],
     dialogue: [
       { who: 'jack', text: 'Meg taught me something about mirrors and vanity.' },
       { who: 'darkness', text: 'A parlor trick will not unmake me, child.' },
     ],
-    game: 'dial', g: { target: -.2, tolerance: .16, x: 160, y: 108, start: 1.4, drift: .8, sway: .8, swayAmp: .18, hold: 1.35 },
-    gamePrompt: 'Hold the beam on him - he will not stand still.',
+    game: 'beam', g: {
+      cols: 7, rows: 4, entry: [0, 0, 1, 0], target: [6, 2],
+      mirrors: [[1, 0], [1, 3], [4, 3], [4, 1], [6, 1]], blocks: [[3, 0], [5, 2]],
+      start: [0, 1, 0, 1, 0],
+    },
+    gamePrompt: 'Turn his own light back on him. Every mirror counts.',
     successDialogue: [
       { who: 'jack', text: 'You were never the night. You were only its shadow.' },
     ],
@@ -218,8 +225,8 @@ export const BEATS = [
       { who: 'jack', text: 'The floor is giving way behind us!' },
       { who: 'jack', text: "Don't stop - jump where the light still holds." },
     ],
-    game: 'chase', g: { gaps: [.15, .29, .44, .58, .72, .87], width: .022, speed: .21 },
-    gamePrompt: 'The causeway is falling. Jump, and do not look back.',
+    game: 'chase', g: { gaps: [.13, .39, .65, .91], arches: [.26, .52, .78], width: .022, speed: .21 },
+    gamePrompt: 'Holes to leap, arches to duck. Read the causeway.',
     successDialogue: [
       { who: 'jack', text: 'Clear. The castle groans shut behind us.' },
     ],
@@ -227,13 +234,17 @@ export const BEATS = [
   },
   {
     id: 'spring-remembers', bg: 'stream', music: 'wonder',
-    faces: [{ key: 'gump', x: 78, y: 82, scale: .58 }, { key: 'jack', x: 158, y: 76, scale: .68 }, { key: 'unicorn', x: 240, y: 92, scale: .5 }],
+    faces: [{ key: 'gump', x: 40, y: 60, scale: .5 }, { key: 'jack', x: 40, y: 116, scale: .5 }, { key: 'unicorn', x: 278, y: 118, scale: .42 }],
     dialogue: [
       { who: 'gump', text: 'The stallion still waits beneath the winter spell.' },
       { who: 'jack', text: 'Then the stolen light must remember where it belongs.' },
     ],
-    game: 'dial', g: { target: -.9, tolerance: .15, x: 240, y: 92, start: .8, drift: .75, sway: .6, swayAmp: .12, hold: 1.3 },
-    gamePrompt: 'Hold the light steady on the horn until it takes.',
+    game: 'beam', g: {
+      cols: 7, rows: 4, entry: [0, 2, 1, 0], target: [6, 3],
+      mirrors: [[2, 2], [2, 0], [4, 0], [4, 3]], blocks: [[5, 1]],
+      start: [1, 1, 0, 0],
+    },
+    gamePrompt: 'Thread the light back into the horn.',
     successDialogue: [
       { who: 'gump', text: 'The stallion rises. Spring has found the forest again.' },
     ],

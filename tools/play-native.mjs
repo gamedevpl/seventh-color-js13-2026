@@ -7,43 +7,70 @@
 // hard. Failures are counted and reported so tuning is measured, not felt.
 
 import { BEATS } from '../native/src/data.js';
-import { GAMES } from '../native/src/games.js';
+import { GAMES, beamTrace } from '../native/src/games.js';
 import { makeRound, currentBeat, tick, press, moveChoice, P } from '../native/src/story.js';
 
 const DT = 1 / 60;
 const NONE = { act: false, pressLeft: false, pressRight: false, heldLeft: false, heldRight: false, heldAct: false };
 const input = (o) => ({ ...NONE, ...o });
 
-// Each solver sees (state, beat) and returns the input a player would give.
+// Cursor-driven puzzles are all edge-triggered: one tap, one step. Tapping
+// every frame models a stuck key, not a player, so every cursor move goes
+// through one human-cadence gate.
+function toCursor(cur, want, n) {
+  if (tapGate++ % 7) return input({});
+  if (cur === want) return input({ act: true });
+  const right = (want - cur + n) % n, left = (cur - want + n) % n;
+  return input(right <= left ? { pressRight: true } : { pressLeft: true });
+}
+
+// Each puzzle solver re-derives its whole plan from the board every frame
+// rather than remembering one. That makes them self-correcting when
+// --sloppy drops an input, and it means the solver is reading the same
+// state the player can see rather than a private script.
 let tapGate = 0;
 const SOLVERS = {
-  icerain(g) {
-    // Go for the mark you can still reach, soonest-to-seal first.
-    const reachable = g.marks
-      .filter((m) => Math.abs(m.x - g.x) / 160 < m.life)
-      .sort((a, b) => a.life - b.life);
-    const m = reachable[0] || g.marks[0];
-    if (!m) return input({});
-    if (Math.abs(m.x - g.x) < 12) return input({ act: true });
-    return input(m.x < g.x ? { heldLeft: true } : { heldRight: true });
+  crack(g) {
+    // 1D Lights Out: find the set of strikes that clears the board.
+    const n = g.n;
+    let picks = null;
+    for (let m = 0; m < (1 << n) && !picks; m++) {
+      const cells = g.cells.slice(), got = [];
+      for (let i = 0; i < n; i++) {
+        if (!((m >> i) & 1)) continue;
+        got.push(i);
+        for (let j = i - 1; j <= i + 1; j++) if (j >= 0 && j < n) cells[j] = !cells[j];
+      }
+      if (cells.every(Boolean)) picks = got;
+    }
+    if (!picks || !picks.length) throw new Error('crack: board is unsolvable');
+    return toCursor(g.sel, picks[0], n);
   },
-  dial(g, b) {
-    // Track the wedge the renderer draws, counter-steering the drift.
-    const target = b.g.target + Math.sin(g.t * (b.g.sway ?? 0)) * (b.g.swayAmp ?? 0);
-    const err = target - g.angle;
-    if (Math.abs(err) < b.g.tolerance * .35) return input({});
-    return input(err > 0 ? { heldRight: true } : { heldLeft: true });
+  beam(g, b) {
+    // Brute-force the mirror settings, then fix the first wrong mirror.
+    const n = b.g.mirrors.length;
+    let want = null;
+    for (let m = 0; m < 2 ** n && !want; m++) {
+      const o = Array.from({ length: n }, (_, i) => (m >> i) & 1);
+      if (beamTrace(b.g, o).hit) want = o;
+    }
+    if (!want) throw new Error(`beam: ${b.id} has no solution`);
+    const wrong = want.findIndex((v, i) => v !== g.orient[i]);
+    if (wrong < 0) return input({});
+    return toCursor(g.sel, wrong, n);
   },
   lights(g) {
-    if (g.show < g.seq.length) return input({});          // watch the demo
-    // pressLeft/pressRight are edge-triggered: one tap, one step. A solver
-    // that taps every frame is not modelling a player, it is modelling a
-    // stuck key - so tap at a human cadence and let the cursor settle.
-    if (tapGate++ % 7) return input({});
-    const want = g.seq[g.step];
-    if (g.cursor === want) return input({ act: true });
-    const n = g.n, right = (want - g.cursor + n) % n, left = (g.cursor - want + n) % n;
-    return input(right <= left ? { pressRight: true } : { pressLeft: true });
+    // Keep only the orders consistent with every score so far, then name
+    // the first survivor - exactly the reasoning the puzzle asks for.
+    const perms = [];
+    const walk = (left, acc) => {
+      if (!left.length) return perms.push(acc);
+      left.forEach((v, i) => walk(left.filter((_, j) => j !== i), [...acc, v]));
+    };
+    walk([...Array(g.n).keys()], []);
+    const viable = perms.filter((p) => g.history.every(([row, score]) => row.filter((v, i) => v === p[i]).length === score));
+    const pick = viable[0] || perms[0];
+    return toCursor(g.cursor, pick[g.guess.length], g.n);
   },
   stillness(g, b) {
     // Read the drifting calm band the gauge draws and breathe toward it.
@@ -51,10 +78,13 @@ const SOLVERS = {
     return input({ heldAct: g.level < zone });
   },
   chase(g, b) {
+    // Holes want a jump, arches want the opposite - so look at what is
+    // actually next rather than reacting to any marker at all.
     const w = b.g.width ?? .035;
-    // Jump when the next hole is close enough that the arc will clear it.
-    const next = b.g.gaps.find((p) => p + w > g.d);
-    const lead = next === undefined ? 1 : next - w - g.d;
+    const gap = b.g.gaps.find((p) => p + w > g.d);
+    const arch = (b.g.arches || []).find((p) => p + w > g.d);
+    if (arch !== undefined && (gap === undefined || arch < gap)) return input({});
+    const lead = gap === undefined ? 1 : gap - w - g.d;
     if (g.y <= 0 && lead < .022 && lead > -w) return input({ act: true });
     return input({});
   },
@@ -95,7 +125,7 @@ while (round.phase !== P.END && guard++ < 400000) {
     // hit was also fed to press(), which ate the success line whole and
     // jumped to the next beat. Finishing a mechanic must land in SUCCESS.
     if (b.successDialogue && round.phase !== P.SUCCESS) throw new Error(`${b.id}: success dialogue skipped on completion`);
-    const cost = started.sealed ?? started.wake ?? started.falls ?? 0;
+    const cost = started.wake ?? started.falls ?? started.moves ?? 0;
     report.push(`  ${b.id.padEnd(20)} ${b.game.padEnd(8)} ${(frames / 60).toFixed(1)}s  mistakes:${cost}`);
     continue;
   }

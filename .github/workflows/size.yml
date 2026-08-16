@@ -1,13 +1,20 @@
 name: size
 
+# push is deliberately NOT a trigger here. It was, until every single run on
+# every push failed the same way: the games-repo checkout below needs
+# GAMES_REPO_TOKEN (read access to the private games repo) and that secret
+# was never added to this repo's settings, so the job dies at "Input required
+# and not supplied: token" before it builds anything. That's a repo-settings
+# gap, not something a workflow fix can paper over - add the secret
+# (Settings -> Secrets and variables -> Actions -> GAMES_REPO_TOKEN, a token
+# with read access to gamedevpl/www.gamedev.pl-games) and restore
+# `push: {branches: [main]}` alongside workflow_dispatch below once it's set.
 on:
   workflow_dispatch:
     inputs:
       branch:
         description: Games-repo branch to pack (defaults to config.json's source.branch)
         required: false
-  push:
-    branches: [main]
 
 jobs:
   pack:

@@ -34,6 +34,8 @@ www.gamedev.pl-games                    seventh-color-js13-2026
 | `node tools/pack.mjs --O2` | override the roadroller search level for one run |
 | `node tools/scene-weight.mjs` | marginal compressed cost of each scene-content group (leave-one-out) |
 | `node tools/scene-weight.mjs --curve` | cumulative zip size by story chapter (scene arrays truncated at real boundaries) |
+| `node tools/pull.mjs --scenes` | list every scene id the scope dial can be set to |
+| `node tools/pull.mjs --endAt <id>` | build as if the story ended at that scene |
 | `npm run size:fast` | pack without roadroller — quicker, for A/B-ing a single change |
 
 `npm run pack -- --strict` exits non-zero when the zip is over budget. Nothing uses it yet,
@@ -140,6 +142,31 @@ boot-only check would pass a build whose input handling the transforms broke. It
 Verify is what turned `mangleProps: "max"` from reckless to routine: its first run caught
 the engine's required-step check (`steps[name]` over a quoted list) breaking, and its
 interaction pass is the regression net for every transform added since.
+
+## The scope dial
+
+`scope.endAt` in `config.json` (or `--endAt <sceneId>` for a one-off) builds the game as
+if the story ended at that scene, and the result is **playable, not just smaller**. Three
+things have to happen together for that to be true, and the dial derives all of them from
+the scene table itself rather than a hand-kept list that would rot:
+
+- the last kept scene is a *link* — it carries `nextSceneId` and would walk the player
+  into a scene the build no longer contains. It is rewritten into a `completion`, which is
+  how the real final scene ends the game. A scene that already has one is left alone;
+- every minigame whose `mode` no longer appears is stubbed — but stubbed with a module
+  exporting the same names, since the dispatchers still import them;
+- music tracks and cast the kept scenes never reach are dropped.
+
+`truncateAndClose` asserts its own output: it re-parses the result and fails unless the
+final scene is genuinely terminal. That assertion exists because the failure is silent and
+fatal — you would only meet it at the end of a playthrough.
+
+Two bugs found while building it, both worth remembering. `nextSceneId` is frequently the
+*last* property of a scene, so removing it left a trailing comma and appending `completion`
+produced `,,`. And the first sweep reported three different scopes at byte-identical sizes:
+`pull` had failed, the previous `game-cut.js` was still on disk, and `pack` measured the
+stale file. **Any sweep must check the exit status of every step** — a build tool that
+fails quietly will report the last good number forever.
 
 ## Pricing a cut
 

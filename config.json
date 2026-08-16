@@ -56,5 +56,10 @@
   ],
   "dropEngineModules": [
     "save"
-  ]
+  ],
+  "scope": {
+    "endAt": null,
+    "outcome": "won",
+    "delayFrames": 8
+  }
 }

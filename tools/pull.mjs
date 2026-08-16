@@ -11,6 +11,7 @@ import { readSelectedPatches } from './lib/audio-inline.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
+import { readScenes, planScope, truncateAndClose, stubFor } from './lib/scope.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -77,7 +78,7 @@ for (const name of moduleNames) {
 }
 writeFileSync(path.join(outDir, 'engine', 'ORDER.json'), `${JSON.stringify(moduleNames)}\n`);
 
-async function bundleGame(stubs) {
+async function bundleGame(stubs, applyScope = false) {
   const result = await build({
     absWorkingDir: gamesDir,
     entryPoints: [path.join(gamesDir, 'games', config.slug, 'game.ts')],
@@ -87,7 +88,7 @@ async function bundleGame(stubs) {
     target: TARGET,
     format: 'iife',
     legalComments: 'inline',
-    plugins: stubs.length ? [{
+    plugins: (stubs.length || (applyScope && scope)) ? [{
       name: 'drop-features',
       setup(pluginBuild) {
         pluginBuild.onResolve({ filter: /\.ts$/ }, (found) => {
@@ -99,8 +100,10 @@ async function bundleGame(stubs) {
         // screen the player can get into. These patches close the doors. Each
         // must match exactly once — a silent miss would ship that black screen.
         pluginBuild.onLoad({ filter: /\.ts$/ }, (found) => {
+          const base = path.basename(found.path);
           const patches = (config.patches ?? []).filter((p) => found.path.endsWith(p.file));
-          if (!patches.length) return undefined;
+          const scoped = applyScope && scope;
+          if (!patches.length && !scoped) return undefined;
           let text = readFileSync(found.path, 'utf8');
           for (const patch of patches) {
             const hits = text.split(patch.find).length - 1;
@@ -108,6 +111,21 @@ async function bundleGame(stubs) {
               throw new Error(`patch for ${patch.file} matched ${hits} times, expected 1 — the source moved`);
             }
             text = text.replace(patch.find, patch.replace);
+          }
+          if (scoped) {
+            const js = () => transformSync(text, { loader: 'ts' }).code;
+            if (scope.droppedModules.includes(base)) return { contents: stubFor(js()), loader: 'js' };
+            const close = { outcome: config.scope?.outcome ?? 'won', delayFrames: config.scope?.delayFrames ?? 8 };
+            if (base === 'story-slice-data.ts') {
+              return { contents: truncateAndClose(js(), 'STORY_SCENES', scope.keepMain, {
+                dropSpread: scope.keepFinale === 0, closeLast: scope.keepFinale === 0, ...close,
+              }), loader: 'js' };
+            }
+            if (base === 'story-slice-finale-data.ts') {
+              return { contents: truncateAndClose(js(), 'FINAL_STORY_SCENES', scope.keepFinale, {
+                dropSpread: false, closeLast: scope.keepFinale > 0, ...close,
+              }), loader: 'js' };
+            }
           }
           return { contents: text, loader: 'ts' };
         });
@@ -122,10 +140,33 @@ async function bundleGame(stubs) {
 // one it actually packs. Keeping both is what lets the drop be verified rather
 // than assumed.
 const stubDir = path.join(root, 'tools', 'stubs');
+
+// The scope dial. `--endAt <sceneId>` overrides config for a one-off trial;
+// `--scenes` just lists what the dial can be set to and exits.
+const gameSrcDir = path.join(gamesDir, 'games', config.slug, 'game');
+// acorn reads JavaScript, so every scope operation works on transpiled source.
+const asJs = (file) => transformSync(readFileSync(file, 'utf8'), { loader: 'ts' }).code;
+const scenes = readScenes(
+  asJs(path.join(gameSrcDir, 'story-slice-data.ts')),
+  asJs(path.join(gameSrcDir, 'story-slice-finale-data.ts')),
+);
+if (flag('scenes')) {
+  console.log(`${scenes.all.length} scenes, in play order:`);
+  scenes.all.forEach((s, i) => console.log(`  ${String(i).padStart(2)}  ${s.id.padEnd(22)} ${s.mode ?? ''}`));
+  process.exit(0);
+}
+const endAt = flag('endAt') || config.scope?.endAt || null;
+const scope = endAt ? planScope(scenes, endAt) : null;
+if (scope) {
+  console.log(`scope: ending at "${scope.lastSceneId}" — ${scope.kept.length}/${scope.totalScenes} scenes,`
+    + ` ${scope.modes.length} modes, ${scope.music.length} tracks, ${scope.cast.length} cast`);
+  if (scope.droppedModules.length) console.log(`  unreachable minigames stubbed: ${scope.droppedModules.length / 2}`);
+}
+
 writeFileSync(path.join(outDir, 'game.js'), await bundleGame([]));
 
 const drops = config.dropFeatures ?? [];
-writeFileSync(path.join(outDir, 'game-cut.js'), await bundleGame(drops));
+writeFileSync(path.join(outDir, 'game-cut.js'), await bundleGame(drops, true));
 if (drops.length) console.log(`staged a feature-dropped game bundle (${drops.length} modules stubbed)`);
 
 // The bespoke micro-engine: bundled separately from GameKit entirely. Sound
@@ -135,7 +176,12 @@ if (drops.length) console.log(`staged a feature-dropped game bundle (${drops.len
 const soundCatalog = JSON.parse(readFileSync(path.join(gamesDir, 'shared', 'audio', 'sounds.json'), 'utf8'));
 const musicPath = path.join(gamesDir, 'games', config.slug, 'music.json');
 const musicCatalog = JSON.parse(readFileSync(musicPath, 'utf8'));
-const usedTrackNames = [manifest.audio.music, ...(manifest.audio.musicTracks ?? [])];
+// Only the tracks scenes in scope actually call for. The default track has to
+// survive whatever the dial says, or the game boots into silence.
+const allTrackNames = [manifest.audio.music, ...(manifest.audio.musicTracks ?? [])];
+const usedTrackNames = scope
+  ? allTrackNames.filter((name) => scope.music.includes(name) || name === scope.kept[0].music)
+  : allTrackNames;
 const usedTracks = Object.fromEntries(usedTrackNames.map((name) => [name, musicCatalog.tracks[name]]));
 const soundPatches = readSelectedPatches(soundCatalog, manifest.audio.sounds);
 

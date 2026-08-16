@@ -3,7 +3,7 @@
   "budget": 13312,
   "source": {
     "repo": "https://github.com/gamedevpl/www.gamedev.pl-games.git",
-    "branch": "codex/seventh-color-cast-prototype",
+    "branch": "claude/seventh-color-js13k-slim",
     "localCheckout": "../www.gamedev.pl-games"
   },
   "transforms": {
@@ -58,7 +58,7 @@
     "save"
   ],
   "scope": {
-    "endAt": null,
+    "endAt": "shadow-council",
     "outcome": "won",
     "delayFrames": 8,
     "recast": {}

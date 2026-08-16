@@ -12,7 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { locateCheckout, run } from './lib/checkout.mjs';
 import { readScenes, planScope, truncateAndClose, stubFor, recastScenes } from './lib/scope.mjs';
-import { planCast, foldAbsentMembers, pruneCastTable, reachableCastIds, readCast } from './lib/cast.mjs';
+import { planCast, foldAbsentMembers, pruneCastTable, reachableCastIds, readCast, foldAbsentSceneFields } from './lib/cast.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -145,6 +145,15 @@ async function bundleGame(stubs, applyScope = false) {
                 };
               }
             }
+            // Every game module, not a hand-picked few: the fold only touches
+            // `.art`/`.mode` compared against values the scene table defines,
+            // so a module that has no such comparison is simply unchanged.
+            if (sceneFields) {
+              let text2 = foldAbsentSceneFields(js(), sceneFields.keptArt, sceneFields.keptModes,
+                sceneFields.allArt, sceneFields.allModes);
+              text2 = foldAbsentMembers(text2, cast.keptIds, cast.keptKinds, cast.allIds, cast.allKinds);
+              return { contents: text2, loader: 'js' };
+            }
           }
           return { contents: text, loader: 'ts' };
         });
@@ -207,6 +216,19 @@ const painted = scope
   ? reachableCastIds(renderJs, [...new Set(scope.kept.map((s) => s.art).filter(Boolean))], allCastIds)
   : null;
 const cast = scope ? planCast(castJs, scope.cast, painted.ids) : null;
+// Scene painters and mode handlers live behind if/else chains on `scene.art`
+// and `scene.mode`, so values no kept scene uses keep whole painters alive.
+const sceneFields = scope ? {
+  keptArt: [...new Set(scope.kept.map((s) => s.art).filter(Boolean))],
+  keptModes: scope.modes,
+  allArt: [...new Set(scenes.all.map((s) => s.art).filter(Boolean))],
+  allModes: [...new Set(scenes.all.map((s) => s.mode).filter(Boolean))],
+} : null;
+if (sceneFields) {
+  const deadArt = sceneFields.allArt.length - sceneFields.keptArt.length;
+  const deadModes = sceneFields.allModes.length - sceneFields.keptModes.length;
+  console.log(`  scene painters folded out: ${deadArt} art, ${deadModes} modes`);
+}
 if (scope) {
   console.log(`scope: ending at "${scope.lastSceneId}" — ${scope.kept.length}/${scope.totalScenes} scenes,`
     + ` ${scope.modes.length} modes, ${scope.music.length} tracks, ${scope.cast.length} cast`);

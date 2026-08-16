@@ -146,6 +146,37 @@ export function reachableCastIds(renderJs, keptArt, allIds) {
   return { ids: [...ids], unmapped: keptArt.filter((a) => !dispatch.has(a)) };
 }
 
+/**
+ * Fold `scene.art === 'x'` / `scene.mode === 'x'` for values no kept scene uses.
+ *
+ * The scene painters all live in one file behind an if/else chain, so no
+ * bundler can drop `paintGlade` when nothing in scope has `art: 'glade'` — the
+ * call site is live code. Folding the test to `false` makes the branch dead and
+ * terser deletes the painter behind it, exactly as with the minigame stubs and
+ * the cast members. At the prologue this strands 27 of the 28 painters.
+ */
+export function foldAbsentSceneFields(js, keptArt, keptModes, allArt, allModes) {
+  const tree = parse(js, { ecmaVersion: 'latest', sourceType: 'module' });
+  const edits = [];
+  walk(tree, (node) => {
+    if (node.type !== 'BinaryExpression') return;
+    if (node.operator !== '===' && node.operator !== '!==') return;
+    for (const [maybeField, maybeLiteral] of [[node.left, node.right], [node.right, node.left]]) {
+      if (maybeField.type !== 'MemberExpression' || maybeField.computed) continue;
+      const field = maybeField.property.name;
+      if (field !== 'art' && field !== 'mode') continue;
+      if (maybeLiteral.type !== 'Literal' || typeof maybeLiteral.value !== 'string') continue;
+      const known = field === 'art' ? allArt : allModes;
+      const kept = field === 'art' ? keptArt : keptModes;
+      if (!known.includes(maybeLiteral.value) || kept.includes(maybeLiteral.value)) continue;
+      edits.push({ start: node.start, end: node.end, text: node.operator === '===' ? 'false' : 'true' });
+      return;
+    }
+  });
+  return edits.sort((a, b) => b.start - a.start)
+    .reduce((text, e) => text.slice(0, e.start) + e.text + text.slice(e.end), js);
+}
+
 export function planCast(castJs, sceneCastIds, painterIds = []) {
   const entries = readCast(castJs);
   const allIds = entries.map((e) => e.id).filter(Boolean);

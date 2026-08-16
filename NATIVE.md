@@ -336,3 +336,32 @@ also confirmed visually via targeted screenshots (a temporary debug start-
 point edit, reverted before committing): `lights`' three selectable dots,
 `dial`'s needle-and-ring, `icerain`'s falling shard and hit-progress dots
 all read clearly against their scenes.
+
+### The chase decision: GO, priced not guessed
+
+Design rule 3 required pricing beat 10's chase before building it. Probed
+on top of the committed M3 baseline: added a `chase` mechanic to
+`games.js` (progress + timed-jump-over-gaps, the same shape as the old
+episode series' `throne-pursuit`) and a fully wired test beat reusing the
+`roots` painter, measured, then reverted both via `git checkout` — the
+same reversible-probe discipline used throughout the episode-series work.
+
+| | zip | delta |
+| --- | ---: | ---: |
+| M3 baseline (3 mechanics, no chase) | 5,152 | — |
+| + `chase` mechanic code only (unreferenced by any beat — not tree-shaken, since `GAMES` is dynamically indexed by `b.game`, so this delta is the mechanic's true marginal cost) | 5,406 | +254 |
+| + a fully wired test beat (dialogue, `gamePrompt`, reused painter) | 5,509 | +357 total |
+
+**357 bytes for a complete, playable chase beat.** Confirmed correct with
+the same two-track verification as the other mechanics: a deterministic
+logic test (clears all three gaps, zero fails) and a screenshot (scrolling
+ground, visible gap markers, Jack's portrait above — reads as an obstacle
+course, not just numbers passing).
+
+**Decision: GO.** Beat 10 gets the chase, not the tap-beat-cinematic
+fallback. Against 8,160 bytes remaining after M3, 357 for the series' one
+motion set piece is not a close call. The committed mechanic set stays at
+three for now — this was a pricing probe, not the real build; beat 10
+proper (its own painter, real dialogue, final gap tuning, wired into the
+actual chain in place of the `roots`-reusing placeholder) is M4 work,
+scoped there already since M4 covers all twelve beats.

@@ -277,7 +277,7 @@ const guardAt = (gd, t, alarm = 0) => {
 };
 
 function dunInit(b) {
-  return { x: b.g.entry + .0, r: 0, mir: [], open: 0, sweep: 0, alarm: 0, t: 0, win: 0, msg: 0, why: 0 };
+  return { x: b.g.entry + .0, r: 0, mir: [], open: 0, sweep: 0, alarm: 0, t: 0, win: 0, msg: 0, why: 0, lock: 0 };
 }
 // The placed bucklers, in the shape beamTrace already expects.
 const dunBeam = (g, st) => beamTrace(
@@ -290,6 +290,7 @@ function dunUpdate(st, b, dt, input) {
   const g = b.g;
   st.t += dt;
   st.msg = Math.max(0, st.msg - dt);
+  st.lock = Math.max(0, st.lock - dt);
   // Recovers over about ten calm seconds - a spike from one bad attempt,
   // not a ratchet a struggling player can never climb back down from.
   st.alarm = Math.max(0, st.alarm - dt * .1);
@@ -317,7 +318,7 @@ function dunUpdate(st, b, dt, input) {
     if (caught || (st.sweep >= 1 && !t.hit)) {
       st.open = st.sweep = 0;
       st.alarm++;
-      st.msg = 2;
+      st.msg = st.lock = 2;
       st.why = 1;
       kick(2);
       sfxNo();
@@ -330,7 +331,7 @@ function dunUpdate(st, b, dt, input) {
 
   if (input.act) {
     if (st.r === 0 && c === g.entry) {
-      if (!st.open) { st.open = 1; st.sweep = 0; sfxHit(); }
+      if (!st.open && st.lock <= 0) { st.open = 1; st.sweep = 0; sfxHit(); }
     } else {
       const at = st.mir.findIndex((m) => m[0] === c && m[1] === st.r);
       if (at < 0) {
@@ -427,6 +428,7 @@ function dunRender(st, b) {
   circle(px, py - 7, 3, { fill: '#e8cdb0' });
   strip();
   if (st.open) meter(10, 6, 300, st.sweep, '#fff0a0');
+  else if (st.lock > 0) meter(10, 6, 300 * (st.lock / 2), 1, '#5a4a3a');
   else text(`bucklers ${g.mirrors - st.mir.length}/${g.mirrors}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
   const here = Math.round(st.x), on = st.mir.find((m) => m[0] === here && m[1] === st.r);
   const doesWhat = st.r === 0 && here === g.entry ? 'SPACE opens the shaft'

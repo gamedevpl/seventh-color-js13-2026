@@ -341,15 +341,20 @@ function dunRender(st, b) {
       rect(X + c * DW, y, DW, 4, { fill: '#3a2f4e' });
     }
   }
-  for (const [c, r] of g.blocks || []) rect(dcx(g, c) - 8, dcy(g, r) - 8, 16, 16, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
-  if (st.open) {
-    const t = dunBeam(g, st);
-    for (let i = 1; i < t.pts.length; i++) {
-      const a = t.pts[i - 1], p = t.pts[i];
-      line(dcx(g, a[0]), dcy(g, a[1]), dcx(g, p[0]), dcy(g, p[1]), { stroke: '#fff0a0', lineWidth: 3 });
-    }
-    line(sunx, dy0(g) - 12, sunx, dcy(g, 0), { stroke: '#fff0a0', lineWidth: 3 });
+  for (const [c, r] of g.shafts) {
+    const x = dcx(g, c), y = dfloor(g, r - 1);
+    for (let i = 0; i < 4; i++) line(x - 5, y + 2 + i * 6, x + 5, y + 2 + i * 6, { stroke: '#5a4a7a', lineWidth: 1 });
+    line(x - 5, y, x - 5, y + 22, { stroke: '#5a4a7a', lineWidth: 1 });
+    line(x + 5, y, x + 5, y + 22, { stroke: '#5a4a7a', lineWidth: 1 });
   }
+  for (const [c, r] of g.blocks || []) rect(dcx(g, c) - 8, dcy(g, r) - 8, 16, 16, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
+  const t = dunBeam(g, st);
+  const lit = st.open ? '#fff0a0' : '#6b5a2e';
+  for (let i = 1; i < t.pts.length; i++) {
+    const a = t.pts[i - 1], p = t.pts[i];
+    line(dcx(g, a[0]), dcy(g, a[1]), dcx(g, p[0]), dcy(g, p[1]), { stroke: lit, lineWidth: st.open ? 3 : 1 });
+  }
+  line(sunx, dy0(g) - 12, sunx, dcy(g, 0), { stroke: lit, lineWidth: st.open ? 3 : 1 });
   for (const [c, r, o] of st.mir) {
     const x = dcx(g, c), y = dcy(g, r), d = 6;
     line(x - d, y + (o ? -d : d), x + d, y + (o ? d : -d), { stroke: '#9fd4f0', lineWidth: 3 });
@@ -368,12 +373,17 @@ function dunRender(st, b) {
   circle(px, py - 7, 3, { fill: '#e8cdb0' });
   strip();
   text(`bucklers ${g.mirrors - st.mir.length}/${g.mirrors}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
-  if (st.msg > 0) text(st.alarm && st.msg > 1.4 ? 'seen! the shaft slams shut' : 'no bucklers left', 110, 11, { fill: '#e8735a', font: '8px system-ui' });
+  const here = Math.round(st.x), on = st.mir.find((m) => m[0] === here && m[1] === st.r);
+  const doesWhat = st.r === 0 && here === g.entry ? 'SPACE opens the shaft'
+    : on ? (on[2] ? 'SPACE takes it back' : 'SPACE turns it')
+    : st.mir.length < g.mirrors ? 'SPACE puts a buckler here' : 'no bucklers left - take one back';
+  if (st.msg > 0) text(st.msg > 1.4 ? 'seen! the shaft slams shut' : 'no bucklers left', 96, 11, { fill: '#e8735a', font: '8px system-ui' });
+  else text(doesWhat, 96, 11, { fill: t.hit ? '#fff0a0' : '#8a7f6a', font: '8px system-ui' });
   meter(258, 6, 52, st.alarm / 5, '#e8735a');
 }
 
 export const GAMES = {
-  dungeon: { init: dunInit, update: dunUpdate, render: dunRender, hint: '\u2190\u2192 walk   \u2191\u2193 climb   SPACE buckler, or open the shaft' },
+  dungeon: { init: dunInit, update: dunUpdate, render: dunRender, hint: '\u2190\u2192 walk   \u2191\u2193 climb the ladders   aim the dim line at him' },
   crack: { init: crackInit, update: crackUpdate, render: crackRender, hint: '← → choose a pane    SPACE strike' },
   lights: { init: lightsInit, update: lightsUpdate, render: lightsRender, hint: '← → choose    SPACE add to the order' },
   stillness: { init: stillInit, update: stillUpdate, render: stillRender, hint: 'hold SPACE to creep closer - only while every head is down' },

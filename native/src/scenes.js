@@ -178,7 +178,7 @@ export const VEILS = {
     clear(320, 156, '#101418');
     for (let i = 0; i < 7; i++) {
       const y = 16 + i * 18 + Math.sin(t * .6 + i * .8) * 4;
-      rect(0, y, 320, 11, { fill: RAINBOW[i] + A(Math.max(0, p * 1.4 - i * .1) * .5) });
+      rect(0, y, 320, 11, { fill: RAINBOW[i] + A(Math.max(0, (p + .22) * 1.25 - i * .12) * .5) });
     }
     for (let i = 0; i < 18; i++) {
       const x = (i * 73 + t * 9) % 340 - 10;

@@ -88,6 +88,26 @@ if (soak) {
   console.log(`soaked ${soak}s (18s silent opening + ${steps} steps)`);
 }
 
+// --skipall drives the dev cheat (both Shifts) to walk every beat in the
+// story, screenshotting each one. Needs a --cheats build. The soak can
+// only reach as far as the first puzzle it cannot solve; this reaches all
+// nineteen, so a beat that crashes on render cannot hide behind a mechanic.
+const skipAll = args.includes('--skipall');
+if (skipAll) {
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(500);
+  for (let i = 0; i < 30 && !problems.length; i++) {
+    await page.keyboard.down('ShiftLeft');
+    await page.keyboard.down('ShiftRight');
+    await page.waitForTimeout(140);
+    await page.keyboard.up('ShiftRight');
+    await page.keyboard.up('ShiftLeft');
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(root, 'build', 'native', `skip-${String(i).padStart(2, '0')}.png`) });
+  }
+  console.log('walked 30 skips across the story');
+}
+
 const probe = await page.evaluate(() => {
   const canvas = document.querySelector('canvas');
   return {

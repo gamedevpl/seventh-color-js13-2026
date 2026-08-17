@@ -15,7 +15,9 @@
     "native": "node tools/native.mjs",
     "native:verify": "node tools/verify-native.mjs",
     "native:soak": "node tools/verify-native.mjs 1 --soak=75",
-    "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak"
+    "native:dev": "node tools/native.mjs --no-roadroller --cheats",
+    "native:coverage": "npm run native:dev && node tools/verify-native.mjs 1 --skipall",
+    "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",

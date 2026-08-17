@@ -31,7 +31,10 @@ function afterDialogue(r, b) {
   else finish(r, b);
 }
 
-function finish(r, b) {
+// Exported for the dev skip only. It is the transition the machine already
+// runs, so the cheat cannot drift from real beat-to-beat behaviour - and
+// since the function exists either way, exposing it costs nothing.
+export function finish(r, b) {
   // A cutscene is a held moment the player cannot press through - the one
   // place the story takes the controls back. It runs on the same machine as
   // everything else: one more phase, one more data field, no new plumbing.

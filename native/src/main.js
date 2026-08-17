@@ -3,7 +3,7 @@ import { SCENES, VEILS, RAINBOW } from './scenes.js';
 import { paintFace } from './faces.js';
 import { GAMES } from './games.js';
 import { BEATS } from './data.js';
-import { makeRound, currentBeat, tick, press, moveChoice, cutLength, P } from './story.js';
+import { makeRound, currentBeat, tick, press, moveChoice, finish, cutLength, P } from './story.js';
 import { initAudio, setMusic, sfxTap, sfxYes, sfxNo, sfxWin } from './audio.js';
 import { fxUpdate, fxBegin, fxEnd } from './fx.js';
 
@@ -23,12 +23,40 @@ addEventListener('resize', resize);
 resize();
 
 let acted = false, left = false, right = false, heldLeft = false, heldRight = false, heldAct = false;
+
+// Dev-only: both Shift keys together jump to the next beat, so the whole
+// nineteen-beat story can be walked without solving every puzzle on the
+// way. `DEV` is substituted at build time - without --cheats this whole
+// block is deleted before a byte of it reaches the zip.
+let shiftL = false, shiftR = false, skipLatch = false;
+function devSkip() {
+  if (mode !== 'play') return;
+  const b = currentBeat(round);
+  round.g = null;
+  round.line = 0;
+  round.cut = 0;
+  round.choiceIndex = 0;
+  // Sitting in P.CUT makes finish() step past the beat instead of into
+  // its cutscene, which is what "skip this screen" has to mean.
+  round.phase = P.CUT;
+  finish(round, b);
+}
 addEventListener('keydown', (e) => {
+  if (DEV) {
+    if (e.code === 'ShiftLeft') shiftL = true;
+    else if (e.code === 'ShiftRight') shiftR = true;
+    if (shiftL && shiftR && !skipLatch) { skipLatch = true; devSkip(); }
+  }
   if (e.key === ' ' || e.key === 'Enter') { acted = true; heldAct = true; }
   else if (e.key === 'ArrowLeft' || e.key === 'a') { left = heldLeft = true; }
   else if (e.key === 'ArrowRight' || e.key === 'd') { right = heldRight = true; }
 });
 addEventListener('keyup', (e) => {
+  if (DEV) {
+    if (e.code === 'ShiftLeft') shiftL = false;
+    else if (e.code === 'ShiftRight') shiftR = false;
+    if (!shiftL || !shiftR) skipLatch = false;
+  }
   if (e.key === ' ' || e.key === 'Enter') heldAct = false;
   else if (e.key === 'ArrowLeft' || e.key === 'a') heldLeft = false;
   else if (e.key === 'ArrowRight' || e.key === 'd') heldRight = false;
@@ -181,6 +209,9 @@ function frame(now) {
     }
   }
 
+  if (DEV && mode === 'play') {
+    text(`${currentBeat(round).id}  [shift+shift = skip]`, 4, 154, { fill: '#4a8a5a', font: '7px system-ui' });
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

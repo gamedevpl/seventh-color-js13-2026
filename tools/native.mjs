@@ -17,6 +17,11 @@ const cli = args.find((a) => /^--O\d$/.test(a));
 const level = cli ? Number(cli.slice(3)) : 0;
 const rolls = Number(args.find((a) => /^--rolls=/.test(a))?.split('=')[1] || 1);
 const noRoadroller = args.includes('--no-roadroller');
+// Dev cheats are compiled in only with --cheats. DEV is substituted as a
+// literal, so without the flag terser deletes every `if (DEV)` block and
+// the shipped zip carries none of it - a debug key that reaches a compo
+// judge is a liability, and one that costs bytes is two.
+const cheats = args.includes('--cheats');
 
 const num = (n) => n.toLocaleString('en-US');
 
@@ -29,12 +34,22 @@ const result = await build({
   target: 'es2020',
   format: 'iife',
   logLevel: 'silent',
+  define: { DEV: cheats ? 'true' : 'false' },
 });
 const raw = result.outputFiles[0].text;
-console.log(`  esbuild bundle           ${num(raw.length)}`);
+console.log(`  esbuild bundle           ${num(raw.length)}${cheats ? '   (+dev cheats)' : ''}`);
 
 const { js: minified, stages } = await minifyJs(raw, { mangleProps: true });
 console.log(`  terser + mangle          ${num(minified.length)}`);
+
+// The dev skip must never reach a shipped build. Checked here, on the
+// minified output, because esbuild only substitutes DEV=false - it is
+// terser that deletes the dead branch, so the pre-minified bundle still
+// mentions the cheat and is the wrong thing to assert against.
+if (!cheats && /ShiftLeft|ShiftRight/.test(minified)) {
+  console.error('\nFAIL: dev cheat survived into a production build');
+  process.exit(1);
+}
 
 const markup = '<canvas id=c></canvas>';
 const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center}';

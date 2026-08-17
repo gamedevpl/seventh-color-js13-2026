@@ -60,15 +60,18 @@ for (const b of BEATS.filter((x) => x.game === 'dungeon')) {
   const { found, tried, rows } = solve(g);
   const reachesAll = rows.length === g.rows;
   const targetReachable = rows.includes(g.target[1]) || true;    // the light reaches it, not Jack
-  const minimal = found && found.k === g.mirrors;
-  const ok = !!found && reachesAll && minimal;
+  // One spare is deliberate - room to try something without first
+  // unpicking the board. Two or more and the level is handing out
+  // decoration, which is what this check exists to catch.
+  const spare = found ? g.mirrors - found.k : 0;
+  const ok = !!found && reachesAll && spare <= 1;
   if (!ok) bad++;
   console.log(
     `${ok ? 'OK  ' : 'FAIL'} ${b.id.padEnd(20)} ${g.cols}x${g.rows}  ${g.mirrors} bucklers  ` +
     `${(g.guards || []).length} guards  floors reachable ${rows.length}/${g.rows}  ` +
-    `${found ? `needs ${found.k}` : 'NO SOLUTION'}` +
+    `${found ? `needs ${found.k}, ${spare} spare` : 'NO SOLUTION'}` +
     `${reachesAll ? '' : '  <-- A FLOOR CANNOT BE REACHED'}` +
-    `${found && !minimal ? `  <-- ${g.mirrors - found.k} BUCKLER(S) ARE DECORATION` : ''}`
+    `${found && spare > 1 ? `  <-- ${spare} BUCKLERS ARE DECORATION` : ''}`
   );
   if (found) {
     const shown = found.chosen.map(([c, r], i) => `${c},${r}${found.orient[i] ? '\\' : '/'}`).join('  ');

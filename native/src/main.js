@@ -150,10 +150,10 @@ function bloom(cx, cy, t, r0, spread) {
 function paintHud(b) {
   if (round.phase === P.GAME) {
     box(126, 30);
-    text(b.gamePrompt, 10, 138, { fill: '#cdbfa0', font: '9px system-ui' });
+    text(b.gamePrompt, 10, 136, { fill: '#cdbfa0', font: '9px system-ui' });
     // The controls belong on screen. A mechanic nobody knows how to drive
     // is indistinguishable from a mechanic that does not work.
-    text(GAMES[b.game].hint, 10, 150, { fill: '#7a6e5c', font: '8px system-ui' });
+    text(GAMES[b.game].hint, 10, 146, { fill: '#7a6e5c', font: '8px system-ui' });
     return null;
   }
   const speak = round.phase === P.SUCCESS ? b.successDialogue[round.line] : b.dialogue[round.line];
@@ -304,7 +304,8 @@ function frame(now) {
   }
 
   if (DEV && mode === 'play') {
-    text(`${currentBeat(round).id}  [shift+shift = skip]`, 4, 24, { fill: '#4a8a5a', font: '7px system-ui' });
+    rect(0, 149, 152, 7, { fill: '#000c' });
+    text(`${currentBeat(round).id}  [shift+shift = skip]`, 4, 155, { fill: '#4a8a5a', font: '7px system-ui' });
   }
   requestAnimationFrame(frame);
 }

@@ -256,11 +256,12 @@ function stillRender(g) {
 // The reflection engine is beamTrace, unchanged from the grid puzzle this
 // replaces: what was wrong there was never the tracer, it was that the
 // player only flipped switches at it.
-const DW = 22, DH = 24, DY = 22;
+const DW = 22, DH = 24;
 const dx0 = (g) => 160 - g.cols * DW / 2;
+const dy0 = (g) => 20 + (100 - g.rows * DH) / 2;
 const dcx = (g, c) => dx0(g) + c * DW + DW / 2;
-const dfloor = (r) => DY + (r + 1) * DH;
-const dcy = (r) => dfloor(r) - 9;
+const dfloor = (g, r) => dy0(g) + (r + 1) * DH;
+const dcy = (g, r) => dfloor(g, r) - 9;
 
 const guardAt = (gd, t) => {
   const [, x0, x1, sp, ph] = gd;
@@ -300,7 +301,7 @@ function dunUpdate(st, b, dt, input) {
         const gx = Math.round(guardAt(gd, st.t));
         return t.pts.some(([pc, pr]) => pr === gd[0] && pc === gx);
       });
-      if (t.hit && !seen) { st.win = .01; kick(2); burst(dcx(g, g.target[0]), dcy(g.target[1]), 22, '#fff0a0', 100); }
+      if (t.hit && !seen) { st.win = .01; kick(2); burst(dcx(g, g.target[0]), dcy(g, g.target[1]), 22, '#fff0a0', 100); }
       else { st.open = 0; st.alarm++; st.msg = 2; kick(1.8); sfxNo(); }
     } else {
       const at = st.mir.findIndex((m) => m[0] === c && m[1] === st.r);
@@ -320,7 +321,7 @@ function dunUpdate(st, b, dt, input) {
       st.alarm++;
       kick(2);
       sfxNo();
-      burst(dcx(g, c), dcy(gd[0]), 10, '#e8735a', 70);
+      burst(dcx(g, c), dcy(g, gd[0]), 10, '#e8735a', 70);
     }
   }
   return false;
@@ -328,41 +329,41 @@ function dunUpdate(st, b, dt, input) {
 
 function dunRender(st, b) {
   const g = b.g, X = dx0(g);
-  rect(0, 16, 320, 110, { fill: '#0b0812' });
-  rect(X - 3, DY - 13, g.cols * DW + 6, g.rows * DH + 17, { fill: '#140f1e' });
+  rect(0, 0, 320, 126, { fill: '#0b0812' });
+  rect(X - 3, dy0(g) - 13, g.cols * DW + 6, g.rows * DH + 17, { fill: '#140f1e' });
   // The sun, waiting on the roof.
   const sunx = dcx(g, g.entry);
-  circle(sunx, DY - 16, 5, { fill: st.open ? '#fff6d8' : '#6a5a3a' });
+  circle(sunx, dy0(g) - 16, 5, { fill: st.open ? '#fff6d8' : '#6a5a3a' });
   for (let r = 0; r < g.rows; r++) {
-    const y = dfloor(r);
+    const y = dfloor(g, r);
     for (let c = 0; c < g.cols; c++) {
       if (r < g.rows - 1 && onShaft(g, c, r + 1)) continue;
       rect(X + c * DW, y, DW, 4, { fill: '#3a2f4e' });
     }
   }
-  for (const [c, r] of g.blocks || []) rect(dcx(g, c) - 8, dcy(r) - 8, 16, 16, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
+  for (const [c, r] of g.blocks || []) rect(dcx(g, c) - 8, dcy(g, r) - 8, 16, 16, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
   if (st.open) {
     const t = dunBeam(g, st);
     for (let i = 1; i < t.pts.length; i++) {
       const a = t.pts[i - 1], p = t.pts[i];
-      line(dcx(g, a[0]), dcy(a[1]), dcx(g, p[0]), dcy(p[1]), { stroke: '#fff0a0', lineWidth: 3 });
+      line(dcx(g, a[0]), dcy(g, a[1]), dcx(g, p[0]), dcy(g, p[1]), { stroke: '#fff0a0', lineWidth: 3 });
     }
-    line(sunx, DY - 12, sunx, dcy(0), { stroke: '#fff0a0', lineWidth: 3 });
+    line(sunx, dy0(g) - 12, sunx, dcy(g, 0), { stroke: '#fff0a0', lineWidth: 3 });
   }
   for (const [c, r, o] of st.mir) {
-    const x = dcx(g, c), y = dcy(r), d = 6;
+    const x = dcx(g, c), y = dcy(g, r), d = 6;
     line(x - d, y + (o ? -d : d), x + d, y + (o ? d : -d), { stroke: '#9fd4f0', lineWidth: 3 });
   }
   // Darkness, at the bottom of everything - his own portrait, shrunk,
   // rather than a shape standing in for him.
-  paintFace('darkness', dcx(g, g.target[0]), dcy(g.target[1]) - 1, .17, st.t, false, false);
+  paintFace(g.face || 'darkness', dcx(g, g.target[0]), dcy(g, g.target[1]) - 1, g.faceScale || .17, st.t, false, false);
   for (const gd of g.guards || []) {
-    const gx = dcx(g, guardAt(gd, st.t)), gy = dcy(gd[0]);
+    const gx = dcx(g, guardAt(gd, st.t)), gy = dcy(g, gd[0]);
     rect(gx - 3, gy - 6, 6, 13, { fill: '#2b2038' });
     circle(gx, gy - 9, 3, { fill: '#4a3a5e' });
     circle(gx + 5, gy - 2, 2, { fill: '#e8735a' });
   }
-  const px = dcx(g, st.x), py = dcy(st.r);
+  const px = dcx(g, st.x), py = dcy(g, st.r);
   rect(px - 2, py - 4, 5, 10, { fill: '#e8b923' });
   circle(px, py - 7, 3, { fill: '#e8cdb0' });
   strip();

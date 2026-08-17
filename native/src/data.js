@@ -145,7 +145,7 @@ export const BEATS = [
     ],
     game: 'dungeon', g: {
       cols: 9, rows: 2, entry: 6, target: [1, 1], mirrors: 1,
-      shafts: [[6, 1]],
+      shafts: [[6, 1]], face: 'meg', faceScale: .2,
     },
     gamePrompt: 'Moonlight through the roof. Bounce it onto Meg.',
     successDialogue: [

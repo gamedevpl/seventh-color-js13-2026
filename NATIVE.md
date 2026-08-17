@@ -650,6 +650,56 @@ new painter, eight music tracks with a sequencer, a stillness mechanic, a
 cutscene phase, and four mechanics rebuilt as puzzles) came to ~2,100
 bytes and left 3,538 of the 13,312 budget unused.
 
+## M8 - the story learns to hold a moment
+
+Five narrated cutscenes over full-screen procedural veils, built on the
+`P.CUT` phase that already existed rather than a second system:
+
+| beat | veil | |
+| --- | --- | --- |
+| `prologue` | bloom | seven rings breathing outward - the premise, before a word of dialogue |
+| `unicorn-stream` | shatter | the horn breaking, the light going out of the world |
+| `winter-comes` | snow | winter arriving, and then not stopping |
+| `edge-of-world` | dark | the castle taking its own roof down behind them |
+| `epilogue` | dawn | colour bleeding back, band by band |
+
+Nineteen beats now, and cutscenes are the cheapest thing in the project
+per unit of effect - no assets, no frames, just maths over time. All five,
+plus the veils and the narration, came to about a kilobyte.
+
+The machine grew exactly two things, both small. A cutscene is a **list of
+lines with a per-line hold**, so the writing sets the pacing rather than a
+duration kept in sync with it by hand. And a beat with **no dialogue *is*
+its cutscene**, opening straight into `P.CUT` - which is what let the
+prologue and epilogue be ordinary beats instead of special cases bolted
+onto the title and ending screens.
+
+One deliberate reversal: cutscenes were designed unskippable, and that was
+wrong. Thirteen unskippable seconds before the first interaction is a real
+risk when a compo judge gives an entry ninety seconds. A press now moves
+to the next line early - the moment keeps its shape for anyone who wants
+it and stops being a wall for anyone who does not.
+
+### Two bugs found by looking, not by reasoning
+
+- **Prose ran off both edges of the canvas.** The epilogue's longest line
+  was clipped at both ends, and a check across every string found four
+  over the limit - including a piece of *dialogue* that had been
+  overflowing since the day it was written and had simply never been
+  screenshotted. Trimming sentences to fit is a losing game as prose keeps
+  getting written, so `draw.js` now wraps against real font metrics and
+  dialogue, retry text and narration all lay out over two lines when they
+  need to.
+- **The integration test silently swallowed a whole beat.** Its cutscene
+  loop watched the *phase*, and two cutscenes back to back are both
+  `P.CUT` - so `winter-comes` was consumed inside `unicorn-stream`'s loop
+  and never reported. It now stops at the beat boundary, which is why the
+  walk reports 19/19 rather than 18/19. The same species of harness bug
+  this project has now hit four times: the test agreeing with itself
+  instead of with the game.
+
+Cost: **10,997 bytes** worst-of-5, leaving 2,315 of the 13,312 budget.
+
 ## Decision: this is the submission
 
 The user's call: **"We need full story."** The native rewrite in this
@@ -659,10 +709,10 @@ same story only in fragments across separate compo entries, which is
 exactly the gap this rewrite closed.
 
 Final locked build, after M7: `node tools/native.mjs --O1 --rolls=5` →
-**9,774 bytes** worst-of-5 zipped against the 13,312-byte budget -
-**3,538 bytes (27%) of headroom unused**, comfortably under the 13,162
-ceiling. Sixteen beats, five mechanics (four of them puzzles), eight
-music tracks.
+**10,997 bytes** worst-of-5 zipped against the 13,312-byte budget -
+**2,315 bytes (17%) of headroom unused**, comfortably under the 13,162
+ceiling. Nineteen beats, five mechanics (four of them puzzles), five
+narrated cutscenes, eight music tracks.
 `unzip -l build/native/index.zip` confirms the archive holds exactly one
 file, `index.html`, at the root - the shape js13kGames requires.
 `tools/verify-native.mjs` reports a clean boot (no console errors,

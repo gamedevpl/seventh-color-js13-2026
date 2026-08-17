@@ -160,11 +160,12 @@ const SOLVERS = {
     // The light travels now, so the route has to stay clear for the whole
     // descent - sample it rather than checking the instant of opening.
     const sweep = g.sweep ?? 1.5;
+    const speedMult = 1 + Math.min(st.alarm, 2.2) * .18;
     const clear = Array.from({ length: 16 }, (_, k) => (k + 1) / 16).every((frac) => {
       const when = st.t + frac * sweep, lit = Math.ceil(frac * t.pts.length);
       return !(g.guards || []).some((gd) => {
         const [, x0, x1, sp, ph] = gd, w = x1 - x0;
-        const u = (when * sp * (1 + st.alarm * .18) + ph) % 2;
+        const u = (when * sp * speedMult + ph) % 2;
         const gx = Math.round(x0 + (u < 1 ? u : 2 - u) * w);
         return t.pts.slice(0, lit).some(([pc, pr]) => pr === gd[0] && pc === gx);
       });

@@ -263,9 +263,16 @@ const dcx = (g, c) => dx0(g) + c * DW + DW / 2;
 const dfloor = (g, r) => dy0(g) + (r + 1) * DH;
 const dcy = (g, r) => dfloor(g, r) - 9;
 
+// Capped, because uncapped this is a trap: past a threshold the guard
+// returns to any lane cell faster than the 1.5s sweep needs, so a route
+// through its lane stops being hard and becomes mathematically
+// impossible. Capped at a speed the sweep can still beat with good
+// timing, and alarm decays with calm time, so a bad run is a worse
+// attempt, never a permanently closed one.
+const guardSpeed = (alarm) => 1 + Math.min(alarm, 2.2) * .18;
 const guardAt = (gd, t, alarm = 0) => {
   const [, x0, x1, sp, ph] = gd;
-  const w = x1 - x0, u = ((t * sp * (1 + alarm * .18) + ph) % 2);
+  const w = x1 - x0, u = ((t * sp * guardSpeed(alarm) + ph) % 2);
   return x0 + (u < 1 ? u : 2 - u) * w;
 };
 
@@ -283,6 +290,9 @@ function dunUpdate(st, b, dt, input) {
   const g = b.g;
   st.t += dt;
   st.msg = Math.max(0, st.msg - dt);
+  // Recovers over about ten calm seconds - a spike from one bad attempt,
+  // not a ratchet a struggling player can never climb back down from.
+  st.alarm = Math.max(0, st.alarm - dt * .1);
   if (st.win) { st.win += dt; return st.win > 1; }
 
   if (input.heldLeft) st.x -= 3.4 * dt;

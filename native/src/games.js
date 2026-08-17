@@ -349,19 +349,30 @@ function dunRender(st, b) {
   }
   for (const [c, r] of g.blocks || []) rect(dcx(g, c) - 8, dcy(g, r) - 8, 16, 16, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
   const t = dunBeam(g, st);
-  const lit = st.open ? '#fff0a0' : '#6b5a2e';
+  const lit = st.open ? '#fff0a0' : t.hit ? '#c9a94e' : '#6b5a2e';
   for (let i = 1; i < t.pts.length; i++) {
     const a = t.pts[i - 1], p = t.pts[i];
     line(dcx(g, a[0]), dcy(g, a[1]), dcx(g, p[0]), dcy(g, p[1]), { stroke: lit, lineWidth: st.open ? 3 : 1 });
   }
   line(sunx, dy0(g) - 12, sunx, dcy(g, 0), { stroke: lit, lineWidth: st.open ? 3 : 1 });
+  // Where the light dies. A line that simply stops reads as a line the
+  // player has not finished drawing; a cross reads as wasted light, which
+  // is what it is - and it is the one thing they need to see to know the
+  // route is wrong rather than incomplete.
+  if (!t.hit && t.pts.length) {
+    const [ec, er] = t.pts[t.pts.length - 1], ex = dcx(g, ec), ey = dcy(g, er);
+    line(ex - 4, ey - 4, ex + 4, ey + 4, { stroke: '#e8735a', lineWidth: 2 });
+    line(ex + 4, ey - 4, ex - 4, ey + 4, { stroke: '#e8735a', lineWidth: 2 });
+  }
   for (const [c, r, o] of st.mir) {
     const x = dcx(g, c), y = dcy(g, r), d = 6;
     line(x - d, y + (o ? -d : d), x + d, y + (o ? d : -d), { stroke: '#9fd4f0', lineWidth: 3 });
   }
   // Darkness, at the bottom of everything - his own portrait, shrunk,
   // rather than a shape standing in for him.
-  paintFace(g.face || 'darkness', dcx(g, g.target[0]), dcy(g, g.target[1]) - 1, g.faceScale || .17, st.t, false, false);
+  const tgx = dcx(g, g.target[0]), tgy = dcy(g, g.target[1]);
+  circle(tgx, tgy, 11 + (t.hit ? Math.sin(st.t * 6) * 1.5 : 0), { stroke: t.hit ? '#fff0a0' : '#6a5a4a', lineWidth: 1 });
+  paintFace(g.face || 'darkness', tgx, tgy - 1, g.faceScale || .17, st.t, false, false);
   for (const gd of g.guards || []) {
     const gx = dcx(g, guardAt(gd, st.t)), gy = dcy(g, gd[0]);
     rect(gx - 3, gy - 6, 6, 13, { fill: '#2b2038' });

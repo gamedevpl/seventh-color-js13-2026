@@ -122,3 +122,67 @@ export const SCENES = {
     }
   },
 };
+
+// Full-screen procedural veils for the narrated cutscenes. These are the
+// cheapest things in the project per unit of effect - no assets, no
+// frames, just maths over time - which is why the story can afford to
+// stop and look at something five separate times. Each takes the beat
+// clock and `p`, progress through the whole cutscene, so a veil can
+// arrive rather than merely loop.
+export const RAINBOW = ['#c9524f', '#d98a4a', '#d9c14f', '#7cb56a', '#5a9bb0', '#6b7ec9', '#9a6bc4'];
+const A = (v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0');
+
+export const VEILS = {
+  // The world as it was: seven rings, breathing outward forever.
+  bloom: (t, p) => {
+    clear(320, 156, '#080610');
+    for (let i = 0; i < 7; i++) {
+      const r = (t * 20 + i * 24) % 200;
+      circle(160, 72, r, { stroke: RAINBOW[i] + A(1 - r / 200), lineWidth: 2 });
+    }
+    circle(160, 72, 5 + Math.sin(t * 2) * 1.5, { fill: '#fff6d8' });
+  },
+  // The light coming apart, and going.
+  shatter: (t, p) => {
+    clear(320, 156, '#0a0710');
+    for (let i = 0; i < 26; i++) {
+      const a = i * 2.42 + t * .25, d = (t * 74 + i * 31) % 210;
+      const x = 160 + Math.cos(a) * d, y = 72 + Math.sin(a) * d * .6;
+      line(x, y, x + Math.cos(a) * 13, y + Math.sin(a) * 8, { stroke: '#cfe8ff' + A(1 - d / 210), lineWidth: 1 });
+    }
+    circle(160, 72, Math.max(0, 16 - t * 5), { fill: '#fff6d8' + A(1 - p) });
+  },
+  // Winter arriving, and then not stopping.
+  snow: (t, p) => {
+    clear(320, 156, '#0d1826');
+    const n = 50 + p * 70;
+    for (let i = 0; i < n; i++) {
+      const x = (i * 61 + Math.sin(t * .7 + i) * 14 + 320) % 330 - 5;
+      const y = (i * 37 + t * (26 + (i % 7) * 7)) % 176 - 10;
+      circle(x, y, i % 5 ? 1 : 1.8, { fill: '#dff0fa' + A(.35 + (i % 5) * .12) });
+    }
+    rect(0, 156 - p * 46, 320, p * 46, { fill: '#cfe4f2' + A(.10 + p * .13) });
+  },
+  // The dark, closing from both sides.
+  dark: (t, p) => {
+    clear(320, 156, '#0b0510');
+    for (let i = 0; i < 15; i++) {
+      const y = (i * 21) % 156, len = 30 + Math.sin(t * .9 + i) * 18 + p * 130;
+      line(0, y, len, y + Math.sin(t + i) * 9, { stroke: '#1d1030', lineWidth: 3 });
+      line(320, y + 10, 320 - len, y + 10 + Math.cos(t + i) * 9, { stroke: '#1d1030', lineWidth: 3 });
+    }
+    rect(0, 0, 320, 156, { fill: '#060309' + A(p * .55) });
+  },
+  // Colour bleeding back into a world that had stopped expecting it.
+  dawn: (t, p) => {
+    clear(320, 156, '#101418');
+    for (let i = 0; i < 7; i++) {
+      const y = 16 + i * 18 + Math.sin(t * .6 + i * .8) * 4;
+      rect(0, y, 320, 11, { fill: RAINBOW[i] + A(Math.max(0, p * 1.4 - i * .1) * .5) });
+    }
+    for (let i = 0; i < 18; i++) {
+      const x = (i * 73 + t * 9) % 340 - 10;
+      circle(x, 20 + (i * 41) % 118, i % 3 ? 1 : 1.7, { fill: '#ffeec0' + A(p * .7) });
+    }
+  },
+};

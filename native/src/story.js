@@ -10,8 +10,14 @@ import { GAMES } from './games.js';
 export const P = { DIALOGUE: 0, CHOICE: 1, RETRY: 2, SUCCESS: 3, END: 4, GAME: 5, CUT: 6 };
 
 export function makeRound(beats, startId) {
-  return { beats, id: startId, phase: P.DIALOGUE, line: 0, choiceIndex: 0, elapsed: 0, g: null, cut: 0 };
+  const r = { beats, id: startId, phase: P.DIALOGUE, line: 0, choiceIndex: 0, elapsed: 0, g: null, cut: 0 };
+  if (!currentBeat(r).dialogue) r.phase = P.CUT;
+  return r;
 }
+
+// How long a narrated cutscene runs: one hold per line, so the writing
+// sets the pacing rather than a number kept in sync with it by hand.
+export const cutLength = (b) => b.cutscene.lines.length * (b.cutscene.hold ?? 3.1);
 
 export function currentBeat(r) {
   return r.beats.find((b) => b.id === r.id);
@@ -29,11 +35,14 @@ function finish(r, b) {
   // A cutscene is a held moment the player cannot press through - the one
   // place the story takes the controls back. It runs on the same machine as
   // everything else: one more phase, one more data field, no new plumbing.
-  if (b.cutscene && r.phase !== P.CUT) { r.phase = P.CUT; r.cut = 0; return; }
+  // A beat that carries dialogue plays its cutscene after it; a beat that
+  // carries none *is* the cutscene, and was already in P.CUT on arrival.
+  if (b.cutscene && b.dialogue && r.phase !== P.CUT) { r.phase = P.CUT; r.cut = 0; return; }
   if (b.ending) { r.phase = P.END; return; }
   r.id = b.next;
-  r.phase = P.DIALOGUE;
   r.line = 0;
+  r.cut = 0;
+  r.phase = currentBeat(r).dialogue ? P.DIALOGUE : P.CUT;
 }
 
 // tick runs every frame regardless of phase (elapsed drives blink/talk
@@ -46,7 +55,7 @@ export function tick(r, dt, input) {
   if (r.phase === P.CUT) {
     r.cut += dt;
     const b = currentBeat(r);
-    if (r.cut >= b.cutscene.seconds) finish(r, b);
+    if (r.cut >= cutLength(b)) finish(r, b);
     return;
   }
   if (r.phase !== P.GAME) return;
@@ -75,7 +84,17 @@ export function press(r) {
     return;
   }
   if (r.phase === P.RETRY) { r.phase = P.CHOICE; return; }
-  if (r.phase === P.GAME || r.phase === P.CUT) return; // GAME completes via tick(), not press()
+  // A cutscene holds, but it does not hold the player hostage: a press
+  // moves to the next line early. The moment keeps its shape for anyone
+  // who wants it and stops being a wall for anyone who does not - which
+  // matters when a compo judge gives the entry ninety seconds.
+  if (r.phase === P.CUT) {
+    const hold = b.cutscene.hold ?? 3.1;
+    r.cut = (Math.floor(r.cut / hold) + 1) * hold;
+    if (r.cut >= cutLength(b)) finish(r, b);
+    return;
+  }
+  if (r.phase === P.GAME) return; // GAME completes via tick(), not press()
   if (++r.line < b.successDialogue.length) return;
   r.line = 0;
   finish(r, b);

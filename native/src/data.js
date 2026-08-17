@@ -4,6 +4,19 @@
 // and tense through the castle, warmer once the color returns.
 export const BEATS = [
   {
+    id: 'prologue', bg: 'forest', music: 'wonder',
+    cutscene: {
+      fx: 'bloom', hold: 3.4,
+      lines: [
+        'Before the first winter, light had seven colours.',
+        'Six of them the world was allowed to keep.',
+        'The seventh lived in the horn of a unicorn, and nowhere else.',
+        'Darkness wanted a night that no morning could argue with.',
+      ],
+    },
+    next: 'shadow-council',
+  },
+  {
     id: 'shadow-council', bg: 'shadow-council', music: 'shadow',
     faces: [{ key: 'darkness', x: 160, y: 62, scale: 1 }],
     dialogue: [
@@ -36,7 +49,26 @@ export const BEATS = [
     successDialogue: [
       { who: 'lili', text: 'It let me touch it. Jack, it let me -' },
     ],
-    cutscene: { text: 'A hidden bow answers first.', seconds: 3.6 },
+    cutscene: {
+      fx: 'shatter', hold: 3.2,
+      lines: [
+        'A hidden bow answers first.',
+        'The horn breaks. The seventh colour goes out of the world.',
+        'And the cold comes in behind it, and keeps coming.',
+      ],
+    },
+    next: 'winter-comes',
+  },
+  {
+    id: 'winter-comes', bg: 'pond', music: 'winter',
+    cutscene: {
+      fx: 'snow', hold: 3.2,
+      lines: [
+        'By morning the stream had forgotten how to move.',
+        'Snow took the glade, then the road, then the year.',
+        'And somewhere beneath it, Lili was already gone.',
+      ],
+    },
     next: 'winter-falls',
   },
   {
@@ -233,6 +265,13 @@ export const BEATS = [
     successDialogue: [
       { who: 'jack', text: 'Clear. The castle groans shut behind us.' },
     ],
+    cutscene: {
+      fx: 'dark', hold: 3.2,
+      lines: [
+        'Behind them the causeway folded quietly into itself.',
+        'The castle brought its own roof down rather than let them leave.',
+      ],
+    },
     next: 'spring-remembers',
   },
   {
@@ -255,7 +294,7 @@ export const BEATS = [
     next: 'seventh-color',
   },
   {
-    id: 'seventh-color', bg: 'forest', music: 'wonder', ending: true,
+    id: 'seventh-color', bg: 'forest', music: 'wonder',
     faces: [
       { key: 'jack', x: 108, y: 62, scale: .68 },
       { key: 'lili', x: 212, y: 62, scale: .68 },
@@ -274,6 +313,19 @@ export const BEATS = [
     successDialogue: [
       { who: 'jack', text: 'I will guard its wonder by listening first.' },
     ],
+    next: 'epilogue',
+  },
+  {
+    id: 'epilogue', bg: 'forest', music: 'wonder', ending: true,
+    cutscene: {
+      fx: 'dawn', hold: 3.4,
+      lines: [
+        'The horn took back its light, and the light took back the year.',
+        'Green came first. Then the rest, all at once, like an argument won.',
+        'They named it the seventh colour.',
+        'You only ever catch it at dawn, and only if you were still.',
+      ],
+    },
     next: null,
   },
 ];

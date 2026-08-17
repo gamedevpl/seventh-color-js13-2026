@@ -77,3 +77,19 @@ export function withTransform({ x, y, scale, rot, alpha }, fn) {
   fn();
   ctx.restore();
 }
+
+// Greedy word wrap against the real font metrics. Prose kept overflowing
+// the 320px canvas as lines got written, and trimming sentences to fit is
+// a losing game - measure instead, so the writing is free to be as long as
+// it needs and the layout copes.
+export function wrap(str, max, font) {
+  ctx.font = font;
+  const out = [];
+  let cur = '';
+  for (const w of str.split(' ')) {
+    const t = cur ? cur + ' ' + w : w;
+    if (cur && ctx.measureText(t).width > max) { out.push(cur); cur = w; } else cur = t;
+  }
+  if (cur) out.push(cur);
+  return out;
+}

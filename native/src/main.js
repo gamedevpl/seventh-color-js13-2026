@@ -1,9 +1,9 @@
-import { initDraw, clear, rect, circle, text } from './draw.js';
-import { SCENES } from './scenes.js';
+import { initDraw, clear, rect, circle, text, wrap } from './draw.js';
+import { SCENES, VEILS, RAINBOW } from './scenes.js';
 import { paintFace } from './faces.js';
 import { GAMES } from './games.js';
 import { BEATS } from './data.js';
-import { makeRound, currentBeat, tick, press, moveChoice, P } from './story.js';
+import { makeRound, currentBeat, tick, press, moveChoice, cutLength, P } from './story.js';
 import { initAudio, setMusic, sfxTap, sfxYes, sfxNo, sfxWin } from './audio.js';
 import { fxUpdate, fxBegin, fxEnd } from './fx.js';
 
@@ -40,13 +40,9 @@ let mode = 'title';
 let round = null;
 let last = 0;
 
+const FONT = '9px system-ui', NARRATE = '10px system-ui';
 function box(y, h) { rect(0, y, VW, h, { fill: '#0008' }); }
 
-// The theme, made literal rather than left implicit in a color-restoration
-// plot: seven concentric rings, seven colors, the same bloom both at the
-// title (a promise) and the ending (the promise kept) - one shared visual
-// for both, not two, per the project's running "one thing, not two" rule.
-const RAINBOW = ['#c9524f', '#d98a4a', '#d9c14f', '#7cb56a', '#5a9bb0', '#6b7ec9', '#9a6bc4'];
 function bloom(cx, cy, t, r0, spread) {
   for (let i = 0; i < RAINBOW.length; i++) {
     circle(cx, cy, r0 + i * spread + Math.sin(t * 1.5 + i) * 1.5, { stroke: RAINBOW[i], lineWidth: 2 });
@@ -64,14 +60,15 @@ function paintHud(b) {
   }
   const speak = round.phase === P.SUCCESS ? b.successDialogue[round.line] : b.dialogue[round.line];
   if (round.phase === P.DIALOGUE || round.phase === P.SUCCESS) {
-    box(128, 28);
-    text(speak.text, 10, 146, { fill: '#f3ead6', font: '9px system-ui' });
+    const lines = wrap(speak.text, 300, FONT);
+    box(126, 30);
+    lines.forEach((l, i) => text(l, 10, (lines.length > 1 ? 138 : 145) + i * 11, { fill: '#f3ead6', font: FONT }));
     return speak.who;
   }
   if (round.phase === P.CHOICE || round.phase === P.RETRY) {
     box(96, 60);
     if (round.phase === P.RETRY) {
-      text(b.choice.retry, 10, 116, { fill: '#e08a7a', font: '9px system-ui' });
+      wrap(b.choice.retry, 300, FONT).forEach((l, i) => text(l, 10, 112 + i * 11, { fill: '#e08a7a', font: FONT }));
       return null;
     }
     text(b.choice.question, 10, 110, { fill: '#f3ead6', font: '9px system-ui' });
@@ -113,13 +110,26 @@ function frame(now) {
     // player cannot press past it. Held moments are the only thing the
     // story machine does that the player does not drive.
     if (round.phase === P.CUT) {
+      const cs = b.cutscene, hold = cs.hold ?? 3.1;
+      const i = Math.min(cs.lines.length - 1, Math.floor(round.cut / hold));
+      const local = round.cut - i * hold;
+      // Each line fades up and down inside its own hold, and the veil gets
+      // progress across the whole cutscene so it can arrive rather than loop.
+      const fade = Math.min(1, local * 2.2) * Math.min(1, (hold - local) * 2.2);
+      const p = round.cut / cutLength(b);
       fxBegin();
-      SCENES[b.bg](round.elapsed);
-      for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, false, false);
-      const fade = Math.min(1, round.cut * 2) * Math.min(1, (b.cutscene.seconds - round.cut) * 2);
-      rect(0, 0, VW, VH, { fill: `rgba(6,4,10,${.55 * fade})` });
-      text(b.cutscene.text, VW / 2, 130, { fill: `rgba(243,234,214,${fade})`, font: '10px system-ui', align: 'center' });
+      if (cs.fx) VEILS[cs.fx](round.elapsed, p);
+      else {
+        SCENES[b.bg](round.elapsed);
+        for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, false, false);
+        rect(0, 0, VW, VH, { fill: `rgba(6,4,10,${.55 * fade})` });
+      }
+      const lines = wrap(cs.lines[i], 296, NARRATE);
+      box(108, 36);
+      lines.forEach((l, k) => text(l, VW / 2, (lines.length > 1 ? 122 : 128) + k * 12, { fill: `rgba(243,234,214,${fade})`, font: NARRATE, align: 'center' }));
+      if (local > .9) text('>', VW - 12, 150, { fill: '#5f5648', font: '8px system-ui', align: 'center' });
       fxEnd();
+      if (doAct) { press(round); sfxTap(); }
       requestAnimationFrame(frame);
       return;
     }

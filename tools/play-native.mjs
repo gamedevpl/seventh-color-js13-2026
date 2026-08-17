@@ -133,10 +133,14 @@ while (round.phase !== P.END && guard++ < 400000) {
   }
 
   if (round.phase === P.CUT) {
+    // Stop at the beat boundary, not merely at the phase change - two
+    // cutscenes back to back are both P.CUT, and a loop that only watches
+    // the phase silently swallows the second one.
     let cf = 0;
-    while (round.phase === P.CUT && cf++ < 60 * 30) tick(round, DT, NONE);
-    if (round.phase === P.CUT) throw new Error(`${b.id}: cutscene never ended`);
-    report.push(`  ${b.id.padEnd(20)} ${'cutscene'.padEnd(8)} ${(cf / 60).toFixed(1)}s  (unskippable)`);
+    const here = round.id;
+    while (round.phase === P.CUT && round.id === here && cf++ < 60 * 60) tick(round, DT, NONE);
+    if (round.phase === P.CUT && round.id === here) throw new Error(`${b.id}: cutscene never ended`);
+    report.push(`  ${b.id.padEnd(20)} ${'cutscene'.padEnd(8)} ${(cf / 60).toFixed(1)}s  ${b.cutscene.lines.length} lines`);
     continue;
   }
 

@@ -248,7 +248,7 @@ export const BEATS = [
       { who: 'darkness', text: 'A parlor trick will not unmake me, child.' },
     ],
     game: 'dungeon', g: {
-      cols: 11, rows: 4, entry: 9, target: [1, 3], mirrors: 4,
+      cols: 11, rows: 4, entry: 9, target: [1, 3], mirrors: 5,
       shafts: [[9, 1], [6, 2], [7, 3]],
       blocks: [[9, 2], [4, 1]],
       guards: [[1, 1, 7, .34, 0], [2, 2, 9, .27, 1.1]],

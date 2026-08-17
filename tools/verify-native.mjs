@@ -62,6 +62,32 @@ for (let i = 0; i < keys.length; i++) {
   await page.screenshot({ path: path.join(root, 'build', 'native', `verify-${i + 1}.png`) });
 }
 
+// --soak=N plays for N seconds on a fixed, repeating input pattern that is
+// mostly *waiting*. That matters: the story machine can end a beat on its
+// own clock - a cutscene running out - and the bug that motivated this
+// soak was invisible to any test that pressed a key every frame, and
+// invisible to the Node integration test because that one never renders.
+// Deterministic on purpose, so a failure reproduces.
+const soak = Number(args.find((a) => /^--soak=/.test(a))?.split('=')[1] || 0);
+if (soak) {
+  // Opening move, deliberately: start the game and then touch nothing at
+  // all for long enough that the prologue runs out on its own clock. A
+  // beat that ends without input is the transition worth guarding, and any
+  // pattern that taps every second or two never reaches it - the first
+  // version of this soak tapped its way through the prologue and passed
+  // happily against the very bug it was written for.
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(18000);
+  const CYCLE = ['', '', '', 'Space', '', 'ArrowRight', '', 'Space', '', '', 'ArrowLeft', '', 'Space', ''];
+  const steps = Math.max(0, Math.round(((soak - 18) * 1000) / 240));
+  for (let i = 0; i < steps && !problems.length; i++) {
+    const k = CYCLE[i % CYCLE.length];
+    if (k) await page.keyboard.press(k);
+    await page.waitForTimeout(240);
+  }
+  console.log(`soaked ${soak}s (18s silent opening + ${steps} steps)`);
+}
+
 const probe = await page.evaluate(() => {
   const canvas = document.querySelector('canvas');
   return {

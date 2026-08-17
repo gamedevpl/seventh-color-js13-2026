@@ -95,10 +95,15 @@ function frame(now) {
     text('tap or press space', VW / 2, 92, { fill: '#a89', font: '9px system-ui', align: 'center' });
     if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; }
   } else {
-    const b = currentBeat(round);
-    setMusic(b.music);
     const before = round.phase;
     tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, heldLeft, heldRight, heldAct });
+    // Read the beat AFTER ticking, never before: tick can end a beat on its
+    // own clock - a cutscene running out, a mechanic completing - and a
+    // frame that renders the previous beat's data against the new beat's
+    // phase is reading a row that no longer applies. Harmless while every
+    // beat carried dialogue; a crash the moment one did not.
+    const b = currentBeat(round);
+    setMusic(b.music);
     if (before === P.GAME && round.phase !== P.GAME) sfxWin();
 
     // A press that finishes a mechanic must not also advance the story -

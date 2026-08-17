@@ -18,6 +18,7 @@ export const BEATS = [
   },
   {
     id: 'shadow-council', bg: 'shadow-council', music: 'shadow',
+    card: ['The Shadow Council', 'a castle that eats its own light'],
     faces: [{ key: 'darkness', x: 160, y: 62, scale: 1 }],
     dialogue: [
       { who: 'darkness', text: 'Winter answers to no one but me.' },
@@ -27,6 +28,7 @@ export const BEATS = [
   },
   {
     id: 'jacks-glade', bg: 'glade', music: 'wonder',
+    card: ["Jack's Glade", 'a moonlit clearing, that same night'],
     faces: [{ key: 'jack', x: 96, y: 68, scale: .72 }, { key: 'lili', x: 220, y: 64, scale: .72, blind: 3 }],
     dialogue: [
       { who: 'lili', text: 'You hide better than any fox, Jack.' },
@@ -73,6 +75,7 @@ export const BEATS = [
   },
   {
     id: 'winter-falls', bg: 'pond', music: 'winter',
+    card: ['The Frozen Pond', 'beneath sealed ice'],
     faces: [{ key: 'jack', x: 74, y: 62, scale: .72 }],
     dialogue: [
       { who: 'jack', text: "Lili? The ice wasn't broken when we crossed." },
@@ -87,6 +90,7 @@ export const BEATS = [
   },
   {
     id: 'hollow-armory', bg: 'roots', music: 'trail',
+    card: ["The Champion's Hollow", 'three root-bound alcoves'],
     faces: [{ key: 'gump', x: 84, y: 70, scale: .64 }, { key: 'jack', x: 232, y: 66, scale: .68 }],
     dialogue: [
       { who: 'gump', text: 'Three alcoves. Three kinds of courage.' },
@@ -117,6 +121,7 @@ export const BEATS = [
   },
   {
     id: 'bog-road', bg: 'bog', music: 'marsh',
+    card: ['The Bog Road', 'a causeway through the marsh'],
     faces: [{ key: 'gump', x: 32, y: 66, scale: .58 }, { key: 'jack', x: 284, y: 62, scale: .66 }],
     dialogue: [
       { who: 'gump', text: 'Three warning lights guard the causeway.' },
@@ -131,6 +136,7 @@ export const BEATS = [
   },
   {
     id: 'megs-looking-glass', bg: 'cottage', music: 'marsh',
+    card: ["Meg's Looking Glass", 'the cottage in the reeds'],
     faces: [{ key: 'meg', x: 274, y: 52, scale: .66 }, { key: 'jack', x: 44, y: 66, scale: .58 }],
     dialogue: [
       { who: 'meg', text: 'What soft little champion wanders into my supper?' },
@@ -151,6 +157,7 @@ export const BEATS = [
   },
   {
     id: 'root-door', bg: 'roots', music: 'castle',
+    card: ['The Root Door', 'the way down'],
     faces: [{ key: 'gump', x: 92, y: 70, scale: .68 }, { key: 'jack', x: 214, y: 78, scale: .7 }],
     dialogue: [
       { who: 'gump', text: 'Four stone mouths, and nowhere onward.' },
@@ -169,6 +176,7 @@ export const BEATS = [
   },
   {
     id: 'gown-that-breathes', bg: 'hall', music: 'castle',
+    card: ['The Gown That Breathes', 'inside the dark castle'],
     faces: [
       { key: 'darkness', x: 232, y: 56, scale: .68 },
       { key: 'lili', x: 88, y: 62, scale: .68 },
@@ -255,6 +263,7 @@ export const BEATS = [
   },
   {
     id: 'edge-of-world', bg: 'causeway', music: 'pursuit',
+    card: ['The Edge of the World', 'the causeway, falling'],
     faces: [{ key: 'jack', x: 160, y: 70, scale: .75 }],
     dialogue: [
       { who: 'jack', text: 'The floor is giving way behind us!' },
@@ -276,6 +285,7 @@ export const BEATS = [
   },
   {
     id: 'spring-remembers', bg: 'stream', music: 'wonder',
+    card: ['Spring Remembers', 'the stream, unfrozen'],
     faces: [{ key: 'gump', x: 40, y: 60, scale: .5 }, { key: 'jack', x: 40, y: 116, scale: .5 }, { key: 'unicorn', x: 278, y: 118, scale: .42 }],
     dialogue: [
       { who: 'gump', text: 'The stallion still waits beneath the winter spell.' },

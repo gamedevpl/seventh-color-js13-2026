@@ -68,19 +68,26 @@ canvas.addEventListener('pointerup', () => { heldAct = false; });
 // The outgoing frame is snapshotted the moment the beat changes and then
 // dissolved over the incoming one, dipping through dark at the midpoint so
 // two very different scenes cross without turning to mush.
-const TRANS = .5;
+// Two transitions, because they say different things. A dissolve means
+// "a moment later, near where we were". A black card means "time and place
+// have moved" - so it is reserved for genuine journeys and carried on the
+// arriving beat as data, never inferred. The throne-room run deliberately
+// gets no cards: three confrontations in one room should not keep stopping
+// to announce themselves.
+const TRANS = .5, CARD = 1.9;
 const snap = document.createElement('canvas');
 snap.width = VW;
 snap.height = VH;
 const sctx = snap.getContext('2d');
-let lastKey = null, trans = 0;
+let lastKey = null, trans = 0, transMax = TRANS, card = null;
 
-function cut(key) {
+function cut(key, arriving) {
   if (key === lastKey) return;
   if (lastKey !== null) {
     sctx.clearRect(0, 0, VW, VH);
     sctx.drawImage(canvas, 0, 0);
-    trans = TRANS;
+    card = arriving || null;
+    transMax = trans = card ? CARD : TRANS;
   }
   lastKey = key;
 }
@@ -88,15 +95,41 @@ function cut(key) {
 // Painted over the world layer but UNDER the text: dissolving two lines of
 // dialogue through each other reads as a rendering fault, not a
 // transition. Subtitles cut, scenery dissolves.
+function drawSnap(alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(snap, 0, 0);
+  ctx.restore();
+}
+
+// Advances the transition clock, and draws the cross-dissolve only. Sits
+// UNDER the text layer, because two lines of dialogue fading through each
+// other reads as a rendering fault rather than a transition.
 function dissolve(dt) {
   if (trans <= 0) return;
   trans -= dt;
-  const p = Math.max(0, trans / TRANS);
+  if (card) return;
+  const p = Math.max(0, trans / transMax);
   rect(0, 0, VW, VH, { fill: `rgba(5,3,9,${Math.sin((1 - p) * Math.PI) * .55})` });
-  ctx.save();
-  ctx.globalAlpha = p;
-  ctx.drawImage(snap, 0, 0);
-  ctx.restore();
+  drawSnap(p);
+}
+
+// The card is the opposite case and so is drawn OVER everything: a
+// blackout that still shows the dialogue waiting underneath is not a
+// blackout. Fade the old scene down, hold the caption, lift into the new
+// one - and let the caption ride the blackness rather than its own timer,
+// so it can never be caught half-lit over a visible scene.
+function cardOverlay() {
+  if (!card || trans <= 0) return;
+  const a = 1 - Math.max(0, trans / transMax);
+  let black = 1;
+  if (a < .2) { drawSnap(1); black = a / .2; }
+  else if (a > .8) black = (1 - a) / .2;
+  rect(0, 0, VW, VH, { fill: `rgba(0,0,0,${black})` });
+  const ta = Math.max(0, (black - .55) / .45);
+  if (ta <= 0) return;
+  text(card[0], VW - 12, 118, { fill: `rgba(232,185,35,${ta})`, font: 'bold 11px system-ui', align: 'right' });
+  if (card[1]) text(card[1], VW - 12, 132, { fill: `rgba(168,155,132,${ta * .8})`, font: '8px system-ui', align: 'right' });
 }
 
 let mode = 'title';
@@ -155,9 +188,16 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000 || 0);
   last = now;
 
-  const doAct = acted, doLeft = left, doRight = right;
+  let doAct = acted;
+  const doLeft = left, doRight = right;
   acted = left = right = false;
   fxUpdate(dt);
+  // A press during a card skips to the lift, and is swallowed - otherwise
+  // the same key also advances the dialogue waiting underneath it.
+  if (card && trans > 0 && doAct) {
+    trans = Math.min(trans, transMax * .16);
+    doAct = false;
+  }
 
   if (mode === 'title') {
     cut('title');
@@ -167,6 +207,7 @@ function frame(now) {
     text('tap or press space', VW / 2, 92, { fill: '#a89', font: '9px system-ui', align: 'center' });
     if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; }
     dissolve(dt);
+    cardOverlay();
   } else {
     const before = round.phase;
     tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, heldLeft, heldRight, heldAct });
@@ -176,7 +217,7 @@ function frame(now) {
     // phase is reading a row that no longer applies. Harmless while every
     // beat carried dialogue; a crash the moment one did not.
     const b = currentBeat(round);
-    cut(round.phase === P.END ? 'end' : b.id);
+    cut(round.phase === P.END ? 'end' : b.id, b.card);
     setMusic(b.music);
     if (before === P.GAME && round.phase !== P.GAME) sfxWin();
 
@@ -209,6 +250,7 @@ function frame(now) {
       box(108, 36);
       lines.forEach((l, k) => text(l, VW / 2, (lines.length > 1 ? 122 : 128) + k * 12, { fill: `rgba(243,234,214,${fade})`, font: NARRATE, align: 'center' }));
       if (local > .9) text('>', VW - 12, 150, { fill: '#5f5648', font: '8px system-ui', align: 'center' });
+      cardOverlay();
       if (doAct) { press(round); sfxTap(); }
       return requestAnimationFrame(frame);
     }
@@ -219,6 +261,7 @@ function frame(now) {
       bloom(160, 58, round.elapsed, 12, 5);
       text('THE SEVENTH COLOR', VW / 2, 70, { fill: '#e8b923', font: 'bold 15px system-ui', align: 'center' });
       text('tap or press space', VW / 2, 108, { fill: '#eee', font: '9px system-ui', align: 'center' });
+      cardOverlay();
       if (doAct) mode = 'title';
       return requestAnimationFrame(frame);
     }
@@ -244,6 +287,7 @@ function frame(now) {
     fxEnd();
     dissolve(dt);
     paintHud(b);
+    cardOverlay();
 
     if (round.phase === P.CHOICE) {
       if (doLeft) moveChoice(round, -1);

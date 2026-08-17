@@ -78,10 +78,20 @@ const milestonePath = path.join(root, 'native-milestone.json');
 let milestone = null;
 try { milestone = JSON.parse(readFileSync(milestonePath, 'utf8')); } catch {}
 
+// The ceiling belongs to the submission chain, and only to that. A
+// --no-roadroller build is a debugging convenience and a --cheats build
+// carries code that is deliberately deleted from the real one; holding
+// either to the competition limit fails honest builds for being what they
+// were asked to be. Measured and reported, never enforced.
 if (milestone) {
   const ceiling = milestone.ceilingBytes;
+  const shippable = !noRoadroller && !cheats;
   const pass = worst.archiveBytes < ceiling;
   console.log('');
-  console.log(`  milestone ${milestone.name}: ceiling ${num(ceiling)}, worst-of-${rolls} ${num(worst.archiveBytes)} -> ${pass ? 'PASS' : 'FAIL'}`);
-  if (!pass) process.exitCode = 1;
+  if (shippable) {
+    console.log(`  milestone ${milestone.name}: ceiling ${num(ceiling)}, worst-of-${rolls} ${num(worst.archiveBytes)} -> ${pass ? 'PASS' : 'FAIL'}`);
+    if (!pass) process.exitCode = 1;
+  } else {
+    console.log(`  ${num(worst.archiveBytes)} bytes - not a submission build (${noRoadroller ? 'no roadroller' : ''}${noRoadroller && cheats ? ', ' : ''}${cheats ? 'dev cheats' : ''}), ceiling not enforced`);
+  }
 }

@@ -263,14 +263,14 @@ const dcx = (g, c) => dx0(g) + c * DW + DW / 2;
 const dfloor = (g, r) => dy0(g) + (r + 1) * DH;
 const dcy = (g, r) => dfloor(g, r) - 9;
 
-const guardAt = (gd, t) => {
+const guardAt = (gd, t, alarm = 0) => {
   const [, x0, x1, sp, ph] = gd;
-  const w = x1 - x0, u = ((t * sp + ph) % 2);
+  const w = x1 - x0, u = ((t * sp * (1 + alarm * .18) + ph) % 2);
   return x0 + (u < 1 ? u : 2 - u) * w;
 };
 
 function dunInit(b) {
-  return { x: b.g.entry + .0, r: 0, mir: [], open: 0, alarm: 0, t: 0, win: 0, msg: 0 };
+  return { x: b.g.entry + .0, r: 0, mir: [], open: 0, sweep: 0, alarm: 0, t: 0, win: 0, msg: 0, why: 0 };
 }
 // The placed bucklers, in the shape beamTrace already expects.
 const dunBeam = (g, st) => beamTrace(
@@ -292,22 +292,40 @@ function dunUpdate(st, b, dt, input) {
   if (input.pressUp && st.r > 0 && onShaft(g, c, st.r)) { st.r--; sfxTap(); }
   if (input.pressDown && st.r < g.rows - 1 && onShaft(g, c, st.r + 1)) { st.r++; sfxTap(); }
 
+  // The light does not arrive, it travels - and every guard it passes on
+  // the way down can raise the alarm. Opening is no longer a single lucky
+  // instant; the whole route has to stay clear for as long as the sweep
+  // takes, which is what makes the moment worth waiting for.
+  if (st.open) {
+    st.sweep += dt / (g.sweep ?? 1.5);
+    const t = dunBeam(g, st);
+    const lit = Math.ceil(st.sweep * t.pts.length);
+    const caught = (g.guards || []).some((gd) => {
+      const gx = Math.round(guardAt(gd, st.t, st.alarm));
+      return t.pts.slice(0, lit).some(([pc, pr]) => pr === gd[0] && pc === gx);
+    });
+    if (caught || (st.sweep >= 1 && !t.hit)) {
+      st.open = st.sweep = 0;
+      st.alarm++;
+      st.msg = 2;
+      st.why = 1;
+      kick(2);
+      sfxNo();
+    } else if (st.sweep >= 1) {
+      st.win = .01;
+      kick(2);
+      burst(dcx(g, g.target[0]), dcy(g, g.target[1]), 22, '#fff0a0', 100);
+    }
+  }
+
   if (input.act) {
     if (st.r === 0 && c === g.entry) {
-      // The shutter. One decision, and the guards get a vote.
-      st.open = 1;
-      const t = dunBeam(g, st);
-      const seen = (g.guards || []).some((gd) => {
-        const gx = Math.round(guardAt(gd, st.t));
-        return t.pts.some(([pc, pr]) => pr === gd[0] && pc === gx);
-      });
-      if (t.hit && !seen) { st.win = .01; kick(2); burst(dcx(g, g.target[0]), dcy(g, g.target[1]), 22, '#fff0a0', 100); }
-      else { st.open = 0; st.alarm++; st.msg = 2; kick(1.8); sfxNo(); }
+      if (!st.open) { st.open = 1; st.sweep = 0; sfxHit(); }
     } else {
       const at = st.mir.findIndex((m) => m[0] === c && m[1] === st.r);
       if (at < 0) {
         if (st.mir.length < g.mirrors) { st.mir.push([c, st.r, 0]); sfxHit(); }
-        else { st.msg = 1.4; sfxNo(); }
+        else { st.msg = 1.4; st.why = 0; sfxNo(); }
       } else if (st.mir[at][2] === 0) { st.mir[at][2] = 1; sfxHit(); }
       else st.mir.splice(at, 1);
     }
@@ -315,7 +333,18 @@ function dunUpdate(st, b, dt, input) {
 
   // Patrols. Touching one costs the climb, never the attempt.
   for (const gd of g.guards || []) {
-    if (gd[0] === st.r && Math.abs(guardAt(gd, st.t) - st.x) < .6) {
+    const gx = guardAt(gd, st.t, st.alarm);
+    for (const m of st.mir) {
+      if (m[1] === gd[0] && Math.abs(gx - m[0]) < .5 && !m[3]) {
+        m[2] ^= 1;
+        m[3] = 1;
+        st.msg = 1.4;
+        st.why = 2;
+        kick(.8);
+        sfxNo();
+      } else if (m[1] === gd[0] && Math.abs(gx - m[0]) >= .9) m[3] = 0;
+    }
+    if (gd[0] === st.r && Math.abs(gx - st.x) < .6) {
       st.r = 0;
       st.x = g.entry;
       st.alarm++;
@@ -347,10 +376,14 @@ function dunRender(st, b) {
     line(x - 5, y, x - 5, y + 22, { stroke: '#5a4a7a', lineWidth: 1 });
     line(x + 5, y, x + 5, y + 22, { stroke: '#5a4a7a', lineWidth: 1 });
   }
+  for (const [gr, x0, x1] of g.guards || []) {
+    rect(dcx(g, x0) - DW / 2, dfloor(g, gr) - 3, (x1 - x0) * DW + DW, 2, { fill: '#4a2a2a99' });
+  }
   for (const [c, r] of g.blocks || []) rect(dcx(g, c) - 8, dcy(g, r) - 8, 16, 16, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
   const t = dunBeam(g, st);
   const lit = st.open ? '#fff0a0' : t.hit ? '#c9a94e' : '#6b5a2e';
-  for (let i = 1; i < t.pts.length; i++) {
+  const reach = st.open ? Math.ceil(st.sweep * t.pts.length) : t.pts.length;
+  for (let i = 1; i < Math.min(reach, t.pts.length); i++) {
     const a = t.pts[i - 1], p = t.pts[i];
     line(dcx(g, a[0]), dcy(g, a[1]), dcx(g, p[0]), dcy(g, p[1]), { stroke: lit, lineWidth: st.open ? 3 : 1 });
   }
@@ -364,9 +397,9 @@ function dunRender(st, b) {
     line(ex - 4, ey - 4, ex + 4, ey + 4, { stroke: '#e8735a', lineWidth: 2 });
     line(ex + 4, ey - 4, ex - 4, ey + 4, { stroke: '#e8735a', lineWidth: 2 });
   }
-  for (const [c, r, o] of st.mir) {
+  for (const [c, r, o, jostled] of st.mir) {
     const x = dcx(g, c), y = dcy(g, r), d = 6;
-    line(x - d, y + (o ? -d : d), x + d, y + (o ? d : -d), { stroke: '#9fd4f0', lineWidth: 3 });
+    line(x - d, y + (o ? -d : d), x + d, y + (o ? d : -d), { stroke: jostled ? '#e8735a' : '#9fd4f0', lineWidth: 3 });
   }
   // Darkness, at the bottom of everything - his own portrait, shrunk,
   // rather than a shape standing in for him.
@@ -374,7 +407,7 @@ function dunRender(st, b) {
   circle(tgx, tgy, 11 + (t.hit ? Math.sin(st.t * 6) * 1.5 : 0), { stroke: t.hit ? '#fff0a0' : '#6a5a4a', lineWidth: 1 });
   paintFace(g.face || 'darkness', tgx, tgy - 1, g.faceScale || .17, st.t, false, false);
   for (const gd of g.guards || []) {
-    const gx = dcx(g, guardAt(gd, st.t)), gy = dcy(g, gd[0]);
+    const gx = dcx(g, guardAt(gd, st.t, st.alarm)), gy = dcy(g, gd[0]);
     rect(gx - 3, gy - 6, 6, 13, { fill: '#2b2038' });
     circle(gx, gy - 9, 3, { fill: '#4a3a5e' });
     circle(gx + 5, gy - 2, 2, { fill: '#e8735a' });
@@ -383,18 +416,19 @@ function dunRender(st, b) {
   rect(px - 2, py - 4, 5, 10, { fill: '#e8b923' });
   circle(px, py - 7, 3, { fill: '#e8cdb0' });
   strip();
-  text(`bucklers ${g.mirrors - st.mir.length}/${g.mirrors}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
+  if (st.open) meter(10, 6, 300, st.sweep, '#fff0a0');
+  else text(`bucklers ${g.mirrors - st.mir.length}/${g.mirrors}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
   const here = Math.round(st.x), on = st.mir.find((m) => m[0] === here && m[1] === st.r);
   const doesWhat = st.r === 0 && here === g.entry ? 'SPACE opens the shaft'
     : on ? (on[2] ? 'SPACE takes it back' : 'SPACE turns it')
     : st.mir.length < g.mirrors ? 'SPACE puts a buckler here' : 'no bucklers left - take one back';
-  if (st.msg > 0) text(st.msg > 1.4 ? 'seen! the shaft slams shut' : 'no bucklers left', 96, 11, { fill: '#e8735a', font: '8px system-ui' });
+  if (st.msg > 0) text(['no bucklers left', 'seen! the shaft slams shut', 'a guard knocks it askew'][st.why], 96, 11, { fill: '#e8735a', font: '8px system-ui' });
   else text(doesWhat, 96, 11, { fill: t.hit ? '#fff0a0' : '#8a7f6a', font: '8px system-ui' });
   meter(258, 6, 52, st.alarm / 5, '#e8735a');
 }
 
 export const GAMES = {
-  dungeon: { init: dunInit, update: dunUpdate, render: dunRender, hint: '\u2190\u2192 walk   \u2191\u2193 climb the ladders   aim the dim line at him' },
+  dungeon: { init: dunInit, update: dunUpdate, render: dunRender, hint: '\u2190\u2192 walk   \u2191\u2193 ladders   guards jostle mirrors in their path' },
   crack: { init: crackInit, update: crackUpdate, render: crackRender, hint: '← → choose a pane    SPACE strike' },
   lights: { init: lightsInit, update: lightsUpdate, render: lightsRender, hint: '← → choose    SPACE add to the order' },
   stillness: { init: stillInit, update: stillUpdate, render: stillRender, hint: 'hold SPACE to creep closer - only while every head is down' },

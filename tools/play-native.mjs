@@ -49,24 +49,30 @@ function planDungeon(g) {
     }
   }
   const base = { cols: g.cols, rows: g.rows, entry: [g.entry, 0, 0, 1], target: g.target, blocks: g.blocks };
+  // How much of a route sits where a guard can reach it. A route through a
+  // patrol lane needs a lucky window; a route outside every lane can be
+  // opened whenever. A player works that out, so the solver should too.
+  const exposure = (mirrors, orient) => {
+    const t = beamTrace({ ...base, mirrors }, orient);
+    return t.pts.filter(([c, r]) => (g.guards || []).some(([gr, x0, x1]) => gr === r && c >= x0 - 1 && c <= x1 + 1)).length
+      + mirrors.filter(([c, r]) => (g.guards || []).some(([gr, x0, x1]) => gr === r && c >= x0 - 1 && c <= x1 + 1)).length * 3;
+  };
   for (let k = 1; k <= g.mirrors; k++) {
-    let hit = null;
+    let best = null, bestCost = Infinity;
     const walk = (start, chosen) => {
-      if (hit) return;
       if (chosen.length === k) {
         for (let m = 0; m < 1 << k; m++) {
           const orient = chosen.map((_, i) => (m >> i) & 1);
-          if (beamTrace({ ...base, mirrors: chosen }, orient).hit) {
-            hit = chosen.map(([c, r], i) => [c, r, orient[i]]);
-            return;
-          }
+          if (!beamTrace({ ...base, mirrors: chosen }, orient).hit) continue;
+          const cost = exposure(chosen, orient);
+          if (cost < bestCost) { bestCost = cost; best = chosen.map(([c, r], i) => [c, r, orient[i]]); }
         }
         return;
       }
-      for (let i = start; i < cells.length && !hit; i++) walk(i + 1, [...chosen, cells[i]]);
+      for (let i = start; i < cells.length; i++) walk(i + 1, [...chosen, cells[i]]);
     };
     walk(0, []);
-    if (hit) return hit;
+    if (best) return best;
   }
   return null;
 }
@@ -151,12 +157,19 @@ const SOLVERS = {
       { cols: g.cols, rows: g.rows, entry: [g.entry, 0, 0, 1], target: g.target, blocks: g.blocks, mirrors: st.mir.map((m) => [m[0], m[1]]) },
       st.mir.map((m) => m[2]),
     );
-    const seen = (g.guards || []).some((gd) => {
-      const [, x0, x1, sp, ph] = gd, w = x1 - x0, u = (st.t * sp + ph) % 2;
-      const gx = Math.round(x0 + (u < 1 ? u : 2 - u) * w);
-      return t.pts.some(([pc, pr]) => pr === gd[0] && pc === gx);
+    // The light travels now, so the route has to stay clear for the whole
+    // descent - sample it rather than checking the instant of opening.
+    const sweep = g.sweep ?? 1.5;
+    const clear = Array.from({ length: 16 }, (_, k) => (k + 1) / 16).every((frac) => {
+      const when = st.t + frac * sweep, lit = Math.ceil(frac * t.pts.length);
+      return !(g.guards || []).some((gd) => {
+        const [, x0, x1, sp, ph] = gd, w = x1 - x0;
+        const u = (when * sp * (1 + st.alarm * .18) + ph) % 2;
+        const gx = Math.round(x0 + (u < 1 ? u : 2 - u) * w);
+        return t.pts.slice(0, lit).some(([pc, pr]) => pr === gd[0] && pc === gx);
+      });
     });
-    return t.hit && !seen ? input({ act: true }) : input({});
+    return t.hit && clear ? input({ act: true }) : input({});
   },
   stillness(g) {
     // Watch the same three heads the player does, and move only when they

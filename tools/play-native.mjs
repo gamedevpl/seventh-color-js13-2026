@@ -11,7 +11,7 @@ import { GAMES, beamTrace } from '../native/src/games.js';
 import { makeRound, currentBeat, tick, press, moveChoice, P } from '../native/src/story.js';
 
 const DT = 1 / 60;
-const NONE = { act: false, pressLeft: false, pressRight: false, heldLeft: false, heldRight: false, heldAct: false };
+const NONE = { act: false, pressLeft: false, pressRight: false, pressUp: false, pressDown: false, heldLeft: false, heldRight: false, heldAct: false };
 const input = (o) => ({ ...NONE, ...o });
 
 // Cursor-driven puzzles are all edge-triggered: one tap, one step. Tapping
@@ -28,6 +28,49 @@ function toCursor(cur, want, n) {
 // rather than remembering one. That makes them self-correcting when
 // --sloppy drops an input, and it means the solver is reading the same
 // state the player can see rather than a private script.
+// Smallest set of bucklers that lands the light on Darkness - the same
+// search the level checker runs, so the test and the gate agree on what
+// "solvable" means.
+const PLANS = {};
+function planDungeon(g) {
+  const rows = new Set([0]);
+  for (let pass = 0; pass < g.rows; pass++) {
+    for (const [, r] of g.shafts) {
+      if (rows.has(r - 1)) rows.add(r);
+      if (rows.has(r)) rows.add(r - 1);
+    }
+  }
+  const cells = [];
+  for (const r of [...rows].filter((r) => r >= 0 && r < g.rows)) {
+    for (let c = 0; c < g.cols; c++) {
+      if (r === 0 && c === g.entry) continue;
+      if ((g.blocks || []).some(([bc, br]) => bc === c && br === r)) continue;
+      cells.push([c, r]);
+    }
+  }
+  const base = { cols: g.cols, rows: g.rows, entry: [g.entry, 0, 0, 1], target: g.target, blocks: g.blocks };
+  for (let k = 1; k <= g.mirrors; k++) {
+    let hit = null;
+    const walk = (start, chosen) => {
+      if (hit) return;
+      if (chosen.length === k) {
+        for (let m = 0; m < 1 << k; m++) {
+          const orient = chosen.map((_, i) => (m >> i) & 1);
+          if (beamTrace({ ...base, mirrors: chosen }, orient).hit) {
+            hit = chosen.map(([c, r], i) => [c, r, orient[i]]);
+            return;
+          }
+        }
+        return;
+      }
+      for (let i = start; i < cells.length && !hit; i++) walk(i + 1, [...chosen, cells[i]]);
+    };
+    walk(0, []);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 let tapGate = 0;
 const SOLVERS = {
   crack(g) {
@@ -71,6 +114,49 @@ const SOLVERS = {
     const viable = perms.filter((p) => g.history.every(([row, score]) => row.filter((v, i) => v === p[i]).length === score));
     const pick = viable[0] || perms[0];
     return toCursor(g.cursor, pick[g.guess.length], g.n);
+  },
+  dungeon(st, b) {
+    // Plan once, then walk the plan: place every buckler the search says is
+    // needed, then stand at the shutter and open it only on a frame where
+    // no guard is standing in the light. Exactly what the level asks of a
+    // player, using only what the level shows them.
+    const g = b.g;
+    const plan = (PLANS[b.id] ||= planDungeon(g));
+    if (!plan) throw new Error(`${b.id}: dungeon level has no solution`);
+
+    const walkTo = (col) => {
+      if (Math.abs(st.x - col) < .12) return null;
+      return input(st.x > col ? { heldLeft: true } : { heldRight: true });
+    };
+    // Anything not yet placed, or placed the wrong way round.
+    for (const [c, r, o] of plan) {
+      const at = st.mir.find((m) => m[0] === c && m[1] === r);
+      if (at && at[2] === o) continue;
+      if (st.r !== r) {
+        const up = st.r > r;
+        const sh = g.shafts.find((x) => x[1] === (up ? st.r : st.r + 1));
+        if (!sh) throw new Error(`${b.id}: floor ${r} is unreachable from ${st.r}`);
+        return walkTo(sh[0]) || (tapGate++ % 7 ? input({}) : input(up ? { pressUp: true } : { pressDown: true }));
+      }
+      return walkTo(c) || (tapGate++ % 7 ? input({}) : input({ act: true }));
+    }
+    // Everything is in place: go to the shaft and wait for a clean moment.
+    if (st.r !== 0) {
+      const sh = g.shafts.find((x) => x[1] === st.r);
+      return walkTo(sh[0]) || (tapGate++ % 7 ? input({}) : input({ pressUp: true }));
+    }
+    const move = walkTo(g.entry);
+    if (move) return move;
+    const t = beamTrace(
+      { cols: g.cols, rows: g.rows, entry: [g.entry, 0, 0, 1], target: g.target, blocks: g.blocks, mirrors: st.mir.map((m) => [m[0], m[1]]) },
+      st.mir.map((m) => m[2]),
+    );
+    const seen = (g.guards || []).some((gd) => {
+      const [, x0, x1, sp, ph] = gd, w = x1 - x0, u = (st.t * sp + ph) % 2;
+      const gx = Math.round(x0 + (u < 1 ? u : 2 - u) * w);
+      return t.pts.some(([pc, pr]) => pr === gd[0] && pc === gx);
+    });
+    return t.hit && !seen ? input({ act: true }) : input({});
   },
   stillness(g) {
     // Watch the same three heads the player does, and move only when they

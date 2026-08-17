@@ -22,7 +22,7 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-let acted = false, left = false, right = false, heldLeft = false, heldRight = false, heldAct = false;
+let acted = false, left = false, right = false, up = false, down = false, heldLeft = false, heldRight = false, heldAct = false;
 
 // Dev-only: both Shift keys together jump to the next beat, so the whole
 // nineteen-beat story can be walked without solving every puzzle on the
@@ -50,6 +50,8 @@ addEventListener('keydown', (e) => {
   if (e.key === ' ' || e.key === 'Enter') { acted = true; heldAct = true; }
   else if (e.key === 'ArrowLeft' || e.key === 'a') { left = heldLeft = true; }
   else if (e.key === 'ArrowRight' || e.key === 'd') { right = heldRight = true; }
+  else if (e.key === 'ArrowUp' || e.key === 'w') up = true;
+  else if (e.key === 'ArrowDown' || e.key === 's') down = true;
 });
 addEventListener('keyup', (e) => {
   if (DEV) {
@@ -189,8 +191,8 @@ function frame(now) {
   last = now;
 
   let doAct = acted;
-  const doLeft = left, doRight = right;
-  acted = left = right = false;
+  const doLeft = left, doRight = right, doUp = up, doDown = down;
+  acted = left = right = up = down = false;
   fxUpdate(dt);
   // A press during a card skips to the lift, and is swallowed - otherwise
   // the same key also advances the dialogue waiting underneath it.
@@ -210,7 +212,7 @@ function frame(now) {
     cardOverlay();
   } else {
     const before = round.phase;
-    tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, heldLeft, heldRight, heldAct });
+    tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, pressUp: doUp, pressDown: doDown, heldLeft, heldRight, heldAct });
     // Read the beat AFTER ticking, never before: tick can end a beat on its
     // own clock - a cutscene running out, a mechanic completing - and a
     // frame that renders the previous beat's data against the new beat's
@@ -302,7 +304,7 @@ function frame(now) {
   }
 
   if (DEV && mode === 'play') {
-    text(`${currentBeat(round).id}  [shift+shift = skip]`, 4, 154, { fill: '#4a8a5a', font: '7px system-ui' });
+    text(`${currentBeat(round).id}  [shift+shift = skip]`, 4, 24, { fill: '#4a8a5a', font: '7px system-ui' });
   }
   requestAnimationFrame(frame);
 }

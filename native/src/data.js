@@ -143,13 +143,11 @@ export const BEATS = [
       { who: 'jack', text: 'One too humble for a lady as magnificent as you.' },
       { who: 'meg', text: 'Magnificent? Say that again, morsel.' },
     ],
-    game: 'beam', g: {
-      cols: 7, rows: 4, entry: [0, 1, 1, 0], target: [3, 3],
-      mirrors: [[3, 0], [5, 1], [3, 1], [5, 0]],
-      waypoints: [[4, 0], [4, 1]],
-      start: [1, 1, 0, 0],
+    game: 'dungeon', g: {
+      cols: 9, rows: 2, entry: 6, target: [1, 1], mirrors: 1,
+      shafts: [[6, 1]],
     },
-    gamePrompt: 'Light every lantern on the way to Meg - not just Meg.',
+    gamePrompt: 'Moonlight through the roof. Bounce it onto Meg.',
     successDialogue: [
       { who: 'jack', text: 'My knees shook. My hand did not.' },
     ],
@@ -249,13 +247,13 @@ export const BEATS = [
       { who: 'jack', text: 'Meg taught me something about mirrors and vanity.' },
       { who: 'darkness', text: 'A parlor trick will not unmake me, child.' },
     ],
-    game: 'beam', g: {
-      cols: 8, rows: 4, entry: [4, 0, 0, 1], target: [1, 3],
-      mirrors: [[1, 2], [4, 3], [6, 1], [6, 3], [0, 1], [0, 2]],
-      waypoints: [[5, 3], [6, 2], [5, 1]],
-      start: [0, 0, 0, 0, 0, 0],
+    game: 'dungeon', g: {
+      cols: 11, rows: 4, entry: 9, target: [1, 3], mirrors: 3,
+      shafts: [[9, 1], [6, 2], [7, 3]],
+      blocks: [[9, 2], [4, 1]],
+      guards: [[1, 1, 7, .34, 0], [2, 2, 9, .27, 1.1]],
     },
-    gamePrompt: 'Every lantern, then him. Reaching him alone is his trick.',
+    gamePrompt: 'Carry the sun down to him - and open the shaft only once.',
     successDialogue: [
       { who: 'jack', text: 'You were never the night. You were only its shadow.' },
     ],
@@ -269,8 +267,6 @@ export const BEATS = [
       { who: 'jack', text: 'The floor is giving way behind us!' },
       { who: 'jack', text: "Don't stop - jump where the light still holds." },
     ],
-    game: 'chase', g: { gaps: [.13, .39, .65, .91], arches: [.26, .52, .78], width: .022, speed: .21 },
-    gamePrompt: 'Holes to leap, arches to duck. Read the causeway.',
     successDialogue: [
       { who: 'jack', text: 'Clear. The castle groans shut behind us.' },
     ],
@@ -291,13 +287,12 @@ export const BEATS = [
       { who: 'gump', text: 'The stallion still waits beneath the winter spell.' },
       { who: 'jack', text: 'Then the stolen light must remember where it belongs.' },
     ],
-    game: 'beam', g: {
-      cols: 8, rows: 4, entry: [0, 0, 1, 0], target: [5, 3],
-      mirrors: [[2, 0], [5, 1], [2, 3], [0, 1], [0, 3]],
-      waypoints: [[1, 3], [0, 2]],
-      start: [0, 0, 0, 0, 0],
+    choice: {
+      question: 'The light is loose in the world again. What does Jack do with it?',
+      options: ['Keep it safe', 'Give it back to the horn', 'Divide it among them'],
+      correct: 1,
+      retry: 'It was never his to keep or to share. It has an owner.',
     },
-    gamePrompt: 'Gather every spark, then thread it into the horn.',
     successDialogue: [
       { who: 'gump', text: 'The stallion rises. Spring has found the forest again.' },
     ],

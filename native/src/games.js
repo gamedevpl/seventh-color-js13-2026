@@ -136,55 +136,6 @@ export function beamTrace(bg, orient) {
   return { pts, reach: hit, lit, hit: hit && lit.every(Boolean) };
 }
 
-function beamInit(b) {
-  const orient = b.g.start.slice();
-  return { orient, sel: 0, moves: 0, win: 0, ...beamTrace(b.g, orient) };
-}
-function beamUpdate(g, b, dt, input) {
-  if (g.hit) {
-    // A held beat so the player sees the light land before the scene moves.
-    g.win += dt;
-    return g.win > .7;
-  }
-  const n = b.g.mirrors.length;
-  if (input.pressLeft) { g.sel = (g.sel - 1 + n) % n; sfxTap(); }
-  if (input.pressRight) { g.sel = (g.sel + 1) % n; sfxTap(); }
-  if (input.act) {
-    g.orient[g.sel] ^= 1;
-    g.moves++;
-    Object.assign(g, beamTrace(b.g, g.orient));
-    if (g.hit) { kick(1.2); burst(cx(b.g, b.g.target[0]), cy(b.g.target[1]), 16, '#fff0a0', 90); }
-    else { sfxHit(); }
-  }
-  return false;
-}
-function beamRender(g, b) {
-  const bg = b.g, X = ox(bg);
-  rect(X - 4, OY - 4, bg.cols * CELL + 8, bg.rows * CELL + 8, { fill: '#0b0a14cc' });
-  for (let c = 0; c < bg.cols; c++) for (let r = 0; r < bg.rows; r++) circle(cx(bg, c), cy(r), 1, { fill: '#3a3450' });
-  for (let i = 1; i < g.pts.length; i++) {
-    const a = g.pts[i - 1], p = g.pts[i];
-    line(cx(bg, a[0]), cy(a[1]), cx(bg, p[0]), cy(p[1]), { stroke: g.hit ? '#fff0a0' : '#e8b92399', lineWidth: g.hit ? 3 : 2 });
-  }
-  for (const [c, r] of bg.blocks || []) rect(cx(bg, c) - 7, cy(r) - 7, 14, 14, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
-  // Lanterns. Reaching the target is easy; reaching it having lit all of
-  // these is the puzzle, and it is why flipping one mirror at a time to
-  // see what happens stops being a strategy.
-  (bg.waypoints || []).forEach(([c, r], i) => {
-    circle(cx(bg, c), cy(r), 5, { fill: g.lit[i] ? '#fff0a0' : '#2a2438', stroke: g.lit[i] ? '#fff0a0' : '#6a5a8a', lineWidth: 1 });
-  });
-  bg.mirrors.forEach(([c, C], i) => {
-    const x = cx(bg, c), y = cy(C), d = 6, sel = i === g.sel;
-    if (sel) circle(x, y, 11, { stroke: '#e8b923', lineWidth: 1 });
-    line(x - d, y + (g.orient[i] ? -d : d), x + d, y + (g.orient[i] ? d : -d), { stroke: sel ? '#fff' : '#9fd4f0', lineWidth: 3 });
-  });
-  const [tc, tr] = bg.target;
-  circle(cx(bg, tc), cy(tr), g.hit ? 8 : 6, { stroke: g.hit ? '#fff0a0' : g.reach ? '#e8735a' : '#c9975a', lineWidth: 2 });
-  strip();
-  const n = (bg.waypoints || []).length;
-  text(`mirror ${g.sel + 1}/${bg.mirrors.length}    lanterns ${g.lit.filter(Boolean).length}/${n}    moves ${g.moves}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
-}
-
 // --- lights: work out the order, do not memorise it ---------------------
 // The first version hid the answer in data.js; the second demonstrated it,
 // which made it a memory test. Neither asked the player to think. Now the
@@ -245,97 +196,6 @@ function lightsRender(g) {
   meter(258, 6, 52, g.wake / 6, '#6a8a5a');
 }
 
-// --- chase: the causeway falls behind you -------------------------------
-// Was: hold right to advance, which meant nothing was chasing you and you
-// could stop to think. Now the run is automatic and accelerating, and the
-// collapse is a real object on screen closing the gap whenever you stumble.
-function chaseInit(b) {
-  return { d: 0, y: 0, vy: 0, t: 0, edge: -.22, falls: 0, flash: 0 };
-}
-function chaseUpdate(g, b, dt, input) {
-  g.t += dt;
-  g.flash = Math.max(0, g.flash - dt * 3);
-  const speed = (b.g.speed ?? .19) + g.t * .006;
-  g.d += speed * dt;
-  g.edge += speed * .93 * dt;
-
-  if (input.act && g.y <= 0) { g.vy = 68; sfxJump(); }
-  if (g.vy || g.y > 0) {
-    g.y += g.vy * dt;
-    g.vy -= 320 * dt;
-    if (g.y <= 0) { g.y = 0; g.vy = 0; }
-  }
-
-  // Two obstacles that want opposite things: holes you must jump, and low
-  // arches you must NOT. One reflex no longer clears the causeway - each
-  // marker has to be read and answered, at speed.
-  const w = b.g.width ?? .035;
-  if (g.y > 3 && (b.g.arches || []).some((p) => Math.abs(g.d - p) < w)) {
-    g.falls++;
-    g.flash = 1;
-    g.vy = -40;
-    g.d = Math.max(0, g.d - .06);
-    g.edge += .012;
-    kick(1.8);
-    sfxNo();
-    burst(80, 100, 10, '#8a6a4a', 70);
-  }
-  // On the ground over a gap: a stumble. Costs ground, lets the collapse in.
-  if (g.y <= 0 && b.g.gaps.some((p) => Math.abs(g.d - p) < w)) {
-    g.falls++;
-    g.flash = 1;
-    g.d = Math.max(0, g.d - .075);
-    g.edge += .015;
-    kick(1.6);
-    sfxNo();
-    burst(80, 120, 10, '#8a6a4a', 70);
-  }
-  // Caught: the worst that happens is the collapse is beaten back, never
-  // a restart - this is the story's climax, not a skill wall.
-  if (g.edge >= g.d - .015) { g.edge = g.d - .16; kick(2.2); sfxNo(); }
-  return g.d >= 1;
-}
-function chaseRender(g, b) {
-  const sx = (p) => 80 + (p - g.d) * 300;
-  // Causeway, drawn as the stretch between gaps rather than one slab, so
-  // the holes are real holes in the floor the player can see coming.
-  const slab = (x, w) => {
-    rect(x, 112, w, 10, { fill: '#4a3a63' });
-    rect(x, 112, w, 2, { fill: '#8a76b0' });
-  };
-  let cut = 0;
-  for (const p of b.g.gaps) {
-    const a = sx(p - (b.g.width ?? .035)), c = sx(p + (b.g.width ?? .035));
-    if (a > cut) slab(cut, a - cut);
-    cut = Math.max(cut, c);
-  }
-  if (cut < 320) slab(cut, 320 - cut);
-  for (const p of b.g.arches || []) {
-    const x = sx(p);
-    if (x > -30 && x < 350) {
-      const half = (b.g.width ?? .035) * 300;
-      rect(x - half, 78, half * 2, 14, { fill: '#4a3a63' });
-      poly([x - half, 92, x + half, 92, x, 102], { fill: '#3a2c50' });
-    }
-  }
-  // The collapse itself.
-  const ex = sx(g.edge);
-  if (ex > -40) {
-    rect(0, 0, Math.max(0, ex), 156, { fill: '#0b0510cc' });
-    for (let i = 0; i < 5; i++) line(ex - 2, 30 + i * 26, ex + 8 + Math.sin(g.t * 6 + i) * 5, 40 + i * 26, { stroke: '#3a1f4a', lineWidth: 2 });
-  }
-  const py = 108 - g.y, run = g.y > 0 ? 0 : Math.sin(g.t * 16) * 2, tint = g.flash > 0 ? '#e8735a' : '#e8b923';
-  rect(78, py - 2 + run, 5, 8, { fill: tint });
-  circle(80, py - 5 + run, 3, { fill: tint });
-  line(78, py + 6, 76 - run, py + 10, { stroke: tint, lineWidth: 2 });
-  line(82, py + 6, 85 + run, py + 10, { stroke: tint, lineWidth: 2 });
-  strip();
-  meter(10, 6, 300, g.d, '#e8b923');
-  // The collapse rides the same track as your progress, so the gap between
-  // the two marks *is* the tension, readable at a glance.
-  rect(10 + 300 * Math.max(0, g.edge), 4, 2, 8, { fill: '#e8735a' });
-}
-
 // --- stillness: move only when the whole herd is grazing ----------------
 // The first version drew a calm band and asked you to keep a marker inside
 // it, which is a following exercise, not a watching one. The herd version
@@ -385,10 +245,135 @@ function stillRender(g) {
   text(safe ? 'still' : 'watching', 268, 11, { fill: safe ? '#7cb56a' : '#e8735a', font: '8px system-ui' });
 }
 
+// --- dungeon: carry the light down to him -------------------------------
+// The Legend finale, made playable. A cross-section of the castle: Jack
+// climbs the floors placing bucklers while sunlight waits at a shaft in
+// the roof, and Darkness is at the bottom. The catch is the whole design -
+// the shutter can only be opened once, at the end, because open light
+// draws every guard in the place. So the route is planned in the dark,
+// walked past patrols, and then committed to in one moment.
+//
+// The reflection engine is beamTrace, unchanged from the grid puzzle this
+// replaces: what was wrong there was never the tracer, it was that the
+// player only flipped switches at it.
+const DW = 22, DH = 24, DY = 22;
+const dx0 = (g) => 160 - g.cols * DW / 2;
+const dcx = (g, c) => dx0(g) + c * DW + DW / 2;
+const dfloor = (r) => DY + (r + 1) * DH;
+const dcy = (r) => dfloor(r) - 9;
+
+const guardAt = (gd, t) => {
+  const [, x0, x1, sp, ph] = gd;
+  const w = x1 - x0, u = ((t * sp + ph) % 2);
+  return x0 + (u < 1 ? u : 2 - u) * w;
+};
+
+function dunInit(b) {
+  return { x: b.g.entry + .0, r: 0, mir: [], open: 0, alarm: 0, t: 0, win: 0, msg: 0 };
+}
+// The placed bucklers, in the shape beamTrace already expects.
+const dunBeam = (g, st) => beamTrace(
+  { cols: g.cols, rows: g.rows, entry: [g.entry, 0, 0, 1], target: g.target, blocks: g.blocks, mirrors: st.mir.map((m) => [m[0], m[1]]) },
+  st.mir.map((m) => m[2]),
+);
+const onShaft = (g, c, r) => g.shafts.some(([sc, sr]) => sc === c && sr === r);
+
+function dunUpdate(st, b, dt, input) {
+  const g = b.g;
+  st.t += dt;
+  st.msg = Math.max(0, st.msg - dt);
+  if (st.win) { st.win += dt; return st.win > 1; }
+
+  if (input.heldLeft) st.x -= 3.4 * dt;
+  if (input.heldRight) st.x += 3.4 * dt;
+  st.x = Math.max(0, Math.min(g.cols - 1, st.x));
+  const c = Math.round(st.x);
+  if (input.pressUp && st.r > 0 && onShaft(g, c, st.r)) { st.r--; sfxTap(); }
+  if (input.pressDown && st.r < g.rows - 1 && onShaft(g, c, st.r + 1)) { st.r++; sfxTap(); }
+
+  if (input.act) {
+    if (st.r === 0 && c === g.entry) {
+      // The shutter. One decision, and the guards get a vote.
+      st.open = 1;
+      const t = dunBeam(g, st);
+      const seen = (g.guards || []).some((gd) => {
+        const gx = Math.round(guardAt(gd, st.t));
+        return t.pts.some(([pc, pr]) => pr === gd[0] && pc === gx);
+      });
+      if (t.hit && !seen) { st.win = .01; kick(2); burst(dcx(g, g.target[0]), dcy(g.target[1]), 22, '#fff0a0', 100); }
+      else { st.open = 0; st.alarm++; st.msg = 2; kick(1.8); sfxNo(); }
+    } else {
+      const at = st.mir.findIndex((m) => m[0] === c && m[1] === st.r);
+      if (at < 0) {
+        if (st.mir.length < g.mirrors) { st.mir.push([c, st.r, 0]); sfxHit(); }
+        else { st.msg = 1.4; sfxNo(); }
+      } else if (st.mir[at][2] === 0) { st.mir[at][2] = 1; sfxHit(); }
+      else st.mir.splice(at, 1);
+    }
+  }
+
+  // Patrols. Touching one costs the climb, never the attempt.
+  for (const gd of g.guards || []) {
+    if (gd[0] === st.r && Math.abs(guardAt(gd, st.t) - st.x) < .6) {
+      st.r = 0;
+      st.x = g.entry;
+      st.alarm++;
+      kick(2);
+      sfxNo();
+      burst(dcx(g, c), dcy(gd[0]), 10, '#e8735a', 70);
+    }
+  }
+  return false;
+}
+
+function dunRender(st, b) {
+  const g = b.g, X = dx0(g);
+  rect(0, 16, 320, 110, { fill: '#0b0812' });
+  rect(X - 3, DY - 13, g.cols * DW + 6, g.rows * DH + 17, { fill: '#140f1e' });
+  // The sun, waiting on the roof.
+  const sunx = dcx(g, g.entry);
+  circle(sunx, DY - 16, 5, { fill: st.open ? '#fff6d8' : '#6a5a3a' });
+  for (let r = 0; r < g.rows; r++) {
+    const y = dfloor(r);
+    for (let c = 0; c < g.cols; c++) {
+      if (r < g.rows - 1 && onShaft(g, c, r + 1)) continue;
+      rect(X + c * DW, y, DW, 4, { fill: '#3a2f4e' });
+    }
+  }
+  for (const [c, r] of g.blocks || []) rect(dcx(g, c) - 8, dcy(r) - 8, 16, 16, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
+  if (st.open) {
+    const t = dunBeam(g, st);
+    for (let i = 1; i < t.pts.length; i++) {
+      const a = t.pts[i - 1], p = t.pts[i];
+      line(dcx(g, a[0]), dcy(a[1]), dcx(g, p[0]), dcy(p[1]), { stroke: '#fff0a0', lineWidth: 3 });
+    }
+    line(sunx, DY - 12, sunx, dcy(0), { stroke: '#fff0a0', lineWidth: 3 });
+  }
+  for (const [c, r, o] of st.mir) {
+    const x = dcx(g, c), y = dcy(r), d = 6;
+    line(x - d, y + (o ? -d : d), x + d, y + (o ? d : -d), { stroke: '#9fd4f0', lineWidth: 3 });
+  }
+  // Darkness, at the bottom of everything - his own portrait, shrunk,
+  // rather than a shape standing in for him.
+  paintFace('darkness', dcx(g, g.target[0]), dcy(g.target[1]) - 1, .17, st.t, false, false);
+  for (const gd of g.guards || []) {
+    const gx = dcx(g, guardAt(gd, st.t)), gy = dcy(gd[0]);
+    rect(gx - 3, gy - 6, 6, 13, { fill: '#2b2038' });
+    circle(gx, gy - 9, 3, { fill: '#4a3a5e' });
+    circle(gx + 5, gy - 2, 2, { fill: '#e8735a' });
+  }
+  const px = dcx(g, st.x), py = dcy(st.r);
+  rect(px - 2, py - 4, 5, 10, { fill: '#e8b923' });
+  circle(px, py - 7, 3, { fill: '#e8cdb0' });
+  strip();
+  text(`bucklers ${g.mirrors - st.mir.length}/${g.mirrors}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
+  if (st.msg > 0) text(st.alarm && st.msg > 1.4 ? 'seen! the shaft slams shut' : 'no bucklers left', 110, 11, { fill: '#e8735a', font: '8px system-ui' });
+  meter(258, 6, 52, st.alarm / 5, '#e8735a');
+}
+
 export const GAMES = {
+  dungeon: { init: dunInit, update: dunUpdate, render: dunRender, hint: '\u2190\u2192 walk   \u2191\u2193 climb   SPACE buckler, or open the shaft' },
   crack: { init: crackInit, update: crackUpdate, render: crackRender, hint: '← → choose a pane    SPACE strike' },
-  beam: { init: beamInit, update: beamUpdate, render: beamRender, hint: '← → pick a mirror    SPACE turn it - light every lantern' },
   lights: { init: lightsInit, update: lightsUpdate, render: lightsRender, hint: '← → choose    SPACE add to the order' },
-  chase: { init: chaseInit, update: chaseUpdate, render: chaseRender, hint: 'SPACE jumps the holes - but never under an arch' },
   stillness: { init: stillInit, update: stillUpdate, render: stillRender, hint: 'hold SPACE to creep closer - only while every head is down' },
 };

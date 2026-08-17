@@ -1,4 +1,4 @@
-import { initDraw, clear, rect, circle, text, wrap } from './draw.js';
+import { initDraw, ctx, clear, rect, circle, text, wrap } from './draw.js';
 import { SCENES, VEILS, RAINBOW } from './scenes.js';
 import { paintFace } from './faces.js';
 import { GAMES } from './games.js';
@@ -64,6 +64,41 @@ addEventListener('keyup', (e) => {
 canvas.addEventListener('pointerdown', () => { acted = heldAct = true; });
 canvas.addEventListener('pointerup', () => { heldAct = false; });
 
+// Beat changes were hard cuts - Darkness, then instantly a moonlit glade.
+// The outgoing frame is snapshotted the moment the beat changes and then
+// dissolved over the incoming one, dipping through dark at the midpoint so
+// two very different scenes cross without turning to mush.
+const TRANS = .5;
+const snap = document.createElement('canvas');
+snap.width = VW;
+snap.height = VH;
+const sctx = snap.getContext('2d');
+let lastKey = null, trans = 0;
+
+function cut(key) {
+  if (key === lastKey) return;
+  if (lastKey !== null) {
+    sctx.clearRect(0, 0, VW, VH);
+    sctx.drawImage(canvas, 0, 0);
+    trans = TRANS;
+  }
+  lastKey = key;
+}
+
+// Painted over the world layer but UNDER the text: dissolving two lines of
+// dialogue through each other reads as a rendering fault, not a
+// transition. Subtitles cut, scenery dissolves.
+function dissolve(dt) {
+  if (trans <= 0) return;
+  trans -= dt;
+  const p = Math.max(0, trans / TRANS);
+  rect(0, 0, VW, VH, { fill: `rgba(5,3,9,${Math.sin((1 - p) * Math.PI) * .55})` });
+  ctx.save();
+  ctx.globalAlpha = p;
+  ctx.drawImage(snap, 0, 0);
+  ctx.restore();
+}
+
 let mode = 'title';
 let round = null;
 let last = 0;
@@ -108,6 +143,14 @@ function paintHud(b) {
   return null;
 }
 
+// Who is talking, decided without drawing, so the portraits can animate a
+// mouth on a frame where the HUD has not been painted yet.
+function speaker(b) {
+  const line = round.phase === P.SUCCESS ? b.successDialogue?.[round.line]
+    : round.phase === P.DIALOGUE ? b.dialogue?.[round.line] : null;
+  return line?.who;
+}
+
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000 || 0);
   last = now;
@@ -117,11 +160,13 @@ function frame(now) {
   fxUpdate(dt);
 
   if (mode === 'title') {
+    cut('title');
     clear(VW, VH, '#0a0710');
     bloom(160, 120, now / 1000, 8, 3);
     text('THE SEVENTH COLOR', VW / 2, 68, { fill: '#e8b923', font: 'bold 16px system-ui', align: 'center' });
     text('tap or press space', VW / 2, 92, { fill: '#a89', font: '9px system-ui', align: 'center' });
     if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; }
+    dissolve(dt);
   } else {
     const before = round.phase;
     tick(round, dt, { act: doAct, pressLeft: doLeft, pressRight: doRight, heldLeft, heldRight, heldAct });
@@ -131,6 +176,7 @@ function frame(now) {
     // phase is reading a row that no longer applies. Harmless while every
     // beat carried dialogue; a crash the moment one did not.
     const b = currentBeat(round);
+    cut(round.phase === P.END ? 'end' : b.id);
     setMusic(b.music);
     if (before === P.GAME && round.phase !== P.GAME) sfxWin();
 
@@ -157,29 +203,29 @@ function frame(now) {
         for (const f of b.faces) paintFace(f.key, f.x, f.y, f.scale, round.elapsed, false, false);
         rect(0, 0, VW, VH, { fill: `rgba(6,4,10,${.55 * fade})` });
       }
+      fxEnd();
+      dissolve(dt);
       const lines = wrap(cs.lines[i], 296, NARRATE);
       box(108, 36);
       lines.forEach((l, k) => text(l, VW / 2, (lines.length > 1 ? 122 : 128) + k * 12, { fill: `rgba(243,234,214,${fade})`, font: NARRATE, align: 'center' }));
       if (local > .9) text('>', VW - 12, 150, { fill: '#5f5648', font: '8px system-ui', align: 'center' });
-      fxEnd();
       if (doAct) { press(round); sfxTap(); }
-      requestAnimationFrame(frame);
-      return;
+      return requestAnimationFrame(frame);
     }
 
     if (round.phase === P.END) {
       SCENES[b.bg](round.elapsed);
+      dissolve(dt);
       bloom(160, 58, round.elapsed, 12, 5);
       text('THE SEVENTH COLOR', VW / 2, 70, { fill: '#e8b923', font: 'bold 15px system-ui', align: 'center' });
       text('tap or press space', VW / 2, 108, { fill: '#eee', font: '9px system-ui', align: 'center' });
       if (doAct) mode = 'title';
-      requestAnimationFrame(frame);
-      return;
+      return requestAnimationFrame(frame);
     }
 
     fxBegin();
     SCENES[b.bg](round.elapsed);
-    const talker = paintHud(b);
+    const talker = speaker(b);
     // The horn returns as the mechanic's actual payoff, not a fixed
     // decoration: hornless through this beat's dialogue and its game
     // phase, restored only once that game resolves into SUCCESS. Beats
@@ -196,6 +242,8 @@ function frame(now) {
     }
     if (round.phase === P.GAME) GAMES[b.game].render(round.g, b, round.elapsed);
     fxEnd();
+    dissolve(dt);
+    paintHud(b);
 
     if (round.phase === P.CHOICE) {
       if (doLeft) moveChoice(round, -1);

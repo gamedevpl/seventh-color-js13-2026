@@ -379,6 +379,7 @@ function dunRender(st, b) {
     for (let c = 0; c < g.cols; c++) {
       if (r < g.rows - 1 && onShaft(g, c, r + 1)) continue;
       rect(X + c * DW, y, DW, 4, { fill: '#3a2f4e' });
+      line(X + c * DW, y, X + c * DW, y + 4, { stroke: '#241c30', lineWidth: 1 });
     }
   }
   for (const [c, r] of g.shafts) {
@@ -391,6 +392,13 @@ function dunRender(st, b) {
     rect(dcx(g, x0) - DW / 2, dfloor(g, gr) - 3, (x1 - x0) * DW + DW, 2, { fill: '#4a2a2a99' });
   }
   for (const [c, r] of g.blocks || []) rect(dcx(g, c) - 8, dcy(g, r) - 8, 16, 16, { fill: '#241c30', stroke: '#4a3a5e', lineWidth: 1 });
+  for (let i = 0; i < 3; i++) {
+    const tx = X - 10 + i * (g.cols * DW + 20) / 2, ty = dy0(g) + 6 + (i % 2) * (g.rows * DH - 10);
+    const flick = .6 + Math.sin(st.t * 9 + i * 4) * .2 + Math.sin(st.t * 23 + i) * .1;
+    circle(tx, ty, 10 * flick, { fill: `rgba(232,140,60,${.1 * flick})` });
+    poly([tx - 2, ty + 4, tx + 2, ty + 4, tx + 1, ty - 3 * flick, tx, ty - 6 * flick, tx - 1, ty - 3 * flick], { fill: '#e8a84a' });
+    rect(tx - 3, ty + 4, 6, 3, { fill: '#241c30' });
+  }
   const t = dunBeam(g, st);
   const lit = st.open ? '#fff0a0' : t.hit ? '#c9a94e' : '#6b5a2e';
   const reach = st.open ? Math.ceil(st.sweep * t.pts.length) : t.pts.length;
@@ -410,7 +418,9 @@ function dunRender(st, b) {
   }
   for (const [c, r, o, jostled] of st.mir) {
     const x = dcx(g, c), y = dcy(g, r), d = 6;
-    line(x - d, y + (o ? -d : d), x + d, y + (o ? d : -d), { stroke: jostled ? '#e8735a' : '#9fd4f0', lineWidth: 3 });
+    const onPath = t.hit && t.pts.some(([pc, pr]) => pc === c && pr === r);
+    if (onPath) circle(x, y, 9, { fill: '#fff0a022' });
+    line(x - d, y + (o ? -d : d), x + d, y + (o ? d : -d), { stroke: jostled ? '#e8735a' : onPath ? '#fff0a0' : '#9fd4f0', lineWidth: 3 });
   }
   // Darkness, at the bottom of everything - his own portrait, shrunk,
   // rather than a shape standing in for him.
@@ -419,13 +429,16 @@ function dunRender(st, b) {
   paintFace(g.face || 'darkness', tgx, tgy - 1, g.faceScale || .17, st.t, false, false);
   for (const gd of g.guards || []) {
     const gx = dcx(g, guardAt(gd, st.t, st.alarm)), gy = dcy(g, gd[0]);
-    rect(gx - 3, gy - 6, 6, 13, { fill: '#2b2038' });
-    circle(gx, gy - 9, 3, { fill: '#4a3a5e' });
-    circle(gx + 5, gy - 2, 2, { fill: '#e8735a' });
+    // The catch radius, drawn rather than hidden - a hazard the player
+    // cannot see the edge of isn't a hazard, it's a surprise.
+    circle(gx, gy - 3, .6 * DW, { fill: '#7a2a2a22', stroke: '#7a2a2a55', lineWidth: 1 });
+    poly([gx, gy - 17, gx - 6, gy - 4, gx - 4, gy + 6, gx + 4, gy + 6, gx + 6, gy - 4], { fill: '#241a30', stroke: '#120c1c', lineWidth: 1 });
+    poly([gx - 4, gy - 8, gx, gy - 15, gx + 4, gy - 8], { fill: '#2e2140' });
+    circle(gx + 3, gy - 9, 1.4, { fill: '#e8735a' });
   }
   const px = dcx(g, st.x), py = dcy(g, st.r);
-  rect(px - 2, py - 4, 5, 10, { fill: '#e8b923' });
-  circle(px, py - 7, 3, { fill: '#e8cdb0' });
+  line(px, py - 6, px, py + 2, { stroke: '#4a3626', lineWidth: 3 });
+  paintFace('jack', px, py - 9, .13, st.t, false, false);
   strip();
   if (st.open) meter(10, 6, 300, st.sweep, '#fff0a0');
   else if (st.lock > 0) meter(10, 6, 300 * (st.lock / 2), 1, '#5a4a3a');

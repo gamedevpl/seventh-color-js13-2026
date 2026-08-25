@@ -5,7 +5,7 @@
 // bursts free of empty hooves. Corkscrews roll the world, the camera rolls
 // with it, and the score tells you how close you are before your eyes do.
 
-import { initGL, frameGL, additive, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, modelFrame, IDENT, pushBox } from './gl.js';
+import { initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, modelFrame, IDENT, pushBox } from './gl.js';
 import { S, genGraph, bfs } from './maze.js';
 import { trackMeshes, makeRider, ride, nbrs, behind, ahead, frame as tframe } from './track.js';
 import { unicornMesh, headMesh, PIVOT, RAINBOW } from './uni.js';
@@ -382,11 +382,11 @@ function frame(now) {
   // turn and the lag flings the camera off the track. This is rigid, so the
   // roll is exact and the channel always frames the shot.
   // high must clear the banked lips (1.5) or they wall the view off.
-  const high = 2.35 - speedSm * .2;
+  const high = 2.0 - speedSm * .15;
   lean += (turnDir() * .1 - lean) * Math.min(1, dt * 4);
   const sideL = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]];
-  const bf = player.r && player.r.b ? behind(g, player.r, 1.9 + speedSm * .7) : null;
-  const bp = bf ? bf[0] : [p[0] - T[0] * 1.9, p[1] - T[1] * 1.9, p[2] - T[2] * 1.9];
+  const bf = player.r && player.r.b ? behind(g, player.r, 2.3 + speedSm * .7) : null;
+  const bp = bf ? bf[0] : [p[0] - T[0] * 2.3, p[1] - T[1] * 2.3, p[2] - T[2] * 2.3];
   // Sit at the point behind, but lift along the RIDER's up, not that
   // point's. Mid-corkscrew the two are rolled apart by a big angle, and
   // lifting along the trailing point's up walks the camera around the tube
@@ -442,7 +442,6 @@ function frame(now) {
 
   if (mode !== 'title') {
     drawMesh(groundM, IDENT);
-    drawMesh(roadM, IDENT);
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
     const sideV = sideL;
     const S8 = .85, lx = player.lane * 2;
@@ -472,7 +471,10 @@ function frame(now) {
       base[2] + (sideV[2] * PIVOT[0] + up[2] * PIVOT[1] + T[2] * PIVOT[2]) * S8,
     ];
     drawMesh(headM, modelFrame(hp, fX, hY, fZ, S8));
-    additive(true);
+    // Deck after the solids so it blends over them, before the glow.
+    glMode(2);
+    drawMesh(roadM, IDENT);
+    glMode(1);
     drawMesh(railM, IDENT);
     drawMesh(braidM, IDENT);
     // hoof wake, stretched by speed - the visual receipt for the throttle
@@ -499,7 +501,7 @@ function frame(now) {
         drawMesh(markM, modelTR(mp[0], mp[1], mp[2], now / 180, .8 + Math.sin(now / 90) * .2));
       }
     }
-    additive(false);
+    glMode(0);
   }
 
   // --- HUD ----------------------------------------------------------------

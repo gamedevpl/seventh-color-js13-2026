@@ -22,7 +22,7 @@ vc=c*mix(l,1.,add);va=a;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,add),0.,1.
 const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
 uniform vec3 fog;uniform float add;
 void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
-else gl_FragColor=vec4(mix(vc,fog,vf),1.);}`;
+else gl_FragColor=vec4(mix(vc,fog,vf),va);}`;
 
 let prog, loc = {};
 
@@ -43,11 +43,10 @@ export function initGL(c) {
   for (const u of ['vp', 'md', 'cam', 'fog', 'add']) loc[u] = gl.getUniformLocation(prog, u);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 }
 
 export function frameGL(vp, cam, fog) {
-  additive(false);
+  mode(0);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(fog[0], fog[1], fog[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -56,13 +55,20 @@ export function frameGL(vp, cam, fog) {
   gl.uniform3fv(loc.fog, fog);
 }
 
-// Switch materials. Additive also drops depth WRITES while keeping the depth
-// TEST, so glow layers still hide behind walls but never occlude each other -
-// they sum, which is the whole bloom effect.
-export function additive(on) {
-  gl.uniform1f(loc.add, on ? 1 : 0);
-  if (on) { gl.enable(gl.BLEND); gl.depthMask(false); }
-  else { gl.disable(gl.BLEND); gl.depthMask(true); }
+// Three materials, one program.
+//   0 SOLID  lambert + fog, opaque, writes depth.
+//   1 GLOW   emissive, additive, depth TEST but no depth WRITE - glow layers
+//            still hide behind solid things but never occlude each other,
+//            they sum, and that summing is the bloom.
+//   2 GLASS  lambert + fog like solid, but alpha-blended and writing no
+//            depth, so overlapping pieces of track stack up and you can see
+//            the rest of the net through the deck you are riding.
+export function mode(m) {
+  gl.uniform1f(loc.add, m === 1 ? 1 : 0);
+  if (!m) { gl.disable(gl.BLEND); gl.depthMask(true); return; }
+  gl.enable(gl.BLEND);
+  gl.depthMask(false);
+  gl.blendFunc(gl.SRC_ALPHA, m === 1 ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
 }
 
 // Interleaved pos3/normal3/color3/alpha1. `dynamic` meshes re-upload each

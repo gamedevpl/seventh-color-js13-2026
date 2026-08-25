@@ -238,6 +238,30 @@ And corkscrews went from one edge in four to one in seven: a 360-degree
 roll inside a one-second segment is a ~350 deg/s spin, which is a showpiece,
 not a texture.
 
+## Design notes, S7 - the deck is glass, not a gutter
+
+The banked channel from S4 read as a gutter you sit inside, and a gutter
+walls the view off: the entire point of a net of ribbons hung in the sky is
+seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
+
+- **The profile is flat**, one token raised rim instead of walls.
+- **The deck is a third material.** The shader's solid path now honours the
+  per-vertex alpha, so one program covers a new GLASS mode: lambert and fog
+  like a solid, but alpha-blended and writing no depth. Overlapping pieces
+  of track therefore stack instead of occluding, and the track ahead, below
+  and overhead all read through the one you are riding. Draw order is
+  solids, then the deck (so it blends over the unicorn it passes in front
+  of), then the glow.
+- **The neon edge rails carry the shape now.** With the deck a faint sheet,
+  a bright line down each side is what makes the track legible at speed;
+  they sit 0.26 up instead of 1.5, high enough to catch the eye and too low
+  to be a wall.
+- Junction beacons went thin (0.22 wide, alpha 0.16) - against a
+  transparent deck the old gold fans dominated every frame.
+- And with no lips to clear, the camera finally drops to where it was
+  wanted all along: 2.0 above the rails instead of 2.35, close behind the
+  head.
+
 ## Milestone log
 
 | gate | ceiling | worst-of-5 | notes |
@@ -248,7 +272,8 @@ not a texture.
 | S3 corkscrews & colours | 9,500 | 7,734 | full-roll corkscrews + rolling camera, speed blur, rainbow-key collection |
 | S4 wipeout channel | 9,500 | 8,223 | on-rails camera behind the head, banked channel, animated head, colour fix |
 | S5 flow | 9,500 | 8,541 | arc-length motion, stabilised tangents, lane-based forks |
-| S6 smoothness | 9,800 | 8,763 | live camera probe; aim walks past nodes, spring easing, low-passed FOV |
+| S6 smoothness | 9,800 | 8,763 |
+| S7 glass deck | 9,800 | 8,786 | flat translucent deck, neon edge rails, open sightlines | live camera probe; aim walks past nodes, spring easing, low-passed FOV |
 
 Bugs caught by looking at S0 screenshots, not by the harness: the
 hand-rolled `lookAt` used `z×up` instead of `up×z` and rendered the world

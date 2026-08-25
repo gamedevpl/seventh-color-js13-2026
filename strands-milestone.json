@@ -1,5 +1,5 @@
 {
-  "name": "S6 smoothness",
-  "description": "live camera probe; aim walks past nodes, spring easing, low-passed FOV",
+  "name": "S7 glass deck",
+  "description": "flat translucent deck, neon edge rails, open sightlines",
   "ceilingBytes": 9800
 }

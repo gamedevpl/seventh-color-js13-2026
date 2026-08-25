@@ -206,18 +206,21 @@ export function frame(g, a, b, t) {
 // Solid road + additive neon. Each edge's rails carry ONE rainbow colour
 // picked by a hash of its endpoints: the colours are landmarks - "the braid
 // went down the green track" is how the player learns the knots.
-// Wipeout cross-section, not a coaster plank: a crowned centre falling to
-// banked lips that curl UP at the edges, so the track reads as a channel
-// you are held inside. Profile is (across, up) offsets from the frame -
-// one data row per rib, and the builder just walks pairs.
+// A FLAT deck, not a gutter. High banked lips made the track a channel you
+// sat inside, and a channel walls off the view: the whole point of a net of
+// ribbons in the sky is seeing the rest of it, and lips 1.5 units tall hid
+// exactly that. The profile is nearly flat now with only a token raised
+// edge, and the deck is drawn as GLASS - alpha-blended, no depth write - so
+// the track ahead, below and overhead all read through the one you ride.
+// Profile is (across, up) offsets from the frame, one data row per rib.
 const PROFILE = [
-  [-3.4, 1.5], [-3.0, .55], [-2.3, .1], [-1.1, -.04], [0, -.1],
-  [1.1, -.04], [2.3, .1], [3.0, .55], [3.4, 1.5],
+  [-3.6, .26], [-3.25, .06], [-2.4, 0], [0, -.02], [2.4, 0], [3.25, .06], [3.6, .26],
 ];
+const DECK_A = .45;
 
 export function trackMeshes(g) {
   const road = [], rail = [];
-  const W = 3.4, K = 8;
+  const W = 3.6, K = 8;
   const quad = (arr, a, b, c, d, nrm, col, al) => {
     for (const q of [a, b, c, a, c, d]) {
       arr.push(q[0], q[1], q[2], nrm[0], nrm[1], nrm[2], col[0], col[1], col[2], al);
@@ -237,20 +240,23 @@ export function trackMeshes(g) {
         // deck: one strip per profile rib pair, darker toward the lips
         for (let j = 0; j < PROFILE.length - 1; j++) {
           const [w0, u0] = PROFILE[j], [w1, u1] = PROFILE[j + 1];
-          // Lips catch more light than the deck - that shading is what
-          // makes the channel read as a channel at speed.
-          const lip = Math.abs(w0) > 2.2 ? 1.9 : 1;
+          // The rim still catches more light - it is what gives a
+          // half-transparent sheet a readable edge at speed.
+          const lip = Math.abs(w0) > 2.3 ? 2.1 : 1;
           quad(road,
             at(pp, ps, pu, w0, u0), at(pp, ps, pu, w1, u1),
             at(cp, cs, cu, w1, u1), at(cp, cs, cu, w0, u0),
-            cu, [.26 * lip, .24 * lip, .38 * lip], 1);
+            cu, [.3 * lip, .28 * lip, .46 * lip], lip > 1 ? .85 : DECK_A);
         }
         // neon strip along the top of each lip, plus a centre spine line
+        // Neon edge rails: with the deck now a faint sheet, these ARE the
+        // track's readable shape - a bright line each side, raised just
+        // enough to catch the eye without becoming a wall again.
         for (const e of [-1, 1]) {
           quad(rail,
-            at(pp, ps, pu, W * e, 1.5), at(cp, cs, cu, W * e, 1.5),
-            at(cp, cs, cu, W * e, 1.9), at(pp, ps, pu, W * e, 1.9),
-            [0, 1, 0], rc, .6);
+            at(pp, ps, pu, W * e, .26), at(cp, cs, cu, W * e, .26),
+            at(cp, cs, cu, W * e, .62), at(pp, ps, pu, W * e, .62),
+            [0, 1, 0], rc, .75);
         }
         // dashed centre line: every other sample, so speed has a metronome
         if (k % 2) {
@@ -268,14 +274,14 @@ export function trackMeshes(g) {
   // question "which of those gates does it flow through?"
   for (let x = 0; x < g.n; x++) for (let z = 0; z < g.n; z++) {
     if (nbrs(g, x, z).length < 3) continue;
-    const [px, py, pz] = g.pos[x][z], R = .4, H = 7;
+    const [px, py, pz] = g.pos[x][z], R = .22, H = 4.5;
     for (const [ux, uz] of [[1, 0], [0, 1]]) for (const e of [-1, 1]) {
       quad(rail,
         [px, py + .1, pz],
         [px + ux * R * e, py + .1, pz + uz * R * e],
         [px + ux * R * e, py + H, pz + uz * R * e],
         [px, py + H, pz],
-        [0, 1, 0], [1.2, 1, .55], .3);
+        [0, 1, 0], [1.2, 1, .55], .16);
     }
   }
   return { road, rail };

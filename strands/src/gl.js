@@ -18,7 +18,7 @@ const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform ve
 uniform mediump float add;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
 float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
-vc=c*mix(l,1.,add);va=a;vf=clamp((length(w.xyz-cam)-7.)/20.,0.,1.);}`;
+vc=c*mix(l,1.,add);va=a;vf=clamp((length(w.xyz-cam)-12.)/58.,0.,1.);}`;
 const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
 uniform vec3 fog;uniform float add;
 void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf));
@@ -126,10 +126,17 @@ export function mul(a, b) {
   return o;
 }
 
-// translate * rotateY - the only model transform anything here needs.
-export function modelTR(x, y, z, yaw = 0, s = 1) {
-  const c = Math.cos(yaw) * s, si = Math.sin(yaw) * s;
-  return [c, 0, -si, 0, 0, s, 0, 0, si, 0, c, 0, x, y, z, 1];
+// translate * rotateY * rotateX - yaw steers, pitch noses the rider into
+// dives and climbs. Positive pitch tips the +z nose downward.
+export function modelTR(x, y, z, yaw = 0, s = 1, pitch = 0) {
+  const cy = Math.cos(yaw) * s, sy = Math.sin(yaw) * s;
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  return [
+    cy, 0, -sy, 0,
+    sy * sp, cp * s, cy * sp, 0,
+    sy * cp, -sp * s, cy * cp, 0,
+    x, y, z, 1,
+  ];
 }
 
 // Axis-aligned box into an interleaved array: center, full sizes, color.

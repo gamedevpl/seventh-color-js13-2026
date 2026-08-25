@@ -1,5 +1,5 @@
 {
-  "name": "S0",
-  "description": "3D TPP maze chase boot: maze + unicorn + fleeing braid, first playable",
-  "ceilingBytes": 6500
+  "name": "S2 wipeout pivot",
+  "description": "coaster-net chase: braided maze as 3D track graph, rails, forks, adaptive score",
+  "ceilingBytes": 9500
 }

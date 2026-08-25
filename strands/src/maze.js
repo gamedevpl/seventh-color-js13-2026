@@ -1,15 +1,16 @@
-// The labyrinth: recursive-backtracker generation, box geometry, circle
-// collision, and BFS distances - all against one wall list, so what the
-// player collides with is exactly what they see and exactly what the
-// braid's flee logic reasons about. One source of truth, three consumers.
+// The labyrinth, lifted into the sky: the same recursive backtracker as
+// before, but its cells are now NODES of a rollercoaster network and its
+// corridors are track segments. Two post-passes turn the spanning tree into
+// a racing circuit: braiding (every dead end gets a second exit - a racer
+// at speed can never be forced into a three-point turn) and a few extra
+// knocked walls, so routes loop and rejoin and the same junction can be
+// entered from three sides. One graph feeds geometry, movement and the
+// braid's flee logic alike.
 
-import { pushBox } from './gl.js';
+export const S = 14;                          // node spacing in world units
+export const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-export const S = 2;          // cell size in world units
-const T = .34;               // wall thickness
-const H = 1.5;               // wall height
-
-export function genMaze(n) {
+export function genGraph(n) {
   // right[x][z]: wall between (x,z) and (x+1,z). bot[x][z]: to (x,z+1).
   const right = [], bot = [], seen = [];
   for (let x = 0; x < n; x++) {
@@ -36,19 +37,6 @@ export function genMaze(n) {
     stack.push([x + dx, z + dz]);
   }
 
-  // Wall boxes: geometry AND collision AND nothing else ever re-derives them.
-  const walls = [];
-  const wall = (cx, cz, hx, hz) => walls.push({ x: cx, z: cz, hx, hz });
-  for (let x = 0; x < n; x++) for (let z = 0; z < n; z++) {
-    if (right[x][z] && x < n - 1) wall((x + 1) * S, (z + .5) * S, T / 2, S / 2 + T / 2);
-    if (bot[x][z] && z < n - 1) wall((x + .5) * S, (z + 1) * S, S / 2 + T / 2, T / 2);
-  }
-  const L = n * S;
-  wall(0, L / 2, T / 2, L / 2 + T / 2);
-  wall(L, L / 2, T / 2, L / 2 + T / 2);
-  wall(L / 2, 0, L / 2 + T / 2, T / 2);
-  wall(L / 2, L, L / 2 + T / 2, T / 2);
-
   const open = (x, z, dx, dz) => {
     const nx = x + dx, nz = z + dz;
     if (nx < 0 || nz < 0 || nx >= n || nz >= n) return false;
@@ -57,52 +45,83 @@ export function genMaze(n) {
     if (dz === 1) return !bot[x][z];
     return !bot[x][nz];
   };
+  const knock = (x, z, dx, dz) => {
+    if (dx === 1) right[x][z] = false;
+    else if (dx === -1) right[x - 1][z] = false;
+    else if (dz === 1) bot[x][z] = false;
+    else bot[x][z - 1] = false;
+  };
+  const closed = (x, z) => DIRS.filter(([dx, dz]) =>
+    x + dx >= 0 && z + dz >= 0 && x + dx < n && z + dz < n && !open(x, z, dx, dz));
 
-  return { n, walls, open };
+  // Braiding: no dead end survives. Then extra loops for route ambiguity -
+  // the "which fork actually leads there" question IS the game.
+  for (let x = 0; x < n; x++) for (let z = 0; z < n; z++) {
+    if (DIRS.filter(([dx, dz]) => open(x, z, dx, dz)).length === 1) {
+      const c = closed(x, z);
+      if (c.length) knock(x, z, ...c[Math.floor(Math.random() * c.length)]);
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    const x = Math.floor(Math.random() * n), z = Math.floor(Math.random() * n);
+    const c = closed(x, z);
+    if (c.length) knock(x, z, ...c[Math.floor(Math.random() * c.length)]);
+  }
+
+  // Node positions: jittered grid + a big swooping height field, so every
+  // corridor is a climb or a dive and the net reads as a coaster, not a floor.
+  const p1 = Math.random() * 9, p2 = Math.random() * 9;
+  const pos = [];
+  for (let x = 0; x < n; x++) {
+    pos.push([]);
+    for (let z = 0; z < n; z++) {
+      pos[x].push([
+        (x + .5) * S + (Math.random() - .5) * S * .3,
+        7 * Math.sin(x * 1.05 + p1) * Math.cos(z * .85 + p2) + (Math.random() - .5) * 2.4,
+        (z + .5) * S + (Math.random() - .5) * S * .3,
+      ]);
+    }
+  }
+
+  // Per-node through-axis: the two most opposite neighbours define the flow
+  // direction. Hermite tangents sign-align to it per edge, so track flows
+  // smoothly THROUGH junctions instead of kinking at them.
+  const axis = [];
+  for (let x = 0; x < n; x++) {
+    axis.push([]);
+    for (let z = 0; z < n; z++) {
+      const ds = [];
+      for (const [dx, dz] of DIRS) if (open(x, z, dx, dz)) {
+        const q = pos[x + dx][z + dz], p = pos[x][z];
+        const v = [q[0] - p[0], q[1] - p[1], q[2] - p[2]];
+        const l = Math.hypot(...v);
+        ds.push([v[0] / l, v[1] / l, v[2] / l]);
+      }
+      let a = ds[0] || [1, 0, 0];
+      if (ds.length > 1) {
+        let bd = 2;
+        for (let i = 0; i < ds.length; i++) for (let j = i + 1; j < ds.length; j++) {
+          const d = ds[i][0] * ds[j][0] + ds[i][1] * ds[j][1] + ds[i][2] * ds[j][2];
+          if (d < bd) { bd = d; a = [ds[i][0] - ds[j][0], ds[i][1] - ds[j][1], ds[i][2] - ds[j][2]]; }
+        }
+        const l = Math.hypot(...a) || 1;
+        a = [a[0] / l, a[1] / l, a[2] / l];
+      }
+      axis[x].push(a);
+    }
+  }
+
+  return { n, open, pos, axis };
 }
 
-export function mazeMesh(m) {
-  const v = [];
-  const L = m.n * S;
-  // Night ground far past the walls, so a camera peeking over the outer
-  // boundary sees dark moor instead of the void.
-  pushBox(v, L / 2, -.3, L / 2, L * 5, .1, L * 5, .05, .045, .09);
-  // Checkered floor - two mossy greens so motion reads even in a bare hall.
-  for (let x = 0; x < m.n; x++) for (let z = 0; z < m.n; z++) {
-    const g = (x + z) % 2 ? [.12, .23, .16] : [.10, .19, .14];
-    pushBox(v, (x + .5) * S, -.05, (z + .5) * S, S, .1, S, ...g);
-  }
-  for (const w of m.walls) {
-    pushBox(v, w.x, H / 2, w.z, w.hx * 2, H, w.hz * 2, .21, .16, .30);
-    // A pale cap line so wall tops read against the fog from above.
-    pushBox(v, w.x, H + .02, w.z, w.hx * 2, .06, w.hz * 2, .38, .30, .50);
-  }
-  // Rainbow gate marks the braid's starting corner - set dressing, no logic.
-  return v;
-}
-
-// Push a circle of radius r out of every wall box it overlaps.
-export function collide(m, x, z, r) {
-  for (const w of m.walls) {
-    const dx = x - Math.max(w.x - w.hx, Math.min(x, w.x + w.hx));
-    const dz = z - Math.max(w.z - w.hz, Math.min(z, w.z + w.hz));
-    const d2 = dx * dx + dz * dz;
-    if (d2 >= r * r || d2 === 0) continue;
-    const d = Math.sqrt(d2), push = (r - d) / d;
-    x += dx * push;
-    z += dz * push;
-  }
-  return [x, z];
-}
-
-export function bfs(m, sx, sz) {
-  const dist = Array.from({ length: m.n }, () => Array(m.n).fill(-1));
+export function bfs(g, sx, sz) {
+  const dist = Array.from({ length: g.n }, () => Array(g.n).fill(-1));
   const q = [[sx, sz]];
   dist[sx][sz] = 0;
   for (let i = 0; i < q.length; i++) {
     const [x, z] = q[i];
-    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      if (m.open(x, z, dx, dz) && dist[x + dx][z + dz] < 0) {
+    for (const [dx, dz] of DIRS) {
+      if (g.open(x, z, dx, dz) && dist[x + dx][z + dz] < 0) {
         dist[x + dx][z + dz] = dist[x][z] + 1;
         q.push([x + dx, z + dz]);
       }

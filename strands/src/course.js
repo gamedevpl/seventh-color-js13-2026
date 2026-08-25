@@ -41,32 +41,56 @@ export function makeCourse(count) {
   // The first stretch is always gentle - a runway to learn the throttle on.
   for (let i = 0; i < 6; i++) step(rnd(-.14, .14), rnd(-.05, .05), S);
 
+  // The run has a SHAPE. Sections used to be drawn uniformly for the whole
+  // two minutes, which makes a course with no memory: the last minute is
+  // exactly as hard as the first, so nothing builds and nothing pays off.
+  // Now the mix ramps - cruise gives way to demands, corkscrews and gaps
+  // arrive more often, and the minimum speeds tighten as you go.
   while (nodes.length < count) {
-    const r = Math.random();
-    if (r < .26) {                                  // cruise
-      const L = 4 + (Math.random() * 4 | 0);
+    const prog = nodes.length / count;                  // 0 at the gate, 1 at the end
+    const hard = Math.min(1, prog * 1.25);
+    const rq = (base, top) => Math.round(base + (top - base) * hard);
+    // weights: cruise, serpentine, dive, climb, gap, corkscrew
+    const W = [
+      .40 - .32 * hard,
+      .19 + .09 * hard,
+      .15 - .04 * hard,
+      .09 - .04 * hard,
+      .14 + .07 * hard,
+      .02 + .34 * hard,     // the signature move, but EARNED: near-absent at
+                            // the gate, everywhere by the end. Seeding it
+                            // from the start just moved the difficulty
+                            // forward instead of building it.
+    ];
+    let r = Math.random() * W.reduce((a, b) => a + b, 0), pick = 0;
+    while (pick < 5 && r > W[pick]) { r -= W[pick]; pick++; }
+    if (nodes.length > count - 8) pick = 0;             // land the ending calmly
+
+    if (pick === 0) {                                   // cruise
+      const L = 3 + (Math.random() * 4 | 0);
       for (let i = 0; i < L; i++) step(rnd(-.2, .2), rnd(-.07, .07), S);
-    } else if (r < .46) {                           // serpentine: carry speed or slide off
-      const L = 5 + (Math.random() * 4 | 0);
+    } else if (pick === 1) {                            // serpentine
+      const L = 4 + (Math.random() * 4 | 0);
       let sgn = Math.random() < .5 ? 1 : -1;
+      const amp = .34 + .22 * hard;
       for (let i = 0; i < L; i++) {
-        step(sgn * rnd(.38, .55), rnd(-.04, .04), S * .9, false, 20);
+        step(sgn * rnd(amp, amp + .18), rnd(-.04, .04), S * .9, false, rq(18, 25));
         if (i % 2) sgn = -sgn;
       }
-    } else if (r < .60) {                           // dive: free speed
+    } else if (pick === 2) {                            // dive: free speed
       const L = 3 + (Math.random() * 3 | 0);
       for (let i = 0; i < L; i++) step(rnd(-.15, .15), -.16, S);
       step(rnd(-.1, .1), .1, S);
-    } else if (r < .66) {                           // climb: it costs you
+    } else if (pick === 3) {                            // climb: it costs you
       const L = 2 + (Math.random() * 2 | 0);
       for (let i = 0; i < L; i++) step(rnd(-.12, .12), .14, S * .9);
-    } else if (r < .88) {                           // the gap: jump it
-      step(rnd(-.08, .08), .02, S, false, 0);
-      step(0, .04, S * .8, true, 0);
-      step(0, -.02, S, false, 0);
-    } else {                                        // corkscrew: speed or fall
+    } else if (pick === 4) {                            // the gap
+      step(rnd(-.08, .08), .02, S);
+      step(0, .04, S * .8, true);
+      step(0, -.02, S);
+    } else {                                            // corkscrew
       step(rnd(-.1, .1), 0, S);
-      step(rnd(-.12, .12), 0, S * 1.1, false, 23, true);
+      step(rnd(-.12, .12), 0, S * 1.1, false, rq(21, 28), true);
       step(rnd(-.1, .1), 0, S);
     }
   }

@@ -59,6 +59,40 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R4 - the run gets a shape, and beating it gets a reason
+
+Two measurements drove this pass. First, the course had **no memory**: its
+sections were drawn from a flat distribution for the whole run, so the last
+minute was exactly as hard as the first - nothing built, nothing paid off.
+The section mix now ramps with progress, and the minimum speeds ramp with
+it (serpentines 18 -> 25, corkscrews 21 -> 28). Measured over 25 courses,
+per 100 nodes: corkscrews 2.6 early -> 7.1 late, demand nodes 28 -> 40.
+
+Second, the **corkscrew - the signature move - showed up once every 27
+seconds**. It is now roughly every 15, but earned: its weight starts near
+zero at the gate and is the single most likely section by the end. Seeding
+it from the start (the first attempt) just moved the difficulty forward
+instead of building it - the balance probe caught that immediately, with
+falls tripling and the rainbow caught in 19% of frames instead of 44%.
+
+Run length went 170 -> 120 nodes, about 90 seconds instead of 134: a
+score-chase run should end while you still want another one, and a shorter
+line makes the ramp felt rather than merely present.
+
+And the meta layer, because in a score game the end screen IS the reason to
+press the button again:
+
+- **The best run persists** through `localStorage`, read and written inside
+  try/catch - a private window or blocked site data must not take the game
+  down with it, and file:// origins refuse storage outright.
+- **The end screen** leads with the score at 52px, marks NEW BEST, and
+  breaks the run into the three things you can get better at: longest
+  single burn, jumps landed, falls.
+- **A progress bar** for the line itself, so the run has a visible middle.
+- **The score runs on stardust too**: an empty tank strips the arp and most
+  of the hats out of the mix and drops a low pulse under it, so you hear
+  the fuel gauge before you look at it.
+
 ## R3 - two sign bugs, and the economy tuned against measurement
 
 Three of the complaints ("left arrow moves it right", "it goes under the

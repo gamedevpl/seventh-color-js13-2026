@@ -85,15 +85,18 @@ const BASS = [0, 0, 12, 0, 3, 3, 15, 3, 5, 5, 17, 5, 7, 7, 10, 3];
 const LEAD = [24, 22, 19, 17, 15, 17, 19, 22, 12, 15, 17, 19, 22, 24, 27, 24,
   19, 17, 15, 12, 10, 12, 15, 17, 19, 17, 15, 12, 15, 19, 22, 24];
 let nextT = 0, step = 0;
-function pump(speedN, closeN) {
+function pump(speedN, closeN, dry) {
   if (!ac) return;
   if (nextT < ac.currentTime) nextT = ac.currentTime + .05;
   while (nextT < ac.currentTime + .16) {
     const s = step % 32;
     if (s % 4 === 0) { kick(nextT); beat = 1; }
-    if (s % 4 === 2) tone(6200, .03, 'square', .012 + speedN * .035, nextT);
+    if (s % 4 === 2) tone(6200, .03, 'square', (.012 + speedN * .035) * (dry ? .25 : 1), nextT);
     if (s % 2 === 0) tone(NOTE(BASS[(s >> 1) % 16]), .16, 'square', .05, nextT);
-    if (speedN > .2) tone(NOTE(BASS[s % 16] + 12), .06, 'sawtooth', .015 + speedN * .03, nextT);
+    // The arp runs on stardust: an empty tank strips the track back to kick
+    // and bass, so you HEAR the fuel gauge before you look at it.
+    if (speedN > .2 && !dry) tone(NOTE(BASS[s % 16] + 12), .06, 'sawtooth', .015 + speedN * .03, nextT);
+    if (dry && s % 8 === 0) tone(58, .34, 'sine', .12, nextT);
     if (closeN > .02) tone(NOTE(LEAD[s]), .2, 'triangle', .02 + closeN * .08, nextT);
     if (mode === 'rainbow') tone(NOTE(LEAD[s] + 12), .18, 'triangle', .05, nextT);
     nextT += 15 / (116 + speedN * 52);
@@ -105,7 +108,11 @@ function pump(speedN, closeN) {
 let mode = 'title', timer = 0;
 let course, depth, roadM, railM, groundM, bgM, braid, trailM;
 let surge = 0, slipT = 0, fly = null, cine = 0, jumps = 0, falls = 0;
-let rainbowT = 0, rainbowTotal = 0, bestBurn = 0, flash = 0, msgT = 0, msg = '';
+let rainbowT = 0, rainbowTotal = 0, streak = 0, bestStreak = 0, flash = 0, msgT = 0, msg = '';
+// Best run survives a reload, or there is nothing to come back for. Any of
+// this can throw (private windows, blocked site data), so it all runs blind.
+let best = 0, isBest = false;
+try { best = +localStorage.rsBest || 0; } catch (e) { /* no store, no problem */ }
 let energy = 40, slowT = 0, stars = [], laneV = 0, prevYaw = 0, turnRate = 0;
 const player = { r: null, speed: 10, lane: 0 };
 const cam = { e: [0, 3, -5], a: [0, 0, 0] };
@@ -226,7 +233,10 @@ function makeBackdrop() {
 }
 
 function newRun() {
-  course = makeCourse(170);
+  // ~90 seconds, not 134. A score-chase run wants to end while you still
+  // want another one, and a shorter line makes the difficulty ramp felt
+  // rather than merely present.
+  course = makeCourse(120);
   depth = depths(course);
   const tm = trackMeshes(course);
   roadM = createMesh(tm.road);
@@ -245,7 +255,7 @@ function newRun() {
   particleM = partM(); starM = partM();
   PART.length = 0; pcur = 0;
   surge = 0; slipT = 0; fly = null; cine = 0; jumps = 0; falls = 0;
-  rainbowT = 0; rainbowTotal = 0; flash = 0; msgT = 0;
+  rainbowT = 0; rainbowTotal = 0; streak = 0; bestStreak = 0; isBest = false; flash = 0; msgT = 0;
   energy = 40; slowT = 0; laneV = 0; prevYaw = 0; turnRate = 0;
   timer = 0;
   camT = null; camU = null; prevP = null;
@@ -423,7 +433,15 @@ function frame(now) {
           if (slowT > .5) doFall('Too slow for the bend - it threw you!');
         } else slowT = 0;
       }
-      if (!player.r.a.next.length && !player.r.b) mode = 'end';
+      if (!player.r.a.next.length && !player.r.b) {
+        mode = 'end';
+        if (rainbowTotal > best) {
+          best = rainbowTotal;
+          isBest = true;
+          try { localStorage.rsBest = best.toFixed(1); } catch (e) { /* nowhere to keep it */ }
+          RAINBOW.forEach((_, i) => tone(523 * 2 ** (i / 7), .5, 'triangle', .09, ac && ac.currentTime + i * .1));
+        }
+      }
     }
 
     // stardust pickup
@@ -464,11 +482,12 @@ function frame(now) {
     } else if (mode === 'rainbow') {
       rainbowT -= dt / 2.2;
       rainbowTotal += dt;
-      bestBurn = Math.max(bestBurn, rainbowTotal);
+      streak += dt;
+      bestStreak = Math.max(bestStreak, streak);
       closeN = 1;
       if (rainbowT <= 0) { detach(); say('The last colour burned out - run it down again!', 2.5); }
     }
-    pump(speedN, closeN);
+    pump(speedN, closeN, mode !== 'rainbow' && energy < 8);
   }
 
   if (doAct) {
@@ -649,6 +668,10 @@ function frame(now) {
     ctx.fillStyle = '#b8ab92';
     ctx.fillText('Stardust feeds the boost. Bends and jumps demand SPEED - too slow and you fall.', VW / 2, 164);
     ctx.fillText('Catch the rainbow to BECOME it; jumps keep it burning. Score is your burn time.', VW / 2, 182);
+    if (best > 0) {
+      ctx.fillStyle = '#9be8ff';
+      ctx.fillText('best ' + best.toFixed(1) + 's', VW / 2, 200);
+    }
     ctx.fillStyle = '#7a6e5c';
     ctx.fillText('↑ boost (burns stardust)   ↓ brake   ← → slide / steer the jump', VW / 2, 222);
     ctx.fillStyle = '#e8b923';
@@ -711,6 +734,18 @@ function frame(now) {
     ctx.fillStyle = '#7a6e5c';
     ctx.font = '10px system-ui';
     ctx.fillText('stardust', 12, 72);
+    // How far down the line you are - the run needs a visible middle.
+    if (player.r && course) {
+      const pr = player.r.a.i / (course.nodes.length - 1);
+      ctx.fillStyle = 'rgba(160,150,130,.22)';
+      ctx.fillRect(VW - 130, 18, 112, 4);
+      ctx.fillStyle = '#b8ab92';
+      ctx.fillRect(VW - 130, 18, 112 * pr, 4);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#7a6e5c';
+      ctx.fillText(best > 0 ? 'best ' + best.toFixed(1) + 's' : 'the line', VW - 18, 38);
+      ctx.textAlign = 'left';
+    }
 
     ctx.textAlign = 'center';
     if (mode === 'rainbow') {
@@ -743,7 +778,9 @@ function frame(now) {
         ctx.fillText('JUMP AHEAD - carry speed!', VW / 2, 120);
       }
     }
-    if (msgT > 0) {
+    // Not over the end panel - the run's last shout would sit across its
+    // header, which is exactly where the score wants to be read.
+    if (msgT > 0 && mode !== 'end') {
       ctx.fillStyle = '#e8b923';
       ctx.font = 'bold 15px system-ui';
       ctx.fillText(msg, VW / 2, 92);
@@ -759,16 +796,46 @@ function frame(now) {
       }
     }
     if (mode === 'end') {
-      ctx.fillStyle = '#000000aa';
-      ctx.fillRect(0, VH / 2 - 60, VW, 120);
-      ctx.fillStyle = '#e8b923';
-      ctx.font = 'bold 26px system-ui';
-      ctx.fillText('END OF THE LINE', VW / 2, VH / 2 - 16);
-      ctx.font = '14px system-ui';
-      ctx.fillStyle = '#f3ead6';
-      ctx.fillText('burned ' + rainbowTotal.toFixed(1) + 's   jumps ' + jumps + '   falls ' + falls + '   best ' + bestBurn.toFixed(1) + 's', VW / 2, VH / 2 + 14);
+      // The end screen IS the reason to press SPACE again: the score large
+      // enough to aim at, the record beside it, and the run broken into the
+      // three things you can actually get better at.
+      ctx.fillStyle = '#000000c4';
+      ctx.fillRect(0, VH / 2 - 96, VW, 192);
+      RAINBOW.forEach(([r, gg, b], i) => {
+        ctx.fillStyle = `rgba(${r * 255},${gg * 255},${b * 255},.85)`;
+        ctx.fillRect(VW / 2 - 122 + i * 35, VH / 2 - 96, 33, 3);
+      });
       ctx.fillStyle = '#b8ab92';
-      ctx.fillText('SPACE - ride again', VW / 2, VH / 2 + 40);
+      ctx.font = '13px system-ui';
+      ctx.fillText('END OF THE LINE', VW / 2, VH / 2 - 68);
+      ctx.fillStyle = isBest ? '#9be8ff' : '#e8b923';
+      ctx.font = 'bold 52px system-ui';
+      ctx.fillText(rainbowTotal.toFixed(1) + 's', VW / 2, VH / 2 - 20);
+      ctx.font = '12px system-ui';
+      ctx.fillStyle = '#7a6e5c';
+      ctx.fillText('AS THE RAINBOW', VW / 2, VH / 2 - 2);
+      if (isBest) {
+        ctx.fillStyle = '#9be8ff';
+        ctx.font = 'bold 15px system-ui';
+        ctx.fillText('NEW BEST', VW / 2, VH / 2 + 22);
+      } else {
+        ctx.fillStyle = '#b8ab92';
+        ctx.font = '13px system-ui';
+        ctx.fillText('best ' + best.toFixed(1) + 's', VW / 2, VH / 2 + 22);
+      }
+      ctx.font = '13px system-ui';
+      const cols = [['longest burn', bestStreak.toFixed(1) + 's'], ['jumps', '' + jumps], ['falls', '' + falls]];
+      cols.forEach(([k, v], i) => {
+        const x = VW / 2 + (i - 1) * 130;
+        ctx.fillStyle = '#f3ead6';
+        ctx.fillText(v, x, VH / 2 + 52);
+        ctx.fillStyle = '#7a6e5c';
+        ctx.font = '11px system-ui';
+        ctx.fillText(k, x, VH / 2 + 68);
+        ctx.font = '13px system-ui';
+      });
+      ctx.fillStyle = '#e8b923';
+      ctx.fillText('SPACE - ride again', VW / 2, VH / 2 + 88);
     }
   }
   requestAnimationFrame(frame);

@@ -12,13 +12,31 @@ function nodeTan(g, a, b) {
   const A = g.pos[a[0]][a[1]], B = g.pos[b[0]][b[1]];
   const ax = g.axis[a[0]][a[1]];
   const d = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
-  const s = Math.sign(ax[0] * d[0] + ax[1] * d[1] + ax[2] * d[2]) || 1;
-  // 1.3x chord: overshoot bows every segment into a serpentine.
-  const L = Math.hypot(...d) * 1.3;
-  return [ax[0] * s * L, ax[1] * s * L, ax[2] * s * L];
+  const L0 = Math.hypot(...d) || 1;
+  const dh = [d[0] / L0, d[1] / L0, d[2] / L0];
+  // Blend the node's through-axis toward the chord as the two approach
+  // perpendicular. Sign-aligning to the axis alone is unstable exactly
+  // there - the dot product crosses zero, the sign flips, and the tangent
+  // snaps a full 180 degrees mid-corner. Measured: max heading change per
+  // frame was 179.7 degrees before this.
+  const k = ax[0] * dh[0] + ax[1] * dh[1] + ax[2] * dh[2];
+  const w = Math.min(1, Math.abs(k) / .5), sg = Math.sign(k) || 1;
+  const v = [
+    ax[0] * sg * w + dh[0] * (1 - w),
+    ax[1] * sg * w + dh[1] * (1 - w),
+    ax[2] * sg * w + dh[2] * (1 - w),
+  ];
+  const vl = Math.hypot(...v) || 1;
+  // Mild overshoot bows every segment into a serpentine; push it much past
+  // this and the curve whips back on itself at the nodes.
+  const L = L0 * 1.12 / vl;
+  return [v[0] * L, v[1] * L, v[2] * L];
 }
 
-// Position + unit tangent at parameter t along edge a->b.
+// Position, unit tangent, and |dP/dt| at parameter t along edge a->b.
+// That third value is what makes motion smooth: a hermite curve is NOT
+// uniformly parameterised, so advancing t proportionally to distance makes
+// the rider surge in the middle of every segment and crawl at its ends.
 export function edgePos(g, a, b, t) {
   const P0 = g.pos[a[0]][a[1]], P1 = g.pos[b[0]][b[1]];
   const T0 = nodeTan(g, a, b), T1 = nodeTan(g, b, a);   // T1 points b->a: minus below
@@ -31,7 +49,7 @@ export function edgePos(g, a, b, t) {
       + (6 * t - 6 * t2) * P1[i] - (3 * t2 - 2 * t) * T1[i]);
   }
   const l = Math.hypot(...tn) || 1;
-  return [p, [tn[0] / l, tn[1] / l, tn[2] / l]];
+  return [p, [tn[0] / l, tn[1] / l, tn[2] / l], l];
 }
 
 export function edgeLen(g, a, b) {
@@ -63,10 +81,12 @@ export function makeRider(g, node) {
 // the track always sits in the channel, correctly banked.
 export function behind(g, r, D) {
   if (!r.b) return null;
-  const on = r.t * r.len;
-  if (on >= D) return frame(g, r.a, r.b, (on - D) / r.len);
+  const spd = edgePos(g, r.a, r.b, r.t)[2] || r.len;
+  const on = r.t * spd;
+  if (on >= D) return frame(g, r.a, r.b, (on - D) / spd);
   if (r.pa && r.pb) {
-    const back = Math.max(0, 1 - (D - on) / r.plen);
+    const ps = edgePos(g, r.pa, r.pb, 1)[2] || r.plen;
+    const back = Math.max(0, 1 - (D - on) / ps);
     return frame(g, r.pa, r.pb, back);
   }
   return frame(g, r.a, r.b, 0);
@@ -86,8 +106,10 @@ export function ride(g, r, dist, choose) {
       r.len = edgeLen(g, r.a, r.b);
       r.t = 0;
     }
-    const remain = (1 - r.t) * r.len;
-    if (dist < remain) { r.t += dist / r.len; dist = 0; }
+    // Arc-length step: dt = ds / |dP/dt| at the current t, not ds / len.
+    const spd = edgePos(g, r.a, r.b, r.t)[2] || r.len;
+    const remain = (1 - r.t) * spd;
+    if (dist < remain) { r.t += dist / spd; dist = 0; }
     else {
       dist -= remain;
       r.pa = r.a; r.pb = r.b; r.plen = r.len;   // keep one edge of history

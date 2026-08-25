@@ -112,11 +112,15 @@ function pump(speedN, closeN) {
 let mode = 'title', round = 0, timer = 0, best = 0;
 let g, roadM, railM, groundM, braid, braidM, dists, bfsT = 0;
 let shards = [], colors = 0, surge = 0, slipT = 0, forkKick = 0;
-const player = { r: null, speed: 10 };
+// `lane` is the racing line: -1 hard left, +1 hard right of the channel.
+// The fork is decided by WHERE YOU ARE when you cross the node, not by what
+// you were pressing at that instant - so the whole approach is the decision
+// window and you can drift across at your leisure.
+const player = { r: null, speed: 10, lane: 0 };
 const cam = { x: 0, y: 3, z: -5, u: [0, 1, 0] };
 const uniM = unicornMesh();
 const headM = headMesh();
-let vp = null, beat = 0, lean = 0;
+let vp = null, beat = 0, lean = 0, camT = null, camU = null;
 
 // Steering only matters at forks: hold left/right while crossing a node and
 // the leftmost/rightmost branch is taken; hands off takes the straightest.
@@ -137,7 +141,8 @@ function pickBranch(c, st, T, A) {
   }
   return bestC;
 }
-const chooseP = (c) => pickBranch(c, turnDir(), player.r.tan, g.pos[player.r.a[0]][player.r.a[1]]);
+const laneSteer = () => (player.lane > .18 ? 1 : player.lane < -.18 ? -1 : 0);
+const chooseP = (c) => pickBranch(c, laneSteer(), player.r.tan, g.pos[player.r.a[0]][player.r.a[1]]);
 
 // Seven colour shards, placed in order of BFS distance from the start, so
 // the sequence red->violet pulls the player across the whole net - the
@@ -181,6 +186,7 @@ function newRound() {
   groundM = createMesh(gr);
   player.r = makeRider(g, [n - 1, n - 1]);
   player.speed = 10;
+  player.lane = 0;
   braid = makeBraid(g, [0, 0]);
   braidM = createMesh(braidVerts(braid, 0), true);
   dists = bfs(g, n - 1, n - 1);
@@ -264,6 +270,11 @@ function frame(now) {
     player.speed += (target - player.speed) * Math.min(1, dt * (heldBack() ? 3 : 1.2));
     player.speed -= player.r.tan[1] * dt * 16;
     player.speed = Math.max(6, Math.min(top + surge * 8, player.speed));
+    // Slide across the channel; let go and it eases back toward the middle.
+    const st = turnDir();
+    if (st) player.lane += st * dt * 2.2;
+    else player.lane -= Math.sign(player.lane) * Math.min(Math.abs(player.lane), dt * .7);
+    player.lane = Math.max(-1, Math.min(1, player.lane));
     const prevA = player.r.a;
     ride(g, player.r, player.speed * dt, chooseP);
     if (player.r.a !== prevA) forkKick = 1;    // crossing pop, feel the switch
@@ -321,6 +332,24 @@ function frame(now) {
     p = player.r.pos; T = player.r.tan;
     if (player.r.b) [p, T, , up] = tframe(g, player.r.a, player.r.b, player.r.t);
   }
+  // Per-edge tangents cannot be smooth for every pair of edges at a
+  // junction - two branches leaving the same node simply point different
+  // ways - so crossing a sharp one snaps the frame in a single step
+  // (measured: up to 88 degrees, against a 99th percentile of 3.7). Ease
+  // ONLY those: small changes pass through untouched, so normal motion has
+  // no lag at all and a corkscrew still rolls at full rate.
+  const ease = (cur, want) => {
+    if (!cur) return [...want];
+    const d = cur[0] * want[0] + cur[1] * want[1] + cur[2] * want[2];
+    if (d > .985) return [...want];
+    const k = Math.min(1, dt * 9);
+    const v = [cur[0] + (want[0] - cur[0]) * k, cur[1] + (want[1] - cur[1]) * k, cur[2] + (want[2] - cur[2]) * k];
+    const l = Math.hypot(...v) || 1;
+    return [v[0] / l, v[1] / l, v[2] / l];
+  };
+  if (mode === 'title' || !player.r) { camT = null; camU = null; }
+  camT = ease(camT, T); camU = ease(camU, up);
+  T = camT; up = camU;
   // Over-the-withers, not a drone: tight behind and barely above the head,
   // so the horn sits in frame and the track fills the screen. Boosting
   // pulls it in and down - the head drops and the camera drops with it.
@@ -330,15 +359,19 @@ function frame(now) {
   // turn and the lag flings the camera off the track. This is rigid, so the
   // roll is exact and the channel always frames the shot.
   // high must clear the banked lips (1.5) or they wall the view off.
-  const high = 2.3 - speedN * .25;
+  const high = 2.35 - speedN * .2;
   lean += (turnDir() * .1 - lean) * Math.min(1, dt * 4);
   const sideL = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]];
   const bf = player.r && player.r.b ? behind(g, player.r, 1.9 + speedN * .7) : null;
   const bp = bf ? bf[0] : [p[0] - T[0] * 1.9, p[1] - T[1] * 1.9, p[2] - T[2] * 1.9];
-  const bu = bf ? bf[3] : up;
-  cam.x = bp[0] + bu[0] * high; cam.y = bp[1] + bu[1] * high; cam.z = bp[2] + bu[2] * high;
-  cam.u = bu;
-  let eye = [cam.x + sideL[0] * lean, cam.y + sideL[1] * lean, cam.z + sideL[2] * lean];
+  // Sit at the point behind, but lift along the RIDER's up, not that
+  // point's. Mid-corkscrew the two are rolled apart by a big angle, and
+  // lifting along the trailing point's up walks the camera around the tube
+  // and straight into the deck.
+  cam.x = bp[0] + up[0] * high; cam.y = bp[1] + up[1] * high; cam.z = bp[2] + up[2] * high;
+  cam.u = up;
+  const lo = player.r ? player.lane * 1.6 : 0;
+  let eye = [cam.x + sideL[0] * (lean + lo), cam.y + sideL[1] * (lean + lo), cam.z + sideL[2] * (lean + lo)];
   // Aim at a point of TRACK ahead, not down the straight tangent: the
   // tangent leaves the road on every bend (which threw the rider
   // off-centre), while a short tangent aim points the camera at the floor.
@@ -346,7 +379,7 @@ function frame(now) {
     ? tframe(g, player.r.a, player.r.b, Math.min(1, player.r.t + 9 / player.r.len)) : null;
   const ap = af ? af[0] : [p[0] + T[0] * 9, p[1] + T[1] * 9, p[2] + T[2] * 9];
   const au = af ? af[3] : up;
-  let at = [ap[0] + au[0] * 1.1, ap[1] + au[1] * 1.1, ap[2] + au[2] * 1.1];
+  let at = [ap[0] + au[0] * 1.7 + sideL[0] * lo, ap[1] + au[1] * 1.7 + sideL[1] * lo, ap[2] + au[2] * 1.7 + sideL[2] * lo];
   let cu = cam.u.map((v, i) => v - sideL[i] * lean * .55);
   if (DEV && devSpec && mode === 'run' && braid.trail.length > 4) {
     const e = braid.trail[0];
@@ -364,7 +397,12 @@ function frame(now) {
     drawMesh(roadM, IDENT);
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
     const sideV = sideL;
-    const S8 = .85, base = [p[0] + up[0] * (bob + .04), p[1] + up[1] * (bob + .04), p[2] + up[2] * (bob + .04)];
+    const S8 = .85, lx = player.lane * 2;
+    const base = [
+      p[0] + up[0] * (bob + .04) + sideV[0] * lx,
+      p[1] + up[1] * (bob + .04) + sideV[1] * lx,
+      p[2] + up[2] * (bob + .04) + sideV[2] * lx,
+    ];
     drawMesh(uniM, modelFrame(base, sideV, up, T, S8));
     // The head: tucked low into the wind when boosting, and nodding to the
     // kick the rest of the time, because the unicorn likes this track.
@@ -405,10 +443,10 @@ function frame(now) {
       drawMesh(pillarM, modelFrame(bp, bs, bu, bt, 1));
     }
     // fork preview: a gold diamond on the branch this input would take
-    if (mode === 'run' && player.r.b && player.r.t > .3) {
+    if (mode === 'run' && player.r.b && player.r.t > .1) {
       const cand = nbrs(g, player.r.b[0], player.r.b[1]).filter((m) => m[0] !== player.r.a[0] || m[1] !== player.r.a[1]);
       if (cand.length > 1) {
-        const ch = pickBranch(cand, turnDir(), T, g.pos[player.r.b[0]][player.r.b[1]]);
+        const ch = pickBranch(cand, laneSteer(), T, g.pos[player.r.b[0]][player.r.b[1]]);
         const [mp] = tframe(g, player.r.b, ch, .22);
         drawMesh(markM, modelTR(mp[0], mp[1], mp[2], now / 180, .8 + Math.sin(now / 90) * .2));
       }
@@ -434,7 +472,8 @@ function frame(now) {
     ctx.fillText('The braid bolted onto the coaster net. Only a full rainbow can hold it:', VW / 2, 166);
     ctx.fillText('gather the seven colours IN ORDER - each one makes you faster.', VW / 2, 186);
     ctx.fillStyle = '#7a6e5c';
-    ctx.fillText('↑ boost   ↓ brake   ← → choose a branch at every fork', VW / 2, 230);
+    ctx.fillText('↑ boost   ↓ brake   ← → slide across the track', VW / 2, 224);
+    ctx.fillText('whichever side you are on when you cross a node picks the branch', VW / 2, 242);
     ctx.fillStyle = '#e8b923';
     ctx.fillText('press SPACE', VW / 2, 264);
   } else {
@@ -484,17 +523,26 @@ function frame(now) {
         const [r, gg, b] = RAINBOW[colors];
         edgeArrow([sp[0], sp[1] + 4, sp[2]], `rgb(${r * 255},${gg * 255},${b * 255})`);
       }
-      // fork telegraph with the CHOICE shown: active side lights up
-      if (player.r.b && nbrs(g, player.r.b[0], player.r.b[1]).length > 2 && player.r.t > .3) {
-        const st = turnDir();
+      // Lane gauge: where you are across the channel, always visible, with
+      // the branch that position currently selects lit. The decision is a
+      // place you drive to, so the readout is a position, not a keypress.
+      const gw = 150, gy = VH - 30;
+      ctx.fillStyle = 'rgba(160,150,130,.22)';
+      ctx.fillRect(VW / 2 - gw / 2, gy - 3, gw, 6);
+      const lst = laneSteer();
+      for (const [sx, dir] of [[-1, 1], [0, 0], [1, -1]]) {
+        ctx.fillStyle = lst === dir ? '#e8b923' : 'rgba(160,150,130,.32)';
+        ctx.fillRect(VW / 2 + sx * gw / 2 - 2, gy - 9, 4, 18);
+      }
+      ctx.fillStyle = '#f3ead6';
+      ctx.beginPath();
+      ctx.arc(VW / 2 - player.lane * gw / 2, gy, 6, 0, 7);
+      ctx.fill();
+      if (player.r.b && nbrs(g, player.r.b[0], player.r.b[1]).length > 2 && player.r.t > .1) {
         ctx.textAlign = 'center';
-        ctx.font = 'bold 26px system-ui';
-        ctx.fillStyle = st > 0 ? '#e8b923' : 'rgba(160,150,130,.5)';
-        ctx.fillText('❮', VW / 2 - 44, VH - 26);
-        ctx.fillStyle = st === 0 ? '#e8b923' : 'rgba(160,150,130,.5)';
-        ctx.fillText('▲', VW / 2, VH - 26);
-        ctx.fillStyle = st < 0 ? '#e8b923' : 'rgba(160,150,130,.5)';
-        ctx.fillText('❯', VW / 2 + 44, VH - 26);
+        ctx.font = 'bold 13px system-ui';
+        ctx.fillStyle = '#e8b923';
+        ctx.fillText('FORK', VW / 2, gy - 18);
       }
       if (slipT > 0) {
         ctx.textAlign = 'center';

@@ -148,6 +148,50 @@ backtracker, but its cells are now NODES of a rollercoaster network:
   braid's tail (white) and the active shard (its own colour) whenever
   they are off-screen.
 
+## Design notes, S5 - making it flow
+
+Two complaints, "smoother track" and "a longer moment at the fork", turned
+out to be four separate causes, three of them measurable:
+
+- **Motion was parameterised by t, not by arc length.** A hermite curve is
+  not uniformly parameterised, so advancing t proportionally to distance
+  made the rider surge through the middle of every segment and crawl at its
+  ends. `edgePos` now also returns |dP/dt| and `ride` steps ds/|dP/dt|.
+  Measured by `tools/test-smooth.mjs`: advance coefficient of variation
+  4.2% -> 0.9%.
+- **Node tangents could flip 180 degrees.** Sign-aligning a node's
+  through-axis to an edge is unstable exactly where the two are
+  perpendicular - the dot product crosses zero and the tangent snaps
+  backwards mid-corner. `nodeTan` now blends the axis toward the chord as
+  they approach perpendicular. Mean heading change 2.47 -> 1.09 deg/frame,
+  p99 10.2 -> 3.7.
+- **Junctions are structurally non-smooth** - two branches leaving one node
+  simply point different ways, and no per-edge tangent scheme fixes that -
+  so the remaining rare snap (up to 88 deg in one frame) is eased in the
+  VIEW only, and only when it is large: changes under ~10 deg pass through
+  untouched, so normal motion has zero lag and corkscrews still roll at
+  full rate.
+- **Node jitter and the fine height octave were the chatter**, not the
+  swell. Jitter dropped from 0.44 to 0.12 of a cell and the fine octave
+  from 8 to 5, while the big swell went UP (17 -> 19): the net keeps its
+  mountain-range silhouette without the local noise. Spacing widened from
+  14 to 22, so segments last about a second at speed.
+
+**The fork became a place, not a keypress.** `player.lane` is a racing line
+across the channel, -1 to +1; steering slides you across it and letting go
+eases you back toward the middle. Which branch you take is decided by WHERE
+YOU ARE when you cross the node. The whole approach is now the decision
+window - about a second of track plus a comfortable 0.9s to cross from one
+side to the other - and the HUD shows a lane gauge with the branch your
+current position selects lit up, instead of arrows that lit on a keypress.
+The camera and the unicorn both ride the lane offset, so the choice is
+visible in the world and not only on the dial.
+
+Also fixed: the chase camera lifts along the RIDER's up, not the up of the
+track point it sits on. Mid-corkscrew those are rolled far apart, and
+lifting along the trailing point's up walked the camera around the tube and
+into the deck.
+
 ## Milestone log
 
 | gate | ceiling | worst-of-5 | notes |
@@ -156,6 +200,8 @@ backtracker, but its cells are now NODES of a rollercoaster network:
 | S1 volumetric braid | 6,500 | 5,236 | ground-dragging plait, additive glow layers, head knot |
 | S2 wipeout pivot | 9,500 | 6,386 | coaster net, rails+forks, adaptive score, gate run catches the braid |
 | S3 corkscrews & colours | 9,500 | 7,734 | full-roll corkscrews + rolling camera, speed blur, rainbow-key collection |
+| S4 wipeout channel | 9,500 | 8,223 | on-rails camera behind the head, banked channel, animated head, colour fix |
+| S5 flow | 9,500 | 8,541 | arc-length motion, stabilised tangents, lane-based forks |
 
 Bugs caught by looking at S0 screenshots, not by the harness: the
 hand-rolled `lookAt` used `z×up` instead of `up×z` and rendered the world

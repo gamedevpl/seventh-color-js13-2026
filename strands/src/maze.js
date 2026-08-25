@@ -7,7 +7,7 @@
 // entered from three sides. One graph feeds geometry, movement and the
 // braid's flee logic alike.
 
-export const S = 14;                          // node spacing in world units
+export const S = 22;                          // node spacing in world units
 export const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 export function genGraph(n) {
@@ -70,19 +70,20 @@ export function genGraph(n) {
 
   // Node positions: jittered grid + a big swooping height field, so every
   // corridor is a climb or a dive and the net reads as a coaster, not a floor.
-  // Two octaves: a big slow swell for silhouette across the whole net, and
-  // a tighter one so neighbouring nodes still differ sharply. Flat is the
-  // enemy - the net should look like a mountain range of ribbons.
+  // Two octaves: a big slow swell for silhouette across the whole net, plus
+  // a gentler second one for local relief. Keep the swell tall (flat is the
+  // enemy) but the fine octave and the per-node jitter small - those are
+  // what turn a flowing net into a chattering one.
   const p1 = Math.random() * 9, p2 = Math.random() * 9, p3 = Math.random() * 9;
   const pos = [];
   for (let x = 0; x < n; x++) {
     pos.push([]);
     for (let z = 0; z < n; z++) {
       pos[x].push([
-        (x + .5) * S + (Math.random() - .5) * S * .44,
-        17 * Math.sin(x * .62 + p1) * Math.cos(z * .5 + p2)
-        + 8 * Math.sin(x * 1.7 + z * 1.3 + p3) + (Math.random() - .5) * 4,
-        (z + .5) * S + (Math.random() - .5) * S * .44,
+        (x + .5) * S + (Math.random() - .5) * S * .12,
+        19 * Math.sin(x * .62 + p1) * Math.cos(z * .5 + p2)
+        + 5 * Math.sin(x * 1.15 + z * .9 + p3) + (Math.random() - .5) * 1.2,
+        (z + .5) * S + (Math.random() - .5) * S * .12,
       ]);
     }
   }

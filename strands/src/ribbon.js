@@ -3,7 +3,7 @@
 // junction, and its ribbon is the trail of where it actually flowed - so it
 // swoops through the same dives and climbs the player must read.
 
-import { makeRider, ride } from './track.js';
+import { makeRider, ride, frame } from './track.js';
 import { RAINBOW } from './uni.js';
 
 const d3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -29,10 +29,17 @@ export function updateBraid(g, br, dists, playerPos, dt, canCatch) {
     }
     return best;
   });
+  // The trail records the track's own frame, not just a point, so the
+  // ribbon lies IN the channel through banks and corkscrews instead of
+  // floating in world-up like a kite string.
   const last = br.trail[br.trail.length - 1];
   if (!last || d3(br.r.pos, last) > 1.3) {
-    br.trail.push([...br.r.pos]);
-    if (br.trail.length > 40) br.trail.shift();  // trail[0] = the tail you catch
+    const f = br.r.b ? frame(g, br.r.a, br.r.b, br.r.t) : null;
+    const p = [...br.r.pos];
+    p.s = f ? f[2] : [1, 0, 0];
+    p.u = f ? f[3] : [0, 1, 0];
+    br.trail.push(p);
+    if (br.trail.length > 44) br.trail.shift();  // trail[0] = the tail you catch
   }
 }
 
@@ -46,14 +53,15 @@ export function braidVerts(br, t) {
   const P = (x, y, z, c, a) => v.push(x, y, z, 0, 1, 0, c[0], c[1], c[2], a);
   const Q = (q) => { for (const k of [0, 1, 2, 0, 2, 3]) P(...q[k]); };
 
-  // Horizontal side vector per trail point, shared by every layer.
-  const side = [];
-  for (let i = 0; i < n; i++) {
-    const a = tr[Math.max(0, i - 1)], p = tr[Math.min(n - 1, i + 1)];
-    let nx = p[2] - a[2], nz = a[0] - p[0];
-    const l = Math.hypot(nx, nz) || 1;
-    side.push([nx / l, nz / l]);
-  }
+  // Side and up come from the TRACK's frame at each recorded point, so the
+  // ribbon banks and corkscrews with the channel it is flowing down.
+  const side = tr.map((p) => p.s || [1, 0, 0]);
+  const upv = tr.map((p) => p.u || [0, 1, 0]);
+  const off = (i, ws, wu) => [
+    tr[i][0] + side[i][0] * ws + upv[i][0] * wu,
+    tr[i][1] + side[i][1] * ws + upv[i][1] * wu,
+    tr[i][2] + side[i][2] * ws + upv[i][2] * wu,
+  ];
   // The oldest end is dissipating; the head is fresh light.
   const fade = (i) => .34 + .66 * (i / (n - 1));
 
@@ -61,17 +69,15 @@ export function braidVerts(br, t) {
   // Every band is bright on its centreline and alpha-zero at both outer
   // edges - a hard-edged quad reads as a rectangle no matter how faint.
   const WHITE = [.86, .84, 1];
-  for (const [w, al, dy, mono] of [[.7, .22, .10, 0], [2.0, .10, .06, 1], [.6, .17, .5, 1]]) {
+  for (const [w, al, dy, mono] of [[.9, .3, .12, 0], [2.8, .14, .07, 1], [.8, .22, .55, 1]]) {
     for (let i = 1; i < n; i++) {
       const c0 = mono ? WHITE : RAINBOW[(i - 1) % 7], c1 = mono ? WHITE : RAINBOW[i % 7];
       const a0 = al * fade(i - 1), a1 = al * fade(i);
-      const [sx0, sz0] = side[i - 1], [sx1, sz1] = side[i];
-      const A = tr[i - 1], B = tr[i];
       for (const e of [-1, 1]) Q([
-        [A[0], A[1] + dy, A[2], c0, a0],
-        [B[0], B[1] + dy, B[2], c1, a1],
-        [B[0] + sx1 * w * e, B[1] + dy, B[2] + sz1 * w * e, c1, 0],
-        [A[0] + sx0 * w * e, A[1] + dy, A[2] + sz0 * w * e, c0, 0],
+        [...off(i - 1, 0, dy), c0, a0],
+        [...off(i, 0, dy), c1, a1],
+        [...off(i, w * e, dy), c1, 0],
+        [...off(i - 1, w * e, dy), c0, 0],
       ]);
     }
   }
@@ -81,49 +87,43 @@ export function braidVerts(br, t) {
   // advancing along the trail and turning with time - that is what makes
   // them cross over and under each other like a plait.
   for (let s = 0; s < 7; s++) {
-    const c = RAINBOW[s], w = .12;
-    const off = (k) => {
+    const c = RAINBOW[s], w = .15;
+    const orb = (k, extra) => {
       const ph = s * (Math.PI * 2 / 7) + k * 1.05 - t * 3;
-      return [
-        tr[k][0] + side[k][0] * Math.cos(ph) * .3,
-        tr[k][1] + .5 + Math.sin(ph) * .3,
-        tr[k][2] + side[k][1] * Math.cos(ph) * .3,
-      ];
+      return off(k, Math.cos(ph) * .38 + extra, .55 + Math.sin(ph) * .38);
     };
     for (let i = 1; i < n; i++) {
-      const A = off(i - 1), B = off(i);
-      const [sx0, sz0] = side[i - 1], [sx1, sz1] = side[i];
       Q([
-        [A[0] - sx0 * w, A[1], A[2] - sz0 * w, c, fade(i - 1)],
-        [A[0] + sx0 * w, A[1], A[2] + sz0 * w, c, fade(i - 1)],
-        [B[0] + sx1 * w, B[1], B[2] + sz1 * w, c, fade(i)],
-        [B[0] - sx1 * w, B[1], B[2] - sz1 * w, c, fade(i)],
+        [...orb(i - 1, -w), c, fade(i - 1)],
+        [...orb(i - 1, w), c, fade(i - 1)],
+        [...orb(i, w), c, fade(i)],
+        [...orb(i, -w), c, fade(i)],
       ]);
     }
   }
 
-  // --- upright haze cards -------------------------------------------------
+  // --- upright haze cards, standing in the channel's own up --------------
   for (let i = 0; i < n; i += 2) {
-    const c = RAINBOW[i % 7], [sx, sz] = side[i], [x, y, z] = tr[i];
-    const w = 1.1, h = 1.5 + Math.sin(t * 2.2 + i) * .3, a = .15 * fade(i);
+    const c = RAINBOW[i % 7];
+    const w = 1.5, h = 2.2 + Math.sin(t * 2.2 + i) * .4, a = .2 * fade(i);
     for (const e of [-1, 1]) Q([
-      [x, y + .05, z, c, a],
-      [x + sx * w * e, y + .05, z + sz * w * e, c, 0],
-      [x + sx * w * e, y + h * .75, z + sz * w * e, c, 0],
-      [x, y + h, z, c, 0],
+      [...off(i, 0, .06), c, a],
+      [...off(i, w * e, .06), c, 0],
+      [...off(i, w * e, h * .75), c, 0],
+      [...off(i, 0, h), c, 0],
     ]);
   }
 
   // --- the head knot ------------------------------------------------------
   // Where the braid entity actually is, the rope ends in the living light
-  // being chased - two crossed white fans pulsing with time. This is the
-  // glimpse the player steers by across the void.
-  const [hx, hy, hz] = br.r.pos, R = 2 + Math.sin(t * 6) * .3;
-  for (const [ux, uz] of [[1, 0], [0, 1]]) for (const e of [-1, 1]) Q([
-    [hx, hy + .05, hz, WHITE, .7],
-    [hx + ux * R * e, hy + .05, hz + uz * R * e, WHITE, 0],
-    [hx + ux * R * e, hy + 1.8, hz + uz * R * e, WHITE, 0],
-    [hx, hy + 3.5, hz, WHITE, 0],
-  ]);
+  // being chased - crossed fans in the TRACK's frame, so the flare lies in
+  // the channel it is racing down, not pasted flat on the world.
+  const hs = tr[n - 1].s || [1, 0, 0], hu = tr[n - 1].u || [0, 1, 0];
+  const hp = br.r.pos, R = 2.6 + Math.sin(t * 6) * .4;
+  const hf = (ws, wu) => [hp[0] + hs[0] * ws + hu[0] * wu, hp[1] + hs[1] * ws + hu[1] * wu, hp[2] + hs[2] * ws + hu[2] * wu];
+  for (const e of [-1, 1]) {
+    Q([[...hf(0, .1), WHITE, .8], [...hf(R * e, .1), WHITE, 0], [...hf(R * e, 2.2), WHITE, 0], [...hf(0, 4), WHITE, 0]]);
+    Q([[...hf(0, .1), WHITE, .8], [...hf(0, 4 * (e > 0 ? 1 : 0)), WHITE, 0], [...hf(R * e * .5, 2.6), WHITE, 0], [...hf(-R * e * .5, 2.6), WHITE, 0]]);
+  }
   return v;
 }

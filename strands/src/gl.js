@@ -21,7 +21,7 @@ float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))
 vc=c*mix(l,1.,add);va=a;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,add),0.,1.);}`;
 const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
 uniform vec3 fog;uniform float add;
-void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf));
+void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
 else gl_FragColor=vec4(mix(vc,fog,vf),1.);}`;
 
 let prog, loc = {};
@@ -148,7 +148,9 @@ export function modelFrame(p, X, Y, Z, s) {
 }
 
 // Axis-aligned box into an interleaved array: center, full sizes, color.
-export function pushBox(v, cx, cy, cz, sx, sy, sz, r, g, b) {
+// `a` matters for additive boxes: front+back faces SUM, so alpha 1 clamps
+// any colour to white - a coloured glow box needs a low alpha.
+export function pushBox(v, cx, cy, cz, sx, sy, sz, r, g, b, a = 1) {
   const x = sx / 2, y = sy / 2, z = sz / 2;
   const F = [
     [[1, 0, 0], [x, -y, -z, x, y, -z, x, y, z, x, -y, z]],
@@ -160,7 +162,7 @@ export function pushBox(v, cx, cy, cz, sx, sy, sz, r, g, b) {
   ];
   for (const [n, q] of F) {
     for (const i of [0, 1, 2, 0, 2, 3]) {
-      v.push(cx + q[i * 3], cy + q[i * 3 + 1], cz + q[i * 3 + 2], n[0], n[1], n[2], r, g, b, 1);
+      v.push(cx + q[i * 3], cy + q[i * 3 + 1], cz + q[i * 3 + 2], n[0], n[1], n[2], r, g, b, a);
     }
   }
 }

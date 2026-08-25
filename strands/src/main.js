@@ -7,8 +7,8 @@
 
 import { initGL, frameGL, additive, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, modelFrame, IDENT, pushBox } from './gl.js';
 import { S, genGraph, bfs } from './maze.js';
-import { trackMeshes, makeRider, ride, nbrs, frame as tframe } from './track.js';
-import { unicornMesh, RAINBOW } from './uni.js';
+import { trackMeshes, makeRider, ride, nbrs, behind, frame as tframe } from './track.js';
+import { unicornMesh, headMesh, PIVOT, RAINBOW } from './uni.js';
 import { makeBraid, updateBraid, braidVerts } from './ribbon.js';
 
 const VW = 640, VH = 360;
@@ -97,7 +97,7 @@ function pump(speedN, closeN) {
   if (nextT < ac.currentTime) nextT = ac.currentTime + .05;
   while (nextT < ac.currentTime + .16) {
     const s = step % 32;
-    if (s % 4 === 0) kick(nextT);
+    if (s % 4 === 0) { kick(nextT); beat = 1; }   // the head nods on this
     if (s % 4 === 2) tone(6200, .03, 'square', .012 + speedN * .035, nextT);
     if (s % 2 === 0) tone(NOTE(BASS[(s >> 1) % 16]), .16, 'square', .05, nextT);
     if (speedN > .2) tone(NOTE(BASS[s % 16] + 12), .06, 'sawtooth', .015 + speedN * .03, nextT);
@@ -115,7 +115,8 @@ let shards = [], colors = 0, surge = 0, slipT = 0, forkKick = 0;
 const player = { r: null, speed: 10 };
 const cam = { x: 0, y: 3, z: -5, u: [0, 1, 0] };
 const uniM = unicornMesh();
-let vp = null;
+const headM = headMesh();
+let vp = null, beat = 0, lean = 0;
 
 // Steering only matters at forks: hold left/right while crossing a node and
 // the leftmost/rightmost branch is taken; hands off takes the straightest.
@@ -156,9 +157,13 @@ function placeShards() {
       if (v < bv) { bv = v; bn = [x, z]; }
     }
     used.add(bn.join(','));
-    const c = RAINBOW[i].map((v) => v * 1.6), m = [];
-    pushBox(m, 0, 4, 0, .5, 8, .5, ...c);       // light column
-    pushBox(m, 0, 1.3, 0, 1.1, 1.1, 1.1, ...c); // the shard itself
+    // Additive boxes SUM their front and back faces, so alpha 1 clamps
+    // every colour to white - that is why the shards all read white. Low
+    // alpha on the glow, a solid-ish core, and the colour survives.
+    const c = RAINBOW[i].map((v) => v * 1.9), m = [];
+    pushBox(m, 0, 3, 0, .34, 6, .34, ...c, .16);      // light column
+    pushBox(m, 0, 1.5, 0, 1.5, 1.5, 1.5, ...c, .12);  // halo
+    pushBox(m, 0, 1.5, 0, .6, .6, .6, ...c, .5);      // the shard itself
     shards.push({ node: bn, mesh: createMesh(m) });
   }
   colors = 0;
@@ -190,16 +195,24 @@ function newRound() {
   timer = 0;
 }
 
-// Sparkle beacon over the braid when it is far - you should always have a
-// bearing, just never a route.
+// Wake plume: a low rainbow flare that rides WITH the braid down its
+// channel - a pillar into the sky told you where it was but not which
+// track it was on, which is the one thing this game must never give away.
 const pillar = [];
-RAINBOW.forEach((c, i) => pushBox(pillar, 0, 4 + i * 2, 0, .4, 1.9, .4, ...c));
+RAINBOW.forEach((c, i) => pushBox(pillar, 0, .5 + i * .28, -i * .5, 3.4 - i * .3, .22, .5, ...c.map((v) => v * 1.8), .5));
 const pillarM = createMesh(pillar);
 // Fork marker: a small glowing diamond dropped on the branch the current
 // steering input will take - the choice is visible before it is made.
 const mark = [];
-pushBox(mark, 0, .6, 0, .9, .9, .9, 1.2, 1, .5);
+pushBox(mark, 0, .6, 0, .9, .9, .9, 1.2, 1, .5, .4);
 const markM = createMesh(mark);
+// Hoof wake: rainbow streaks that stretch behind under boost. Drawn in the
+// rider's own frame, so they lie in the channel through every corkscrew.
+const wake = [];
+// Seven thin streaks, low and well behind: additive overlap blows straight
+// to white, so alpha stays small and the colours stay readable.
+RAINBOW.forEach((c, i) => pushBox(wake, (i - 3) * .19, .16, -2.5, .09, .09, 3.2, ...c.map((v) => v * 1.5), .1));
+const wakeM = createMesh(wake);
 
 // Project a world point to screen space; wc<=0 means behind the camera.
 function project(w) {
@@ -308,17 +321,33 @@ function frame(now) {
     p = player.r.pos; T = player.r.tan;
     if (player.r.b) [p, T, , up] = tframe(g, player.r.a, player.r.b, player.r.t);
   }
-  const k = Math.min(1, dt * 5);
-  cam.x += (p[0] - T[0] * 5.6 + up[0] * 2.2 - cam.x) * k;
-  cam.y += (p[1] - T[1] * 5.6 + up[1] * 2.2 - cam.y) * k;
-  cam.z += (p[2] - T[2] * 5.6 + up[2] * 2.2 - cam.z) * k;
-  const ku = Math.min(1, dt * 4);
-  cam.u = cam.u.map((v, i) => v + (up[i] - v) * ku);
-  const ul = Math.hypot(...cam.u) || 1;
-  cam.u = cam.u.map((v) => v / ul);
-  let eye = [cam.x, cam.y, cam.z];
-  let at = [p[0] + T[0] * 4, p[1] + T[1] * 4 + up[1] * .6, p[2] + T[2] * 4];
-  let cu = cam.u;
+  // Over-the-withers, not a drone: tight behind and barely above the head,
+  // so the horn sits in frame and the track fills the screen. Boosting
+  // pulls it in and down - the head drops and the camera drops with it.
+  // ON THE RAILS: the eye sits at a point of TRACK a fixed distance behind,
+  // lifted along that point's own up. A world-space lerp toward an offset
+  // from the rider cannot survive a corkscrew - the target orbits a full
+  // turn and the lag flings the camera off the track. This is rigid, so the
+  // roll is exact and the channel always frames the shot.
+  // high must clear the banked lips (1.5) or they wall the view off.
+  const high = 2.3 - speedN * .25;
+  lean += (turnDir() * .1 - lean) * Math.min(1, dt * 4);
+  const sideL = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]];
+  const bf = player.r && player.r.b ? behind(g, player.r, 1.9 + speedN * .7) : null;
+  const bp = bf ? bf[0] : [p[0] - T[0] * 1.9, p[1] - T[1] * 1.9, p[2] - T[2] * 1.9];
+  const bu = bf ? bf[3] : up;
+  cam.x = bp[0] + bu[0] * high; cam.y = bp[1] + bu[1] * high; cam.z = bp[2] + bu[2] * high;
+  cam.u = bu;
+  let eye = [cam.x + sideL[0] * lean, cam.y + sideL[1] * lean, cam.z + sideL[2] * lean];
+  // Aim at a point of TRACK ahead, not down the straight tangent: the
+  // tangent leaves the road on every bend (which threw the rider
+  // off-centre), while a short tangent aim points the camera at the floor.
+  const af = player.r && player.r.b
+    ? tframe(g, player.r.a, player.r.b, Math.min(1, player.r.t + 9 / player.r.len)) : null;
+  const ap = af ? af[0] : [p[0] + T[0] * 9, p[1] + T[1] * 9, p[2] + T[2] * 9];
+  const au = af ? af[3] : up;
+  let at = [ap[0] + au[0] * 1.1, ap[1] + au[1] * 1.1, ap[2] + au[2] * 1.1];
+  let cu = cam.u.map((v, i) => v - sideL[i] * lean * .55);
   if (DEV && devSpec && mode === 'run' && braid.trail.length > 4) {
     const e = braid.trail[0];
     eye = [e[0], e[1] + 2.5, e[2]];
@@ -334,18 +363,46 @@ function frame(now) {
     drawMesh(groundM, IDENT);
     drawMesh(roadM, IDENT);
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
-    const sideV = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]];
-    drawMesh(uniM, modelFrame([p[0] + up[0] * (bob + .04), p[1] + up[1] * (bob + .04), p[2] + up[2] * (bob + .04)], sideV, up, T, .85));
+    const sideV = sideL;
+    const S8 = .85, base = [p[0] + up[0] * (bob + .04), p[1] + up[1] * (bob + .04), p[2] + up[2] * (bob + .04)];
+    drawMesh(uniM, modelFrame(base, sideV, up, T, S8));
+    // The head: tucked low into the wind when boosting, and nodding to the
+    // kick the rest of the time, because the unicorn likes this track.
+    beat = Math.max(0, beat - dt * 4.5);
+    const duck = speedN * .42 + surge * .16;
+    const nod = beat * beat * .34 * (1 - speedN * .5);
+    const pitch = duck + nod;
+    const sway = Math.sin(now / 460) * .12 * (1 - speedN * .6) + turnDir() * -.18;
+    const cp = Math.cos(pitch), sp = Math.sin(pitch), cs = Math.cos(sway), ss = Math.sin(sway);
+    // head frame = body frame, rotated about side (pitch) then up (sway)
+    const hZ = [T[0] * cp - up[0] * sp, T[1] * cp - up[1] * sp, T[2] * cp - up[2] * sp];
+    const hY = [T[0] * sp + up[0] * cp, T[1] * sp + up[1] * cp, T[2] * sp + up[2] * cp];
+    const hX = sideV;
+    const fZ = [hZ[0] * cs - hX[0] * ss, hZ[1] * cs - hX[1] * ss, hZ[2] * cs - hX[2] * ss];
+    const fX = [hX[0] * cs + hZ[0] * ss, hX[1] * cs + hZ[1] * ss, hX[2] * cs + hZ[2] * ss];
+    const hp = [
+      base[0] + (sideV[0] * PIVOT[0] + up[0] * PIVOT[1] + T[0] * PIVOT[2]) * S8,
+      base[1] + (sideV[1] * PIVOT[0] + up[1] * PIVOT[1] + T[1] * PIVOT[2]) * S8,
+      base[2] + (sideV[2] * PIVOT[0] + up[2] * PIVOT[1] + T[2] * PIVOT[2]) * S8,
+    ];
+    drawMesh(headM, modelFrame(hp, fX, hY, fZ, S8));
     additive(true);
     drawMesh(railM, IDENT);
     drawMesh(braidM, IDENT);
+    // hoof wake, stretched by speed - the visual receipt for the throttle
+    if (speedN > .25) {
+      const st = .5 + speedN * 1.8 + surge;
+      drawMesh(wakeM, modelFrame(base, sideV, up, [T[0] * st, T[1] * st, T[2] * st], S8));
+    }
     if (colors < 7 && mode === 'run') {
       const sh = shards[colors], sp = g.pos[sh.node[0]][sh.node[1]];
       drawMesh(sh.mesh, modelTR(sp[0], sp[1], sp[2], now / 350));
     }
-    const pd = d3(p, braid.r.pos);
-    if (pd > 28 && mode === 'run') {
-      drawMesh(pillarM, modelTR(braid.r.pos[0], braid.r.pos[1] + Math.sin(now / 300) * .4, braid.r.pos[2], now / 400));
+    // wake plume, laid in the braid's own channel so it reads as something
+    // racing a track rather than a marker floating in the sky
+    if (mode === 'run' && braid.r.b) {
+      const [bp, bt, bs, bu] = tframe(g, braid.r.a, braid.r.b, braid.r.t);
+      drawMesh(pillarM, modelFrame(bp, bs, bu, bt, 1));
     }
     // fork preview: a gold diamond on the branch this input would take
     if (mode === 'run' && player.r.b && player.r.t > .3) {

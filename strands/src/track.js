@@ -52,8 +52,24 @@ export function nbrs(g, x, z) {
 
 // --- the rider ------------------------------------------------------------
 export function makeRider(g, node) {
-  return { a: node, from: null, b: null, t: 0, len: 1,
+  return { a: node, from: null, b: null, t: 0, len: 1, pa: null, pb: null, plen: 1,
     pos: [...g.pos[node[0]][node[1]]], tan: [0, 0, 1] };
+}
+
+// The frame a fixed arc-distance BEHIND the rider, staying on the rails.
+// The chase camera lives here: a world-space lerp toward an offset from the
+// rider cannot survive a corkscrew (the target orbits a full turn and the
+// lag throws the camera clean off the track), but a point that is itself on
+// the track always sits in the channel, correctly banked.
+export function behind(g, r, D) {
+  if (!r.b) return null;
+  const on = r.t * r.len;
+  if (on >= D) return frame(g, r.a, r.b, (on - D) / r.len);
+  if (r.pa && r.pb) {
+    const back = Math.max(0, 1 - (D - on) / r.plen);
+    return frame(g, r.pa, r.pb, back);
+  }
+  return frame(g, r.a, r.b, 0);
 }
 
 // Advance `dist` along the rails. At every node, `choose(candidates)` picks
@@ -72,7 +88,11 @@ export function ride(g, r, dist, choose) {
     }
     const remain = (1 - r.t) * r.len;
     if (dist < remain) { r.t += dist / r.len; dist = 0; }
-    else { dist -= remain; r.from = r.a; r.a = r.b; r.b = null; }
+    else {
+      dist -= remain;
+      r.pa = r.a; r.pb = r.b; r.plen = r.len;   // keep one edge of history
+      r.from = r.a; r.a = r.b; r.b = null;
+    }
   }
   if (r.b) [r.pos, r.tan] = edgePos(g, r.a, r.b, r.t);
   else r.pos = [...g.pos[r.a[0]][r.a[1]]];
@@ -113,9 +133,18 @@ export function frame(g, a, b, t) {
 // Solid road + additive neon. Each edge's rails carry ONE rainbow colour
 // picked by a hash of its endpoints: the colours are landmarks - "the braid
 // went down the green track" is how the player learns the knots.
+// Wipeout cross-section, not a coaster plank: a crowned centre falling to
+// banked lips that curl UP at the edges, so the track reads as a channel
+// you are held inside. Profile is (across, up) offsets from the frame -
+// one data row per rib, and the builder just walks pairs.
+const PROFILE = [
+  [-3.4, 1.5], [-3.0, .55], [-2.3, .1], [-1.1, -.04], [0, -.1],
+  [1.1, -.04], [2.3, .1], [3.0, .55], [3.4, 1.5],
+];
+
 export function trackMeshes(g) {
   const road = [], rail = [];
-  const W = 1.7, K = 8;
+  const W = 3.4, K = 8;
   const quad = (arr, a, b, c, d, nrm, col, al) => {
     for (const q of [a, b, c, a, c, d]) {
       arr.push(q[0], q[1], q[2], nrm[0], nrm[1], nrm[2], col[0], col[1], col[2], al);
@@ -132,15 +161,30 @@ export function trackMeshes(g) {
       let [pp, , ps, pu] = frame(g, a, b, 0);
       for (let k = 1; k <= kk; k++) {
         const [cp, , cs, cu] = frame(g, a, b, k / kk);
-        quad(road,
-          at(pp, ps, pu, -W, 0), at(pp, ps, pu, W, 0),
-          at(cp, cs, cu, W, 0), at(cp, cs, cu, -W, 0),
-          cu, [.14, .13, .20], 1);
+        // deck: one strip per profile rib pair, darker toward the lips
+        for (let j = 0; j < PROFILE.length - 1; j++) {
+          const [w0, u0] = PROFILE[j], [w1, u1] = PROFILE[j + 1];
+          // Lips catch more light than the deck - that shading is what
+          // makes the channel read as a channel at speed.
+          const lip = Math.abs(w0) > 2.2 ? 1.9 : 1;
+          quad(road,
+            at(pp, ps, pu, w0, u0), at(pp, ps, pu, w1, u1),
+            at(cp, cs, cu, w1, u1), at(cp, cs, cu, w0, u0),
+            cu, [.26 * lip, .24 * lip, .38 * lip], 1);
+        }
+        // neon strip along the top of each lip, plus a centre spine line
         for (const e of [-1, 1]) {
           quad(rail,
-            at(pp, ps, pu, W * e, 0), at(cp, cs, cu, W * e, 0),
-            at(cp, cs, cu, W * e, .4), at(pp, ps, pu, W * e, .4),
+            at(pp, ps, pu, W * e, 1.5), at(cp, cs, cu, W * e, 1.5),
+            at(cp, cs, cu, W * e, 1.9), at(pp, ps, pu, W * e, 1.9),
             [0, 1, 0], rc, .6);
+        }
+        // dashed centre line: every other sample, so speed has a metronome
+        if (k % 2) {
+          quad(rail,
+            at(pp, ps, pu, -.16, -.06), at(pp, ps, pu, .16, -.06),
+            at(cp, cs, cu, .16, -.06), at(cp, cs, cu, -.16, -.06),
+            cu, [1, .95, .8], .32);
         }
         pp = cp; ps = cs; pu = cu;
       }

@@ -70,14 +70,18 @@ export function genGraph(n) {
 
   // Node positions: jittered grid + a big swooping height field, so every
   // corridor is a climb or a dive and the net reads as a coaster, not a floor.
-  const p1 = Math.random() * 9, p2 = Math.random() * 9;
+  // Two octaves: a big slow swell for silhouette across the whole net, and
+  // a tighter one so neighbouring nodes still differ sharply. Flat is the
+  // enemy - the net should look like a mountain range of ribbons.
+  const p1 = Math.random() * 9, p2 = Math.random() * 9, p3 = Math.random() * 9;
   const pos = [];
   for (let x = 0; x < n; x++) {
     pos.push([]);
     for (let z = 0; z < n; z++) {
       pos[x].push([
         (x + .5) * S + (Math.random() - .5) * S * .44,
-        9 * Math.sin(x * 1.05 + p1) * Math.cos(z * .85 + p2) + (Math.random() - .5) * 3,
+        17 * Math.sin(x * .62 + p1) * Math.cos(z * .5 + p2)
+        + 8 * Math.sin(x * 1.7 + z * 1.3 + p3) + (Math.random() - .5) * 4,
         (z + .5) * S + (Math.random() - .5) * S * .44,
       ]);
     }

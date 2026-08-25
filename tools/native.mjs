@@ -22,12 +22,17 @@ const noRoadroller = args.includes('--no-roadroller');
 // the shipped zip carries none of it - a debug key that reaches a compo
 // judge is a liability, and one that costs bytes is two.
 const cheats = args.includes('--cheats');
+// Two entries live in this repo now. --game picks which one this run
+// builds; each has its own source dir, milestone file and title, and both
+// go through the same squeeze chain so their numbers stay comparable.
+const game = args.find((a) => /^--game=/.test(a))?.split('=')[1] || 'native';
+const TITLES = { native: 'The Seventh Color', strands: 'Seven Strands' };
 
 const num = (n) => n.toLocaleString('en-US');
 
 const result = await build({
   absWorkingDir: root,
-  entryPoints: [path.join(root, 'native/src/main.js')],
+  entryPoints: [path.join(root, game, 'src/main.js')],
   bundle: true,
   write: false,
   platform: 'browser',
@@ -57,7 +62,7 @@ const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;displ
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {
   const out = await squeeze({
-    js: minified, css, markup, title: 'The Seventh Color',
+    js: minified, css, markup, title: TITLES[game] || game,
     roadroller: !noRoadroller, level, zopfliIterations: rolls > 1 ? 15 : 200,
   });
   console.log(`  roll ${i + 1}/${rolls}: index.zip = ${num(out.archiveBytes)}`);
@@ -65,7 +70,7 @@ for (let i = 0; i < rolls; i++) {
   if (!worst || out.archiveBytes > worst.archiveBytes) worst = out;
 }
 
-const outDir = path.join(root, 'build', 'native');
+const outDir = path.join(root, 'build', game);
 mkdirSync(outDir, { recursive: true });
 writeFileSync(path.join(outDir, 'index.html'), best.document);
 writeFileSync(path.join(outDir, 'index.zip'), best.archive);
@@ -74,7 +79,7 @@ console.log('');
 console.log(`  best of ${rolls}:  ${num(best.archiveBytes)}`);
 console.log(`  worst of ${rolls}: ${num(worst.archiveBytes)}`);
 
-const milestonePath = path.join(root, 'native-milestone.json');
+const milestonePath = path.join(root, `${game}-milestone.json`);
 let milestone = null;
 try { milestone = JSON.parse(readFileSync(milestonePath, 'utf8')); } catch {}
 

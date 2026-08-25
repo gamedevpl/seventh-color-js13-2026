@@ -4,7 +4,7 @@
 // machine and mechanics come online, the same "drive it a little, not just
 // boot" discipline as the GameKit-episode verify.mjs.
 
-const KEY_MAP = { space: 'Space', left: 'ArrowLeft', right: 'ArrowRight', enter: 'Enter' };
+const KEY_MAP = { space: 'Space', left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown', enter: 'Enter' };
 
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -17,9 +17,10 @@ const root = path.resolve(here, '..');
 const args = process.argv.slice(2);
 const seconds = Number(args.find((a) => /^\d+$/.test(a)) || 3);
 const keysArg = args.find((a) => /^--keys=/.test(a))?.split('=')[1] || '';
+const game = args.find((a) => /^--game=/.test(a))?.split('=')[1] || 'native';
 const keys = keysArg ? keysArg.split(',') : [];
 
-const archive = readFileSync(path.join(root, 'build', 'native', 'index.zip'));
+const archive = readFileSync(path.join(root, 'build', game, 'index.zip'));
 const nameLength = archive.readUInt16LE(26);
 const extraLength = archive.readUInt16LE(28);
 const method = archive.readUInt16LE(8);
@@ -32,12 +33,18 @@ const stage = mkdtempSync(path.join(tmpdir(), 'js13k-native-verify-'));
 const pagePath = path.join(stage, 'index.html');
 writeFileSync(pagePath, document);
 
-const browser = await chromium.launch();
+// Software WebGL in headless needs an explicit opt-in these days; without
+// it the strands build boots to a dead context and the probe blames the game.
+const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const context = await browser.newContext({ viewport: { width: 900, height: 640 } });
 const page = await context.newPage();
 
 const problems = [];
 page.on('console', (message) => {
+  // Headless GL emits *performance* chatter (ReadPixels stalls from the
+  // screenshotting itself). That is the harness observing, not the game
+  // failing - filter exactly that class and nothing else.
+  if (/GL Driver Message \(OpenGL, Performance/.test(message.text())) return;
   if (message.type() === 'error' || message.type() === 'warning') problems.push(`${message.type()}: ${message.text()}`);
 });
 page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
@@ -59,7 +66,7 @@ for (let i = 0; i < keys.length; i++) {
     await page.keyboard.press(key);
   }
   await page.waitForTimeout(350);
-  await page.screenshot({ path: path.join(root, 'build', 'native', `verify-${i + 1}.png`) });
+  await page.screenshot({ path: path.join(root, 'build', game, `verify-${i + 1}.png`) });
 }
 
 // --soak=N plays for N seconds on a fixed, repeating input pattern that is
@@ -103,7 +110,7 @@ if (skipAll) {
     await page.keyboard.up('ShiftRight');
     await page.keyboard.up('ShiftLeft');
     await page.waitForTimeout(300);
-    await page.screenshot({ path: path.join(root, 'build', 'native', `skip-${String(i).padStart(2, '0')}.png`) });
+    await page.screenshot({ path: path.join(root, 'build', game, `skip-${String(i).padStart(2, '0')}.png`) });
   }
   console.log('walked 30 skips across the story');
 }
@@ -116,7 +123,7 @@ const probe = await page.evaluate(() => {
   };
 });
 
-const shot = path.join(root, 'build', 'native', 'verify.png');
+const shot = path.join(root, 'build', game, 'verify.png');
 await page.screenshot({ path: shot });
 await browser.close();
 

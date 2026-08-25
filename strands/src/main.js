@@ -10,7 +10,7 @@ import { initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, pers
 import { S, makeCourse, depths } from './course.js';
 import { trackMeshes, makeRider, ride, behind, ahead, placeAt, frame as tframe } from './track.js';
 import { unicornMesh, headMesh, PIVOT, RAINBOW } from './uni.js';
-import { makeBraid, updateBraid, makeTrail, feedTrail, nearTrail, trailVerts, BUF } from './ribbon.js';
+import { makeBraid, updateBraid, makeTrail, feedTrail, trailVerts, BUF } from './ribbon.js';
 
 const VW = 640, VH = 360;
 const FOG = [.035, .03, .08];
@@ -106,7 +106,7 @@ let mode = 'title', timer = 0;
 let course, depth, roadM, railM, groundM, bgM, braid, trailM;
 let surge = 0, slipT = 0, fly = null, cine = 0, jumps = 0, falls = 0;
 let rainbowT = 0, rainbowTotal = 0, bestBurn = 0, flash = 0, msgT = 0, msg = '';
-let energy = 40, slowT = 0, stars = [];
+let energy = 40, slowT = 0, stars = [], laneV = 0, prevYaw = 0, turnRate = 0;
 const player = { r: null, speed: 10, lane: 0 };
 const cam = { e: [0, 3, -5], a: [0, 0, 0] };
 const uniM = unicornMesh();
@@ -126,11 +126,11 @@ function placeStars() {
     const e = a.next[0];
     if (!e) continue;
     if (e.gap) {
-      const A = a.p, B = e.to.p, dist = d3(A, B), h = Math.min(11, dist * .22);
-      for (const u of [.3, .5, .7]) {
+      const A = a.p, B = e.to.p, dist = d3(A, B), h = Math.min(18, dist * .3);
+      for (const u of [.2, .35, .5, .65, .8]) {
         stars.push({ i: a.i, p: [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u + 4 * h * u * (1 - u) + 1.2, A[2] + (B[2] - A[2]) * u] });
       }
-    } else if ((e.to.req || Math.random() < .55)) {
+    } else if ((e.to.req || Math.random() < .8)) {
       const k = e.to.req ? 2 : 1;
       for (let j = 0; j < k; j++) {
         const t = .25 + .5 * (j + Math.random()) / k;
@@ -246,7 +246,7 @@ function newRun() {
   PART.length = 0; pcur = 0;
   surge = 0; slipT = 0; fly = null; cine = 0; jumps = 0; falls = 0;
   rainbowT = 0; rainbowTotal = 0; flash = 0; msgT = 0;
-  energy = 40; slowT = 0;
+  energy = 40; slowT = 0; laneV = 0; prevYaw = 0; turnRate = 0;
   timer = 0;
   camT = null; camU = null; prevP = null;
 }
@@ -291,17 +291,26 @@ function doFall(why) {
   const back = player.r.pa || player.r.a;
   placeAt(player.r, back, null);
   player.speed = 12;
+  player.lane = 0; laneV = 0;
   energy = Math.max(energy, 30);
   fly = null;
   slowT = 0;
 }
 
+// The gap is as long as you EARNED. Launch fast and the landing is chosen
+// further down the chain - the hole literally opens up for you - and the
+// flight is time-dilated on top, so a good launch buys a long, slow, silly
+// arc through the stars instead of a hop.
 function startFly() {
-  const a = player.r.a, b = player.r.b;
+  const a = player.r.a;
+  let b = player.r.b;
+  const extra = Math.max(0, Math.min(3, Math.floor((player.speed - 17) / 6)));
+  for (let i = 0; i < extra && b.next.length && !b.next[0].gap; i++) b = b.next[0].to;
   const dist = d3(a.p, b.p);
-  fly = { a, b, u: player.r.s / Math.max(1, player.r.len), v: Math.max(10, player.speed),
-    need: dist * 1.02 + 7, dist, h: Math.min(11, dist * .22), sink: 0, lat: player.lane * 2.8 };
-  tone(300, .3, 'sawtooth', .09);
+  fly = { a, b, u: 0, v: Math.max(10, player.speed), need: 16, dist,
+    h: Math.min(18, dist * .3), sink: 0, lat: player.lane * 2.8, air: 0 };
+  tone(300, .35, 'sawtooth', .09);
+  tone(660, .5, 'triangle', .05);
   jumps++;
 }
 function flyState() {
@@ -347,28 +356,32 @@ function frame(now) {
     const free = mode === 'rainbow';
     const canBoost = heldFwd() && (free || energy > 0);
     const top = free ? 40 : 34;
-    const target = canBoost ? top : heldBack() ? 9 : 15;
+    const target = canBoost ? top : heldBack() ? 9 : 20;
     player.speed += (target - player.speed) * Math.min(1, dt * (heldBack() ? 3 : 1.2));
-    if (canBoost && !free) energy = Math.max(0, energy - dt * 10);
+    if (canBoost && !free) energy = Math.max(0, energy - dt * 19);
 
     if (fly) {
       cine = Math.min(1, cine + dt * 4);
       // air control: boost burns stardust to stretch the arc, lateral drift
       // lines up the landing (and the stars strung along the arc)
       if (heldFwd() && (free || energy > 0)) {
-        fly.v += dt * 16;
-        if (!free) energy = Math.max(0, energy - dt * 14);
+        // Same ceiling as the deck: the flight is dilated now, so an
+        // uncapped air-boost pumped landing speeds to 79 against a limit of
+        // 46 - and a landing at 79 gets thrown off the very next bend.
+        fly.v = Math.min(46, fly.v + dt * 16);
+        if (!free) energy = Math.max(0, energy - dt * 22);
         burst(prevP || player.r.pos, 1, 2);
       }
       fly.lat += turnDir() * dt * 7;
       fly.lat = Math.max(-4.5, Math.min(4.5, fly.lat));
-      fly.u += fly.v / fly.dist * dt;
+      fly.air += dt;
+      fly.u += fly.v * .5 / fly.dist * dt;   // dilated: air time is the reward
       const deficit = Math.max(0, fly.need - fly.v);
       fly.sink += deficit * dt * .9;
       if (fly.sink > 7) doFall('Fell short! Carry more speed into the jump - or boost mid-air.');
       else if (fly.u >= 1) {
         placeAt(player.r, fly.b, fly.a);
-        player.speed = Math.max(player.speed, fly.v * .9);
+        player.speed = Math.min(46, Math.max(player.speed, fly.v * .9));
         player.lane = Math.max(-1, Math.min(1, fly.lat / 2.8));
         fly = null;
         tone(140, .25, 'triangle', .12);
@@ -381,10 +394,22 @@ function frame(now) {
       }
     } else {
       cine = Math.max(0, cine - dt * 1.4);
-      const st = turnDir();
-      if (st) player.lane += st * dt * 2.2;
-      else player.lane -= Math.sign(player.lane) * Math.min(Math.abs(player.lane), dt * .7);
-      player.lane = Math.max(-1, Math.min(1, player.lane));
+      // Lateral physics. a = v * turnRate is the real centrifugal term, and
+      // it pushes you to the OUTSIDE of the bend; steering is an opposing
+      // acceleration you have to actually apply. Fast through a serpentine
+      // is no longer free - you have to hold the line, and if you cannot,
+      // you go over the edge. This is what makes falling off possible.
+      const yawNow = Math.atan2(player.r.tan[0], player.r.tan[2]);
+      let dy2 = yawNow - prevYaw;
+      dy2 -= Math.round(dy2 / (2 * Math.PI)) * 2 * Math.PI;
+      prevYaw = yawNow;
+      turnRate = dt > 0 ? dy2 / dt : 0;
+      const cf = -turnRate * player.speed / 2.8 * .3;      // lane units/s^2
+      laneV += (cf + turnDir() * 6 - laneV * 2.6) * dt;
+      player.lane += laneV * dt;
+      if (!turnDir() && Math.abs(turnRate) < .3) player.lane -= Math.sign(player.lane) * Math.min(Math.abs(player.lane), dt * .5);
+      if (Math.abs(player.lane) > 1.25) doFall('Thrown off the edge! Steer INTO the bend to hold the line.');
+      player.lane = Math.max(-1.25, Math.min(1.25, player.lane));
       // Gravity along the tangent: dives are FREE speed - use them.
       player.speed -= player.r.tan[1] * dt * 22;
       player.speed = Math.max(7, Math.min(46, player.speed));
@@ -408,7 +433,7 @@ function frame(now) {
         if (st2.taken || st2.i < pi - 1 || st2.i > pi + 2) continue;
         if (d3(st2.p, pp2) < 2.7) {
           st2.taken = true;
-          energy = Math.min(100, energy + 9);
+          energy = Math.min(100, energy + 10);
           surge = Math.max(surge, .25);
           burst(st2.p, 8, 5);
           tone(880 + Math.random() * 220, .12, 'triangle', .07);
@@ -421,12 +446,16 @@ function frame(now) {
 
     if (mode === 'run') {
       updateBraid(braid, player.r.pos, dt, depth);
-      if (!fly && braid.burst <= 0 && nearTrail(braid.tl, player.r.pos, 3.4)) {
+      // Reaching the HEAD is the catch - stepping on the tail was never the
+      // fantasy, and it made the merge feel like an accident.
+      if (!fly && braid.burst <= 0 && d3(player.r.pos, braid.r.pos) < 4.6) {
         mode = 'rainbow';
         rainbowT = 7;
         energy = 100;
         flash = 1;
         surge = 1;
+        burst(braid.r.pos, 70, 13);
+        burst(player.r.pos, 40, 8);
         say('YOU ARE THE RAINBOW - jump the gaps to keep it burning!', 5);
         RAINBOW.forEach((_, i) => tone(392 * 2 ** (i / 7), .35, 'triangle', .1, ac && ac.currentTime + i * .07));
       }
@@ -471,20 +500,30 @@ function frame(now) {
   camT = ease(camT, camTv, rT); camU = ease(camU, camUv, rUp);
   let T = camT, up = camU;
 
+  // ONE handedness for everything: cross(up, forward), which is what
+  // track.js's own frame produces. main.js used cross(forward, up) - the
+  // opposite - so its side vector pointed screen-RIGHT while the track's
+  // pointed screen-LEFT. That single sign is why pressing left slid the
+  // unicorn right, and why the lean on serpentines looked inside out.
+  const X = (u, f) => [u[1] * f[2] - u[2] * f[1], u[2] * f[0] - u[0] * f[2], u[0] * f[1] - u[1] * f[0]];
   const hd2 = Math.atan2(T[0], T[2]);
   let dhd = hd2 - lastHd;
   dhd -= Math.round(dhd / (2 * Math.PI)) * 2 * Math.PI;
   lastHd = hd2;
   if (dt > 0) rollSm += (Math.max(-.6, Math.min(.6, dhd / dt * .5)) - rollSm) * Math.min(1, dt * 3);
   const roll = rollSm * (1 - cine);
-  let sideL = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]];
   const cR = Math.cos(roll), sR = Math.sin(roll);
+  let sideL = X(up, T);
   up = [up[0] * cR + sideL[0] * sR, up[1] * cR + sideL[1] * sR, up[2] * cR + sideL[2] * sR];
-  sideL = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]];
-  // raw frame for the body, with the same lean rolled in
-  let rSide = [rT[1] * rUp[2] - rT[2] * rUp[1], rT[2] * rUp[0] - rT[0] * rUp[2], rT[0] * rUp[1] - rT[1] * rUp[0]];
-  const rUp2 = [rUp[0] * cR + rSide[0] * sR, rUp[1] * cR + rSide[1] * sR, rUp[2] * cR + rSide[2] * sR];
-  rSide = [rT[1] * rUp2[2] - rT[2] * rUp2[1], rT[2] * rUp2[0] - rT[0] * rUp2[2], rT[0] * rUp2[1] - rT[1] * rUp2[0]];
+  sideL = X(up, T);
+  // The DECK frame, unrolled: everything POSITIONAL rides this, because the
+  // extra lean is a pose, not a place. Offsetting along a rolled-up vector
+  // is what used to drive the unicorn under the road on hard bends.
+  const dSide = X(rUp, rT);
+  // ...and the rolled frame, for the pose only.
+  const rSide0 = X(rUp, rT);
+  const rUp2 = [rUp[0] * cR + rSide0[0] * sR, rUp[1] * cR + rSide0[1] * sR, rUp[2] * cR + rSide0[2] * sR];
+  const rSide = X(rUp2, rT);
   lean += (turnDir() * .1 - lean) * Math.min(1, dt * 4);
 
   const high = (2.0 - speedSm * .15) + cine * 2.2;
@@ -499,8 +538,13 @@ function frame(now) {
   clSm += (cl - clSm) * Math.min(1, dt * 4);
   const lo = player.r ? player.lane * 2.2 : 0;
   const swing = cine * 3.2;
-  const sh = (speedSm * speedSm * .08 + surge * .1) * (1 - cine);
-  const shx = Math.sin(now * .037) * sh, shy = Math.cos(now * .029) * sh * .6;
+  // Dynamic shake: two incommensurable sine pairs so it never settles into a
+  // visible rhythm, scaled hard by speed and punched by every surge. Gated
+  // out of the jump cinematic, which wants to be still.
+  const sh = (speedSm * speedSm * .22 + surge * .3) * (1 - cine);
+  const shx = (Math.sin(now * .041) + Math.sin(now * .0173) * .6) * sh;
+  const shy = (Math.cos(now * .031) + Math.cos(now * .0119) * .6) * sh * .7;
+  const shr = Math.sin(now * .027) * sh * .06;
   const tgtE = [
     bp[0] + up[0] * (high / Math.max(.55, clSm) + shy) + sideL[0] * (lean + lo + swing + shx),
     bp[1] + up[1] * (high / Math.max(.55, clSm) + shy) + sideL[1] * (lean + lo + swing + shx),
@@ -518,8 +562,11 @@ function frame(now) {
     cam.e[i] += (tgtE[i] - cam.e[i]) * k;
     cam.a[i] += (tgtA[i] - cam.a[i]) * k;
   }
-  const cu = up.map((v, i) => v - sideL[i] * lean * .5);
+  const cu = up.map((v, i) => v - sideL[i] * (lean * .5 + shr));
   fovSm += (1.03 + speedSm * .38 + surge * .2 + cine * .16 - fovSm) * Math.min(1, dt * 6);
+  // Dev only: the run's vital signs, so tools/test-balance.mjs can tune the
+  // stardust economy against real play instead of arithmetic on paper.
+  if (DEV) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal]);
   if (DEV) (window.__cam = window.__cam || []).push([now, cam.e[0], cam.e[1], cam.e[2], cam.a[0], cam.a[1], cam.a[2], fovSm, cu[0], cu[1], cu[2]]);
   vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);
@@ -549,9 +596,9 @@ function frame(now) {
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
     const S8 = .85, lx = fly ? 0 : player.lane * 2.8;
     const base = [
-      p[0] + rUp2[0] * (bob + .04) + rSide[0] * lx,
-      p[1] + rUp2[1] * (bob + .04) + rSide[1] * lx,
-      p[2] + rUp2[2] * (bob + .04) + rSide[2] * lx,
+      p[0] + rUp[0] * (bob + .04) + dSide[0] * lx,
+      p[1] + rUp[1] * (bob + .04) + dSide[1] * lx,
+      p[2] + rUp[2] * (bob + .04) + dSide[2] * lx,
     ];
     drawMesh(uniM, modelFrame(base, rSide, rUp2, rT, S8));
     beat = Math.max(0, beat - dt * 4.5);
@@ -607,7 +654,27 @@ function frame(now) {
     ctx.fillStyle = '#e8b923';
     ctx.fillText('press SPACE', VW / 2, 258);
   } else {
-    const blur = Math.max(0, speedSm - .3) + surge * .5 + cine * .3;
+    const blur = Math.max(0, speedSm - .28) + surge * .5 + cine * .3;
+    // REAL radial blur: redraw the rendered frame over itself a few times,
+    // scaled up about the viewport centre. Successive scaled copies at low
+    // alpha smear every pixel outward along its own radius - a zoom blur,
+    // for the price of three drawImage calls and no shader.
+    if (blur > .02) {
+      // ADDITIVE, not a plain alpha composite. Averaging scaled copies in
+      // over the crisp frame darkens small bright features - every scaled
+      // copy is mostly dark sky - so the rainbow's own head came out as a
+      // dim disc. Adding them only ever brightens: bright things smear
+      // outward as light, which is the whole point.
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 1; i <= 4; i++) {
+        const sc = 1 + i * i * .013 * (.6 + blur * 1.7);
+        ctx.globalAlpha = Math.min(.3, blur * .38) / i;
+        const w2 = VW * sc, h2 = VH * sc;
+        ctx.drawImage(glc, (VW - w2) / 2, (VH - h2) / 2, w2, h2);
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
     if (blur > 0) {
       for (const [col, ox] of [['rgba(120,220,255,', -2], ['rgba(255,120,190,', 2], ['rgba(255,255,255,', 0]]) {
         ctx.strokeStyle = col + Math.min(.42, blur * (ox ? .22 : .45)) + ')';

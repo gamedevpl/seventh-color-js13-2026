@@ -131,7 +131,11 @@ export function frame(a, b, t) {
   const Tb = edgePos(a, b, Math.min(1, t + e))[1];
   let dh = Math.atan2(Tb[0], Tb[2]) - Math.atan2(Ta[0], Ta[2]);
   dh -= Math.round(dh / (2 * Math.PI)) * 2 * Math.PI;
-  let phi = Math.max(-.5, Math.min(.5, dh * 1.6)) * Math.min(1, 4 * t * (1 - t));
+  // NEGATIVE, because up' = u*cos - s0*sin: a positive phi leans the surface
+  // normal AWAY from the turn. Banking outward is the opposite of what a
+  // body does in a corner, and it reads as wrong even when you cannot say
+  // why. tools/test-bank.mjs pins the direction down.
+  let phi = -Math.max(-.5, Math.min(.5, dh * 1.6)) * Math.min(1, 4 * t * (1 - t));
   if (twisted(a, b)) phi += Math.PI * 2 * sm(t);
   const c = Math.cos(phi), si = Math.sin(phi);
   return [p, T,

@@ -43,12 +43,6 @@ export function feedTrail(tl, pos, s, u, dist) {
   tl.head = pt;
 }
 
-export function nearTrail(tl, p, r) {
-  if (tl.head && d3(tl.head, p) < r) return true;
-  for (let i = tl.pts.length - 1; i >= 0; i--) if (d3(tl.pts[i], p) < r) return true;
-  return false;
-}
-
 export function makeBraid(course) {
   return { r: makeRider(course.start), tl: makeTrail(), burst: 0 };
 }
@@ -56,7 +50,11 @@ export function makeBraid(course) {
 export function updateBraid(br, playerPos, dt, depth) {
   const pd = d3(br.r.pos, playerPos);
   br.burst = Math.max(0, br.burst - dt);
-  let sp = pd < 14 ? 27 : pd > 55 ? 11 : 16;
+  // Below the player's boosted top speed on purpose: with the tank forcing
+  // roughly half-throttle, a flee speed of 27 made the chase a coin flip on
+  // course layout. The difficulty belongs in the track's demands, not in an
+  // unwinnable pursuit.
+  let sp = pd < 14 ? 24 : pd > 55 ? 11 : 16;
   if (br.burst > 0) sp = 44;
   const before = [...br.r.pos];
   ride(br.r, sp * dt, (es) => {

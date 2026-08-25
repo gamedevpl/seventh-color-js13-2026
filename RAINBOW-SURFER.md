@@ -59,6 +59,60 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R3 - two sign bugs, and the economy tuned against measurement
+
+Three of the complaints ("left arrow moves it right", "it goes under the
+track", "the lean on serpentines still looks wrong") turned out to be TWO
+sign errors, both pinned down by a test rather than by staring:
+
+- **main.js built its side vector as cross(forward, up); track.js builds
+  cross(up, forward).** Opposite handedness. main's pointed screen-RIGHT
+  while the track's pointed screen-LEFT, so pressing left slid the unicorn
+  right, and the roll leaned the wrong way on top of the track's own bank.
+  One helper, one handedness, everywhere.
+- **The track banked OUT of its corners.** `up' = u*cos - s0*sin` with a
+  positive phi tilts the surface normal away from the turn - the opposite
+  of what a body does in a bend. `tools/test-bank.mjs` builds a deliberate
+  left-hander and asserts the normal leans toward +X.
+- **Under the deck**: the lateral lane offset was applied along the ROLLED
+  up vector, so on a hard lean the offset dived below the road. Position
+  now rides the unrolled deck frame; only the pose is rolled.
+
+Then the economy, which is not a thing you can reason out on paper:
+`tools/test-balance.mjs` plays a fixed full-throttle policy in a real
+browser and reports speed, stardust, falls and how much of the run was
+spent as the rainbow. First measurement: tank empty 69% of frames, below
+the corkscrew minimum 53%, rainbow never caught. After tuning cruise to 20
+(so an empty tank still clears the gentlest demand instead of soft-locking
+against it), burn to 19/s, dust to 10 a piece on 80% of edges, and the
+rainbow's flee speed to 24 - three consecutive trials give 44-52% of the
+run spent as the rainbow, 16-19s of burn, 13-23% empty tank, one fall per
+35 seconds. The probe also caught an uncapped air-boost pumping landing
+speeds to 79 against a deck limit of 46, which then threw the player off
+the very next bend.
+
+Also in this pass:
+
+- **Real radial blur**, ADDITIVELY composited: the rendered frame is drawn
+  back over itself four times, scaled about the viewport centre. A plain
+  alpha composite averages in mostly-dark copies and DIMS small bright
+  features - the rainbow's own head came out as a dark disc - while
+  `lighter` only ever brightens, so light smears outward as light.
+  (`preserveDrawingBuffer` is on for this.)
+- **Dynamic shake** from two incommensurable sine pairs so it never settles
+  into a rhythm, scaled by speed squared, plus a roll component - gated out
+  of the jump cinematic, which wants to be still.
+- **Centrifugal force**: a = v x turnRate pushes you to the outside of every
+  bend and steering is an opposing acceleration you must actually apply.
+  Past 1.25 lanes you go over the edge. This is what finally makes falling
+  off possible - and what makes the wide deck matter.
+- **The gap is as long as you earned**: launch speed picks a landing node
+  further down the chain, and the flight is time-dilated on top, so a good
+  launch buys a long slow arc through the stardust instead of a hop.
+- **The merge is a catch, not a stumble**: reaching the rainbow's HEAD
+  transforms you, with a 110-particle detonation - stepping on its tail
+  made the best moment in the game feel like an accident.
+
 ## Why the maze had to go (R1)
 
 The grid maze had cycles, and cycles are why the rainbow could come at you

@@ -28,7 +28,10 @@ let prog, loc = {};
 
 export function initGL(c) {
   canvas = c;
-  gl = c.getContext('webgl', { antialias: true });
+  // preserveDrawingBuffer, because the HUD samples this canvas back with
+  // drawImage to build the radial blur. Without it the buffer is undefined
+  // by the time the 2D pass reads it.
+  gl = c.getContext('webgl', { antialias: true, preserveDrawingBuffer: true });
   const sh = (type, src) => {
     const s = gl.createShader(type);
     gl.shaderSource(s, src);

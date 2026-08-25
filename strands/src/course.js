@@ -57,10 +57,10 @@ export function makeCourse(count) {
       const L = 3 + (Math.random() * 3 | 0);
       for (let i = 0; i < L; i++) step(rnd(-.15, .15), -.16, S);
       step(rnd(-.1, .1), .1, S);
-    } else if (r < .70) {                           // climb: it costs you
+    } else if (r < .66) {                           // climb: it costs you
       const L = 2 + (Math.random() * 2 | 0);
       for (let i = 0; i < L; i++) step(rnd(-.12, .12), .14, S * .9);
-    } else if (r < .85) {                           // the gap: jump it
+    } else if (r < .88) {                           // the gap: jump it
       step(rnd(-.08, .08), .02, S, false, 0);
       step(0, .04, S * .8, true, 0);
       step(0, -.02, S, false, 0);

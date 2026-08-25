@@ -6,13 +6,23 @@
 
 export let gl, canvas;
 
-const VS = `attribute vec3 p,n,c;uniform mat4 vp,md;uniform vec3 cam;
-varying vec3 vc;varying float vf;
+// Two materials in one program. Solid geometry gets lambert + fog-toward-
+// fog-colour. Glow gets no lighting (it emits, it is not lit) and fades
+// toward nothing rather than toward fog, because additive blending adds -
+// mixing a distant glow toward the fog colour would brighten the horizon
+// instead of letting the light die away.
+// `add` lives in both stages, so it carries an explicit precision: default
+// float precision is highp in the vertex shader and mediump in the fragment
+// one, and a uniform whose precision disagrees across stages is a link error.
+const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
+uniform mediump float add;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
 float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
-vc=c*l;vf=clamp((length(w.xyz-cam)-7.)/20.,0.,1.);}`;
-const FS = `precision mediump float;varying vec3 vc;varying float vf;uniform vec3 fog;
-void main(){gl_FragColor=vec4(mix(vc,fog,vf),1.);}`;
+vc=c*mix(l,1.,add);va=a;vf=clamp((length(w.xyz-cam)-7.)/20.,0.,1.);}`;
+const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
+uniform vec3 fog;uniform float add;
+void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf));
+else gl_FragColor=vec4(mix(vc,fog,vf),1.);}`;
 
 let prog, loc = {};
 
@@ -30,12 +40,14 @@ export function initGL(c) {
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog']) loc[u] = gl.getUniformLocation(prog, u);
-  for (const a of ['p', 'n', 'c']) loc[a] = gl.getAttribLocation(prog, a);
+  for (const u of ['vp', 'md', 'cam', 'fog', 'add']) loc[u] = gl.getUniformLocation(prog, u);
+  for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 }
 
 export function frameGL(vp, cam, fog) {
+  additive(false);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(fog[0], fog[1], fog[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -44,29 +56,40 @@ export function frameGL(vp, cam, fog) {
   gl.uniform3fv(loc.fog, fog);
 }
 
-// Interleaved pos3/normal3/color3. `dynamic` meshes re-upload each frame
-// (the braid); everything else is built once at round start.
+// Switch materials. Additive also drops depth WRITES while keeping the depth
+// TEST, so glow layers still hide behind walls but never occlude each other -
+// they sum, which is the whole bloom effect.
+export function additive(on) {
+  gl.uniform1f(loc.add, on ? 1 : 0);
+  if (on) { gl.enable(gl.BLEND); gl.depthMask(false); }
+  else { gl.disable(gl.BLEND); gl.depthMask(true); }
+}
+
+// Interleaved pos3/normal3/color3/alpha1. `dynamic` meshes re-upload each
+// frame (the braid); everything else is built once at round start.
 export function createMesh(arr, dynamic) {
   const b = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, b);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
-  return { b, n: arr.length / 9, dynamic };
+  return { b, n: arr.length / 10, dynamic };
 }
 
 export function updateMesh(m, arr) {
   gl.bindBuffer(gl.ARRAY_BUFFER, m.b);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.DYNAMIC_DRAW);
-  m.n = arr.length / 9;
+  m.n = arr.length / 10;
 }
 
 export function drawMesh(m, model) {
   gl.bindBuffer(gl.ARRAY_BUFFER, m.b);
-  gl.vertexAttribPointer(loc.p, 3, gl.FLOAT, false, 36, 0);
-  gl.vertexAttribPointer(loc.n, 3, gl.FLOAT, false, 36, 12);
-  gl.vertexAttribPointer(loc.c, 3, gl.FLOAT, false, 36, 24);
+  gl.vertexAttribPointer(loc.p, 3, gl.FLOAT, false, 40, 0);
+  gl.vertexAttribPointer(loc.n, 3, gl.FLOAT, false, 40, 12);
+  gl.vertexAttribPointer(loc.c, 3, gl.FLOAT, false, 40, 24);
+  gl.vertexAttribPointer(loc.a, 1, gl.FLOAT, false, 40, 36);
   gl.enableVertexAttribArray(loc.p);
   gl.enableVertexAttribArray(loc.n);
   gl.enableVertexAttribArray(loc.c);
+  gl.enableVertexAttribArray(loc.a);
   gl.uniformMatrix4fv(loc.md, false, model);
   gl.drawArrays(gl.TRIANGLES, 0, m.n);
 }
@@ -122,7 +145,7 @@ export function pushBox(v, cx, cy, cz, sx, sy, sz, r, g, b) {
   ];
   for (const [n, q] of F) {
     for (const i of [0, 1, 2, 0, 2, 3]) {
-      v.push(cx + q[i * 3], cy + q[i * 3 + 1], cz + q[i * 3 + 2], n[0], n[1], n[2], r, g, b);
+      v.push(cx + q[i * 3], cy + q[i * 3 + 1], cz + q[i * 3 + 2], n[0], n[1], n[2], r, g, b, 1);
     }
   }
 }

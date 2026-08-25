@@ -42,11 +42,46 @@ in ~4.8 KB zipped, a third of the budget, before polish milestones.
   streaming behind it.
 - Rounds grow: each catch rebuilds a maze two cells wider.
 
+## Design notes, S1 - the braid drags along the ground
+
+The braid was reworked from a flat ribbon floating at chest height into a
+rope of light dragging along the stone, glowing volumetrically. There is
+no post-process bloom in the byte budget, so the bloom is built from
+geometry plus additive blending: the shader gained a per-vertex alpha and
+an `add` uniform (emissive, unlit, fades to nothing instead of toward the
+fog colour - additive blending *adds*, so fading toward fog would
+brighten the horizon). Additive draws keep the depth TEST but drop depth
+WRITES: glow still hides behind walls but layers never occlude each
+other - they sum, and that summing is the bloom.
+
+Layers, all rebuilt from the same trail every frame:
+
+- **seven cores** orbiting the shared path - seven phases evenly around a
+  circle, advancing along the trail and turning with time, so the strands
+  genuinely cross over and under like a plait (sway alone just lays seven
+  parallel ribbons down like a flag);
+- **ground smear** - a tight rainbow spill plus a wide pale wash, each
+  bright at the centreline and alpha-zero at both outer edges, because a
+  hard-edged quad reads as a rectangle no matter how faint it is;
+- **a pale sheath** at rope height so the plait sits inside a haze;
+- **upright haze cards** every other trail point, bright at the floor and
+  fading with height, giving the glow a body standing in the air;
+- **a head knot** - two crossed white fans pulsing at the braid's actual
+  position, so the rope ends in the living light being chased rather than
+  just stopping.
+
+Dev-only spectator rig (compiled out of shipping builds): holding O
+teleports the player onto the braid's own trail and parks the camera on
+the tail point - trail points are corridor-interior by construction, so a
+headless screenshot always frames the ribbon instead of a wall. The catch
+check is suppressed while spectating.
+
 ## Milestone log
 
 | gate | ceiling | worst-of-5 | notes |
 | --- | ---: | ---: | --- |
 | S0 first playable | 6,500 | 4,790 | maze+chase+catch+title/win, headless-verified |
+| S1 volumetric braid | 6,500 | 5,236 | ground-dragging plait, additive glow layers, head knot |
 
 Bugs caught by looking at S0 screenshots, not by the harness: the
 hand-rolled `lookAt` used `z×up` instead of `up×z` and rendered the world

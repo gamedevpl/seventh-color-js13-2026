@@ -4,7 +4,7 @@
 // over raw WebGL; the HUD is a transparent 2D canvas laid over the GL one,
 // because canvas text costs nothing and GL text costs everything.
 
-import { initGL, frameGL, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox } from './gl.js';
+import { initGL, frameGL, additive, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox } from './gl.js';
 import { S, genMaze, mazeMesh, collide, bfs } from './maze.js';
 import { unicornMesh, RAINBOW } from './uni.js';
 import { makeBraid, updateBraid, braidVerts } from './ribbon.js';
@@ -129,13 +129,23 @@ function frame(now) {
     updateBraid(maze, braid, player, dists, dt);
     updateMesh(braidM, braidVerts(braid, now / 1000));
 
+    // Dev only, while O is held: spectate from the braid's own trail - trail
+    // points are corridor-interior by construction, so the shot frames the
+    // ribbon instead of whatever wall a scripted key sequence drove into.
+    // Compiled out of every shipping build.
+    if (DEV && held.o && braid.trail.length > 18) {
+      const p = braid.trail[4], q = braid.trail[8];
+      player.x = p[0]; player.z = p[2];
+      player.yaw = Math.atan2(q[0] - p[0], q[2] - p[2]);
+    }
+
     // gallop rhythm follows real speed
     if (player.speed > 2 && Math.floor(timer * 7) !== Math.floor((timer - dt) * 7)) {
       tone(150 + Math.random() * 40, .04, 'triangle', .05);
     }
 
     const tail = braid.trail[0];
-    if (tail && Math.hypot(player.x - tail[0], player.z - tail[2]) < .95) {
+    if (!(DEV && held.o) && tail && Math.hypot(player.x - tail[0], player.z - tail[2]) < .95) {
       mode = 'won';
       best = best === 0 ? timer : Math.min(best, timer);
       RAINBOW.forEach((_, i) => tone(392 * 2 ** (i / 7), .3, 'triangle', .1, i * .09));
@@ -155,17 +165,27 @@ function frame(now) {
   cam.x += (wantX - cam.x) * k;
   cam.y += (2.3 - cam.y) * k;
   cam.z += (wantZ - cam.z) * k;
+  // Dev only: park the eye ON a trail point further back - trail points are
+  // corridor-interior by construction, so the shot is never inside a wall.
+  if (DEV && held.o && mode === 'run' && braid.trail.length > 18) {
+    const e = braid.trail[0];
+    cam.x = e[0]; cam.y = 1.35; cam.z = e[2];
+  }
   const eye = [cam.x, cam.y, cam.z];
   const vp = mul(perspective(1.05, VW / VH, .1, 60), lookAt(eye, [player.x + fx * 1.4, .9, player.z + fz * 1.4]));
   frameGL(vp, eye, FOG);
 
   if (mode !== 'title') {
+    // Solids first, then everything that emits - the glow layers need the
+    // depth buffer already filled by the world they are shining through.
     drawMesh(mazeM, IDENT);
-    drawMesh(braidM, IDENT);
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, Math.abs(player.speed) / 4) * .1;
     drawMesh(uniM, modelTR(player.x, bob, player.z, player.yaw, .8));
+    additive(true);
+    drawMesh(braidM, IDENT);
     const pd = Math.hypot(player.x - braid.x, player.z - braid.z);
     if (pd > 7 && mode === 'run') drawMesh(pillarM, modelTR(braid.x, Math.sin(now / 300) * .3, braid.z, now / 400));
+    additive(false);
   }
 
   // --- HUD ----------------------------------------------------------------

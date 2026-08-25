@@ -48,15 +48,19 @@ if (!rows.length) { console.log('no probe data - is this a --cheats build?'); pr
 // Bucket by speed, because both density and streak length ride on it.
 const BUCKETS = [[.2, .4], [.4, .6], [.6, .8], [.8, 1.01]];
 console.log(`${rows.length} frames sampled\n`);
-console.log('speedN      frames   travel/frame   streak    overlap   motes   within 12u');
+console.log('speedN      frames   travel/frame   streak    overlap   motes   within 12u   worst overlap');
 let worst = 0;
 for (const [lo, hi] of BUCKETS) {
   const b = rows.filter((r) => r[0] >= lo && r[0] < hi);
   if (!b.length) continue;
   const avg = (k) => b.reduce((s, r) => s + r[k], 0) / b.length;
   const vl = avg(1), len = avg(2), ov = len / vl;
-  worst = Math.max(worst, ov);
-  console.log(`${lo.toFixed(1)}-${hi.toFixed(1)}   ${String(b.length).padStart(6)}   ${vl.toFixed(3).padStart(10)}u   ${len.toFixed(2).padStart(6)}u   ${ov.toFixed(1).padStart(6)}x   ${avg(3).toFixed(0).padStart(5)}   ${avg(4).toFixed(1).padStart(9)}`);
+  // The guard is the WORST per-mote overlap in each frame, not the average:
+  // edge motes are stretched a little, and it is the longest streak on
+  // screen that decides whether anything reads as standing geometry.
+  const mx = Math.max(...b.map((r) => r[5]));
+  worst = Math.max(worst, mx);
+  console.log(`${lo.toFixed(1)}-${hi.toFixed(1)}   ${String(b.length).padStart(6)}   ${vl.toFixed(3).padStart(10)}u   ${len.toFixed(2).padStart(6)}u   ${ov.toFixed(1).padStart(6)}x   ${avg(3).toFixed(0).padStart(5)}   ${avg(4).toFixed(1).padStart(9)}   ${mx.toFixed(1).padStart(11)}x`);
 }
 console.log(`\nworst overlap factor: ${worst.toFixed(1)}x`);
 if (worst > 4) {

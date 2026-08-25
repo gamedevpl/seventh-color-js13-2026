@@ -1,5 +1,5 @@
 {
-  "name": "R7 streaks that move",
-  "description": "streak length tied to real per-frame camera travel, tighter mote cone, age-based fade-in",
+  "name": "R8 flow and glass",
+  "description": "speed dust weighted by optical flow, stencil-masked planar reflections in the glass deck",
   "ceilingBytes": 11500
 }

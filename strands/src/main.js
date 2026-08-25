@@ -6,7 +6,7 @@
 // rainbow the boost is free, the colours burn down instead, and a landed
 // jump relights one. Score is how long you burned.
 
-import { initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelFrame, IDENT, pushBox } from './gl.js';
+import { initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelFrame, IDENT, pushBox, setDim, mask, reflector } from './gl.js';
 import { S, makeCourse, depths } from './course.js';
 import { trackMeshes, makeRider, ride, behind, ahead, placeAt, frame as tframe } from './track.js';
 import { unicornMesh, headMesh, PIVOT, RAINBOW } from './uni.js';
@@ -185,7 +185,7 @@ const DBUF = new Float32Array(DMAX * 60);
 let prevEye = null;
 
 function dustVerts(speedN, dt) {
-  let n = 0, near = 0;
+  let n = 0, near = 0, maxOv = 0;
   if (!prevEye) { prevEye = [...cam.e]; return 0; }
   let vx = cam.e[0] - prevEye[0], vy = cam.e[1] - prevEye[1], vz = cam.e[2] - prevEye[2];
   prevEye = [...cam.e];
@@ -237,8 +237,20 @@ function dustVerts(speedN, dt) {
     // including right beside you, and simply swell into being.
     d[3] = Math.min(1, d[3] + dt * 3);
     const dist = Math.hypot(d[0] - cam.e[0], d[1] - cam.e[1], d[2] - cam.e[2]);
-    const a = alp * Math.min(1, wa) * d[3] * Math.min(1, (82 - dist) / 22);
-    if (DEV && dist < 12) near++;
+    // How fast this mote crosses the FRAME, which is not the same thing as
+    // how fast you are going. For a camera translating forward, a static
+    // point sweeps at v*sin(theta)/dist - nothing at the vanishing point,
+    // fastest out at the edges. In world terms that is perp/dist^2 per unit
+    // travelled. The streak's own length scales by the identical factor, so
+    // the two cancel and every mote used to look equally lively: the far
+    // axial ones crawled but shone just as bright as the ones whipping past
+    // your ear. That uniformity IS the snowstorm. Weighting brightness and
+    // a little length by the flow puts the light where the motion is.
+    const perp = Math.sqrt(Math.max(0, dist * dist - far * far));
+    const fn = Math.min(1, perp / (dist * dist) / .042);
+    const a = alp * Math.min(1, wa) * d[3] * fn * fn * Math.min(1, (82 - dist) / 22);
+    const ln = len * (1 + fn * .6);
+    if (DEV) { if (dist < 12) near++; if (a > .02) maxOv = Math.max(maxOv, ln / vl); }
     if (a <= .01) continue;
     // the streak: a thin quad from the mote back along the travel direction
     // TOWARD the vanishing point, not away from it. The camera moves +v and
@@ -247,7 +259,7 @@ function dustVerts(speedN, dt) {
     // other way anchors the streak on the wrong side of the mote, and the
     // mote appears to jump forward a streak-length every frame - which is
     // exactly the "vibrating in the air" instead of approaching.
-    const tx = d[0] + vx * len, ty = d[1] + vy * len, tz = d[2] + vz * len;
+    const tx = d[0] + vx * ln, ty = d[1] + vy * ln, tz = d[2] + vz * ln;
     let ex = d[0] - cam.e[0], ey = d[1] - cam.e[1], ez = d[2] - cam.e[2];
     let sx = vy * ez - vz * ey, sy = vz * ex - vx * ez, sz = vx * ey - vy * ex;
     const sl = Math.hypot(sx, sy, sz) || 1;
@@ -266,7 +278,7 @@ function dustVerts(speedN, dt) {
     put(tx + sx, ty + sy, tz + sz, 0);
     put(tx - sx, ty - sy, tz - sz, 0);
   }
-  if (DEV) (window.__dust = window.__dust || []).push([speedN, vl, len, n / 60, near]);
+  if (DEV) (window.__dust = window.__dust || []).push([speedN, vl, len, n / 60, near, maxOv]);
   return n;
 }
 
@@ -729,7 +741,8 @@ function frame(now) {
       p[1] + rUp[1] * (bob + .04) + dSide[1] * lx,
       p[2] + rUp[2] * (bob + .04) + dSide[2] * lx,
     ];
-    drawMesh(uniM, modelFrame(base, rSide, rUp2, rT, S8));
+    const uniMdl = modelFrame(base, rSide, rUp2, rT, S8);
+    drawMesh(uniM, uniMdl);
     beat = Math.max(0, beat - dt * 4.5);
     const duck = speedN * .42 + surge * .16 - cine * .5;
     const pitch = duck + beat * beat * .34 * (1 - speedN * .5);
@@ -744,11 +757,31 @@ function frame(now) {
       base[1] + (rSide[1] * PIVOT[0] + rUp2[1] * PIVOT[1] + rT[1] * PIVOT[2]) * S8,
       base[2] + (rSide[2] * PIVOT[0] + rUp2[2] * PIVOT[1] + rT[2] * PIVOT[2]) * S8,
     ];
-    drawMesh(headM, modelFrame(hp, fX, hY, fZ, S8));
+    const headMdl = modelFrame(hp, fX, hY, fZ, S8);
+    drawMesh(headM, headMdl);
 
+    // The deck is glass, so it shows what stands over it. The mirror is one
+    // plane, through the rider and along the DECK's own normal - rUp, not
+    // rUp2: rUp2 carries the cosmetic lean, and hanging the mirror off a
+    // pose rather than the road would tilt the whole reflection with a
+    // flourish the track never made. Distant deck reflects through that
+    // same local plane and is a little wrong for it; fog, a third of the
+    // brightness and a few pixels of screen make that academic.
     glMode(2);
+    mask(1);
     drawMesh(roadM, IDENT);
+    mask(2);
     glMode(1);
+    setDim(.34);
+    const RFL = reflector(p, rUp);
+    drawMesh(railM, RFL);
+    if (trailM.n) drawMesh(trailM, RFL);
+    drawMesh(uniM, mul(RFL, uniMdl));
+    drawMesh(headM, mul(RFL, headMdl));
+    if (starM.n) drawMesh(starM, RFL);
+    if (particleM.n) drawMesh(particleM, RFL);
+    setDim(1);
+    mask(0);
     drawMesh(bgM, IDENT);
     drawMesh(railM, IDENT);
     if (trailM.n) drawMesh(trailM, IDENT);

@@ -59,6 +59,64 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R8 - light where the motion is, and a deck that behaves like glass
+
+### The snowstorm
+
+"They should fly faster the nearer they are to the edge of the screen."
+They already did - that is the trouble.
+
+For a camera translating forward, a static point sweeps the frame at
+`v*sin(theta)/dist`: nothing at all at the vanishing point, fastest out at
+the edges. But the streak's own length scales by the identical factor - the
+`R/(R^2+z^2)` that cancelled out in R7 - so every mote looked equally
+lively. The far axial ones crawled while shining exactly as bright as the
+ones whipping past your ear, and a field of uniform slow dots is the
+definition of a snowstorm.
+
+So brightness now rides that same optical flow: `perp/dist^2`, normalised
+and squared. The crawlers fade out of the picture entirely (they are culled
+below alpha 0.01, so they cost no fill either), and the fast ones at the
+edges keep the light. A small length bonus, up to 1.6x, gives the edges the
+long lines the eye expects.
+
+| | drawn motes | within 12u |
+| --- | ---: | ---: |
+| before, speedN 0.6-0.8 | 56 | 8.3 |
+| after, speedN 0.6-0.8 | 38 | 8.3 |
+
+Fewer than two-thirds as many motes drawn, with the close traffic - the
+part you actually read as speed - untouched. `test-dust.mjs` guards the
+worst per-mote overlap now, not the average, since it is the longest streak
+on screen that decides whether anything reads as standing geometry: 3.6x,
+under the 4x limit.
+
+### The glass
+
+The deck was already a translucent sheet; now it reflects. A planar mirror,
+one plane through the rider along the DECK's own normal - `rUp`, not
+`rUp2`, because `rUp2` carries the cosmetic lean and hanging a mirror off a
+pose rather than the road would tilt the whole reflection with a flourish
+the track never made. The rainbow, the unicorn and its head, the stardust
+and the sparks are all drawn a second time through that matrix, additively,
+at a third of their brightness. The neon rails go through it too, and their
+reflected pair inboard of the real ones is what makes the deck read as a
+pane with thickness rather than a decal.
+
+**It needs a mask.** A mirror image floating beside the track - out over a
+gap, past the edge, in open air - is worse than no mirror at all. The deck
+marks the stencil buffer as it draws, and the reflected pass lands only
+where the deck itself appeared on screen. The deck is drawn after the
+solids and tests depth, so a stretch of it hidden behind scenery marks
+nothing and reflects nothing, for free.
+
+The plane is local, so distant deck reflects through the wrong plane and is
+somewhat wrong for it. Fog, a third brightness and a handful of pixels make
+that academic.
+
+Cost: **227 bytes** and about 4 fps of the software rasteriser's 39 - the
+same order as the dust, and nothing at all on a real GPU.
+
 ## R7 - the streak becomes a smear, and the cone gets tight
 
 "They still hang in the air instead of flying past." Right, and the whole
@@ -601,6 +659,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R8 flow and glass | 11,500 | 11,468 | dust weighted by optical flow, stencil-masked planar reflections in the deck |
 | R7 streaks that move | 11,500 | 11,211 | streak length tied to real frame travel, tight cone, age-based fade |
 | R6 dust approaches | 11,500 | 11,192 | streak direction corrected, per-mote fade band, both effects stand down for the jump |
 

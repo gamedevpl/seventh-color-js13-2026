@@ -15,10 +15,10 @@ export let gl, canvas;
 // float precision is highp in the vertex shader and mediump in the fragment
 // one, and a uniform whose precision disagrees across stages is a link error.
 const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
-uniform mediump float add;varying vec3 vc;varying float vf,va;
+uniform mediump float add,dim;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
 float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
-vc=c*mix(l,1.,add);va=a;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,add),0.,1.);}`;
+vc=c*mix(l,1.,add);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,add),0.,1.);}`;
 const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
 uniform vec3 fog;uniform float add;
 void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
@@ -31,7 +31,7 @@ export function initGL(c) {
   // preserveDrawingBuffer, because the HUD samples this canvas back with
   // drawImage to build the radial blur. Without it the buffer is undefined
   // by the time the 2D pass reads it.
-  gl = c.getContext('webgl', { antialias: true, preserveDrawingBuffer: true });
+  gl = c.getContext('webgl', { antialias: true, preserveDrawingBuffer: true, stencil: true });
   const sh = (type, src) => {
     const s = gl.createShader(type);
     gl.shaderSource(s, src);
@@ -43,7 +43,8 @@ export function initGL(c) {
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog', 'add']) loc[u] = gl.getUniformLocation(prog, u);
+  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim']) loc[u] = gl.getUniformLocation(prog, u);
+  gl.uniform1f(loc.dim, 1);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
 }
@@ -52,7 +53,7 @@ export function frameGL(vp, cam, fog) {
   mode(0);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(fog[0], fog[1], fog[2], 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
   gl.uniformMatrix4fv(loc.vp, false, vp);
   gl.uniform3fv(loc.cam, cam);
   gl.uniform3fv(loc.fog, fog);
@@ -72,6 +73,37 @@ export function mode(m) {
   gl.enable(gl.BLEND);
   gl.depthMask(false);
   gl.blendFunc(gl.SRC_ALPHA, m === 1 ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
+}
+
+// A blanket multiplier on every vertex alpha, so one mesh can be drawn a
+// second time as a faint ghost of itself - which is all a reflection is.
+export const setDim = (v) => gl.uniform1f(loc.dim, v);
+
+// A planar reflection needs a MASK. A mirror image floating beside the
+// track - out over a gap, past the edge, in the empty air - is worse than
+// no mirror at all. So the deck marks the stencil buffer as it draws, and
+// the reflected pass lands only where the deck itself appeared on screen.
+// The deck is drawn after the solids and tests depth, so a stretch of it
+// hidden behind the scenery marks nothing and reflects nothing.
+//   1 write the mask (the deck pass)   2 test it (the mirror pass)   0 off
+export function mask(m) {
+  if (!m) { gl.disable(gl.STENCIL_TEST); return; }
+  gl.enable(gl.STENCIL_TEST);
+  gl.stencilFunc(m === 1 ? gl.ALWAYS : gl.EQUAL, 1, 255);
+  gl.stencilOp(gl.KEEP, gl.KEEP, m === 1 ? gl.REPLACE : gl.KEEP);
+}
+
+// Mirror through the plane (point q, unit normal n): x - 2(n.x - n.q)n.
+// Handed the deck's own normal, so the mirror rolls through a corkscrew
+// with the road instead of staying politely horizontal.
+export function reflector(q, n) {
+  const [a, b, c] = n, d = 2 * (a * q[0] + b * q[1] + c * q[2]);
+  return [
+    1 - 2 * a * a, -2 * a * b, -2 * a * c, 0,
+    -2 * b * a, 1 - 2 * b * b, -2 * b * c, 0,
+    -2 * c * a, -2 * c * b, 1 - 2 * c * c, 0,
+    d * a, d * b, d * c, 1,
+  ];
 }
 
 // Interleaved pos3/normal3/color3/alpha1. `dynamic` meshes re-upload each

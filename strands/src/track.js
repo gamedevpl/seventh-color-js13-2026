@@ -115,7 +115,9 @@ export function ahead(r, D, choose) {
 
 // --- the moving frame -----------------------------------------------------
 const sm = (t) => t * t * (3 - 2 * t);
-export const twisted = (a, b) => ((a.i * 31 + b.i * 17) % 7) === 1;
+// Corkscrews are a COURSE decision now (b.twist), not a hash - because they
+// carry a speed requirement, and demands must be authored, not accidental.
+export const twisted = (a, b) => b.twist;
 
 export function frame(a, b, t) {
   const [p, T] = edgePos(a, b, t);
@@ -173,7 +175,9 @@ export function trackMeshes(course) {
       }
       continue;
     }
-    const rc = RAINBOW[(a.i * 5 + b.i * 3) % 7].map((v) => v * 1.7);
+    // Rails carry the demand: hot warning pink where a minimum speed
+    // applies, the rainbow hash everywhere else. Read the track, not a HUD.
+    const rc = b.req ? [2.2, .55, .8] : RAINBOW[(a.i * 5 + b.i * 3) % 7].map((v) => v * 1.7);
     const kk = twisted(a, b) ? K * 3 : K;
     let [pp, , ps, pu] = frame(a, b, 0);
     for (let k = 1; k <= kk; k++) {
@@ -200,18 +204,6 @@ export function trackMeshes(course) {
           cu, [1, .95, .8], .32);
       }
       pp = cp; ps = cs; pu = cu;
-    }
-    // A split announces itself with a thin gold column on the node.
-    if (a.next.length > 1) {
-      const R = .22, H = 4.5;
-      for (const [ux, uz] of [[1, 0], [0, 1]]) for (const sd of [-1, 1]) {
-        quad(rail,
-          [a.p[0], a.p[1] + .1, a.p[2]],
-          [a.p[0] + ux * R * sd, a.p[1] + .1, a.p[2] + uz * R * sd],
-          [a.p[0] + ux * R * sd, a.p[1] + H, a.p[2] + uz * R * sd],
-          [a.p[0], a.p[1] + H, a.p[2]],
-          [0, 1, 0], [1.2, 1, .55], .16);
-      }
     }
   }
   return { road, rail };

@@ -1,12 +1,12 @@
-// The course must be ACYCLIC. That is not a style preference: cycles are
-// exactly why the rainbow could come at the player head-on in the maze
-// version, and a chase reads as chaos the moment the quarry can appear
-// travelling the wrong way. Also checks nothing is orphaned and that the
-// split/merge/jump mix is actually happening.
+// Course invariants for the physics run. The course must be one forward
+// CHAIN (forks were cut on purpose - the game is earning the road, not
+// choosing it), acyclic, fully reachable, and it must actually contain the
+// things the game is made of: speed-demand sections, corkscrews and jumps.
+// A run of pure cruise is a treadmill, not a rhythm chart.
 import { makeCourse } from '../strands/src/course.js';
 
 let cycles = 0, orphans = 0;
-const tot = { nodes: 0, split: 0, merge: 0, gap: 0 };
+const tot = { nodes: 0, split: 0, req: 0, twist: 0, gap: 0 };
 const N = 60;
 for (let i = 0; i < N; i++) {
   const c = makeCourse(120);
@@ -25,15 +25,15 @@ for (let i = 0; i < N; i++) {
   orphans += c.nodes.length - seen.size;
   tot.nodes += c.nodes.length;
   tot.split += c.nodes.filter((n) => n.next.length > 1).length;
-  const inc = new Map();
-  c.nodes.forEach((n) => n.next.forEach((e) => inc.set(e.to, (inc.get(e.to) || 0) + 1)));
-  tot.merge += [...inc.values()].filter((v) => v > 1).length;
+  tot.req += c.nodes.filter((n) => n.req > 0).length;
+  tot.twist += c.nodes.filter((n) => n.twist).length;
   tot.gap += c.nodes.reduce((a, n) => a + n.next.filter((e) => e.gap).length, 0);
 }
-console.log(`${N} courses: avg ${(tot.nodes / N) | 0} nodes, ${(tot.split / N).toFixed(1)} splits, ${(tot.merge / N).toFixed(1)} merges, ${(tot.gap / N).toFixed(1)} jumps`);
+console.log(`${N} courses: avg ${(tot.nodes / N) | 0} nodes, ${(tot.req / N).toFixed(1)} demand nodes, ${(tot.twist / N).toFixed(1)} corkscrews, ${(tot.gap / N).toFixed(1)} jumps`);
 if (cycles || orphans) {
   console.log(`FAIL: ${cycles} cycles, ${orphans} orphaned nodes`);
   process.exit(1);
 }
-if (tot.split < N || tot.gap < N) { console.log('FAIL: course is not branching or not jumping'); process.exit(1); }
-console.log('acyclic, fully reachable, branching and jumping: OK');
+if (tot.split > 0) { console.log('FAIL: the course must be a single chain now'); process.exit(1); }
+if (tot.req < N * 4 || tot.gap < N) { console.log('FAIL: not enough demands or jumps'); process.exit(1); }
+console.log('single chain, acyclic, with demands, corkscrews and jumps: OK');

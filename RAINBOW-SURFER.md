@@ -29,6 +29,36 @@ strands/src/
              mode, chase camera, HUD, adaptive score
 ```
 
+## R2 - the run became physical (and the forks went the way of the maze)
+
+"Hold up-arrow to go fast" was not a game. Now SPEED IS A RESOURCE:
+
+- **Stardust** is scattered along the deck (denser before demands, strung
+  along every jump arc) and the boost BURNS it - ~10/s on the deck, more
+  in the air. No dust, no boost: cruise is 15, boost tops at 34.
+- **Demands**: serpentines need 20, corkscrews 23 - carried through the
+  whole section, or half a second under the minimum slides you off the
+  track. Demand sections have hot-pink rails: read the track, not a HUD.
+- **Gaps** need momentum: flight speed under the requirement makes you
+  SINK below the far lip - and a mid-air boost (burning dust) can save
+  you. Air steering drifts the landing line onto the stars strung along
+  the arc.
+- **Dives are free speed** (gravity along the tangent, coefficient raised)
+  and climbs bleed it - the course is a rhythm chart for the throttle.
+- **Falling is soft**: respawn one node back, with pity stardust so a dry
+  tank cannot soft-lock in front of the same demand forever.
+- **As the rainbow the boost is free** - you are made of the stuff - and
+  the seven-colour burn clock is the cost instead. Falls while burning
+  also tear the rainbow away.
+- **Forks are gone.** The course is one joyful line; sections (cruise /
+  serpentine / dive / climb / gap / corkscrew) give it rhythm, and the
+  lane now exists for gathering stardust, not choosing roads.
+- Particles: four-point bloom sparkles burst off every pickup, stream
+  behind the airborne unicorn and spark off hooves at high speed.
+- The unicorn is drawn in the RAW track frame, perpendicular to the deck
+  it stands on - only the camera gets the smoothing. It was visibly
+  aligned to the eased camera frame before, which read as floaty.
+
 ## Why the maze had to go (R1)
 
 The grid maze had cycles, and cycles are why the rainbow could come at you

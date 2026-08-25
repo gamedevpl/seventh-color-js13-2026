@@ -1,13 +1,12 @@
-// RAINBOW SURFER. Catch the rainbow - and BECOME it. The seven colours burn
-// down while you ride; jumping the gaps relights them. When the last colour
-// gutters out the rainbow tears ahead of you and the chase is on again.
-// Score is how long you burned.
-//
-// The course grows forward and never loops (course.js proves it): nothing
-// can ever come past you the wrong way, and route choice is which side of
-// the deck you are on when a split goes by.
+// RAINBOW SURFER. The run is physical now: speed is a RESOURCE. Stardust
+// scattered on the deck feeds the boost; serpentines and corkscrews demand
+// a minimum speed or you slide off; gaps demand momentum or you sink short
+// of the far lip (an air-boost can save you - it burns stardust too);
+// dives hand you speed for free. Catch the rainbow and BECOME it - as the
+// rainbow the boost is free, the colours burn down instead, and a landed
+// jump relights one. Score is how long you burned.
 
-import { initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, modelFrame, IDENT, pushBox } from './gl.js';
+import { initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelFrame, IDENT, pushBox } from './gl.js';
 import { S, makeCourse, depths } from './course.js';
 import { trackMeshes, makeRider, ride, behind, ahead, placeAt, frame as tframe } from './track.js';
 import { unicornMesh, headMesh, PIVOT, RAINBOW } from './uni.js';
@@ -105,8 +104,9 @@ function pump(speedN, closeN) {
 // --- state ----------------------------------------------------------------
 let mode = 'title', timer = 0;
 let course, depth, roadM, railM, groundM, bgM, braid, trailM;
-let surge = 0, slipT = 0, fly = null, cine = 0, jumps = 0;
-let rainbowT = 0, rainbowTotal = 0, bestBurn = 0, flash = 0, msgT = 0;
+let surge = 0, slipT = 0, fly = null, cine = 0, jumps = 0, falls = 0;
+let rainbowT = 0, rainbowTotal = 0, bestBurn = 0, flash = 0, msgT = 0, msg = '';
+let energy = 40, slowT = 0, stars = [];
 const player = { r: null, speed: 10, lane: 0 };
 const cam = { e: [0, 3, -5], a: [0, 0, 0] };
 const uniM = unicornMesh();
@@ -114,30 +114,94 @@ const headM = headMesh();
 let vp = null, beat = 0, lean = 0, camT = null, camU = null, speedSm = 0, fovSm = 1.03, clSm = 1;
 let lastHd = 0, rollSm = 0, prevP = null;
 const camTv = [0, 0, 0], camUv = [0, 0, 0];
+const first = (es) => es[0];
 
-function pickBranch(es, st, T, A) {
-  if (es.length === 1) return es[0];
-  const h = Math.hypot(T[0], T[2]) || 1;
-  const d = [T[0] / h, T[2] / h];
-  let bestE = es[0], bv = -1e9;
-  for (const e of es) {
-    const M = e.to.p;
-    let ex = M[0] - A[0], ez = M[2] - A[2];
-    const l = Math.hypot(ex, ez) || 1;
-    ex /= l; ez /= l;
-    const ang = Math.atan2(d[1] * ex - d[0] * ez, d[0] * ex + d[1] * ez);
-    const v = st > 0 ? ang : st < 0 ? -ang : -Math.abs(ang);
-    if (v > bv) { bv = v; bestE = e; }
+function say(t, dur) { msg = t; msgT = dur; }
+
+// Stardust: authored onto the course - denser before demands, and strung
+// along the flight arc of every gap so the jump itself feeds you.
+function placeStars() {
+  stars = [];
+  for (const a of course.nodes) {
+    const e = a.next[0];
+    if (!e) continue;
+    if (e.gap) {
+      const A = a.p, B = e.to.p, dist = d3(A, B), h = Math.min(11, dist * .22);
+      for (const u of [.3, .5, .7]) {
+        stars.push({ i: a.i, p: [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u + 4 * h * u * (1 - u) + 1.2, A[2] + (B[2] - A[2]) * u] });
+      }
+    } else if ((e.to.req || Math.random() < .55)) {
+      const k = e.to.req ? 2 : 1;
+      for (let j = 0; j < k; j++) {
+        const t = .25 + .5 * (j + Math.random()) / k;
+        const f = tframe(a, e.to, t);
+        const lane = Math.sin(a.i * .9 + j * 2) * 2.8;
+        stars.push({ i: a.i, p: [f[0][0] + f[2][0] * lane + f[3][0] * 1.1, f[0][1] + f[2][1] * lane + f[3][1] * 1.1, f[0][2] + f[2][2] * lane + f[3][2] * 1.1] });
+      }
+    }
   }
-  return bestE;
 }
-const laneSteer = () => (player.lane > .18 ? 1 : player.lane < -.18 ? -1 : 0);
-const chooseP = (es) => pickBranch(es, laneSteer(), player.r.tan, player.r.a.p);
 
-// The night the course hangs in: stars and aurora curtains on a wide ring
-// around the course's centre. They are FINITE-far, so the camera's travel
-// slides them slowly against the void - the parallax that makes speed read
-// at the horizon and not only at your hooves.
+// --- particles: bloomy star sparks ---------------------------------------
+const PMAX = 160, PART = [];
+let pcur = 0;
+function spawnP(p, v, col, life) {
+  PART[pcur % PMAX] = { p: [...p], v, col, life, max: life };
+  pcur++;
+}
+function burst(p, n, sp) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, b = Math.random() * Math.PI - Math.PI / 2;
+    spawnP(p, [Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 2, Math.sin(a) * Math.cos(b) * sp], RAINBOW[(Math.random() * 7) | 0], .6 + Math.random() * .5);
+  }
+}
+const PBUF = new Float32Array(PMAX * 120);
+function particleVerts(now) {
+  let n = 0;
+  const put = (x, y, z, c, a) => {
+    PBUF[n] = x; PBUF[n + 1] = y; PBUF[n + 2] = z;
+    PBUF[n + 3] = 0; PBUF[n + 4] = 1; PBUF[n + 5] = 0;
+    PBUF[n + 6] = c[0] * 1.8; PBUF[n + 7] = c[1] * 1.8; PBUF[n + 8] = c[2] * 1.8; PBUF[n + 9] = a;
+    n += 10;
+  };
+  for (const pt of PART) {
+    if (!pt || pt.life <= 0) continue;
+    const f = pt.life / pt.max, sz = .16 + f * .2, a = f * .8;
+    const [x, y, z] = pt.p;
+    // a four-point star: two crossed quads read as a bloom sparkle
+    put(x - sz, y, z, pt.col, a); put(x + sz, y, z, pt.col, a); put(x, y + sz * 2.6, z, pt.col, 0);
+    put(x - sz, y, z, pt.col, a); put(x + sz, y, z, pt.col, a); put(x, y - sz * 2.6, z, pt.col, 0);
+    put(x, y - sz, z, pt.col, a); put(x, y + sz, z, pt.col, a); put(x + sz * 2.6, y, z, pt.col, 0);
+    put(x, y - sz, z, pt.col, a); put(x, y + sz, z, pt.col, a); put(x - sz * 2.6, y, z, pt.col, 0);
+  }
+  return n;
+}
+const partM = () => createMesh(new Float32Array(0), true);
+let particleM, starM;
+const SBUF = new Float32Array(24000);
+
+function starVerts(now) {
+  if (!player.r) return 0;
+  const pi = player.r.a.i;
+  let n = 0;
+  const put = (x, y, z, c, a) => {
+    SBUF[n] = x; SBUF[n + 1] = y; SBUF[n + 2] = z;
+    SBUF[n + 3] = 0; SBUF[n + 4] = 1; SBUF[n + 5] = 0;
+    SBUF[n + 6] = c[0]; SBUF[n + 7] = c[1]; SBUF[n + 8] = c[2]; SBUF[n + 9] = a;
+    n += 10;
+  };
+  for (const st of stars) {
+    if (st.taken || st.i < pi - 1 || st.i > pi + 16) continue;
+    const s = .5 + Math.sin(now / 160 + st.i * 2.1) * .14;
+    const c = [1.6, 1.5, 1.2], [x, y, z] = st.p;
+    for (const [dx, dy] of [[s, 0], [0, s]]) {
+      put(x - dx, y - dy, z, c, .8); put(x + dx, y + dy, z, c, .8); put(x + dy * .4, y + dx * .4, z + s, c, 0);
+      put(x - dx, y - dy, z, c, .8); put(x + dx, y + dy, z, c, .8); put(x - dy * .4, y - dx * .4, z - s, c, 0);
+    }
+  }
+  return n;
+}
+
 function makeBackdrop() {
   let cx = 0, cz = 0;
   for (const n of course.nodes) { cx += n.p[0]; cz += n.p[2]; }
@@ -155,18 +219,14 @@ function makeBackdrop() {
     const px = cx + Math.cos(an) * r, pz = cz + Math.sin(an) * r;
     const sx = -Math.sin(an), sz2 = Math.cos(an);
     const w = 50 + Math.random() * 60, h0 = -20, h1 = 120 + Math.random() * 90;
-    for (const q of [
-      [px - sx * w, h0, pz - sz2 * w], [px + sx * w, h0, pz + sz2 * w],
-      [px + sx * w, h1, pz + sz2 * w], [px - sx * w, h1, pz - sz2 * w],
-    ].flatMap((p2, k, arr) => (k < 3 ? [arr[0], arr[k], arr[k + 1]] : []))) {
-      v.push(q[0], q[1], q[2], 0, 1, 0, c[0], c[1], c[2], .1);
-    }
+    const quad = [[px - sx * w, h0, pz - sz2 * w], [px + sx * w, h0, pz + sz2 * w], [px + sx * w, h1, pz + sz2 * w], [px - sx * w, h1, pz - sz2 * w]];
+    for (const k of [0, 1, 2, 0, 2, 3]) v.push(quad[k][0], quad[k][1], quad[k][2], 0, 1, 0, c[0], c[1], c[2], .1);
   }
   return createMesh(v);
 }
 
 function newRun() {
-  course = makeCourse(160);
+  course = makeCourse(170);
   depth = depths(course);
   const tm = trackMeshes(course);
   roadM = createMesh(tm.road);
@@ -175,21 +235,22 @@ function newRun() {
   pushBox(gr, 0, -70, 800, 6000, .2, 6000, .04, .035, .08);
   groundM = createMesh(gr);
   bgM = makeBackdrop();
+  placeStars();
   player.r = makeRider(course.start);
   player.speed = 14;
   player.lane = 0;
   braid = makeBraid(course);
-  ride(braid.r, S * 6, (es) => es[0]);
+  ride(braid.r, S * 6, first);
   trailM = createMesh(new Float32Array(0), true);
-  surge = 0; slipT = 0; fly = null; cine = 0; jumps = 0;
+  particleM = partM(); starM = partM();
+  PART.length = 0; pcur = 0;
+  surge = 0; slipT = 0; fly = null; cine = 0; jumps = 0; falls = 0;
   rainbowT = 0; rainbowTotal = 0; flash = 0; msgT = 0;
+  energy = 40; slowT = 0;
   timer = 0;
   camT = null; camU = null; prevP = null;
 }
 
-const mark = [];
-pushBox(mark, 0, .6, 0, .9, .9, .9, 1.2, 1, .5, .4);
-const markM = createMesh(mark);
 const wake = [];
 RAINBOW.forEach((c, i) => pushBox(wake, (i - 3) * .22, .16, -2.8, .11, .11, 3.6, ...c.map((v) => v * 1.6), .12));
 const wakeM = createMesh(wake);
@@ -218,34 +279,52 @@ function edgeArrow(w, col) {
   ctx.restore();
 }
 
-// --- the jump -------------------------------------------------------------
+// --- falling and flying ---------------------------------------------------
+function doFall(why) {
+  falls++;
+  flash = .8;
+  say(why, 3);
+  tone(120, .6, 'sawtooth', .12);
+  if (mode === 'rainbow') detach(true);
+  // Respawn a node back, with a little pity stardust so a dry tank cannot
+  // soft-lock you in front of the same demand forever.
+  const back = player.r.pa || player.r.a;
+  placeAt(player.r, back, null);
+  player.speed = 12;
+  energy = Math.max(energy, 30);
+  fly = null;
+  slowT = 0;
+}
+
 function startFly() {
   const a = player.r.a, b = player.r.b;
   const dist = d3(a.p, b.p);
-  fly = { a, b, u: player.r.s / Math.max(1, player.r.len), dur: dist / Math.max(16, player.speed), h: Math.min(11, dist * .22) };
+  fly = { a, b, u: player.r.s / Math.max(1, player.r.len), v: Math.max(10, player.speed),
+    need: dist * 1.02 + 7, dist, h: Math.min(11, dist * .22), sink: 0, lat: player.lane * 2.8 };
   tone(300, .3, 'sawtooth', .09);
   jumps++;
 }
 function flyState() {
   const u = fly.u, A = fly.a.p, B = fly.b.p;
   const arc = 4 * fly.h * u * (1 - u);
-  const p = [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u + arc, A[2] + (B[2] - A[2]) * u];
+  const dx = B[0] - A[0], dz = B[2] - A[2];
+  const hl = Math.hypot(dx, dz) || 1;
+  const sx = dz / hl, sz = -dx / hl;
+  const p = [A[0] + dx * u + sx * fly.lat, A[1] + (B[1] - A[1]) * u + arc - fly.sink, A[2] + dz * u + sz * fly.lat];
   const dArc = 4 * fly.h * (1 - 2 * u);
-  const T = [B[0] - A[0], B[1] - A[1] + dArc, B[2] - A[2]];
+  const T = [dx, B[1] - A[1] + dArc, dz];
   const l = Math.hypot(...T) || 1;
   return [p, [T[0] / l, T[1] / l, T[2] / l]];
 }
 
-// The rainbow tears ahead: reappears a few nodes down the road, trail reset.
-function detach() {
+function detach(silent) {
   mode = 'run';
-  slipT = 2.5;
+  if (!silent) { slipT = 2.5; tone(170, .5, 'sawtooth', .11); }
   let n = player.r.b || player.r.a, from = player.r.a;
   for (let i = 0; i < 3 && n.next.length; i++) { from = n; n = n.next[0].to; }
   placeAt(braid.r, n, from);
   braid.tl = makeTrail();
   braid.burst = 1.2;
-  tone(170, .5, 'sawtooth', .11);
 }
 
 let last = 0;
@@ -262,20 +341,39 @@ function frame(now) {
     surge = Math.max(0, surge - dt / 1.4);
     slipT = Math.max(0, slipT - dt);
     msgT = Math.max(0, msgT - dt);
-    const top = mode === 'rainbow' ? 40 : 30;
-    const target = heldFwd() ? top : heldBack() ? 9 : 15;
+    // THE resource rule: boost exists only while there is stardust to burn.
+    // As the rainbow the boost is free - you are made of the stuff - and
+    // the burn meter is the cost instead.
+    const free = mode === 'rainbow';
+    const canBoost = heldFwd() && (free || energy > 0);
+    const top = free ? 40 : 34;
+    const target = canBoost ? top : heldBack() ? 9 : 15;
     player.speed += (target - player.speed) * Math.min(1, dt * (heldBack() ? 3 : 1.2));
+    if (canBoost && !free) energy = Math.max(0, energy - dt * 10);
 
     if (fly) {
-      fly.u += dt / fly.dur;
       cine = Math.min(1, cine + dt * 4);
-      if (fly.u >= 1) {
+      // air control: boost burns stardust to stretch the arc, lateral drift
+      // lines up the landing (and the stars strung along the arc)
+      if (heldFwd() && (free || energy > 0)) {
+        fly.v += dt * 16;
+        if (!free) energy = Math.max(0, energy - dt * 14);
+        burst(prevP || player.r.pos, 1, 2);
+      }
+      fly.lat += turnDir() * dt * 7;
+      fly.lat = Math.max(-4.5, Math.min(4.5, fly.lat));
+      fly.u += fly.v / fly.dist * dt;
+      const deficit = Math.max(0, fly.need - fly.v);
+      fly.sink += deficit * dt * .9;
+      if (fly.sink > 7) doFall('Fell short! Carry more speed into the jump - or boost mid-air.');
+      else if (fly.u >= 1) {
         placeAt(player.r, fly.b, fly.a);
+        player.speed = Math.max(player.speed, fly.v * .9);
+        player.lane = Math.max(-1, Math.min(1, fly.lat / 2.8));
         fly = null;
         tone(140, .25, 'triangle', .12);
         tone(520, .5, 'triangle', .07);
         if (mode === 'rainbow') {
-          // a jump landed while burning relights one colour
           rainbowT = Math.min(7, rainbowT + 1);
           flash = Math.max(flash, .5);
           tone(392 * 2 ** (rainbowT / 7), .4, 'triangle', .1);
@@ -287,38 +385,59 @@ function frame(now) {
       if (st) player.lane += st * dt * 2.2;
       else player.lane -= Math.sign(player.lane) * Math.min(Math.abs(player.lane), dt * .7);
       player.lane = Math.max(-1, Math.min(1, player.lane));
-      player.speed -= player.r.tan[1] * dt * 16;
-      player.speed = Math.max(7, Math.min(top + surge * 8, player.speed));
-      ride(player.r, player.speed * dt, chooseP);
+      // Gravity along the tangent: dives are FREE speed - use them.
+      player.speed -= player.r.tan[1] * dt * 22;
+      player.speed = Math.max(7, Math.min(46, player.speed));
+      ride(player.r, player.speed * dt, first);
       if (player.r.edge && player.r.edge.gap) startFly();
+      else {
+        // Demand sections: below the minimum for half a second, you slide off.
+        const req = player.r.b ? player.r.b.req : 0;
+        if (req && player.speed < req - 1) {
+          slowT += dt;
+          if (slowT > .5) doFall('Too slow for the bend - it threw you!');
+        } else slowT = 0;
+      }
       if (!player.r.a.next.length && !player.r.b) mode = 'end';
     }
 
-    speedN = (player.speed - 7) / 33;
+    // stardust pickup
+    if (player.r) {
+      const pi = player.r.a.i, pp2 = fly ? (prevP || player.r.pos) : player.r.pos;
+      for (const st2 of stars) {
+        if (st2.taken || st2.i < pi - 1 || st2.i > pi + 2) continue;
+        if (d3(st2.p, pp2) < 2.7) {
+          st2.taken = true;
+          energy = Math.min(100, energy + 9);
+          surge = Math.max(surge, .25);
+          burst(st2.p, 8, 5);
+          tone(880 + Math.random() * 220, .12, 'triangle', .07);
+        }
+      }
+    }
+
+    speedN = (player.speed - 7) / 39;
     speedSm += (speedN - speedSm) * Math.min(1, dt * 1.5);
 
     if (mode === 'run') {
       updateBraid(braid, player.r.pos, dt, depth);
-      // Touch ANY part of the ribbon and you merge with it: the rainbow can
-      // never be overtaken, because being about to overtake it IS catching
-      // it. You become the rainbow; the trail machine just changes owners.
       if (!fly && braid.burst <= 0 && nearTrail(braid.tl, player.r.pos, 3.4)) {
         mode = 'rainbow';
         rainbowT = 7;
+        energy = 100;
         flash = 1;
         surge = 1;
-        msgT = 5;
+        say('YOU ARE THE RAINBOW - jump the gaps to keep it burning!', 5);
         RAINBOW.forEach((_, i) => tone(392 * 2 ** (i / 7), .35, 'triangle', .1, ac && ac.currentTime + i * .07));
       }
       const hd = braid.tl.head;
       if (hd) closeN = Math.max(0, 1 - d3(player.r.pos, hd) / 40);
-    } else {
-      // burning: the trail streams from YOU, and the colours drain
+    } else if (mode === 'rainbow') {
       rainbowT -= dt / 2.2;
       rainbowTotal += dt;
       bestBurn = Math.max(bestBurn, rainbowTotal);
       closeN = 1;
-      if (rainbowT <= 0) detach();
+      if (rainbowT <= 0) { detach(); say('The last colour burned out - run it down again!', 2.5); }
     }
     pump(speedN, closeN);
   }
@@ -328,13 +447,15 @@ function frame(now) {
     if (mode === 'title' || mode === 'end') { newRun(); mode = 'run'; }
   }
 
-  // --- camera + rider frame -----------------------------------------------
-  let p = [0, 0, 0], T = [0, 0, 1], up = [0, 1, 0];
+  // --- frames: RAW for the unicorn, eased for the camera --------------------
+  // The unicorn stands perpendicular to the TRACK, exactly - it is a
+  // physical thing on a physical road. Only the camera gets the smoothing.
+  let p = [0, 0, 0], rT = [0, 0, 1], rUp = [0, 1, 0];
   if (fly) {
-    [p, T] = flyState();
+    [p, rT] = flyState();
   } else if (player.r) {
-    p = player.r.pos; T = player.r.tan;
-    if (player.r.b) [p, T, , up] = tframe(player.r.a, player.r.b, player.r.t);
+    p = player.r.pos; rT = player.r.tan;
+    if (player.r.b) [p, rT, , rUp] = tframe(player.r.a, player.r.b, player.r.t);
   }
   const ease = (cur, vel, want) => {
     if (!cur) return [...want];
@@ -347,14 +468,9 @@ function frame(now) {
     cur[0] /= l; cur[1] /= l; cur[2] /= l;
     return cur;
   };
-  const upT = up;
-  camT = ease(camT, camTv, T); camU = ease(camU, camUv, up);
-  T = camT; up = camU;
+  camT = ease(camT, camTv, rT); camU = ease(camU, camUv, rUp);
+  let T = camT, up = camU;
 
-  // Serpentine lean: roll the whole frame with the ACTUAL horizontal turn
-  // rate. Geometry banking fades out at every node, so on a winding line of
-  // short segments it never adds up - this does, because it follows the
-  // motion itself and knows nothing about nodes.
   const hd2 = Math.atan2(T[0], T[2]);
   let dhd = hd2 - lastHd;
   dhd -= Math.round(dhd / (2 * Math.PI)) * 2 * Math.PI;
@@ -365,6 +481,10 @@ function frame(now) {
   const cR = Math.cos(roll), sR = Math.sin(roll);
   up = [up[0] * cR + sideL[0] * sR, up[1] * cR + sideL[1] * sR, up[2] * cR + sideL[2] * sR];
   sideL = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]];
+  // raw frame for the body, with the same lean rolled in
+  let rSide = [rT[1] * rUp[2] - rT[2] * rUp[1], rT[2] * rUp[0] - rT[0] * rUp[2], rT[0] * rUp[1] - rT[1] * rUp[0]];
+  const rUp2 = [rUp[0] * cR + rSide[0] * sR, rUp[1] * cR + rSide[1] * sR, rUp[2] * cR + rSide[2] * sR];
+  rSide = [rT[1] * rUp2[2] - rT[2] * rUp2[1], rT[2] * rUp2[0] - rT[0] * rUp2[2], rT[0] * rUp2[1] - rT[1] * rUp2[0]];
   lean += (turnDir() * .1 - lean) * Math.min(1, dt * 4);
 
   const high = (2.0 - speedSm * .15) + cine * 2.2;
@@ -375,11 +495,10 @@ function frame(now) {
     const bf = behind(player.r, back);
     bp = bf ? bf[0] : [p[0] - T[0] * back, p[1] - T[1] * back, p[2] - T[2] * back];
   }
-  const cl = Math.max(.55, camT ? up[0] * upT[0] + up[1] * upT[1] + up[2] * upT[2] : 1);
+  const cl = Math.max(.55, camT ? up[0] * rUp[0] + up[1] * rUp[1] + up[2] * rUp[2] : 1);
   clSm += (cl - clSm) * Math.min(1, dt * 4);
   const lo = player.r ? player.lane * 2.2 : 0;
   const swing = cine * 3.2;
-  // speed shake: intentional, amplitude-controlled, continuous
   const sh = (speedSm * speedSm * .08 + surge * .1) * (1 - cine);
   const shx = Math.sin(now * .037) * sh, shy = Math.cos(now * .029) * sh * .6;
   const tgtE = [
@@ -390,7 +509,7 @@ function frame(now) {
   let tgtA;
   if (fly) tgtA = [p[0], p[1] + .6, p[2]];
   else {
-    const af = player.r ? ahead(player.r, 9, (es) => pickBranch(es, laneSteer(), player.r.tan, player.r.b.p)) : null;
+    const af = player.r ? ahead(player.r, 9) : null;
     const ap = af ? af[0] : [p[0] + T[0] * 9, p[1] + T[1] * 9, p[2] + T[2] * 9];
     tgtA = [ap[0] + up[0] * 1.7 + sideL[0] * lo, ap[1] + up[1] * 1.7 + sideL[1] * lo, ap[2] + up[2] * 1.7 + sideL[2] * lo];
   }
@@ -401,44 +520,53 @@ function frame(now) {
   }
   const cu = up.map((v, i) => v - sideL[i] * lean * .5);
   fovSm += (1.03 + speedSm * .38 + surge * .2 + cine * .16 - fovSm) * Math.min(1, dt * 6);
-  // Dev only: publish the camera for tools/test-camlive.mjs.
   if (DEV) (window.__cam = window.__cam || []).push([now, cam.e[0], cam.e[1], cam.e[2], cam.a[0], cam.a[1], cam.a[2], fovSm, cu[0], cu[1], cu[2]]);
   vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);
 
   if (mode !== 'title') {
-    // While burning, the trail streams from the player - fed with the real
-    // displacement, so it flows through jumps too.
     if (mode === 'rainbow' || (mode === 'end' && rainbowT > 0)) {
       const dP = prevP ? d3(p, prevP) : 0;
-      feedTrail(braid.tl, p, sideL, up, dP);
+      feedTrail(braid.tl, p, rSide, rUp2, dP);
+    }
+    // hoof sparks while boosting hard on the deck
+    if (!fly && player.speed > 26 && Math.random() < .5) {
+      burst([p[0] - rT[0] * 1.2 + rUp2[0] * .2, p[1] - rT[1] * 1.2 + rUp2[1] * .2, p[2] - rT[2] * 1.2 + rUp2[2] * .2], 1, 3);
     }
     prevP = [...p];
+    for (const pt of PART) {
+      if (!pt || pt.life <= 0) continue;
+      pt.life -= dt;
+      pt.v[1] -= 7 * dt;
+      pt.p[0] += pt.v[0] * dt; pt.p[1] += pt.v[1] * dt; pt.p[2] += pt.v[2] * dt;
+    }
     const nb = trailVerts(braid.tl, now / 1000, mode === 'rainbow' || mode === 'end');
     if (nb) updateMesh(trailM, BUF, nb);
+    updateMesh(starM, SBUF, starVerts(now));
+    updateMesh(particleM, PBUF, particleVerts(now));
 
     drawMesh(groundM, IDENT);
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
     const S8 = .85, lx = fly ? 0 : player.lane * 2.8;
     const base = [
-      p[0] + up[0] * (bob + .04) + sideL[0] * lx,
-      p[1] + up[1] * (bob + .04) + sideL[1] * lx,
-      p[2] + up[2] * (bob + .04) + sideL[2] * lx,
+      p[0] + rUp2[0] * (bob + .04) + rSide[0] * lx,
+      p[1] + rUp2[1] * (bob + .04) + rSide[1] * lx,
+      p[2] + rUp2[2] * (bob + .04) + rSide[2] * lx,
     ];
-    drawMesh(uniM, modelFrame(base, sideL, up, T, S8));
+    drawMesh(uniM, modelFrame(base, rSide, rUp2, rT, S8));
     beat = Math.max(0, beat - dt * 4.5);
     const duck = speedN * .42 + surge * .16 - cine * .5;
     const pitch = duck + beat * beat * .34 * (1 - speedN * .5);
     const sway = Math.sin(now / 460) * .12 * (1 - speedN * .6) + turnDir() * -.18;
     const cp2 = Math.cos(pitch), sp2 = Math.sin(pitch), cs2 = Math.cos(sway), ss2 = Math.sin(sway);
-    const hZ = [T[0] * cp2 - up[0] * sp2, T[1] * cp2 - up[1] * sp2, T[2] * cp2 - up[2] * sp2];
-    const hY = [T[0] * sp2 + up[0] * cp2, T[1] * sp2 + up[1] * cp2, T[2] * sp2 + up[2] * cp2];
-    const fZ = [hZ[0] * cs2 - sideL[0] * ss2, hZ[1] * cs2 - sideL[1] * ss2, hZ[2] * cs2 - sideL[2] * ss2];
-    const fX = [sideL[0] * cs2 + hZ[0] * ss2, sideL[1] * cs2 + hZ[1] * ss2, sideL[2] * cs2 + hZ[2] * ss2];
+    const hZ = [rT[0] * cp2 - rUp2[0] * sp2, rT[1] * cp2 - rUp2[1] * sp2, rT[2] * cp2 - rUp2[2] * sp2];
+    const hY = [rT[0] * sp2 + rUp2[0] * cp2, rT[1] * sp2 + rUp2[1] * cp2, rT[2] * sp2 + rUp2[2] * cp2];
+    const fZ = [hZ[0] * cs2 - rSide[0] * ss2, hZ[1] * cs2 - rSide[1] * ss2, hZ[2] * cs2 - rSide[2] * ss2];
+    const fX = [rSide[0] * cs2 + hZ[0] * ss2, rSide[1] * cs2 + hZ[1] * ss2, rSide[2] * cs2 + hZ[2] * ss2];
     const hp = [
-      base[0] + (sideL[0] * PIVOT[0] + up[0] * PIVOT[1] + T[0] * PIVOT[2]) * S8,
-      base[1] + (sideL[1] * PIVOT[0] + up[1] * PIVOT[1] + T[1] * PIVOT[2]) * S8,
-      base[2] + (sideL[2] * PIVOT[0] + up[2] * PIVOT[1] + T[2] * PIVOT[2]) * S8,
+      base[0] + (rSide[0] * PIVOT[0] + rUp2[0] * PIVOT[1] + rT[0] * PIVOT[2]) * S8,
+      base[1] + (rSide[1] * PIVOT[0] + rUp2[1] * PIVOT[1] + rT[1] * PIVOT[2]) * S8,
+      base[2] + (rSide[2] * PIVOT[0] + rUp2[2] * PIVOT[1] + rT[2] * PIVOT[2]) * S8,
     ];
     drawMesh(headM, modelFrame(hp, fX, hY, fZ, S8));
 
@@ -448,17 +576,11 @@ function frame(now) {
     drawMesh(bgM, IDENT);
     drawMesh(railM, IDENT);
     if (trailM.n) drawMesh(trailM, IDENT);
+    if (starM.n) drawMesh(starM, IDENT);
+    if (particleM.n) drawMesh(particleM, IDENT);
     if (speedN > .2 || fly || mode === 'rainbow') {
       const st = .5 + speedN * 2 + surge + cine * 1.5;
-      drawMesh(wakeM, modelFrame(base, sideL, up, [T[0] * st, T[1] * st, T[2] * st], S8));
-    }
-    if (!fly && player.r.b && player.r.t > .1) {
-      const cand = player.r.b.next;
-      if (cand.length > 1) {
-        const ch = pickBranch(cand, laneSteer(), player.r.tan, player.r.b.p);
-        const [mp] = tframe(player.r.b, ch.to, .22);
-        drawMesh(markM, modelTR(mp[0], mp[1], mp[2], now / 180, .8 + Math.sin(now / 90) * .2));
-      }
+      drawMesh(wakeM, modelFrame(base, rSide, rUp2, [rT[0] * st, rT[1] * st, rT[2] * st], S8));
     }
     glMode(0);
   }
@@ -478,14 +600,13 @@ function frame(now) {
     ctx.fillText('RAINBOW SURFER', VW / 2, 76);
     ctx.font = '13px system-ui';
     ctx.fillStyle = '#b8ab92';
-    ctx.fillText('Catch the rainbow - and BECOME it. The seven colours burn down as you ride;', VW / 2, 168);
-    ctx.fillText('jumping the gaps relights them. Score is how long you burn.', VW / 2, 186);
+    ctx.fillText('Stardust feeds the boost. Bends and jumps demand SPEED - too slow and you fall.', VW / 2, 164);
+    ctx.fillText('Catch the rainbow to BECOME it; jumps keep it burning. Score is your burn time.', VW / 2, 182);
     ctx.fillStyle = '#7a6e5c';
-    ctx.fillText('↑ boost   ↓ brake   ← → slide across the deck (your side picks the branch)', VW / 2, 226);
+    ctx.fillText('↑ boost (burns stardust)   ↓ brake   ← → slide / steer the jump', VW / 2, 222);
     ctx.fillStyle = '#e8b923';
-    ctx.fillText('press SPACE', VW / 2, 262);
+    ctx.fillText('press SPACE', VW / 2, 258);
   } else {
-    // speed drama: chromatic double streaks + hard vignette
     const blur = Math.max(0, speedSm - .3) + surge * .5 + cine * .3;
     if (blur > 0) {
       for (const [col, ox] of [['rgba(120,220,255,', -2], ['rgba(255,120,190,', 2], ['rgba(255,255,255,', 0]]) {
@@ -515,11 +636,17 @@ function frame(now) {
     ctx.fillStyle = '#f3ead6';
     ctx.fillText(Math.round(player.speed * 9) + ' km/h', 12, 22);
     ctx.fillText('burn ' + rainbowTotal.toFixed(1) + 's', 12, 42);
-    ctx.fillText('jumps ' + jumps, 12, 62);
+    // stardust tank
+    ctx.fillStyle = 'rgba(160,150,130,.25)';
+    ctx.fillRect(12, 52, 104, 9);
+    ctx.fillStyle = mode === 'rainbow' ? '#9be8ff' : '#ffd75e';
+    ctx.fillRect(14, 54, energy, 5);
+    ctx.fillStyle = '#7a6e5c';
+    ctx.font = '10px system-ui';
+    ctx.fillText('stardust', 12, 72);
 
     ctx.textAlign = 'center';
     if (mode === 'rainbow') {
-      // the seven colours, draining right to left; a landed jump refills one
       for (let i = 0; i < 7; i++) {
         const [r, gg, b] = RAINBOW[i];
         const f = Math.max(0, Math.min(1, rainbowT - i));
@@ -528,40 +655,41 @@ function frame(now) {
         ctx.fillStyle = `rgb(${r * 255},${gg * 255},${b * 255})`;
         ctx.fillRect(VW / 2 - 70 + i * 20, 16 + (1 - f) * 9, 16, f * 9);
       }
-      if (msgT > 0) {
-        ctx.fillStyle = '#e8b923';
-        ctx.font = 'bold 17px system-ui';
-        ctx.fillText('YOU ARE THE RAINBOW - jump the gaps to keep it burning!', VW / 2, 92);
-      }
     } else if (mode === 'run') {
       const hd = braid.tl.head;
       if (hd) edgeArrow(hd, '#fff');
       ctx.fillStyle = 'rgba(232,185,35,' + (.55 + Math.sin(now / 300) * .25) + ')';
       ctx.font = 'bold 14px system-ui';
       ctx.fillText('CATCH THE RAINBOW', VW / 2, 24);
-      if (slipT > 0) {
+    }
+    // demand warnings, front and centre - this is the game now
+    if (!fly && player.r && player.r.b) {
+      const req = player.r.b.req;
+      const nextGap = player.r.b.next[0] && player.r.b.next[0].gap && player.r.t > .3;
+      if (req && player.speed < req + 2) {
+        ctx.fillStyle = `rgba(255,80,110,${.6 + Math.sin(now / 90) * .4})`;
+        ctx.font = 'bold 22px system-ui';
+        ctx.fillText('SPEED UP!', VW / 2, 120);
+      } else if (nextGap) {
         ctx.fillStyle = '#e8b923';
-        ctx.font = 'bold 15px system-ui';
-        ctx.fillText('The last colour burned out - it tears ahead! Run it down again.', VW / 2, 92);
+        ctx.font = 'bold 16px system-ui';
+        ctx.fillText('JUMP AHEAD - carry speed!', VW / 2, 120);
       }
+    }
+    if (msgT > 0) {
+      ctx.fillStyle = '#e8b923';
+      ctx.font = 'bold 15px system-ui';
+      ctx.fillText(msg, VW / 2, 92);
     }
     if (fly) {
       ctx.fillStyle = `rgba(232,185,35,${Math.min(1, cine)})`;
       ctx.font = 'bold 30px system-ui';
       ctx.fillText('AIRBORNE', VW / 2, VH - 40);
-    } else if (mode === 'run' || mode === 'rainbow') {
-      const gw = 150, gy = VH - 30;
-      ctx.fillStyle = 'rgba(160,150,130,.22)';
-      ctx.fillRect(VW / 2 - gw / 2, gy - 3, gw, 6);
-      const lst = laneSteer();
-      for (const [sx, dir] of [[-1, 1], [0, 0], [1, -1]]) {
-        ctx.fillStyle = lst === dir ? '#e8b923' : 'rgba(160,150,130,.32)';
-        ctx.fillRect(VW / 2 + sx * gw / 2 - 2, gy - 9, 4, 18);
+      if (fly.sink > 1.5) {
+        ctx.fillStyle = `rgba(255,80,110,${.6 + Math.sin(now / 80) * .4})`;
+        ctx.font = 'bold 18px system-ui';
+        ctx.fillText('SINKING - BOOST!', VW / 2, VH - 70);
       }
-      ctx.fillStyle = '#f3ead6';
-      ctx.beginPath();
-      ctx.arc(VW / 2 - player.lane * gw / 2, gy, 6, 0, 7);
-      ctx.fill();
     }
     if (mode === 'end') {
       ctx.fillStyle = '#000000aa';
@@ -571,7 +699,7 @@ function frame(now) {
       ctx.fillText('END OF THE LINE', VW / 2, VH / 2 - 16);
       ctx.font = '14px system-ui';
       ctx.fillStyle = '#f3ead6';
-      ctx.fillText('burned as the rainbow ' + rainbowTotal.toFixed(1) + 's   jumps ' + jumps + '   best burn ' + bestBurn.toFixed(1) + 's', VW / 2, VH / 2 + 14);
+      ctx.fillText('burned ' + rainbowTotal.toFixed(1) + 's   jumps ' + jumps + '   falls ' + falls + '   best ' + bestBurn.toFixed(1) + 's', VW / 2, VH / 2 + 14);
       ctx.fillStyle = '#b8ab92';
       ctx.fillText('SPACE - ride again', VW / 2, VH / 2 + 40);
     }

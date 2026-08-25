@@ -192,6 +192,52 @@ track point it sits on. Mid-corkscrew those are rolled far apart, and
 lifting along the trailing point's up walked the camera around the tube and
 into the deck.
 
+## Design notes, S6 - "the ride is terribly unsmooth"
+
+The rider's own motion measured clean (0.9% speed variation) and the frame
+rate measured clean (57 fps, 0.5% stutters), so neither was the problem.
+What the player feels is the CAMERA, and nothing was measuring that. So
+`tools/test-camlive.mjs` reads a DEV-only probe out of the running game -
+real eye, aim, FOV, real frame times - and reports eye acceleration, view
+swing rate and FOV rate. Four separate defects fell out of it, none of
+which any earlier test could see:
+
+| | before | after |
+| --- | ---: | ---: |
+| view swing, max | 2,327 deg/s | 211 deg/s |
+| frames over 400 deg/s (24s) | many | 0 |
+| eye acceleration, max | 1,706 u/s² | 235 u/s² |
+| frames over 300 u/s² (24s) | 8 per 15s | 0 |
+| FOV rate, max | 107 deg/s | 62 deg/s |
+
+- **The aim point froze, then teleported.** `ahead()` clamped at the end of
+  the segment, so for the last nine units before every node the camera
+  stared at a fixed spot, then jumped nine units onto the next branch. It
+  now walks past the node onto the branch the lane predicts.
+- **The branch prediction disagreed with the actual choice.** The aim used
+  the camera's smoothed tangent while `chooseP` used the rider's raw one;
+  near a node they picked different branches and the view flipped 152
+  degrees in a frame. Both use the rider's tangent now.
+- **A rate clamp is not smoothing.** Clamping is continuous in value but its
+  velocity switches on and off at the threshold, and a velocity step IS
+  jerk. Replaced with a critically damped spring. The spring deliberately
+  lags the roll, so the boom lengthens by the lag's cosine to keep its
+  height off the deck through a corkscrew - and that compensation is itself
+  low-passed, because unfiltered it put the spikes right back.
+- **Every step in the FOV was a pop.** `surge` jumps to 1 on a pickup and
+  `forkKick` to 1 at each fork; measured at 620 and 103 deg/s, recurring
+  every couple of seconds. One low-pass on the finished FOV catches all of
+  them at the source-independent end.
+
+Also, from the same pass: FOV was wired to instantaneous speed, which rises
+and falls with every crest because gravity acts along the track - the image
+breathed continuously (`tools/test-fov.mjs`: 5.7 deg/s peak, halved by
+smoothing). The speed streaks re-rolled their angles every frame, which is
+white noise, and white noise reads as judder; they have fixed angles now.
+And corkscrews went from one edge in four to one in seven: a 360-degree
+roll inside a one-second segment is a ~350 deg/s spin, which is a showpiece,
+not a texture.
+
 ## Milestone log
 
 | gate | ceiling | worst-of-5 | notes |
@@ -202,6 +248,7 @@ into the deck.
 | S3 corkscrews & colours | 9,500 | 7,734 | full-roll corkscrews + rolling camera, speed blur, rainbow-key collection |
 | S4 wipeout channel | 9,500 | 8,223 | on-rails camera behind the head, banked channel, animated head, colour fix |
 | S5 flow | 9,500 | 8,541 | arc-length motion, stabilised tangents, lane-based forks |
+| S6 smoothness | 9,800 | 8,763 | live camera probe; aim walks past nodes, spring easing, low-passed FOV |
 
 Bugs caught by looking at S0 screenshots, not by the harness: the
 hand-rolled `lookAt` used `z×up` instead of `up×z` and rendered the world

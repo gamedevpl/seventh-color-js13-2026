@@ -1,5 +1,5 @@
 {
-  "name": "S5 flow",
-  "description": "arc-length motion, stabilised node tangents, lane-based forks, wider smoother net",
-  "ceilingBytes": 9500
+  "name": "S6 smoothness",
+  "description": "live camera probe; aim walks past nodes, spring easing, low-passed FOV",
+  "ceilingBytes": 9800
 }

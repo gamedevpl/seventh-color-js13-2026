@@ -52,14 +52,40 @@ export function edgePos(g, a, b, t) {
   return [p, [tn[0] / l, tn[1] / l, tn[2] / l], l];
 }
 
-export function edgeLen(g, a, b) {
-  let L = 0, p = edgePos(g, a, b, 0)[0];
-  for (let k = 1; k <= 6; k++) {
-    const q = edgePos(g, a, b, k / 6)[0];
-    L += Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]);
-    p = q;
+// Arc-length table for one edge, built once when a rider enters it. This is
+// the spine of smooth motion: everywhere else we want to ask "where am I
+// 2.4 units back down the track", and answering that from t alone is
+// impossible - a hermite curve covers wildly different distances for equal
+// steps of t. Estimating with the local |dP/dt| (what this used to do) is
+// worse than useless: the estimate is non-monotonic, so the camera's anchor
+// slid backwards and forwards frame to frame. Measured: 17% of frames had
+// an eye acceleration spike, peaking at a full frame's travel.
+const LUT_N = 32;
+export function buildLUT(g, a, b) {
+  const ss = [0];
+  let prev = edgePos(g, a, b, 0)[0], acc = 0;
+  for (let k = 1; k <= LUT_N; k++) {
+    const q = edgePos(g, a, b, k / LUT_N)[0];
+    acc += Math.hypot(q[0] - prev[0], q[1] - prev[1], q[2] - prev[2]);
+    ss.push(acc);
+    prev = q;
   }
-  return L;
+  return ss;
+}
+
+// Invert it: arc distance -> curve parameter, piecewise linear.
+export function tAt(ss, s) {
+  const len = ss[LUT_N];
+  if (s <= 0) return 0;
+  if (s >= len) return 1;
+  let i = 1;
+  while (i < LUT_N && ss[i] < s) i++;
+  const span = ss[i] - ss[i - 1] || 1;
+  return (i - 1 + (s - ss[i - 1]) / span) / LUT_N;
+}
+
+export function edgeLen(g, a, b) {
+  return buildLUT(g, a, b)[LUT_N];
 }
 
 export function nbrs(g, x, z) {
@@ -69,27 +95,12 @@ export function nbrs(g, x, z) {
 }
 
 // --- the rider ------------------------------------------------------------
+// `s` is arc distance along the current edge - the authoritative position.
+// `t` is derived from it for geometry, never integrated directly.
 export function makeRider(g, node) {
-  return { a: node, from: null, b: null, t: 0, len: 1, pa: null, pb: null, plen: 1,
+  return { a: node, from: null, b: null, t: 0, s: 0, len: 1, lut: null,
+    pa: null, pb: null, plut: null, plen: 1,
     pos: [...g.pos[node[0]][node[1]]], tan: [0, 0, 1] };
-}
-
-// The frame a fixed arc-distance BEHIND the rider, staying on the rails.
-// The chase camera lives here: a world-space lerp toward an offset from the
-// rider cannot survive a corkscrew (the target orbits a full turn and the
-// lag throws the camera clean off the track), but a point that is itself on
-// the track always sits in the channel, correctly banked.
-export function behind(g, r, D) {
-  if (!r.b) return null;
-  const spd = edgePos(g, r.a, r.b, r.t)[2] || r.len;
-  const on = r.t * spd;
-  if (on >= D) return frame(g, r.a, r.b, (on - D) / spd);
-  if (r.pa && r.pb) {
-    const ps = edgePos(g, r.pa, r.pb, 1)[2] || r.plen;
-    const back = Math.max(0, 1 - (D - on) / ps);
-    return frame(g, r.pa, r.pb, back);
-  }
-  return frame(g, r.a, r.b, 0);
 }
 
 // Advance `dist` along the rails. At every node, `choose(candidates)` picks
@@ -103,21 +114,53 @@ export function ride(g, r, dist, choose) {
         !r.from || m[0] !== r.from[0] || m[1] !== r.from[1]);
       r.b = choose(c.length ? c : [r.from]);
       if (!r.b) return;
-      r.len = edgeLen(g, r.a, r.b);
-      r.t = 0;
+      r.lut = buildLUT(g, r.a, r.b);
+      r.len = r.lut[LUT_N];
+      r.s = 0;
     }
-    // Arc-length step: dt = ds / |dP/dt| at the current t, not ds / len.
-    const spd = edgePos(g, r.a, r.b, r.t)[2] || r.len;
-    const remain = (1 - r.t) * spd;
-    if (dist < remain) { r.t += dist / spd; dist = 0; }
+    const remain = r.len - r.s;
+    if (dist < remain) { r.s += dist; dist = 0; }
     else {
       dist -= remain;
-      r.pa = r.a; r.pb = r.b; r.plen = r.len;   // keep one edge of history
+      r.pa = r.a; r.pb = r.b; r.plut = r.lut; r.plen = r.len;
       r.from = r.a; r.a = r.b; r.b = null;
     }
   }
-  if (r.b) [r.pos, r.tan] = edgePos(g, r.a, r.b, r.t);
-  else r.pos = [...g.pos[r.a[0]][r.a[1]]];
+  if (r.b) {
+    r.t = tAt(r.lut, r.s);
+    [r.pos, r.tan] = edgePos(g, r.a, r.b, r.t);
+  } else r.pos = [...g.pos[r.a[0]][r.a[1]]];
+}
+
+// The frame a fixed arc-distance BEHIND the rider, staying on the rails.
+// The chase camera lives here: a world-space lerp toward an offset from the
+// rider cannot survive a corkscrew (the target orbits a full turn and the
+// lag throws the camera clean off the track), but a point that is itself on
+// the track always sits in the channel, correctly banked.
+export function behind(g, r, D) {
+  if (!r.b) return null;
+  if (r.s >= D) return frame(g, r.a, r.b, tAt(r.lut, r.s - D));
+  if (r.pa && r.pb) return frame(g, r.pa, r.pb, tAt(r.plut, r.plen - (D - r.s)));
+  return frame(g, r.a, r.b, 0);
+}
+
+// ...and a fixed arc-distance AHEAD, WALKING ON past the node onto whichever
+// branch `choose` predicts. Clamping at the node instead (what this did) is
+// a disaster you can hear in the numbers: the aim point freezes for the last
+// nine units of every segment and then teleports nine units onto the next
+// one. Measured in the live game, that whipped the view at 2327 deg/s.
+export function ahead(g, r, D, choose) {
+  if (!r.b) return null;
+  const s = r.s + D;
+  if (s <= r.len) return frame(g, r.a, r.b, tAt(r.lut, s));
+  const c = nbrs(g, r.b[0], r.b[1]).filter((m) => m[0] !== r.a[0] || m[1] !== r.a[1]);
+  const nb = (choose && c.length ? choose(c) : c[0]) || r.a;
+  // one-slot cache: rebuilding this table every frame is pure waste
+  if (!r.alut || r.anb0 !== nb[0] || r.anb1 !== nb[1] || r.ab0 !== r.b[0] || r.ab1 !== r.b[1]) {
+    r.alut = buildLUT(g, r.b, nb);
+    r.anb0 = nb[0]; r.anb1 = nb[1]; r.ab0 = r.b[0]; r.ab1 = r.b[1];
+  }
+  return frame(g, r.b, nb, tAt(r.alut, Math.min(r.alut[LUT_N], s - r.len)));
 }
 
 // --- the moving frame -----------------------------------------------------
@@ -128,8 +171,14 @@ export function ride(g, r, dist, choose) {
 // hashed order-independently from their endpoints, roll a full 360 along
 // their length. Node roll is always zero, so every fork is entered upright.
 const sm = (t) => t * t * (3 - 2 * t);
+// A corkscrew turns the world 360 degrees within ONE segment, and a segment
+// lasts about a second at speed - so it is inherently a ~350 deg/s roll, and
+// the camera on its 2.4-unit boom sweeps a full circle with it. That is a
+// showpiece, not a texture: at one edge in four it WAS the ride, and the
+// ride read as violent. One in seven keeps the spectacle rare enough to be
+// a moment.
 export const twisted = (a, b) =>
-  ((a[0] + b[0]) * 31 + (a[1] + b[1]) * 17 + Math.abs(a[0] - b[0])) % 4 === 1;
+  ((a[0] + b[0]) * 31 + (a[1] + b[1]) * 17 + Math.abs(a[0] - b[0])) % 7 === 1;
 
 export function frame(g, a, b, t) {
   const [p, T] = edgePos(g, a, b, t);
@@ -144,7 +193,9 @@ export function frame(g, a, b, t) {
   const Tb = edgePos(g, a, b, Math.min(1, t + e))[1];
   let dh = Math.atan2(Tb[0], Tb[2]) - Math.atan2(Ta[0], Ta[2]);
   dh -= Math.round(dh / (2 * Math.PI)) * 2 * Math.PI;
-  let phi = Math.max(-.8, Math.min(.8, dh * 2.4)) * Math.min(1, 6 * t * (1 - t));
+  // Softer bank, ramped in over a quarter of the edge rather than a sixth:
+  // a 46-degree lean arriving in 0.18s is its own jolt.
+  let phi = Math.max(-.5, Math.min(.5, dh * 1.6)) * Math.min(1, 4 * t * (1 - t));
   if (twisted(a, b)) phi += Math.PI * 2 * sm(t);
   const c = Math.cos(phi), si = Math.sin(phi);
   return [p, T,

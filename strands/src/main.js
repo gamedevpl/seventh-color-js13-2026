@@ -7,7 +7,7 @@
 
 import { initGL, frameGL, additive, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, modelFrame, IDENT, pushBox } from './gl.js';
 import { S, genGraph, bfs } from './maze.js';
-import { trackMeshes, makeRider, ride, nbrs, behind, frame as tframe } from './track.js';
+import { trackMeshes, makeRider, ride, nbrs, behind, ahead, frame as tframe } from './track.js';
 import { unicornMesh, headMesh, PIVOT, RAINBOW } from './uni.js';
 import { makeBraid, updateBraid, braidVerts } from './ribbon.js';
 
@@ -120,7 +120,8 @@ const player = { r: null, speed: 10, lane: 0 };
 const cam = { x: 0, y: 3, z: -5, u: [0, 1, 0] };
 const uniM = unicornMesh();
 const headM = headMesh();
-let vp = null, beat = 0, lean = 0, camT = null, camU = null;
+let vp = null, beat = 0, lean = 0, camT = null, camU = null, speedSm = 0, fovSm = 1.03, clSm = 1;
+const camTv = [0, 0, 0], camUv = [0, 0, 0];
 
 // Steering only matters at forks: hold left/right while crossing a node and
 // the leftmost/rightmost branch is taken; hands off takes the straightest.
@@ -277,7 +278,8 @@ function frame(now) {
     player.lane = Math.max(-1, Math.min(1, player.lane));
     const prevA = player.r.a;
     ride(g, player.r, player.speed * dt, chooseP);
-    if (player.r.a !== prevA) forkKick = 1;    // crossing pop, feel the switch
+    // Only a real fork pops the view; every node doing it was a hitch.
+    if (player.r.a !== prevA && nbrs(g, player.r.a[0], player.r.a[1]).length > 2) forkKick = 1;
 
     // braid flees against fresh BFS-from-player, recomputed on a short clock
     bfsT -= dt;
@@ -300,6 +302,13 @@ function frame(now) {
     }
 
     speedN = (player.speed - 6) / 32;
+    // The camera must NOT track instantaneous speed. Gravity along the
+    // track makes real speed rise and fall with every crest and dip, so a
+    // FOV (or boom length) wired straight to it pumps the whole image a
+    // couple of times a second - the single biggest reason the ride read as
+    // unsmooth. This lags by about two thirds of a second: it answers a
+    // sustained boost and ignores the terrain ripple.
+    speedSm += (speedN - speedSm) * Math.min(1, dt * 1.5);
     const tail = braid.trail[0];
     if (tail) {
       const td = d3(player.r.pos, tail);
@@ -338,17 +347,31 @@ function frame(now) {
   // (measured: up to 88 degrees, against a 99th percentile of 3.7). Ease
   // ONLY those: small changes pass through untouched, so normal motion has
   // no lag at all and a corkscrew still rolls at full rate.
-  const ease = (cur, want) => {
+  // A RATE LIMIT, not a blend-past-a-threshold. The threshold version of
+  // this jittered badly: under it the frame snapped exactly to the target,
+  // over it the frame lerped 15% of the way, so around the boundary - which
+  // is precisely where a corkscrew's roll rate sits - it alternated between
+  // the two every frame and sawtoothed. A rate limit is continuous at its
+  // own boundary: at exactly maxStep the clamped result IS the target.
+  // Critically damped spring, not a rate clamp. A clamp is continuous in
+  // value but its VELOCITY switches on and off the instant the threshold is
+  // crossed, and a velocity step is exactly what "jerk" means - the live
+  // probe showed eye accelerations past 1700 u/s^2 from that alone. A spring
+  // is smooth in both, and criticaly damped it never overshoots.
+  const K = 9;
+  const ease = (cur, vel, want) => {
     if (!cur) return [...want];
-    const d = cur[0] * want[0] + cur[1] * want[1] + cur[2] * want[2];
-    if (d > .985) return [...want];
-    const k = Math.min(1, dt * 9);
-    const v = [cur[0] + (want[0] - cur[0]) * k, cur[1] + (want[1] - cur[1]) * k, cur[2] + (want[2] - cur[2]) * k];
-    const l = Math.hypot(...v) || 1;
-    return [v[0] / l, v[1] / l, v[2] / l];
+    for (let i = 0; i < 3; i++) {
+      vel[i] += ((want[i] - cur[i]) * K * K - 2 * K * vel[i]) * dt;
+      cur[i] += vel[i] * dt;
+    }
+    const l = Math.hypot(cur[0], cur[1], cur[2]) || 1;
+    cur[0] /= l; cur[1] /= l; cur[2] /= l;
+    return cur;
   };
   if (mode === 'title' || !player.r) { camT = null; camU = null; }
-  camT = ease(camT, T); camU = ease(camU, up);
+  const upT = up;                                // unsmoothed track up
+  camT = ease(camT, camTv, T); camU = ease(camU, camUv, up);
   T = camT; up = camU;
   // Over-the-withers, not a drone: tight behind and barely above the head,
   // so the horn sits in frame and the track fills the screen. Boosting
@@ -359,26 +382,41 @@ function frame(now) {
   // turn and the lag flings the camera off the track. This is rigid, so the
   // roll is exact and the channel always frames the shot.
   // high must clear the banked lips (1.5) or they wall the view off.
-  const high = 2.35 - speedN * .2;
+  const high = 2.35 - speedSm * .2;
   lean += (turnDir() * .1 - lean) * Math.min(1, dt * 4);
   const sideL = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]];
-  const bf = player.r && player.r.b ? behind(g, player.r, 1.9 + speedN * .7) : null;
+  const bf = player.r && player.r.b ? behind(g, player.r, 1.9 + speedSm * .7) : null;
   const bp = bf ? bf[0] : [p[0] - T[0] * 1.9, p[1] - T[1] * 1.9, p[2] - T[2] * 1.9];
   // Sit at the point behind, but lift along the RIDER's up, not that
   // point's. Mid-corkscrew the two are rolled apart by a big angle, and
   // lifting along the trailing point's up walks the camera around the tube
   // and straight into the deck.
-  cam.x = bp[0] + up[0] * high; cam.y = bp[1] + up[1] * high; cam.z = bp[2] + up[2] * high;
+  // The spring deliberately lags the roll, which keeps junction kinks from
+  // jolting the eye - but a lagged up vector also swings the boom sideways
+  // and drops the camera toward the deck through a corkscrew. Lengthen the
+  // boom by exactly the lag's cosine and it keeps its height off the track
+  // while still rolling smoothly.
+  // ...and the compensation itself gets low-passed, or it becomes the very
+  // thing it is fixing: the lag cosine drops sharply at a junction, and an
+  // unfiltered boom length tracking it put the spikes straight back.
+  const cl = Math.max(.55, camT ? up[0] * upT[0] + up[1] * upT[1] + up[2] * upT[2] : 1);
+  clSm += (cl - clSm) * Math.min(1, dt * 4);
+  const lift = high / Math.max(.55, clSm);
+  cam.x = bp[0] + up[0] * lift; cam.y = bp[1] + up[1] * lift; cam.z = bp[2] + up[2] * lift;
   cam.u = up;
   const lo = player.r ? player.lane * 1.6 : 0;
   let eye = [cam.x + sideL[0] * (lean + lo), cam.y + sideL[1] * (lean + lo), cam.z + sideL[2] * (lean + lo)];
   // Aim at a point of TRACK ahead, not down the straight tangent: the
   // tangent leaves the road on every bend (which threw the rider
   // off-centre), while a short tangent aim points the camera at the floor.
-  const af = player.r && player.r.b
-    ? tframe(g, player.r.a, player.r.b, Math.min(1, player.r.t + 9 / player.r.len)) : null;
+  // Predict with the RIDER's tangent, exactly what chooseP uses. Predicting
+  // with the camera's smoothed tangent instead let the two disagree near a
+  // node, and when they did, the aim point teleported from one branch to the
+  // other as the node went by - a 152-degree view flip in a single frame.
+  const af = player.r ? ahead(g, player.r, 9, (c) =>
+    pickBranch(c, laneSteer(), player.r.tan, g.pos[player.r.b[0]][player.r.b[1]])) : null;
   const ap = af ? af[0] : [p[0] + T[0] * 9, p[1] + T[1] * 9, p[2] + T[2] * 9];
-  const au = af ? af[3] : up;
+  const au = up;
   let at = [ap[0] + au[0] * 1.7 + sideL[0] * lo, ap[1] + au[1] * 1.7 + sideL[1] * lo, ap[2] + au[2] * 1.7 + sideL[2] * lo];
   let cu = cam.u.map((v, i) => v - sideL[i] * lean * .55);
   if (DEV && devSpec && mode === 'run' && braid.trail.length > 4) {
@@ -388,7 +426,17 @@ function frame(now) {
     cu = [0, 1, 0];
   }
   // Speed widens the world: FOV kick is most of what "fast" feels like.
-  const fov = 1.03 + speedN * .32 + surge * .22 + forkKick * .06;
+  // ONE low-pass on the finished field of view, which catches every source
+  // of a step at once: surge is set to 1 the instant a colour is taken and
+  // forkKick to 1 the instant a fork is crossed, and each of those was a
+  // visible pop - measured at 103 deg/s per fork and 620 deg/s per pickup,
+  // recurring every couple of seconds. Filter the result, not each cause.
+  fovSm += (1.03 + speedSm * .3 + surge * .18 + forkKick * .04 - fovSm) * Math.min(1, dt * 6);
+  const fov = fovSm;
+  // Dev only: publish the real camera so tools/test-camlive.mjs can measure
+  // the actual ride - lane, lean, FOV and all - instead of a Node replica of
+  // it. Compiled out of every shipping build.
+  if (DEV) (window.__cam = window.__cam || []).push([now, eye[0], eye[1], eye[2], at[0], at[1], at[2], fov, cu[0], cu[1], cu[2]]);
   vp = mul(perspective(fov, VW / VH, .1, 160), lookAt(eye, at, cu));
   frameGL(vp, eye, FOG);
 
@@ -484,8 +532,9 @@ function frame(now) {
       ctx.strokeStyle = `rgba(255,255,255,${Math.min(.4, blur * .4)})`;
       ctx.lineWidth = 1.5;
       for (let i = 0; i < 24; i++) {
-        const an = Math.random() * Math.PI * 2;
-        const r0 = 100 + Math.random() * 60, r1 = r0 + 30 + blur * 160;
+        // Fixed angles per streak, not fresh randoms every frame: re-rolling
+        // them each frame is white noise, and white noise reads as judder.
+        const an = i * 2.399, r0 = 104 + (i % 5) * 13, r1 = r0 + 30 + blur * 160;
         ctx.beginPath();
         ctx.moveTo(VW / 2 + Math.cos(an) * r0, VH / 2 + Math.sin(an) * r0 * .62);
         ctx.lineTo(VW / 2 + Math.cos(an) * r1, VH / 2 + Math.sin(an) * r1 * .62);

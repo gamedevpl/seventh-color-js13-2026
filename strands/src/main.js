@@ -168,26 +168,39 @@ function burst(p, n, sp) {
 // which reads as wallpaper; these stream past, sweep sideways when you turn
 // (because they do not turn with you), and the faster you go the more of
 // them wake up. Each is drawn as a streak along the camera's actual
-// velocity, so its length IS the motion blur of that mote.
-const DMAX = 230, DUST = [];
+// per-frame velocity, so its length IS the motion blur of that mote.
+//
+// That length is measured, not chosen. For a mote at lateral offset R and
+// axial distance z the screen angle is atan(R/z), and BOTH the per-frame
+// angular motion and the streak's angular length scale by R/(R^2+z^2) - so
+// the ratio deciding whether a dash reads as motion or as an object is
+// vl/len everywhere on screen, wherever the mote sits. A real exposure
+// gives exactly 1: successive smears abut, no overlap and no gap. The first
+// cut used a fixed len of up to 28 units against a vl of about 0.6 - a
+// ratio of 1/49, every dash overlapping its own next position by 98%, which
+// is a rod hanging in the air, not a streak. len rides vl now, so the
+// overlap is a small deliberate number and stays right at any frame rate.
+const DMAX = 150, DUST = [];
 const DBUF = new Float32Array(DMAX * 60);
 let prevEye = null;
 
 function dustVerts(speedN, dt) {
-  let n = 0;
+  let n = 0, near = 0;
   if (!prevEye) { prevEye = [...cam.e]; return 0; }
   let vx = cam.e[0] - prevEye[0], vy = cam.e[1] - prevEye[1], vz = cam.e[2] - prevEye[2];
   prevEye = [...cam.e];
   const vl = Math.hypot(vx, vy, vz);
   if (vl < 1e-4) return 0;
   vx /= vl; vy /= vl; vz /= vl;
-  // How many are awake, and how long each smears - both ride on speed.
+  // How many are awake rides speed; how long each smears rides the actual
+  // frame displacement. The multiplier is the overlap factor - frames of
+  // exposure - and a mild exaggeration over the honest 1 is all it needs.
   const wake = Math.max(0, (speedN - .12) / .88);
-  const len = 2 + speedN * 26;
+  const len = vl * (1.4 + speedN * 1.2);
   // Fades right out for the jump: airborne, the camera pulls back and swings
   // sideways, so ITS velocity - which is what the streaks are drawn along -
   // stops having anything to do with where the unicorn is going.
-  const alp = Math.min(.75, .12 + speedN * .8) * (1 - cine);
+  const alp = Math.min(.5, .06 + speedN * .55) * (1 - cine);
   if (alp <= .01) return 0;
   // a stable basis around the travel direction
   let ax = -vz, ay = 0, az = vx;
@@ -202,19 +215,30 @@ function dustVerts(speedN, dt) {
     if (wa <= 0) break;
     let d = DUST[i];
     const far = d && (d[0] - cam.e[0]) * vx + (d[1] - cam.e[1]) * vy + (d[2] - cam.e[2]) * vz;
-    if (!d || far < -6 || far > 120) {
-      const r = 6 + Math.random() * 34, th = Math.random() * 6.283;
-      const ahead = 24 + Math.random() * 80;
+    if (!d || far < -8 || far > 82) {
+      // A TIGHT cone, not a big sparse cloud. Spread through a 38-unit
+      // radius and 150 units deep, these few motes drifted past close
+      // enough to sweep across the frame about once every five seconds -
+      // scenery, not speed. Same count in a cone a third as wide and half
+      // as deep passes one every fraction of a second.
+      const r = 2 + Math.random() * 17, th = Math.random() * 6.283;
+      const ahead = 8 + Math.random() * 72;
       const co = Math.cos(th) * r, si = Math.sin(th) * r;
       d = DUST[i] = [
         cam.e[0] + vx * ahead + ax * co + bx * si,
         cam.e[1] + vy * ahead + ay * co + by * si,
         cam.e[2] + vz * ahead + az * co + bz * si,
+        0,
       ];
     }
-    // fade in with distance so nothing pops into existence in your face
+    // Fade in by AGE, not by distance. Fading by distance is what forced
+    // motes to be born far away and dim, and the near ones - the only ones
+    // that visibly move - were the casualty. Age lets one appear anywhere,
+    // including right beside you, and simply swell into being.
+    d[3] = Math.min(1, d[3] + dt * 3);
     const dist = Math.hypot(d[0] - cam.e[0], d[1] - cam.e[1], d[2] - cam.e[2]);
-    const a = alp * Math.min(1, wa) * Math.min(1, dist / 16) * Math.min(1, (120 - dist) / 40);
+    const a = alp * Math.min(1, wa) * d[3] * Math.min(1, (82 - dist) / 22);
+    if (DEV && dist < 12) near++;
     if (a <= .01) continue;
     // the streak: a thin quad from the mote back along the travel direction
     // TOWARD the vanishing point, not away from it. The camera moves +v and
@@ -227,7 +251,7 @@ function dustVerts(speedN, dt) {
     let ex = d[0] - cam.e[0], ey = d[1] - cam.e[1], ez = d[2] - cam.e[2];
     let sx = vy * ez - vz * ey, sy = vz * ex - vx * ez, sz = vx * ey - vy * ex;
     const sl = Math.hypot(sx, sy, sz) || 1;
-    const w = .09;
+    const w = .16;
     sx = sx / sl * w; sy = sy / sl * w; sz = sz / sl * w;
     const put = (x, y, z, aa) => {
       DBUF[n] = x; DBUF[n + 1] = y; DBUF[n + 2] = z;
@@ -242,6 +266,7 @@ function dustVerts(speedN, dt) {
     put(tx + sx, ty + sy, tz + sz, 0);
     put(tx - sx, ty - sy, tz - sz, 0);
   }
+  if (DEV) (window.__dust = window.__dust || []).push([speedN, vl, len, n / 60, near]);
   return n;
 }
 

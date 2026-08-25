@@ -1,5 +1,5 @@
 {
-  "name": "R6 dust approaches",
-  "description": "speed-dust streaks drawn toward the vanishing point, per-mote fade band, dust and blur stand down for the jump",
+  "name": "R7 streaks that move",
+  "description": "streak length tied to real per-frame camera travel, tighter mote cone, age-based fade-in",
   "ceilingBytes": 11500
 }

@@ -59,6 +59,53 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R7 - the streak becomes a smear, and the cone gets tight
+
+"They still hang in the air instead of flying past." Right, and the whole
+effect collapses to one ratio.
+
+For a mote at lateral offset R and axial distance z the screen angle is
+`atan(R/z)`. Differentiate: both the per-frame angular motion and the
+streak's angular length scale by the same `R/(R^2+z^2)`. They cancel, so
+
+```
+angular motion per frame / angular streak length  =  vl / len
+```
+
+everywhere on screen, wherever the mote sits - one scalar for the entire
+effect. `vl` is how far the camera actually moved this frame. A real
+exposure gives exactly 1: successive smears abut, no overlap, no gap.
+
+The streak length was a constant `2 + speedN*26`, up to 28 units, against a
+`vl` of about 0.6. **Overlap factor 23-37x, measured**: every dash covering
+its own next position by 97%. That is not a smear, it is a rod hanging in
+space, and no amount of tuning colour or count would have fixed it. `len`
+rides `vl` now, at `1.4 + speedN*1.2` frames of exposure - a mild
+exaggeration over the honest 1, and frame-rate-correct for free.
+
+| | streak | overlap |
+| --- | ---: | ---: |
+| before, speedN 0.5 | 15.1u | 22.9x |
+| before, speedN 0.7 | 19.7u | 23.4x |
+| after, speedN 0.5 | 1.37u | 2.0x |
+| after, speedN 0.7 | 1.78u | 2.2x |
+
+**Then it was too subtle, and density was the reason.** The motes filled a
+cone 38 units in radius and 150 deep, and the ones that read as speed are
+the ones that pass close enough to sweep across the frame - measured at
+**0.2 to 1.2 within 12 units** at any moment. A third of the width and half
+the depth gives **1.7 to 8.9**, roughly seven times the close traffic, with
+*fewer* motes in total (56 against 109 at speed). Subtler and faster at the
+same time.
+
+**And the fade moved from distance to age.** Fading by distance is what
+forced motes to be born far away and dim - which took out precisely the
+near ones that move. Each now carries a fade-in it swells through over a
+third of a second, so one can appear anywhere, including beside your ear.
+
+`tools/test-dust.mjs` reports the overlap factor and the close count from
+the running game, and fails above 4x. Run against the old code it fails.
+
 ## R6 - the dust approaches, and the jump is allowed to be sharp
 
 Three defects in the speed effect, all of them reported as "feel" and all of
@@ -554,6 +601,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R7 streaks that move | 11,500 | 11,211 | streak length tied to real frame travel, tight cone, age-based fade |
 | R6 dust approaches | 11,500 | 11,192 | streak direction corrected, per-mote fade band, both effects stand down for the jump |
 
 Bugs caught by looking at S0 screenshots, not by the harness: the

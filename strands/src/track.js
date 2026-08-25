@@ -13,7 +13,8 @@ function nodeTan(g, a, b) {
   const ax = g.axis[a[0]][a[1]];
   const d = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
   const s = Math.sign(ax[0] * d[0] + ax[1] * d[1] + ax[2] * d[2]) || 1;
-  const L = Math.hypot(...d);
+  // 1.3x chord: overshoot bows every segment into a serpentine.
+  const L = Math.hypot(...d) * 1.3;
   return [ax[0] * s * L, ax[1] * s * L, ax[2] * s * L];
 }
 
@@ -77,11 +78,37 @@ export function ride(g, r, dist, choose) {
   else r.pos = [...g.pos[r.a[0]][r.a[1]]];
 }
 
-// --- geometry -------------------------------------------------------------
-const sideOf = (t) => {
-  const h = Math.hypot(t[0], t[2]) || 1;
-  return [t[2] / h, -t[0] / h];
-};
+// --- the moving frame -----------------------------------------------------
+// Everything that stands ON the track - road quads, rails, the rider, the
+// camera - shares one frame: position, tangent, side, up. Roll comes from
+// two sources: banking (lean into horizontal turns, faded to zero at nodes
+// so junction geometry never cracks) and corkscrews - a quarter of edges,
+// hashed order-independently from their endpoints, roll a full 360 along
+// their length. Node roll is always zero, so every fork is entered upright.
+const sm = (t) => t * t * (3 - 2 * t);
+export const twisted = (a, b) =>
+  ((a[0] + b[0]) * 31 + (a[1] + b[1]) * 17 + Math.abs(a[0] - b[0])) % 4 === 1;
+
+export function frame(g, a, b, t) {
+  const [p, T] = edgePos(g, a, b, t);
+  const h = Math.max(.05, Math.hypot(T[0], T[2]));
+  const s0 = [T[2] / h, 0, -T[0] / h];
+  let ux = T[1] * s0[2], uy = T[2] * s0[0] - T[0] * s0[2], uz = -T[1] * s0[0];
+  const ul = Math.hypot(ux, uy, uz) || 1;
+  ux /= ul; uy /= ul; uz /= ul;
+  // banking: horizontal turn rate, clamped, zeroed at both nodes
+  const e = .05;
+  const Ta = edgePos(g, a, b, Math.max(0, t - e))[1];
+  const Tb = edgePos(g, a, b, Math.min(1, t + e))[1];
+  let dh = Math.atan2(Tb[0], Tb[2]) - Math.atan2(Ta[0], Ta[2]);
+  dh -= Math.round(dh / (2 * Math.PI)) * 2 * Math.PI;
+  let phi = Math.max(-.8, Math.min(.8, dh * 2.4)) * Math.min(1, 6 * t * (1 - t));
+  if (twisted(a, b)) phi += Math.PI * 2 * sm(t);
+  const c = Math.cos(phi), si = Math.sin(phi);
+  return [p, T,
+    [s0[0] * c + ux * si, s0[1] * c + uy * si, s0[2] * c + uz * si],
+    [ux * c - s0[0] * si, uy * c - s0[1] * si, uz * c - s0[2] * si]];
+}
 
 // Solid road + additive neon. Each edge's rails carry ONE rainbow colour
 // picked by a hash of its endpoints: the colours are landmarks - "the braid
@@ -94,32 +121,28 @@ export function trackMeshes(g) {
       arr.push(q[0], q[1], q[2], nrm[0], nrm[1], nrm[2], col[0], col[1], col[2], al);
     }
   };
+  const at = (P, s, u, ws, wu) => [P[0] + s[0] * ws + u[0] * wu, P[1] + s[1] * ws + u[1] * wu, P[2] + s[2] * ws + u[2] * wu];
   for (let x = 0; x < g.n; x++) for (let z = 0; z < g.n; z++) {
     for (const [dx, dz] of [[1, 0], [0, 1]]) {
       if (!g.open(x, z, dx, dz)) continue;
       const a = [x, z], b = [x + dx, z + dz];
       // Neon wants punch: over-drive the palette colour, let additive clamp.
       const rc = RAINBOW[(x * 5 + z * 11 + dx * 3 + dz * 7) % 7].map((v) => v * 1.7);
-      let [pp, pt] = edgePos(g, a, b, 0), ps = sideOf(pt);
-      for (let k = 1; k <= K; k++) {
-        const [cp, ct] = edgePos(g, a, b, k / K), cs = sideOf(ct);
-        // normal = tan x side, so slopes shade like slopes
-        const nrm = [ct[1] * cs[1], ct[2] * cs[0] - ct[0] * cs[1], -ct[1] * cs[0]];
+      const kk = twisted(a, b) ? K * 3 : K;    // corkscrews need the samples
+      let [pp, , ps, pu] = frame(g, a, b, 0);
+      for (let k = 1; k <= kk; k++) {
+        const [cp, , cs, cu] = frame(g, a, b, k / kk);
         quad(road,
-          [pp[0] - ps[0] * W, pp[1], pp[2] - ps[1] * W],
-          [pp[0] + ps[0] * W, pp[1], pp[2] + ps[1] * W],
-          [cp[0] + cs[0] * W, cp[1], cp[2] + cs[1] * W],
-          [cp[0] - cs[0] * W, cp[1], cp[2] - cs[1] * W],
-          nrm, [.14, .13, .20], 1);
+          at(pp, ps, pu, -W, 0), at(pp, ps, pu, W, 0),
+          at(cp, cs, cu, W, 0), at(cp, cs, cu, -W, 0),
+          cu, [.14, .13, .20], 1);
         for (const e of [-1, 1]) {
           quad(rail,
-            [pp[0] + ps[0] * W * e, pp[1], pp[2] + ps[1] * W * e],
-            [cp[0] + cs[0] * W * e, cp[1], cp[2] + cs[1] * W * e],
-            [cp[0] + cs[0] * W * e, cp[1] + .4, cp[2] + cs[1] * W * e],
-            [pp[0] + ps[0] * W * e, pp[1] + .4, pp[2] + ps[1] * W * e],
+            at(pp, ps, pu, W * e, 0), at(cp, cs, cu, W * e, 0),
+            at(cp, cs, cu, W * e, .4), at(pp, ps, pu, W * e, .4),
             [0, 1, 0], rc, .6);
         }
-        pp = cp; ps = cs;
+        pp = cp; ps = cs; pu = cu;
       }
     }
   }

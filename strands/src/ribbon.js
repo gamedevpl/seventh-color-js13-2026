@@ -9,15 +9,18 @@ import { RAINBOW } from './uni.js';
 const d3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 export function makeBraid(g, node) {
-  return { r: makeRider(g, node), trail: [] };
+  return { r: makeRider(g, node), trail: [], burst: 0 };
 }
 
-export function updateBraid(g, br, dists, playerPos, dt) {
-  // Rubber band, coaster scale: panics when the player closes in but a
-  // committed boost (34 u/s + downhill) still catches it; dawdles when far
-  // so the chase stays findable across the void.
+export function updateBraid(g, br, dists, playerPos, dt, canCatch) {
+  // Rubber band, coaster scale: its panic speed sits just above the base
+  // top speed, so the braid is uncatchable until the collected colours
+  // raise the ceiling - the rainbow is the key, not a bigger engine. When
+  // grabbed at without the full rainbow it BURSTS away in a panic sprint.
   const pd = d3(br.r.pos, playerPos);
-  const sp = pd < 12 ? 23 : pd > 45 ? 10 : 15;
+  br.burst = Math.max(0, br.burst - dt);
+  let sp = pd < 12 ? (canCatch ? 21 : 26) : pd > 45 ? 10 : 15;
+  if (br.burst > 0) sp = 42;
   ride(g, br.r, sp * dt, (c) => {
     let best = c[0], bd = -1;
     for (const m of c) {
@@ -27,9 +30,9 @@ export function updateBraid(g, br, dists, playerPos, dt) {
     return best;
   });
   const last = br.trail[br.trail.length - 1];
-  if (!last || d3(br.r.pos, last) > 1.1) {
+  if (!last || d3(br.r.pos, last) > 1.3) {
     br.trail.push([...br.r.pos]);
-    if (br.trail.length > 34) br.trail.shift();  // trail[0] = the tail you catch
+    if (br.trail.length > 40) br.trail.shift();  // trail[0] = the tail you catch
   }
 }
 

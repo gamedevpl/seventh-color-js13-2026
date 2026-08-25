@@ -76,9 +76,9 @@ export function genGraph(n) {
     pos.push([]);
     for (let z = 0; z < n; z++) {
       pos[x].push([
-        (x + .5) * S + (Math.random() - .5) * S * .3,
-        7 * Math.sin(x * 1.05 + p1) * Math.cos(z * .85 + p2) + (Math.random() - .5) * 2.4,
-        (z + .5) * S + (Math.random() - .5) * S * .3,
+        (x + .5) * S + (Math.random() - .5) * S * .44,
+        9 * Math.sin(x * 1.05 + p1) * Math.cos(z * .85 + p2) + (Math.random() - .5) * 3,
+        (z + .5) * S + (Math.random() - .5) * S * .44,
       ]);
     }
   }

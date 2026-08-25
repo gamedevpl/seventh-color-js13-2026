@@ -18,7 +18,7 @@ const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform ve
 uniform mediump float add;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
 float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
-vc=c*mix(l,1.,add);va=a;vf=clamp((length(w.xyz-cam)-12.)/58.,0.,1.);}`;
+vc=c*mix(l,1.,add);va=a;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,add),0.,1.);}`;
 const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
 uniform vec3 fog;uniform float add;
 void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf));
@@ -102,19 +102,23 @@ export function perspective(fov, aspect, near, far) {
   return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / d, -1, 0, 0, 2 * far * near / d, 0];
 }
 
-export function lookAt(eye, at) {
+// General up vector, because the camera rolls with the track now - a
+// corkscrew is only a corkscrew if the horizon turns with you.
+export function lookAt(eye, at, up = [0, 1, 0]) {
   let zx = eye[0] - at[0], zy = eye[1] - at[1], zz = eye[2] - at[2];
   const zl = Math.hypot(zx, zy, zz);
   zx /= zl; zy /= zl; zz /= zl;
-  let xx = zz, xz = -zx;                       // cross(up=(0,1,0), z)
-  const xl = Math.hypot(xx, xz) || 1;
-  xx /= xl; xz /= xl;
-  const yx = zy * xz, yy = zz * xx - zx * xz, yz = -zy * xx;   // cross(z, x)
+  let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx;
+  const xl = Math.hypot(xx, xy, xz) || 1;
+  xx /= xl; xy /= xl; xz /= xl;
+  const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
   return [
     xx, yx, zx, 0,
-    0, yy, zy, 0,
+    xy, yy, zy, 0,
     xz, yz, zz, 0,
-    -(xx * eye[0] + xz * eye[2]), -(yx * eye[0] + yy * eye[1] + yz * eye[2]), -(zx * eye[0] + zy * eye[1] + zz * eye[2]), 1,
+    -(xx * eye[0] + xy * eye[1] + xz * eye[2]),
+    -(yx * eye[0] + yy * eye[1] + yz * eye[2]),
+    -(zx * eye[0] + zy * eye[1] + zz * eye[2]), 1,
   ];
 }
 
@@ -126,16 +130,20 @@ export function mul(a, b) {
   return o;
 }
 
-// translate * rotateY * rotateX - yaw steers, pitch noses the rider into
-// dives and climbs. Positive pitch tips the +z nose downward.
-export function modelTR(x, y, z, yaw = 0, s = 1, pitch = 0) {
-  const cy = Math.cos(yaw) * s, sy = Math.sin(yaw) * s;
-  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+// translate * rotateY - for things that spin in place (pillars, shards).
+export function modelTR(x, y, z, yaw = 0, s = 1) {
+  const c = Math.cos(yaw) * s, si = Math.sin(yaw) * s;
+  return [c, 0, -si, 0, 0, s, 0, 0, si, 0, c, 0, x, y, z, 1];
+}
+
+// Full-frame model matrix: the rider is glued to the track's moving frame
+// (side/up/forward), so it corkscrews when the track does.
+export function modelFrame(p, X, Y, Z, s) {
   return [
-    cy, 0, -sy, 0,
-    sy * sp, cp * s, cy * sp, 0,
-    sy * cp, -sp * s, cy * cp, 0,
-    x, y, z, 1,
+    X[0] * s, X[1] * s, X[2] * s, 0,
+    Y[0] * s, Y[1] * s, Y[2] * s, 0,
+    Z[0] * s, Z[1] * s, Z[2] * s, 0,
+    p[0], p[1], p[2], 1,
   ];
 }
 

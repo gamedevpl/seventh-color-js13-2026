@@ -1,14 +1,13 @@
-// Seven Strands - the second Seventh Color entry, pivoted into a coaster
-// chase. The braid bolted onto a rollercoaster net twisted through the
-// night sky: a braided maze whose corridors are hermite track segments.
-// The player rides rails at speed, picks a branch at every fork, and can
-// SEE the braid glowing somewhere out there - but never quite which route
-// leads to it. The score is adaptive: drums and bass always, an arp that
-// wakes with speed, a lead that sings as the tail gets close.
+// Seven Strands - the coaster chase. The braid bolted onto a rollercoaster
+// net twisted through the night sky; the unicorn rides the rails after it.
+// The loop: gather the seven colours IN ORDER (each raises your top speed
+// and surges you forward) - only a full rainbow can hold the braid, which
+// bursts free of empty hooves. Corkscrews roll the world, the camera rolls
+// with it, and the score tells you how close you are before your eyes do.
 
-import { initGL, frameGL, additive, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox } from './gl.js';
+import { initGL, frameGL, additive, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, modelFrame, IDENT, pushBox } from './gl.js';
 import { S, genGraph, bfs } from './maze.js';
-import { trackMeshes, makeRider, ride, nbrs } from './track.js';
+import { trackMeshes, makeRider, ride, nbrs, frame as tframe } from './track.js';
 import { unicornMesh, RAINBOW } from './uni.js';
 import { makeBraid, updateBraid, braidVerts } from './ribbon.js';
 
@@ -85,10 +84,9 @@ function kick(t0) {
   o.stop(t0 + .16);
 }
 
-// The score is three layers over a kick: bass always, an octave-up saw arp
-// that wakes with speed (and the whole thing accelerates 116->168 BPM),
-// and a pentatonic lead that fades in as the tail gets close - the music
-// IS the proximity meter.
+// The score is the instrument panel: kick+bass always, hats and a saw arp
+// wake with speed (116->168 BPM), a pentatonic lead fades in as the tail
+// gets close, and a bright counter-voice grows with each colour gathered.
 const NOTE = (s) => 110 * 2 ** (s / 12);
 const BASS = [0, 0, 12, 0, 3, 3, 15, 3, 5, 5, 17, 5, 7, 7, 10, 3];
 const LEAD = [24, 22, 19, 17, 15, 17, 19, 22, 12, 15, 17, 19, 22, 24, 27, 24,
@@ -104,6 +102,7 @@ function pump(speedN, closeN) {
     if (s % 2 === 0) tone(NOTE(BASS[(s >> 1) % 16]), .16, 'square', .05, nextT);
     if (speedN > .2) tone(NOTE(BASS[s % 16] + 12), .06, 'sawtooth', .015 + speedN * .03, nextT);
     if (closeN > .02) tone(NOTE(LEAD[s]), .2, 'triangle', .02 + closeN * .08, nextT);
+    if (colors > 0) tone(NOTE(LEAD[(s + 8) % 32] + 12), .09, 'square', .006 + colors / 7 * .04, nextT);
     nextT += 15 / (116 + speedN * 52);
     step++;
   }
@@ -112,30 +111,57 @@ function pump(speedN, closeN) {
 // --- round state ----------------------------------------------------------
 let mode = 'title', round = 0, timer = 0, best = 0;
 let g, roadM, railM, groundM, braid, braidM, dists, bfsT = 0;
+let shards = [], colors = 0, surge = 0, slipT = 0, forkKick = 0;
 const player = { r: null, speed: 10 };
-const cam = { x: 0, y: 3, z: -5 };
+const cam = { x: 0, y: 3, z: -5, u: [0, 1, 0] };
 const uniM = unicornMesh();
+let vp = null;
 
 // Steering only matters at forks: hold left/right while crossing a node and
 // the leftmost/rightmost branch is taken; hands off takes the straightest.
-function chooseP(c) {
+// Pure, so the HUD can PREVIEW the branch the current input would take.
+function pickBranch(c, st, T, A) {
   if (c.length === 1) return c[0];
-  const T = player.r.tan, h = Math.hypot(T[0], T[2]) || 1;
+  const h = Math.hypot(T[0], T[2]) || 1;
   const d = [T[0] / h, T[2] / h];
-  const A = g.pos[player.r.a[0]][player.r.a[1]];
-  const st = turnDir();
   let bestC = c[0], bv = -1e9;
   for (const m of c) {
     const M = g.pos[m[0]][m[1]];
     let ex = M[0] - A[0], ez = M[2] - A[2];
     const l = Math.hypot(ex, ez) || 1;
     ex /= l; ez /= l;
-    const dot = d[0] * ex + d[1] * ez, cr = d[1] * ex - d[0] * ez;
-    const ang = Math.atan2(cr, dot);
+    const ang = Math.atan2(d[1] * ex - d[0] * ez, d[0] * ex + d[1] * ez);
     const v = st > 0 ? ang : st < 0 ? -ang : -Math.abs(ang);
     if (v > bv) { bv = v; bestC = m; }
   }
   return bestC;
+}
+const chooseP = (c) => pickBranch(c, turnDir(), player.r.tan, g.pos[player.r.a[0]][player.r.a[1]]);
+
+// Seven colour shards, placed in order of BFS distance from the start, so
+// the sequence red->violet pulls the player across the whole net - the
+// collecting IS the learning of the knots.
+function placeShards() {
+  const n = g.n, dd = bfs(g, n - 1, n - 1);
+  let maxd = 0;
+  for (let x = 0; x < n; x++) for (let z = 0; z < n; z++) maxd = Math.max(maxd, dd[x][z]);
+  shards = [];
+  const used = new Set([(n - 1) + ',' + (n - 1)]);
+  for (let i = 0; i < 7; i++) {
+    const want = (i + 1) * maxd / 8;
+    let bn = null, bv = 1e9;
+    for (let x = 0; x < n; x++) for (let z = 0; z < n; z++) {
+      if (used.has(x + ',' + z)) continue;
+      const v = Math.abs(dd[x][z] - want) + Math.random();
+      if (v < bv) { bv = v; bn = [x, z]; }
+    }
+    used.add(bn.join(','));
+    const c = RAINBOW[i].map((v) => v * 1.6), m = [];
+    pushBox(m, 0, 4, 0, .5, 8, .5, ...c);       // light column
+    pushBox(m, 0, 1.3, 0, 1.1, 1.1, 1.1, ...c); // the shard itself
+    shards.push({ node: bn, mesh: createMesh(m) });
+  }
+  colors = 0;
 }
 
 function newRound() {
@@ -153,11 +179,14 @@ function newRound() {
   braid = makeBraid(g, [0, 0]);
   braidM = createMesh(braidVerts(braid, 0), true);
   dists = bfs(g, n - 1, n - 1);
+  placeShards();
+  surge = 0; slipT = 0;
   ride(g, player.r, .01, chooseP);
   const T = player.r.tan, h = Math.hypot(T[0], T[2]) || 1;
   cam.x = player.r.pos[0] - T[0] / h * 5.4;
   cam.y = player.r.pos[1] + 2.4;
   cam.z = player.r.pos[2] - T[2] / h * 5.4;
+  cam.u = [0, 1, 0];
   timer = 0;
 }
 
@@ -166,6 +195,40 @@ function newRound() {
 const pillar = [];
 RAINBOW.forEach((c, i) => pushBox(pillar, 0, 4 + i * 2, 0, .4, 1.9, .4, ...c));
 const pillarM = createMesh(pillar);
+// Fork marker: a small glowing diamond dropped on the branch the current
+// steering input will take - the choice is visible before it is made.
+const mark = [];
+pushBox(mark, 0, .6, 0, .9, .9, .9, 1.2, 1, .5);
+const markM = createMesh(mark);
+
+// Project a world point to screen space; wc<=0 means behind the camera.
+function project(w) {
+  const x = vp[0] * w[0] + vp[4] * w[1] + vp[8] * w[2] + vp[12];
+  const y = vp[1] * w[0] + vp[5] * w[1] + vp[9] * w[2] + vp[13];
+  const wc = vp[3] * w[0] + vp[7] * w[1] + vp[11] * w[2] + vp[15];
+  return [x / wc * VW / 2 + VW / 2, -y / wc * VH / 2 + VH / 2, wc];
+}
+
+// Edge-of-screen arrow toward an off-screen target, in its own colour.
+function edgeArrow(w, col) {
+  const [sx, sy, wc] = project(w);
+  const on = wc > 0 && sx > 0 && sx < VW && sy > 0 && sy < VH;
+  if (on) return;
+  let dx = sx - VW / 2, dy = sy - VH / 2;
+  if (wc < 0) { dx = -dx; dy = -dy; }
+  const l = Math.hypot(dx, dy) || 1;
+  dx /= l; dy /= l;
+  const px = VW / 2 + dx * (VW / 2 - 26), py = VH / 2 + dy * (VH / 2 - 26);
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(Math.atan2(dy, dx));
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
 
 let last = 0;
 function frame(now) {
@@ -177,13 +240,20 @@ function frame(now) {
   let speedN = 0, closeN = 0;
   if (mode === 'run') {
     timer += dt;
-    // Boost / brake / cruise - and gravity along the track: dives feed
-    // speed, climbs bleed it. The rollercoaster is a real one.
-    const target = heldFwd() ? 30 : heldBack() ? 7 : 14;
+    surge = Math.max(0, surge - dt / 1.4);
+    slipT = Math.max(0, slipT - dt);
+    forkKick = Math.max(0, forkKick - dt * 3);
+    // Boost / brake / cruise. The TOP speed is earned: each gathered colour
+    // raises it, each pickup surges past it. And gravity along the tangent:
+    // dives feed speed, climbs bleed it.
+    const top = 22 + colors * 2;
+    const target = heldFwd() ? top : heldBack() ? 7 : 13;
     player.speed += (target - player.speed) * Math.min(1, dt * (heldBack() ? 3 : 1.2));
     player.speed -= player.r.tan[1] * dt * 16;
-    player.speed = Math.max(6, Math.min(34, player.speed));
+    player.speed = Math.max(6, Math.min(top + surge * 8, player.speed));
+    const prevA = player.r.a;
     ride(g, player.r, player.speed * dt, chooseP);
+    if (player.r.a !== prevA) forkKick = 1;    // crossing pop, feel the switch
 
     // braid flees against fresh BFS-from-player, recomputed on a short clock
     bfsT -= dt;
@@ -192,18 +262,35 @@ function frame(now) {
       const cell = player.r.t < .5 || !player.r.b ? player.r.a : player.r.b;
       dists = bfs(g, cell[0], cell[1]);
     }
-    updateBraid(g, braid, dists, player.r.pos, dt);
+    updateBraid(g, braid, dists, player.r.pos, dt, colors === 7);
     updateMesh(braidM, braidVerts(braid, now / 1000));
 
-    speedN = (player.speed - 6) / 28;
+    // colour pickup: the next shard in rainbow order
+    if (colors < 7) {
+      const sh = shards[colors];
+      if (d3(player.r.pos, g.pos[sh.node[0]][sh.node[1]]) < 3.4) {
+        tone(392 * 2 ** (colors / 7), .5, 'triangle', .12);
+        colors++;
+        surge = 1;
+      }
+    }
+
+    speedN = (player.speed - 6) / 32;
     const tail = braid.trail[0];
     if (tail) {
       const td = d3(player.r.pos, tail);
       closeN = Math.max(0, 1 - td / 34);
-      if (!(DEV && devSpec) && td < 2.6) {
-        mode = 'won';
-        best = best === 0 ? timer : Math.min(best, timer);
-        RAINBOW.forEach((_, i) => tone(392 * 2 ** (i / 7), .3, 'triangle', .1, ac && ac.currentTime + i * .09));
+      if (!(DEV && devSpec) && td < 2.8) {
+        if (colors === 7) {
+          mode = 'won';
+          best = best === 0 ? timer : Math.min(best, timer);
+          RAINBOW.forEach((_, i) => tone(392 * 2 ** (i / 7), .3, 'triangle', .1, ac && ac.currentTime + i * .09));
+        } else if (braid.burst <= 0) {
+          // Empty hooves: it tears free. The rainbow is the key.
+          braid.burst = 1.4;
+          slipT = 3;
+          tone(180, .4, 'sawtooth', .1);
+        }
       }
     }
     pump(speedN, closeN);
@@ -215,39 +302,59 @@ function frame(now) {
     else if (mode === 'won') { round++; newRound(); mode = 'run'; }
   }
 
-  // --- camera + draw ------------------------------------------------------
-  const p = player.r ? player.r.pos : [0, 0, 0];
-  const T = player.r ? player.r.tan : [0, 0, 1];
-  const h = Math.hypot(T[0], T[2]) || 1;
-  const dx = T[0] / h, dz = T[2] / h;
+  // --- camera: full frame follow, rolls with the track --------------------
+  let p = [0, 0, 0], T = [0, 0, 1], up = [0, 1, 0];
+  if (player.r) {
+    p = player.r.pos; T = player.r.tan;
+    if (player.r.b) [p, T, , up] = tframe(g, player.r.a, player.r.b, player.r.t);
+  }
   const k = Math.min(1, dt * 5);
-  cam.x += (p[0] - dx * 5.4 - cam.x) * k;
-  cam.y += (p[1] + 2.4 - cam.y) * k;
-  cam.z += (p[2] - dz * 5.4 - cam.z) * k;
-  // Dev only, while O is held: spectate the braid from its own trail.
+  cam.x += (p[0] - T[0] * 5.6 + up[0] * 2.2 - cam.x) * k;
+  cam.y += (p[1] - T[1] * 5.6 + up[1] * 2.2 - cam.y) * k;
+  cam.z += (p[2] - T[2] * 5.6 + up[2] * 2.2 - cam.z) * k;
+  const ku = Math.min(1, dt * 4);
+  cam.u = cam.u.map((v, i) => v + (up[i] - v) * ku);
+  const ul = Math.hypot(...cam.u) || 1;
+  cam.u = cam.u.map((v) => v / ul);
+  let eye = [cam.x, cam.y, cam.z];
+  let at = [p[0] + T[0] * 4, p[1] + T[1] * 4 + up[1] * .6, p[2] + T[2] * 4];
+  let cu = cam.u;
   if (DEV && devSpec && mode === 'run' && braid.trail.length > 4) {
     const e = braid.trail[0];
-    cam.x = e[0]; cam.y = e[1] + 2.5; cam.z = e[2];
+    eye = [e[0], e[1] + 2.5, e[2]];
+    at = [...braid.r.pos];
+    cu = [0, 1, 0];
   }
-  const eye = [cam.x, cam.y, cam.z];
-  const at = DEV && devSpec && mode === 'run'
-    ? [...braid.r.pos]
-    : [p[0] + dx * 3.5, p[1] + .8 + T[1] * 3, p[2] + dz * 3.5];
-  const vp = mul(perspective(1.1, VW / VH, .1, 110), lookAt(eye, at));
+  // Speed widens the world: FOV kick is most of what "fast" feels like.
+  const fov = 1.03 + speedN * .32 + surge * .22 + forkKick * .06;
+  vp = mul(perspective(fov, VW / VH, .1, 160), lookAt(eye, at, cu));
   frameGL(vp, eye, FOG);
 
   if (mode !== 'title') {
     drawMesh(groundM, IDENT);
     drawMesh(roadM, IDENT);
-    const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .12;
-    const yaw = Math.atan2(T[0], T[2]), pitch = -Math.atan2(T[1], h);
-    drawMesh(uniM, modelTR(p[0], p[1] + bob + .05, p[2], yaw, .85, pitch));
+    const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
+    const sideV = [T[1] * up[2] - T[2] * up[1], T[2] * up[0] - T[0] * up[2], T[0] * up[1] - T[1] * up[0]];
+    drawMesh(uniM, modelFrame([p[0] + up[0] * (bob + .04), p[1] + up[1] * (bob + .04), p[2] + up[2] * (bob + .04)], sideV, up, T, .85));
     additive(true);
     drawMesh(railM, IDENT);
     drawMesh(braidM, IDENT);
+    if (colors < 7 && mode === 'run') {
+      const sh = shards[colors], sp = g.pos[sh.node[0]][sh.node[1]];
+      drawMesh(sh.mesh, modelTR(sp[0], sp[1], sp[2], now / 350));
+    }
     const pd = d3(p, braid.r.pos);
-    if (pd > 40 && mode === 'run') {
+    if (pd > 28 && mode === 'run') {
       drawMesh(pillarM, modelTR(braid.r.pos[0], braid.r.pos[1] + Math.sin(now / 300) * .4, braid.r.pos[2], now / 400));
+    }
+    // fork preview: a gold diamond on the branch this input would take
+    if (mode === 'run' && player.r.b && player.r.t > .3) {
+      const cand = nbrs(g, player.r.b[0], player.r.b[1]).filter((m) => m[0] !== player.r.a[0] || m[1] !== player.r.a[1]);
+      if (cand.length > 1) {
+        const ch = pickBranch(cand, turnDir(), T, g.pos[player.r.b[0]][player.r.b[1]]);
+        const [mp] = tframe(g, player.r.b, ch, .22);
+        drawMesh(markM, modelTR(mp[0], mp[1], mp[2], now / 180, .8 + Math.sin(now / 90) * .2));
+      }
     }
     additive(false);
   }
@@ -267,26 +374,79 @@ function frame(now) {
     ctx.fillText('SEVEN STRANDS', VW / 2, 78);
     ctx.font = '13px system-ui';
     ctx.fillStyle = '#b8ab92';
-    ctx.fillText('The braid bolted onto the old coaster net above the moor.', VW / 2, 168);
-    ctx.fillText('You can see it out there. Which track is it on?', VW / 2, 188);
+    ctx.fillText('The braid bolted onto the coaster net. Only a full rainbow can hold it:', VW / 2, 166);
+    ctx.fillText('gather the seven colours IN ORDER - each one makes you faster.', VW / 2, 186);
     ctx.fillStyle = '#7a6e5c';
-    ctx.fillText('↑ boost   ↓ brake   ← → choose a branch at every fork', VW / 2, 232);
+    ctx.fillText('↑ boost   ↓ brake   ← → choose a branch at every fork', VW / 2, 230);
     ctx.fillStyle = '#e8b923';
-    ctx.fillText('press SPACE', VW / 2, 266);
+    ctx.fillText('press SPACE', VW / 2, 264);
   } else {
+    // speed blur: radial streaks + vignette, scaling with velocity - the
+    // 2D overlay is the whole post-processing budget, and it is enough.
+    const blur = Math.max(0, speedN - .35) + surge * .5;
+    if (blur > 0 && mode === 'run') {
+      ctx.strokeStyle = `rgba(255,255,255,${Math.min(.4, blur * .4)})`;
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 24; i++) {
+        const an = Math.random() * Math.PI * 2;
+        const r0 = 100 + Math.random() * 60, r1 = r0 + 30 + blur * 160;
+        ctx.beginPath();
+        ctx.moveTo(VW / 2 + Math.cos(an) * r0, VH / 2 + Math.sin(an) * r0 * .62);
+        ctx.lineTo(VW / 2 + Math.cos(an) * r1, VH / 2 + Math.sin(an) * r1 * .62);
+        ctx.stroke();
+      }
+      const vg = ctx.createRadialGradient(VW / 2, VH / 2, VH * .42, VW / 2, VH / 2, VH * .78);
+      vg.addColorStop(0, 'rgba(8,5,18,0)');
+      vg.addColorStop(1, `rgba(8,5,18,${Math.min(.55, blur * .6)})`);
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, VW, VH);
+    }
+
     ctx.font = '14px system-ui';
     ctx.textAlign = 'left';
     ctx.fillStyle = '#f3ead6';
     ctx.fillText(timer.toFixed(1) + 's', 12, 22);
     ctx.fillText(Math.round(player.speed * 9) + ' km/h', 12, 42);
     if (round > 0) ctx.fillText('net ' + (round + 1), 12, 62);
-    // Fork telegraph: arrows light up while a junction is incoming.
-    if (mode === 'run' && player.r.b && nbrs(g, player.r.b[0], player.r.b[1]).length > 2 && player.r.t > .35) {
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#e8b923';
-      ctx.font = 'bold 26px system-ui';
-      ctx.fillText('❮      ❯', VW / 2, VH - 26);
+
+    // the rainbow meter: seven slots, filled in order, current one pulsing
+    for (let i = 0; i < 7; i++) {
+      const [r, gg, b] = RAINBOW[i];
+      const on = i < colors;
+      ctx.fillStyle = on ? `rgb(${r * 255},${gg * 255},${b * 255})` : 'rgba(120,110,140,.35)';
+      const pu = i === colors ? Math.sin(now / 150) * 2 : 0;
+      ctx.fillRect(VW / 2 - 63 + i * 18, 12 - pu / 2, 14, 8 + pu);
     }
+
+    if (mode === 'run') {
+      // guidance arrows: rainbow chevron to the braid, coloured to the shard
+      const tail = braid.trail[0];
+      if (tail) edgeArrow(tail, '#fff');
+      if (colors < 7) {
+        const sp = g.pos[shards[colors].node[0]][shards[colors].node[1]];
+        const [r, gg, b] = RAINBOW[colors];
+        edgeArrow([sp[0], sp[1] + 4, sp[2]], `rgb(${r * 255},${gg * 255},${b * 255})`);
+      }
+      // fork telegraph with the CHOICE shown: active side lights up
+      if (player.r.b && nbrs(g, player.r.b[0], player.r.b[1]).length > 2 && player.r.t > .3) {
+        const st = turnDir();
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 26px system-ui';
+        ctx.fillStyle = st > 0 ? '#e8b923' : 'rgba(160,150,130,.5)';
+        ctx.fillText('❮', VW / 2 - 44, VH - 26);
+        ctx.fillStyle = st === 0 ? '#e8b923' : 'rgba(160,150,130,.5)';
+        ctx.fillText('▲', VW / 2, VH - 26);
+        ctx.fillStyle = st < 0 ? '#e8b923' : 'rgba(160,150,130,.5)';
+        ctx.fillText('❯', VW / 2 + 44, VH - 26);
+      }
+      if (slipT > 0) {
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#e8b923';
+        ctx.font = 'bold 15px system-ui';
+        ctx.fillText('It tears free! Gather all seven colours to hold it.', VW / 2, 90);
+      }
+    }
+
     if (mode === 'won') {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#00000088';

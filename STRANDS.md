@@ -114,6 +114,40 @@ backtracker, but its cells are now NODES of a rollercoaster network:
 - The scripted release-build gate run actually catches the braid
   (21.9s), verifying the chase end-to-end with zero dev code.
 
+## Design notes, S3 - corkscrews, speed blur, and the rainbow key
+
+- **The moving frame.** One `frame(g,a,b,t)` in track.js returns
+  pos/tangent/side/up for everything that stands on the track: road quads,
+  rails, the rider, the camera. Roll has two sources - banking (lean into
+  horizontal turns, faded to zero at nodes so junction geometry never
+  cracks) and corkscrews: a quarter of edges, hashed order-independently
+  from their endpoints, roll a full 360 along their length. Node roll is
+  always zero, so every fork is entered upright. `lookAt` grew an
+  arbitrary-up parameter and the camera lerps its up vector toward the
+  rider's - a corkscrew is only a corkscrew if the horizon turns with you.
+- **Serpentines**: hermite tangents overshoot at 1.3x chord, node jitter
+  and height amplitude raised - every segment bows.
+- **The rainbow is the key** (the acceleration question, answered): seven
+  colour shards placed in order of BFS distance from the start, so
+  red->violet pulls the player across the whole net. Each collected colour
+  raises top speed by 2 (22 -> 36) and fires a surge; the braid's panic
+  speed is 26, so it is UNCATCHABLE until the collected colours raise your
+  ceiling past it. Grabbing the tail with an incomplete rainbow makes the
+  braid burst away at 42 with a "gather all seven" flash - collecting all
+  seven is literally the key to holding it.
+- **Speed blur without post-processing**: the 2D HUD canvas draws radial
+  streaks and a vignette scaling with velocity, and the GL camera widens
+  its FOV with speed (1.03 -> ~1.45 at full surge). The overlay is the
+  whole post-processing budget, and it is enough.
+- **The choice is visible before it is made**: a gold diamond pulses on
+  the branch the current steering input would take (the pure
+  `pickBranch` is called in preview every frame), and the fork telegraph
+  arrows light the active side. Crossing any node fires a small FOV kick.
+- **You can always find both quarries**: additive glow carries ~150 units
+  (solid fog still dies at 70), and edge-of-screen arrows point at the
+  braid's tail (white) and the active shard (its own colour) whenever
+  they are off-screen.
+
 ## Milestone log
 
 | gate | ceiling | worst-of-5 | notes |
@@ -121,6 +155,7 @@ backtracker, but its cells are now NODES of a rollercoaster network:
 | S0 first playable | 6,500 | 4,790 | maze+chase+catch+title/win, headless-verified |
 | S1 volumetric braid | 6,500 | 5,236 | ground-dragging plait, additive glow layers, head knot |
 | S2 wipeout pivot | 9,500 | 6,386 | coaster net, rails+forks, adaptive score, gate run catches the braid |
+| S3 corkscrews & colours | 9,500 | 7,734 | full-roll corkscrews + rolling camera, speed blur, rainbow-key collection |
 
 Bugs caught by looking at S0 screenshots, not by the harness: the
 hand-rolled `lookAt` used `z×up` instead of `up×z` and rendered the world

@@ -26,7 +26,7 @@ const cheats = args.includes('--cheats');
 // builds; each has its own source dir, milestone file and title, and both
 // go through the same squeeze chain so their numbers stay comparable.
 const game = args.find((a) => /^--game=/.test(a))?.split('=')[1] || 'native';
-const TITLES = { native: 'The Seventh Color', strands: 'Seven Strands' };
+const TITLES = { native: 'The Seventh Color', strands: 'Rainbow Surfer' };
 
 const num = (n) => n.toLocaleString('en-US');
 

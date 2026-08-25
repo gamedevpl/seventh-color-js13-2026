@@ -1,34 +1,84 @@
-# Seven Strands — the second entry, 3D
+# RAINBOW SURFER — the second entry, 3D
 
-Same legend as The Seventh Color, opposite form. After the light came
-back, one braid of it bolted onto a rollercoaster net twisted through the
-night sky; the restored unicorn races it down. A wipeout-style coaster
-chase: rails, speed, forks — completely separate code from game one,
+Run the rainbow down, then ride it. A wipeout-style chase along a track
+that grows forward through the night sky, splits into two routes now and
+then, and breaks open into jumps. Completely separate code from game one,
 sharing only the build/measure/verify toolchain (`--game=strands` on the
-same tools, same squeeze chain, so byte numbers stay comparable).
+same tools, so byte numbers stay comparable).
 
-## Architecture (S2, the coaster pivot)
+## Architecture (R1)
 
 ```
 strands/src/
-  gl.js      raw WebGL: one shader, two materials (lambert+fog solid /
-             additive emissive glow), hand-rolled mat4, box mesh builder
-  maze.js    recursive-backtracker maze, BRAIDED (no dead end survives,
-             extra loops knocked open) - its cells are nodes of the track
-             graph, with jittered positions on a swooping height field
-             and a per-node through-axis for smooth hermite flow
-  track.js   the rollercoaster: hermite curves over the graph, road +
-             neon-rail meshes, junction light columns, and the ONE
-             rail-rider that moves both the player and the braid
-  uni.js     the unicorn as boxes: gold horn, violet mane, rainbow tail
-  ribbon.js  the braid on rails: flees via argmax BFS-distance at every
-             fork, dragging its five-layer volumetric glow along the track
-  main.js    loop, boost/brake + gravity-along-tangent, fork steering,
-             chase camera, HUD, and the adaptive score
+  gl.js      raw WebGL, one shader, three materials: SOLID (lambert+fog),
+             GLOW (additive, no depth write), GLASS (lambert+fog, alpha
+             blended, no depth write - the deck)
+  course.js  the course: grows FORWARD, never loops. Splits into two
+             parallel routes and closes again a few nodes later; some
+             edges are GAPS you have to jump. Each node stores its own
+             tangent, so flow through a split or a merge is continuous by
+             construction
+  track.js   hermite curves between nodes, arc-length tables, the deck and
+             neon meshes, and the ONE rail-rider that moves both the
+             player and the rainbow
+  uni.js     the unicorn as boxes; the head is its own mesh on a neck pivot
+  ribbon.js  the rainbow: flees forward, its spine resampled through
+             Catmull-Rom so it is a curve rather than a chain of sticks,
+             with orbiting strands, haze sheets and drifting motes
+  main.js    loop, lane steering, the jump and its flight cutscene, surf
+             mode, chase camera, HUD, adaptive score
 ```
 
-No three.js — the whole game fits in ~6.4 KB zipped, under half the
-budget, at the S2 milestone.
+## Why the maze had to go (R1)
+
+The grid maze had cycles, and cycles are why the rainbow could come at you
+head-on: in a graph with loops the quarry's flight path can double back
+into your face, which reads as chaos rather than a chase. The course is
+now acyclic by construction (`tools/test-course.mjs` proves it over many
+generated courses), so nothing can ever travel the wrong way past you.
+
+It fixed something else for free. Per-node stored tangents mean a split's
+two exits share one entry tangent and a merge's two entries share one exit,
+so the junction kinks the grid version fought for three milestones simply
+cannot arise. Measured, straight after the switch:
+
+| | grid maze | forward course |
+| --- | ---: | ---: |
+| heading change per frame, mean | 1.07 deg | 0.48 deg |
+| heading change, p99 | 3.63 deg | 1.75 deg |
+| heading change, max | 91.9 deg | 1.90 deg |
+| advance speed variation | 0.9% | 0.4% |
+
+## The rainbow
+
+It used to read as jumping point by point, because it was: the trail took
+a sample every 1.3 units and drew straight quads between them, so the head
+popped forward a whole sample at a time and the body was visibly a polygon.
+Now the newest point IS the rainbow's exact position, updated every frame
+so the head glides; older points are fixed; and the spine is resampled
+through Catmull-Rom before any geometry is built. Layers: two haze sheets
+(bright core, wide soft wash, both alpha-zero at the outer edge), seven
+strands orbiting a shared axis so they plait over and under, drifting
+motes that wink in and out, and a crossed head flare. All of it is written
+into one preallocated Float32Array - a few hundred KB of fresh arrays every
+frame is a GC hitch waiting to happen.
+
+## Jumps
+
+A gap draws no deck; the hole IS the jump. The rider leaves the rails on a
+parabola that lands exactly on the far node, so it is a spectacle and never
+a fail state. Landing lights on each lip telegraph it. `cine` swells while
+airborne and eases back after touchdown, and it is the single number every
+cinematic term blends through: the camera drops back, lifts, swings out to
+the side to put the unicorn against the sky, widens its field of view, and
+the head comes up out of its tuck.
+
+## Surfing
+
+Catch the rainbow and it stops fleeing: it runs just ahead at YOUR pace and
+a shade faster, so holding the ride means holding the throttle. Coast and
+it walks away; let the gap reach 34 units and it tears free, and you are
+chasing again.
 
 ## Design notes, S0
 

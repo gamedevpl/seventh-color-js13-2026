@@ -80,10 +80,14 @@ export function createMesh(arr, dynamic) {
   return { b, n: arr.length / 10, dynamic };
 }
 
-export function updateMesh(m, arr) {
+// Accepts a preallocated Float32Array plus a float count, so the per-frame
+// mesh (the rainbow) can be rebuilt with no allocation at all - a few
+// hundred KB of fresh arrays every frame is a GC hitch waiting to happen.
+export function updateMesh(m, arr, count) {
   gl.bindBuffer(gl.ARRAY_BUFFER, m.b);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.DYNAMIC_DRAW);
-  m.n = arr.length / 10;
+  const n = count === undefined ? arr.length : count;
+  gl.bufferData(gl.ARRAY_BUFFER, ArrayBuffer.isView(arr) ? arr.subarray(0, n) : new Float32Array(arr), gl.DYNAMIC_DRAW);
+  m.n = n / 10;
 }
 
 export function drawMesh(m, model) {

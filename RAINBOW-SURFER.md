@@ -51,17 +51,57 @@ cannot arise. Measured, straight after the switch:
 
 ## The rainbow
 
-It used to read as jumping point by point, because it was: the trail took
-a sample every 1.3 units and drew straight quads between them, so the head
-popped forward a whole sample at a time and the body was visibly a polygon.
-Now the newest point IS the rainbow's exact position, updated every frame
-so the head glides; older points are fixed; and the spine is resampled
-through Catmull-Rom before any geometry is built. Layers: two haze sheets
-(bright core, wide soft wash, both alpha-zero at the outer edge), seven
-strands orbiting a shared axis so they plait over and under, drifting
-motes that wink in and out, and a crossed head flare. All of it is written
-into one preallocated Float32Array - a few hundred KB of fresh arrays every
-frame is a GC hitch waiting to happen.
+Two generations of stutter, both fixed at the parameterisation:
+
+1. It drew straight quads between points sampled every 1.3 units - the head
+   popped a whole sample at a time and the body was visibly a polygon.
+2. After the Catmull-Rom pass it STILL popped, ~20x a second, because
+   points were committed on a euclidean threshold (spacing wobbled with
+   frame time) and the curve was sampled BY SEGMENT INDEX - so every commit
+   re-parameterised the whole ribbon.
+
+Now commits are interpolated inside the frame's travel to land at EXACT
+arc spacing, the head rides the true position every frame, and geometry
+samples the chain at fixed fractions of total arc length, which changes
+continuously (verified: a 0.3-unit feed moves no vertex more than ~1 unit,
+and only near the head). The tail fade reaches zero, so dropping the
+oldest point is invisible too.
+
+Layers: three haze sheets, upright curtains, seven strands plaiting round
+a shared axis, drifting motes, and a crossed head flare - all written into
+one preallocated Float32Array. When the PLAYER owns the rainbow the head
+flare is skipped and the first ~14 samples damp to zero, because the
+camera sits at the head and the glow otherwise floods the screen white
+from inside.
+
+## Become the rainbow (the game, finally)
+
+Chasing was a loop with no goal, colour-collecting felt arbitrary, and the
+rainbow could be OVERTAKEN, which broke the fantasy outright. All three
+died together: touching ANY part of the ribbon merges you with it - being
+about to overtake it IS catching it. The unicorn becomes the rainbow; the
+trail machine simply changes owners, so the ribbon flows from the old head
+to your hooves without a seam. The seven colours then burn down (~2.2s
+each); landing a jump relights one; when the last gutters out the rainbow
+tears three nodes ahead and the chase resumes. SCORE IS TOTAL BURN TIME.
+One goal, one meter, and the jumps - the course's best moments - are now
+the thing that keeps the ride alive.
+
+## The rest of the graphics pass
+
+- **Serpentine lean**: geometry banking fades at every node, so on winding
+  lines of short segments it never added up. The camera and rider now also
+  roll with the ACTUAL smoothed horizontal turn rate, which knows nothing
+  about nodes - the krecioł is back on serpentines.
+- **Deck widened** 3.6 -> 5 half-width; lane range scaled to match.
+- **Speed drama**: chromatic double streaks (cyan/magenta ghosts under the
+  white), a harder vignette, FOV coefficient up, and a deliberate 6 Hz
+  micro-shake that scales with speed squared - all gated to fade during
+  the jump cinematic so the airborne shot stays clean.
+- **Parallax backdrop**: 150 stars and nine aurora curtains on a finite
+  ring (~260-500u) around the course's centre, drawn in the glow pass.
+  Finite-far means the camera's travel slides them slowly against the
+  void - the horizon now participates in speed.
 
 ## Jumps
 

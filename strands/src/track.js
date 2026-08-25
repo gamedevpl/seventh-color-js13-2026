@@ -143,13 +143,13 @@ export function frame(a, b, t) {
 // glass - alpha blended, no depth write - so track ahead, below and overhead
 // all read through the one you ride.
 const PROFILE = [
-  [-3.6, .26], [-3.25, .06], [-2.4, 0], [0, -.02], [2.4, 0], [3.25, .06], [3.6, .26],
+  [-5, .3], [-4.5, .07], [-3.3, 0], [0, -.02], [3.3, 0], [4.5, .07], [5, .3],
 ];
 const DECK_A = .45;
 
 export function trackMeshes(course) {
   const road = [], rail = [];
-  const W = 3.6, K = 8;
+  const W = 5, K = 8;
   const quad = (arr, a, b, c, d, nrm, col, al) => {
     for (const q of [a, b, c, a, c, d]) {
       arr.push(q[0], q[1], q[2], nrm[0], nrm[1], nrm[2], col[0], col[1], col[2], al);

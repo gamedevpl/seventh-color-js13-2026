@@ -183,15 +183,23 @@ function dustVerts(speedN, dt) {
   vx /= vl; vy /= vl; vz /= vl;
   // How many are awake, and how long each smears - both ride on speed.
   const wake = Math.max(0, (speedN - .12) / .88);
-  const live = (DMAX * wake * wake) | 0;
   const len = 2 + speedN * 26;
-  const alp = Math.min(.75, .12 + speedN * .8);
+  // Fades right out for the jump: airborne, the camera pulls back and swings
+  // sideways, so ITS velocity - which is what the streaks are drawn along -
+  // stops having anything to do with where the unicorn is going.
+  const alp = Math.min(.75, .12 + speedN * .8) * (1 - cine);
+  if (alp <= .01) return 0;
   // a stable basis around the travel direction
   let ax = -vz, ay = 0, az = vx;
   const al = Math.hypot(ax, ay, az) || 1;
   ax /= al; az /= al;
   const bx = vy * az - vz * ay, by = vz * ax - vx * az, bz = vx * ay - vy * ax;
-  for (let i = 0; i < live; i++) {
+  for (let i = 0; i < DMAX; i++) {
+    // Each mote wakes at its own speed, and fades in over a band rather than
+    // switching on: culling by a count that tracks speed made whole motes
+    // blink as the speed wobbled around each threshold.
+    const wa = (wake * wake - i / DMAX) * 8;
+    if (wa <= 0) break;
     let d = DUST[i];
     const far = d && (d[0] - cam.e[0]) * vx + (d[1] - cam.e[1]) * vy + (d[2] - cam.e[2]) * vz;
     if (!d || far < -6 || far > 120) {
@@ -206,10 +214,16 @@ function dustVerts(speedN, dt) {
     }
     // fade in with distance so nothing pops into existence in your face
     const dist = Math.hypot(d[0] - cam.e[0], d[1] - cam.e[1], d[2] - cam.e[2]);
-    const a = alp * Math.min(1, dist / 16) * Math.min(1, (120 - dist) / 40);
+    const a = alp * Math.min(1, wa) * Math.min(1, dist / 16) * Math.min(1, (120 - dist) / 40);
     if (a <= .01) continue;
     // the streak: a thin quad from the mote back along the travel direction
-    const tx = d[0] - vx * len, ty = d[1] - vy * len, tz = d[2] - vz * len;
+    // TOWARD the vanishing point, not away from it. The camera moves +v and
+    // the mote is static, so relative to the camera the mote moves -v: over
+    // the exposure its image swept from (p + v*len) to (p). Trailing it the
+    // other way anchors the streak on the wrong side of the mote, and the
+    // mote appears to jump forward a streak-length every frame - which is
+    // exactly the "vibrating in the air" instead of approaching.
+    const tx = d[0] + vx * len, ty = d[1] + vy * len, tz = d[2] + vz * len;
     let ex = d[0] - cam.e[0], ey = d[1] - cam.e[1], ez = d[2] - cam.e[2];
     let sx = vy * ez - vz * ey, sy = vz * ex - vx * ez, sz = vx * ey - vy * ex;
     const sl = Math.hypot(sx, sy, sz) || 1;
@@ -749,7 +763,10 @@ function frame(now) {
     ctx.fillStyle = '#e8b923';
     ctx.fillText('press SPACE', VW / 2, 258);
   } else {
-    const blur = Math.max(0, speedSm - .28) + surge * .5 + cine * .3;
+    // The jump is a held cinematic shot and wants to be SHARP. The blur used
+    // to be boosted by `cine`, which ghosted the whole frame exactly when
+    // the camera was swinging - it reads as double vision.
+    const blur = (Math.max(0, speedSm - .28) + surge * .5) * (1 - cine * .9);
     // REAL radial blur: redraw the rendered frame over itself a few times,
     // scaled up about the viewport centre. Successive scaled copies at low
     // alpha smear every pixel outward along its own radius - a zoom blur,

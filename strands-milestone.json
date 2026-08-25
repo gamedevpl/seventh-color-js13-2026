@@ -1,5 +1,5 @@
 {
-  "name": "R5 speed dust",
-  "description": "world-anchored speed dust replacing screen rays, blur cost measured and cut to three passes",
+  "name": "R6 dust approaches",
+  "description": "speed-dust streaks drawn toward the vanishing point, per-mote fade band, dust and blur stand down for the jump",
   "ceilingBytes": 11500
 }

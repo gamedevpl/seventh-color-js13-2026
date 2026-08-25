@@ -59,6 +59,44 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R6 - the dust approaches, and the jump is allowed to be sharp
+
+Three defects in the speed effect, all of them reported as "feel" and all of
+them one-line sign or shape errors.
+
+**The motes vibrated instead of approaching.** Each streak was drawn from
+the mote *away* from the direction of travel - the intuitive reading of "a
+trail behind it". But the mote is static and the camera is the thing that
+moves: over one frame's exposure the mote's image sweeps from `p + v*len`
+to `p`, so the streak belongs on the far side, pointing back toward the
+vanishing point. Drawn the other way the streak anchored on the wrong side
+of the mote, and every frame the mote appeared to hop forward a whole
+streak-length. One sign; the difference between rushing past you and
+buzzing in place.
+
+**Motes blinked as the speed wobbled.** Density was culled by an index
+count that tracked speed, so a mote at the boundary switched on and off
+several times a second while cruising. Replaced with a per-mote fade band -
+each mote wakes over a stretch of speed rather than at a threshold:
+
+```js
+const wa = (wake * wake - i / DMAX) * 8;   // > 1 fully awake, 0..1 fading in
+if (wa <= 0) break;                        // everything past here is asleep
+```
+
+The count still rides speed squared; only the edge is soft now.
+
+**The jump was a hall of mirrors.** Both effects were *boosted* by the
+cinematic flag: the blur added `cine * .3` and the dust kept its full
+alpha. But the jump is the one held shot in the game, and during it the
+camera pulls back and swings sideways - so its velocity, which is exactly
+what the streaks are drawn along, stops having anything to do with where
+the unicorn is going. Streaks raked across the frame while three composite
+copies ghosted over each other: reported, precisely, as "I feel like I've
+gone cross-eyed". Both now stand down for the flight (`* (1 - cine)` on the
+dust with an early out, `* (1 - cine * .9)` on the blur), and the ordinary
+running blur - which the report said was fine - is untouched.
+
 ## R5 - speed you fly through, not speed painted on
 
 The old speed effect was a fan of screen-space rays at fixed angles that
@@ -508,8 +546,15 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | S3 corkscrews & colours | 9,500 | 7,734 | full-roll corkscrews + rolling camera, speed blur, rainbow-key collection |
 | S4 wipeout channel | 9,500 | 8,223 | on-rails camera behind the head, banked channel, animated head, colour fix |
 | S5 flow | 9,500 | 8,541 | arc-length motion, stabilised tangents, lane-based forks |
-| S6 smoothness | 9,800 | 8,763 |
-| S7 glass deck | 9,800 | 8,786 | flat translucent deck, neon edge rails, open sightlines | live camera probe; aim walks past nodes, spring easing, low-passed FOV |
+| S6 smoothness | 9,800 | 8,763 | live camera probe; aim walks past nodes, spring easing, low-passed FOV |
+| S7 glass deck | 9,800 | 8,786 | flat translucent deck, neon edge rails, open sightlines |
+| R1 rainbow surfer | 11,500 | 8,688 | maze dropped for a forward course, jumps with a flight shot, surf the rainbow |
+| R1b become the rainbow | 11,500 | 9,384 | merge on touch, burn meter, graphics pass |
+| R2 physical run | 11,500 | 10,217 | speed as a resource: stardust, demands, falling off |
+| R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
+| R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
+| R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R6 dust approaches | 11,500 | 11,192 | streak direction corrected, per-mote fade band, both effects stand down for the jump |
 
 Bugs caught by looking at S0 screenshots, not by the harness: the
 hand-rolled `lookAt` used `z×up` instead of `up×z` and rendered the world

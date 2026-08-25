@@ -162,6 +162,75 @@ function burst(p, n, sp) {
     spawnP(p, [Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 2, Math.sin(a) * Math.cos(b) * sp], RAINBOW[(Math.random() * 7) | 0], .6 + Math.random() * .5);
   }
 }
+// --- speed dust ----------------------------------------------------------
+// Motes anchored in the WORLD that you fly through, not rays pinned to the
+// screen. Screen-space rays at fixed angles sit still and merely stretch,
+// which reads as wallpaper; these stream past, sweep sideways when you turn
+// (because they do not turn with you), and the faster you go the more of
+// them wake up. Each is drawn as a streak along the camera's actual
+// velocity, so its length IS the motion blur of that mote.
+const DMAX = 230, DUST = [];
+const DBUF = new Float32Array(DMAX * 60);
+let prevEye = null;
+
+function dustVerts(speedN, dt) {
+  let n = 0;
+  if (!prevEye) { prevEye = [...cam.e]; return 0; }
+  let vx = cam.e[0] - prevEye[0], vy = cam.e[1] - prevEye[1], vz = cam.e[2] - prevEye[2];
+  prevEye = [...cam.e];
+  const vl = Math.hypot(vx, vy, vz);
+  if (vl < 1e-4) return 0;
+  vx /= vl; vy /= vl; vz /= vl;
+  // How many are awake, and how long each smears - both ride on speed.
+  const wake = Math.max(0, (speedN - .12) / .88);
+  const live = (DMAX * wake * wake) | 0;
+  const len = 2 + speedN * 26;
+  const alp = Math.min(.75, .12 + speedN * .8);
+  // a stable basis around the travel direction
+  let ax = -vz, ay = 0, az = vx;
+  const al = Math.hypot(ax, ay, az) || 1;
+  ax /= al; az /= al;
+  const bx = vy * az - vz * ay, by = vz * ax - vx * az, bz = vx * ay - vy * ax;
+  for (let i = 0; i < live; i++) {
+    let d = DUST[i];
+    const far = d && (d[0] - cam.e[0]) * vx + (d[1] - cam.e[1]) * vy + (d[2] - cam.e[2]) * vz;
+    if (!d || far < -6 || far > 120) {
+      const r = 6 + Math.random() * 34, th = Math.random() * 6.283;
+      const ahead = 24 + Math.random() * 80;
+      const co = Math.cos(th) * r, si = Math.sin(th) * r;
+      d = DUST[i] = [
+        cam.e[0] + vx * ahead + ax * co + bx * si,
+        cam.e[1] + vy * ahead + ay * co + by * si,
+        cam.e[2] + vz * ahead + az * co + bz * si,
+      ];
+    }
+    // fade in with distance so nothing pops into existence in your face
+    const dist = Math.hypot(d[0] - cam.e[0], d[1] - cam.e[1], d[2] - cam.e[2]);
+    const a = alp * Math.min(1, dist / 16) * Math.min(1, (120 - dist) / 40);
+    if (a <= .01) continue;
+    // the streak: a thin quad from the mote back along the travel direction
+    const tx = d[0] - vx * len, ty = d[1] - vy * len, tz = d[2] - vz * len;
+    let ex = d[0] - cam.e[0], ey = d[1] - cam.e[1], ez = d[2] - cam.e[2];
+    let sx = vy * ez - vz * ey, sy = vz * ex - vx * ez, sz = vx * ey - vy * ex;
+    const sl = Math.hypot(sx, sy, sz) || 1;
+    const w = .09;
+    sx = sx / sl * w; sy = sy / sl * w; sz = sz / sl * w;
+    const put = (x, y, z, aa) => {
+      DBUF[n] = x; DBUF[n + 1] = y; DBUF[n + 2] = z;
+      DBUF[n + 3] = 0; DBUF[n + 4] = 1; DBUF[n + 5] = 0;
+      DBUF[n + 6] = 1.5; DBUF[n + 7] = 1.5; DBUF[n + 8] = 1.7; DBUF[n + 9] = aa;
+      n += 10;
+    };
+    put(d[0] - sx, d[1] - sy, d[2] - sz, a);
+    put(d[0] + sx, d[1] + sy, d[2] + sz, a);
+    put(tx + sx, ty + sy, tz + sz, 0);
+    put(d[0] - sx, d[1] - sy, d[2] - sz, a);
+    put(tx + sx, ty + sy, tz + sz, 0);
+    put(tx - sx, ty - sy, tz - sz, 0);
+  }
+  return n;
+}
+
 const PBUF = new Float32Array(PMAX * 120);
 function particleVerts(now) {
   let n = 0;
@@ -184,7 +253,7 @@ function particleVerts(now) {
   return n;
 }
 const partM = () => createMesh(new Float32Array(0), true);
-let particleM, starM;
+let particleM, starM, dustM;
 const SBUF = new Float32Array(24000);
 
 function starVerts(now) {
@@ -252,7 +321,8 @@ function newRun() {
   braid = makeBraid(course);
   ride(braid.r, S * 6, first);
   trailM = createMesh(new Float32Array(0), true);
-  particleM = partM(); starM = partM();
+  particleM = partM(); starM = partM(); dustM = partM();
+  DUST.length = 0; prevEye = null;
   PART.length = 0; pcur = 0;
   surge = 0; slipT = 0; fly = null; cine = 0; jumps = 0; falls = 0;
   rainbowT = 0; rainbowTotal = 0; streak = 0; bestStreak = 0; isBest = false; flash = 0; msgT = 0;
@@ -610,6 +680,7 @@ function frame(now) {
     if (nb) updateMesh(trailM, BUF, nb);
     updateMesh(starM, SBUF, starVerts(now));
     updateMesh(particleM, PBUF, particleVerts(now));
+    updateMesh(dustM, DBUF, dustVerts(speedN, dt));
 
     drawMesh(groundM, IDENT);
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
@@ -644,6 +715,7 @@ function frame(now) {
     if (trailM.n) drawMesh(trailM, IDENT);
     if (starM.n) drawMesh(starM, IDENT);
     if (particleM.n) drawMesh(particleM, IDENT);
+    if (dustM.n) drawMesh(dustM, IDENT);
     if (speedN > .2 || fly || mode === 'rainbow') {
       const st = .5 + speedN * 2 + surge + cine * 1.5;
       drawMesh(wakeM, modelFrame(base, rSide, rUp2, [rT[0] * st, rT[1] * st, rT[2] * st], S8));
@@ -689,9 +761,17 @@ function frame(now) {
       // dim disc. Adding them only ever brightens: bright things smear
       // outward as light, which is the whole point.
       ctx.globalCompositeOperation = 'lighter';
-      for (let i = 1; i <= 4; i++) {
-        const sc = 1 + i * i * .013 * (.6 + blur * 1.7);
-        ctx.globalAlpha = Math.min(.3, blur * .38) / i;
+      // Layer count rides the blur, because each pass is a full-screen
+      // composite: six of them cost a third of the frame rate at a speed
+      // you spend most of the run below. Two when it barely matters, six
+      // when the screen is supposed to come apart.
+      // Three passes, spaced wider and pushed harder, rather than six close
+      // together: each pass is a full-screen fill, and six of them cost a
+      // third of the frame rate for a difference you cannot see.
+      const layers = 1 + Math.min(2, (blur * 3) | 0);
+      for (let i = 1; i <= layers; i++) {
+        const sc = 1 + i * i * .026 * (.7 + blur * 2.1);
+        ctx.globalAlpha = Math.min(.5, blur * .62) / (i * .7);
         const w2 = VW * sc, h2 = VH * sc;
         ctx.drawImage(glc, (VW - w2) / 2, (VH - h2) / 2, w2, h2);
       }
@@ -699,17 +779,6 @@ function frame(now) {
       ctx.globalCompositeOperation = 'source-over';
     }
     if (blur > 0) {
-      for (const [col, ox] of [['rgba(120,220,255,', -2], ['rgba(255,120,190,', 2], ['rgba(255,255,255,', 0]]) {
-        ctx.strokeStyle = col + Math.min(.42, blur * (ox ? .22 : .45)) + ')';
-        ctx.lineWidth = ox ? 2 : 1.5;
-        for (let i = 0; i < 30; i++) {
-          const an = i * 2.399, r0 = 96 + (i % 5) * 14, r1 = r0 + 34 + blur * 200;
-          ctx.beginPath();
-          ctx.moveTo(VW / 2 + ox + Math.cos(an) * r0, VH / 2 + Math.sin(an) * r0 * .62);
-          ctx.lineTo(VW / 2 + ox + Math.cos(an) * r1, VH / 2 + Math.sin(an) * r1 * .62);
-          ctx.stroke();
-        }
-      }
       const vg = ctx.createRadialGradient(VW / 2, VH / 2, VH * .38, VW / 2, VH / 2, VH * .8);
       vg.addColorStop(0, 'rgba(8,5,18,0)');
       vg.addColorStop(1, `rgba(8,5,18,${Math.min(.7, blur * .75)})`);

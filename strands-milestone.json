@@ -1,5 +1,5 @@
 {
-  "name": "R4 shape and score",
-  "description": "difficulty ramp, corkscrew rhythm, shorter run, persistent best, end screen, fuel-aware score",
+  "name": "R5 speed dust",
+  "description": "world-anchored speed dust replacing screen rays, blur cost measured and cut to three passes",
   "ceilingBytes": 11500
 }

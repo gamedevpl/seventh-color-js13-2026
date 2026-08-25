@@ -59,6 +59,34 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R5 - speed you fly through, not speed painted on
+
+The old speed effect was a fan of screen-space rays at fixed angles that
+merely got longer. Fixed angles do not move, so it read as wallpaper with a
+zoom on it. Replaced with **speed dust**: motes anchored in the WORLD that
+you fly through. They stream past, sweep sideways when you turn (they do
+not turn with you), and each is drawn as a streak along the camera's actual
+frame-to-frame velocity - so the streak's length IS that mote's motion
+blur, not a decoration standing in for one. Density rides speed squared:
+
+| speed | motes awake (of 230) | streak |
+| ---: | ---: | ---: |
+| 90 km/h | 0 | - |
+| 180 km/h | 13 | 10.7u |
+| 270 km/h | 65 | 17.3u |
+| 414 km/h | 230 | 28.0u |
+
+They fade in with distance at both ends, so nothing pops into being in your
+face and nothing vanishes at the horizon.
+
+**The zoom blur got measured rather than piled on.** Six full-screen
+composite passes cost a third of the frame rate: an A/B in the headless
+harness put the blur at about -9 fps and the dust at about -4, against a
+~50 fps baseline in software rasterisation. Three passes spaced wider and
+pushed harder look the same and give most of it back (37 -> 41 fps).
+`preserveDrawingBuffer`, which the blur needs to read the frame back,
+measured at about half a frame per second - not worth a second thought.
+
 ## R4 - the run gets a shape, and beating it gets a reason
 
 Two measurements drove this pass. First, the course had **no memory**: its

@@ -59,6 +59,59 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R12 - the chase was giving itself away
+
+"Too easy to catch, and when it goes badly it disappears - and I often
+catch it without pressing anything."
+
+All three at once, from one inverted rubber band.
+
+Cruising with no throttle is **20**. The rainbow fled at **16** in the
+middle band and **11** past 55 units. So doing nothing closed the gap at
+four units a second, and *having fallen behind* closed it at nine: the band
+it ran to when you lost ground was the band where it handed the catch back.
+
+I built the policy that asks the only question that matters here -
+`test-balance.mjs --idle`, which steers to survive but never touches the
+boost. Against the old numbers it **caught the rainbow in two runs out of
+three**, at 39.5s and 25.8s. The pursuit was decoration.
+
+### The shape it wants
+
+| gap | flee speed | against cruise 20 | against boost 34 |
+| --- | ---: | --- | --- |
+| inside 15u | 26 | opens | closes 8/s |
+| 15-60u | 22 | opens | closes 12/s |
+| past 60u | min(22, v x 0.92) | closes | closes 12/s |
+| past 110u | min(22, 8) | closes fast | closes fast |
+
+Sixty units is an **equilibrium**, and that is the whole trick: below it the
+flee speed of 22 outruns cruise and the gap opens again, above it the leash
+closes it. A player doing nothing is held there - in sight, plainly ahead,
+refusing to be had for free. Every unit inside sixty costs stardust, and
+stardust is collected by driving well.
+
+The second stage is deliberately **fixed rather than proportional**. A run
+of falls leaves you slow, and a leash scaled by your speed reels in slowest
+exactly when the gap is worst - measured that way, a policy that fell 23
+times still trailed by 532 units. That is not a chase any more, it is an
+ex-chase. The free recovery only ever returns you to the equilibrium.
+
+### Measured
+
+| policy | catches | as the rainbow |
+| --- | ---: | ---: |
+| idle - never boosts (6 runs) | **0** | 0% |
+| skilled - boosts and reads bends (4 runs) | **4**, at 19-39s | 23, 40, 50, 51% |
+
+Before the change the idle policy caught it 2 times in 3. After, never in
+six - while a player who actually plays catches it every time and spends
+about **41%** of the run as the rainbow.
+
+The first cut of this overshot: at a flee speed of 23 the skilled policy
+managed only two catches in three and 13% rainbow time. 22 is the number
+that outruns a coasting player and still loses to one spending stardust.
+
 ## R11 - the opening and closing shots
 
 Both cutscenes are an **override on the one camera rig**, not a second
@@ -836,6 +889,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R12 the chase | 12,500 | 12,243 | flee speed above coasting, two-stage gap leash, idle policy proves it |
 | R11 opening and closing shots | 12,500 | 12,229 | intro reveal cutscene, locked-off ending over a runout, letterboxed |
 | R10 sky, bank, phantom road | 12,000 | 11,744 | fall-grace soft-lock fix, phantom reflection removed, skybox, inverted wall sections |
 | R9 the long bend | 11,500 | 11,471 | sweeper sections, longer serpentines, skilled balance policy |

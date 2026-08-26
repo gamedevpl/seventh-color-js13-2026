@@ -19,7 +19,12 @@ const secs = Number(process.argv.find((a) => /^--secs=/.test(a))?.split('=')[1] 
 //            what the game asks of you. Without this the harness steers the
 //            wrong way through half of every sustained arc, so it charges a
 //            long banked bend for a mistake the player is not making.
+//   idle   - steers to survive but NEVER boosts. This is the policy that
+//            answers the only question that matters about the chase: can
+//            you catch the rainbow by doing nothing? If it ever catches,
+//            the pursuit is decoration.
 const skilled = process.argv.includes('--skill');
+const idle = process.argv.includes('--idle');
 const archive = readFileSync(path.join(root, 'build', 'strands', 'index.zip'));
 const nl = archive.readUInt16LE(26), el = archive.readUInt16LE(28);
 const method = archive.readUInt16LE(8), comp = archive.readUInt32LE(18);
@@ -35,8 +40,8 @@ await page.goto(pathToFileURL(pagePath).href, { waitUntil: 'load' });
 await page.waitForTimeout(500);
 await page.keyboard.press('Space');
 await page.evaluate(() => { window.__st = []; });
-await page.keyboard.down('ArrowUp');
-if (skilled) {
+if (!idle) await page.keyboard.down('ArrowUp');
+if (skilled || idle) {
   // Steering INTO the bend means matching the sign of turnRate: left is +1
   // in turnDir and the centrifugal term is -turnRate, so they cancel when
   // the two signs agree. The second term pulls a drifting lane back to the
@@ -69,7 +74,7 @@ if (skilled) {
     else await page.waitForTimeout(1000);
   }
 }
-await page.keyboard.up('ArrowUp');
+if (!idle) await page.keyboard.up('ArrowUp');
 const rows = await page.evaluate(() => window.__st || []);
 await browser.close();
 if (!rows.length) { console.log('no probe data - is this a --cheats build?'); process.exit(1); }
@@ -81,11 +86,19 @@ const rainbowFrames = rows.filter((r) => r[5]).length;
 const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
 const pct = (a, f) => (a.filter(f).length / a.length * 100).toFixed(0);
 const span = (rows[rows.length - 1][0] - rows[0][0]) / 1000;
-console.log(`${span.toFixed(0)}s of full-throttle play, ${skilled ? 'steering into the bends' : 'weaving blind'}\n`);
+console.log(`${span.toFixed(0)}s of full-throttle play, ${idle ? 'NO BOOST AT ALL' : skilled ? 'steering into the bends' : 'weaving blind'}\n`);
 console.log(`speed    mean ${mean(sp).toFixed(1)}  min ${Math.min(...sp).toFixed(1)}  max ${Math.max(...sp).toFixed(1)}`);
 console.log(`         under 20 (serpentine minimum): ${pct(sp, (v) => v < 20)}% of frames`);
 console.log(`         under 23 (corkscrew minimum):  ${pct(sp, (v) => v < 23)}% of frames`);
 console.log(`stardust mean ${mean(en).toFixed(1)}  empty: ${pct(en, (v) => v <= 0.5)}% of frames`);
+// The chase, which is the whole shape of the run: how far the rainbow sits,
+// and whether this policy ever actually reaches it.
+const gaps = rows.filter((r) => !r[5]).map((r) => r[9]);
+const caughtAt = rows.findIndex((r) => r[5]);
+if (gaps.length) {
+  console.log(`gap      mean ${mean(gaps).toFixed(0)}u  min ${Math.min(...gaps).toFixed(0)}  max ${Math.max(...gaps).toFixed(0)}`);
+}
+console.log(`caught   ${caughtAt < 0 ? 'never' : ((rows[caughtAt][0] - rows[0][0]) / 1000).toFixed(1) + 's'}`);
 console.log(`falls ${falls}   jumps ${jumps}   rainbow ${(rainbowFrames / rows.length * 100).toFixed(0)}% of frames   burn total ${burnT.toFixed(1)}s`);
 console.log();
 if (falls > span / 6) console.log('WARN: falling more than once every 6 seconds - too punishing');

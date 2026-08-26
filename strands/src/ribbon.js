@@ -47,14 +47,40 @@ export function makeBraid(course) {
   return { r: makeRider(course.start), tl: makeTrail(), burst: 0 };
 }
 
-export function updateBraid(br, playerPos, dt, depth) {
+export function updateBraid(br, playerPos, playerSpeed, dt, depth) {
   const pd = d3(br.r.pos, playerPos);
   br.burst = Math.max(0, br.burst - dt);
-  // Below the player's boosted top speed on purpose: with the tank forcing
-  // roughly half-throttle, a flee speed of 27 made the chase a coin flip on
-  // course layout. The difficulty belongs in the track's demands, not in an
-  // unwinnable pursuit.
-  let sp = pd < 14 ? 24 : pd > 55 ? 11 : 16;
+  // The one rule the chase has to obey: the rainbow must outrun a player who
+  // is doing NOTHING. Cruise with no throttle is 20. The old flee speed was
+  // 16 in the middle band and 11 past 55 units - so you gained four units a
+  // second by sitting there and nine by having fallen behind. Measured, a
+  // policy that never touched the boost caught it in two runs out of three.
+  // The rubber band was inverted: the band it ran to when you lost ground
+  // was the band where it handed the catch back.
+  //
+  // 22 outruns cruise and loses to boost, so closing the gap costs stardust
+  // and stardust is collected by driving well. 27 inside fifteen units, so
+  // the last stretch - where you can see it and want it - asks for the most.
+  let sp = pd < 15 ? 26 : 22;
+  // The leash is on the GAP, not on the catch. Past sixty units it stops
+  // running away by matching just under your speed, so a bad patch cannot
+  // turn hopeless and the thing stays on screen pulling you forward - but
+  // closing it back up is still yours to do. Slowing it BELOW your speed is
+  // what made falling behind the profitable move.
+  // Two stages. At sixty it matches just under you, which for a cruising
+  // player is an EQUILIBRIUM: below sixty the flee speed of 22 outruns
+  // cruise and the gap opens again, above sixty it closes. So the rainbow
+  // parks itself right there, in sight, refusing to be had for free.
+  if (pd > 60) sp = Math.min(sp, playerSpeed * .92);
+  // Past a hundred and ten something has gone wrong - a run of falls, each
+  // one setting you back a node while it kept going. Measured at up to 646
+  // units, which is not a chase any more, it is an ex-chase. Here it reels
+  // back properly. That recovery is free, but it only ever returns you to
+  // the equilibrium; every unit inside it is still earned.
+  // Fixed, not proportional: a run of falls leaves you SLOW, and a leash
+  // scaled by your speed reels in slowest exactly when the gap is worst.
+  // Measured that way, a policy that fell 23 times still trailed by 532.
+  if (pd > 110) sp = Math.min(sp, 8);
   if (br.burst > 0) sp = 44;
   const before = [...br.r.pos];
   ride(br.r, sp * dt, (es) => {

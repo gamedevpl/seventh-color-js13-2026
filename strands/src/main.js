@@ -536,7 +536,7 @@ function frame(now) {
     introT += dt;
     msgT = Math.max(0, msgT - dt);
     // The rainbow is already leaving while you watch. Nothing else moves.
-    updateBraid(braid, player.r.pos, dt, depth);
+    updateBraid(braid, player.r.pos, player.speed, dt, depth);
     // Three beats: what is happening, who you are, what to do about it.
     const beatI = introT < 2.4 ? 0 : introT < 3.9 ? 1 : 2;
     if (beatI !== introBeat) {
@@ -667,7 +667,7 @@ function frame(now) {
     speedSm += (speedN - speedSm) * Math.min(1, dt * 1.5);
 
     if (mode === 'run') {
-      updateBraid(braid, player.r.pos, dt, depth);
+      updateBraid(braid, player.r.pos, player.speed, dt, depth);
       // Reaching the HEAD is the catch - stepping on the tail was never the
       // fantasy, and it made the merge feel like an accident.
       if (!fly && braid.burst <= 0 && d3(player.r.pos, braid.r.pos) < 4.6) {
@@ -820,7 +820,7 @@ function frame(now) {
   // Only while you are actually driving: the cutscenes hold the speed static
   // with no throttle, and letting those frames into the sample quietly drags
   // every percentage in the balance report toward "too slow".
-  if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate]);
+  if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate, braid && braid.r ? d3(player.r.pos, braid.r.pos) : 0]);
   if (DEV) (window.__cam = window.__cam || []).push([now, cam.e[0], cam.e[1], cam.e[2], cam.a[0], cam.a[1], cam.a[2], fovSm, cu[0], cu[1], cu[2]]);
   vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);

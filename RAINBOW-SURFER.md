@@ -59,6 +59,78 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R10 - a soft-lock, a phantom road, and a sky with no corners
+
+Six things off one screenshot, and two of them were real bugs.
+
+### The soft-lock
+
+"Too slow for the bend" over and over at a perfectly healthy speed. A fall
+respawns you a node back at speed 12, and the demand check gives half a
+second of grace. The throttle has a **0.83s time constant**, so half a
+second from 12 with the boost open reaches about **21.9** - and a late-run
+serpentine demands up to 26. You are thrown again immediately, respawn a
+node further back, and walk backwards through the section forever.
+
+R9 made it worse without noticing: lengthening serpentines from four-to-
+seven flicks to six-to-ten made landing *inside* a demand run far more
+likely, and raising the demand to 19-26 raised the bar you cannot clear.
+
+The fix is a grace window rather than a bigger respawn speed: 1.6 seconds
+during which the demand cannot bite, which reaches about 31 - clear of
+anything on the course - and pity stardust raised to 45 so boost is
+actually available for all of it. **A respawn must not immediately
+re-trigger the condition it respawned you from.**
+
+The blind balance policy had been reporting this all along as an inflated
+fall count; with the cascade gone it drops from 3.3 falls per 40s to 1.7,
+and the skilled policy from 0.3 to 0.
+
+### The phantom road
+
+"As if the track reflects in its own glass, some kind of bug." Exactly
+right. R8 reflected the rail mesh, and the rail mesh is the **whole
+course** while the mirror plane is local to the player. Distant rails
+reflected through a plane that has nothing to do with them landed in
+nonsense places and drew a convincing second road alongside the real one -
+which is also why the run in the screenshot got stuck: there was no telling
+which road was the road. Reflecting a localised thing near the deck (the
+rainbow, the unicorn, the sparks) is sound; reflecting all the geometry in
+the level through one local plane is not.
+
+### A sky with no corners
+
+The stars were 150 solid **cubes** at 260-500 units - several pixels of
+unmistakable square, and being placed in the world they parallaxed, so a
+star would slide past like a nearby rock. Now a genuine skybox: 260 fixed
+directions re-emitted every frame at a constant radius from the eye, so
+they never approach and never slide, billboarded against the camera's own
+right and up so each is a point from any angle, and drawn first with depth
+testing off - a skybox is not far away, it is simply *behind*.
+
+### Hairlines, not hail
+
+The streaks were 0.16 wide and read as hail. A smear wants to be a hairline
+with length, so 0.055, with the brightness raised to compensate.
+
+### The wall
+
+The corkscrew's trick is a full roll inside one edge, over before you
+register it. **The wall** is that idea held for ten seconds: a sweeper laid
+on its side across eight to eleven nodes with an authored bank, sine-
+enveloped so it joins flat track at both ends. Measured, excluding
+corkscrews: **maximum deck tilt 149 degrees from upright**, past vertical
+and plainly upside down, in 2.1 sustained inverted runs per course.
+
+The bank is authored per node and smoothstepped along each edge, folded
+into the same `phi` the deck geometry, the rider's pose and the camera all
+share - so there is nothing to keep in sync. `test-smooth` confirms it adds
+no jerk: roll change per frame p99 0.687 degrees.
+
+Its demand marks only the deep middle, where you are far enough over that
+speed is what keeps you on. Pink on the ramps in and out would be pink for
+the sake of it.
+
 ## R9 - the long bend, and an instrument that was lying about it
 
 The course had two kinds of turn - the serpentine's flick from side to side
@@ -707,6 +779,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R10 sky, bank, phantom road | 12,000 | 11,744 | fall-grace soft-lock fix, phantom reflection removed, skybox, inverted wall sections |
 | R9 the long bend | 11,500 | 11,471 | sweeper sections, longer serpentines, skilled balance policy |
 | R8 flow and glass | 11,500 | 11,468 | dust weighted by optical flow, stencil-masked planar reflections in the deck |
 | R7 streaks that move | 11,500 | 11,211 | streak length tied to real frame travel, tight cone, age-based fade |

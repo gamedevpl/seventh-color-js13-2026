@@ -6,7 +6,7 @@
 // rainbow the boost is free, the colours burn down instead, and a landed
 // jump relights one. Score is how long you burned.
 
-import { initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelFrame, IDENT, pushBox, setDim, mask, reflector } from './gl.js';
+import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelFrame, IDENT, pushBox, setDim, mask, reflector } from './gl.js';
 import { S, makeCourse, depths } from './course.js';
 import { trackMeshes, makeRider, ride, behind, ahead, placeAt, frame as tframe } from './track.js';
 import { unicornMesh, headMesh, PIVOT, RAINBOW } from './uni.js';
@@ -106,14 +106,14 @@ function pump(speedN, closeN, dry) {
 
 // --- state ----------------------------------------------------------------
 let mode = 'title', timer = 0;
-let course, depth, roadM, railM, groundM, bgM, braid, trailM;
+let course, depth, roadM, railM, groundM, bgM, braid, trailM, skyM;
 let surge = 0, slipT = 0, fly = null, cine = 0, jumps = 0, falls = 0;
 let rainbowT = 0, rainbowTotal = 0, streak = 0, bestStreak = 0, flash = 0, msgT = 0, msg = '';
 // Best run survives a reload, or there is nothing to come back for. Any of
 // this can throw (private windows, blocked site data), so it all runs blind.
 let best = 0, isBest = false;
 try { best = +localStorage.rsBest || 0; } catch (e) { /* no store, no problem */ }
-let energy = 40, slowT = 0, stars = [], laneV = 0, prevYaw = 0, turnRate = 0;
+let energy = 40, slowT = 0, graceT = 0, stars = [], laneV = 0, prevYaw = 0, turnRate = 0;
 const player = { r: null, speed: 10, lane: 0 };
 const cam = { e: [0, 3, -5], a: [0, 0, 0] };
 const uniM = unicornMesh();
@@ -200,7 +200,7 @@ function dustVerts(speedN, dt) {
   // Fades right out for the jump: airborne, the camera pulls back and swings
   // sideways, so ITS velocity - which is what the streaks are drawn along -
   // stops having anything to do with where the unicorn is going.
-  const alp = Math.min(.5, .06 + speedN * .55) * (1 - cine);
+  const alp = Math.min(.62, .08 + speedN * .68) * (1 - cine);
   if (alp <= .01) return 0;
   // a stable basis around the travel direction
   let ax = -vz, ay = 0, az = vx;
@@ -263,7 +263,9 @@ function dustVerts(speedN, dt) {
     let ex = d[0] - cam.e[0], ey = d[1] - cam.e[1], ez = d[2] - cam.e[2];
     let sx = vy * ez - vz * ey, sy = vz * ex - vx * ez, sz = vx * ey - vy * ex;
     const sl = Math.hypot(sx, sy, sz) || 1;
-    const w = .16;
+    // Thin. Fat streaks read as hail rather than as speed - a smear wants
+    // to be a hairline with length, not a lozenge.
+    const w = .055;
     sx = sx / sl * w; sy = sy / sl * w; sz = sz / sl * w;
     const put = (x, y, z, aa) => {
       DBUF[n] = x; DBUF[n + 1] = y; DBUF[n + 2] = z;
@@ -329,17 +331,44 @@ function starVerts(now) {
   return n;
 }
 
+// The sky. These used to be 150 solid CUBES scattered at 260 to 500 units,
+// which at that distance is several pixels of unmistakable square - stars
+// have no corners. And being placed in the world they parallaxed, so a
+// "star" would slide past the track like a nearby rock.
+// A skybox instead: fixed directions, re-emitted every frame at a constant
+// radius from the EYE, so they never approach and never slide - and
+// billboarded, so each is a point of light from wherever you look. Drawn
+// first with depth testing off, which is what puts them behind everything.
+const SKY = [];
+for (let i = 0; i < 260; i++) {
+  const u = Math.random() * 2 - 1, th = Math.random() * 6.283, r = Math.sqrt(1 - u * u);
+  SKY.push([Math.cos(th) * r, u, Math.sin(th) * r,
+    .07 + Math.random() * .16, .35 + Math.random() * .65, (Math.random() * 7) | 0]);
+}
+const KBUF = new Float32Array(SKY.length * 60);
+function skyVerts(sx, sy, sz, ux, uy, uz) {
+  let n = 0;
+  const R = 46;
+  for (const [dx, dy, dz, sz0, br, ci] of SKY) {
+    const c = ci > 4 ? [1.5, 1.5, 1.7] : RAINBOW[ci].map((v) => 1.1 + v * .8);
+    const px = cam.e[0] + dx * R, py = cam.e[1] + dy * R, pz = cam.e[2] + dz * R;
+    for (const [ox, oy] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) {
+      KBUF[n] = px + (sx * ox + ux * oy) * sz0;
+      KBUF[n + 1] = py + (sy * ox + uy * oy) * sz0;
+      KBUF[n + 2] = pz + (sz * ox + uz * oy) * sz0;
+      KBUF[n + 3] = 0; KBUF[n + 4] = 1; KBUF[n + 5] = 0;
+      KBUF[n + 6] = c[0]; KBUF[n + 7] = c[1]; KBUF[n + 8] = c[2]; KBUF[n + 9] = br;
+      n += 10;
+    }
+  }
+  return n;
+}
+
 function makeBackdrop() {
   let cx = 0, cz = 0;
   for (const n of course.nodes) { cx += n.p[0]; cz += n.p[2]; }
   cx /= course.nodes.length; cz /= course.nodes.length;
   const v = [];
-  for (let i = 0; i < 150; i++) {
-    const an = Math.random() * Math.PI * 2, r = 260 + Math.random() * 240;
-    const y = -40 + Math.random() * 260, sz = 1.5 + Math.random() * 1.8;
-    const c = [[1.6, 1.6, 1.6], [1.2, 1.4, 1.8], [1.7, 1.3, 1.5]][i % 3];
-    pushBox(v, cx + Math.cos(an) * r, y, cz + Math.sin(an) * r, sz, sz, sz, ...c, 1);
-  }
   for (let i = 0; i < 9; i++) {
     const an = i / 9 * Math.PI * 2 + Math.random() * .4, r = 330;
     const c = RAINBOW[i % 7].map((x) => x * 2.4);
@@ -372,12 +401,12 @@ function newRun() {
   braid = makeBraid(course);
   ride(braid.r, S * 6, first);
   trailM = createMesh(new Float32Array(0), true);
-  particleM = partM(); starM = partM(); dustM = partM();
+  particleM = partM(); starM = partM(); dustM = partM(); skyM = partM();
   DUST.length = 0; prevEye = null;
   PART.length = 0; pcur = 0;
   surge = 0; slipT = 0; fly = null; cine = 0; jumps = 0; falls = 0;
   rainbowT = 0; rainbowTotal = 0; streak = 0; bestStreak = 0; isBest = false; flash = 0; msgT = 0;
-  energy = 40; slowT = 0; laneV = 0; prevYaw = 0; turnRate = 0;
+  energy = 40; slowT = 0; graceT = 0; laneV = 0; prevYaw = 0; turnRate = 0;
   timer = 0;
   camT = null; camU = null; prevP = null;
 }
@@ -423,9 +452,16 @@ function doFall(why) {
   placeAt(player.r, back, null);
   player.speed = 12;
   player.lane = 0; laneV = 0;
-  energy = Math.max(energy, 30);
+  energy = Math.max(energy, 45);
   fly = null;
   slowT = 0;
+  // ...and a window where the demand cannot bite, because respawning at 12
+  // in the middle of a long serpentine was a SOFT-LOCK. The throttle has a
+  // 0.83s time constant, so half a second of grace only gets you to about
+  // 22 - under a late-run demand of 26 you are thrown again instantly, and
+  // again, walking backwards through the section forever. 1.6s reaches 31,
+  // clear of anything, and the pity stardust now covers the whole window.
+  graceT = 1.6;
 }
 
 // The gap is as long as you EARNED. Launch fast and the landing is chosen
@@ -548,8 +584,9 @@ function frame(now) {
       if (player.r.edge && player.r.edge.gap) startFly();
       else {
         // Demand sections: below the minimum for half a second, you slide off.
+        graceT = Math.max(0, graceT - dt);
         const req = player.r.b ? player.r.b.req : 0;
-        if (req && player.speed < req - 1) {
+        if (req && !graceT && player.speed < req - 1) {
           slowT += dt;
           if (slowT > .5) doFall('Too slow for the bend - it threw you!');
         } else slowT = 0;
@@ -733,6 +770,20 @@ function frame(now) {
     updateMesh(particleM, PBUF, particleVerts(now));
     updateMesh(dustM, DBUF, dustVerts(speedN, dt));
 
+    // The sky first, with no depth test at all, so nothing can ever occlude
+    // it and it can never occlude anything. A skybox is not far away - it is
+    // simply behind.
+    // Screen right, from the same up vector lookAt uses, so each star is
+    // square-on to the viewport however the world is rolling.
+    const vz = [cam.e[0] - cam.a[0], cam.e[1] - cam.a[1], cam.e[2] - cam.a[2]];
+    const vs = X(cu, vz), vsl = Math.hypot(vs[0], vs[1], vs[2]) || 1;
+    glMode(1);
+    gl.disable(gl.DEPTH_TEST);
+    updateMesh(skyM, KBUF, skyVerts(vs[0] / vsl, vs[1] / vsl, vs[2] / vsl, cu[0], cu[1], cu[2]));
+    drawMesh(skyM, IDENT);
+    gl.enable(gl.DEPTH_TEST);
+    glMode(0);
+
     drawMesh(groundM, IDENT);
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
     const S8 = .85, lx = fly ? 0 : player.lane * 2.8;
@@ -774,7 +825,13 @@ function frame(now) {
     glMode(1);
     setDim(.34);
     const RFL = reflector(p, rUp);
-    drawMesh(railM, RFL);
+    // NOT the rails. One local plane is only right near the player, and the
+    // rail mesh is the WHOLE course - so distant rails reflected through it
+    // landed in nonsense places and drew a convincing phantom road beside
+    // the real one. Reflecting a localised thing near the deck is fine;
+    // reflecting all the geometry in the level through a local plane is
+    // not. Read as "the track reflects in its own glass, some kind of bug",
+    // and that was exactly right.
     if (trailM.n) drawMesh(trailM, RFL);
     drawMesh(uniM, mul(RFL, uniMdl));
     drawMesh(headM, mul(RFL, headMdl));

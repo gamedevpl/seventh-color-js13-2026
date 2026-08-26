@@ -136,6 +136,12 @@ export function frame(a, b, t) {
   // body does in a corner, and it reads as wrong even when you cannot say
   // why. tools/test-bank.mjs pins the direction down.
   let phi = -Math.max(-.5, Math.min(.5, dh * 1.6)) * Math.min(1, 4 * t * (1 - t));
+  // Authored bank on top of the automatic one, smoothstepped between the
+  // two nodes so it eases on and off instead of stepping at every joint.
+  // This is what lets a bend be ridden on its side, or past it: the deck
+  // and the rider share this frame, so the road, the pose and the camera
+  // all roll together and there is nothing else to keep in sync.
+  phi += (a.bank + (b.bank - a.bank) * sm(t));
   if (twisted(a, b)) phi += Math.PI * 2 * sm(t);
   const c = Math.cos(phi), si = Math.sin(phi);
   return [p, T,

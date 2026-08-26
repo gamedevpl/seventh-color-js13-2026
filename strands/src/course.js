@@ -19,7 +19,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 export function makeCourse(count) {
   const nodes = [];
   const add = (p) => {
-    const n = { p, dir: [0, 0, 1], next: [], i: nodes.length, req: 0, twist: false };
+    const n = { p, dir: [0, 0, 1], next: [], i: nodes.length, req: 0, twist: false, bank: 0 };
     nodes.push(n);
     return n;
   };
@@ -27,13 +27,14 @@ export function makeCourse(count) {
   let cur = add([0, 0, 0]);
   const start = cur;
 
-  const step = (dyaw, dpitch, len, gap, req, twist) => {
+  const step = (dyaw, dpitch, len, gap, req, twist, bank) => {
     yaw += dyaw;
     pitch = Math.max(-.6, Math.min(.5, pitch * .86 + dpitch));
     const d = [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)];
     const n = add([cur.p[0] + d[0] * len, cur.p[1] + d[1] * len, cur.p[2] + d[2] * len]);
     n.req = req || 0;
     n.twist = !!twist;
+    n.bank = bank || 0;
     cur.next.push({ to: n, gap: !!gap });
     cur = n;
   };
@@ -50,18 +51,20 @@ export function makeCourse(count) {
     const prog = nodes.length / count;                  // 0 at the gate, 1 at the end
     const hard = Math.min(1, prog * 1.25);
     const rq = (base, top) => Math.round(base + (top - base) * hard);
-    // weights: cruise, serpentine, dive, climb, gap, corkscrew, sweeper
+    // weights: cruise, serpentine, dive, climb, gap, corkscrew, sweeper, wall
     const W = [
-      .34 - .28 * hard,
-      .16 + .07 * hard,
-      .13 - .03 * hard,
-      .08 - .03 * hard,
-      .13 + .06 * hard,
-      .02 + .30 * hard,     // the signature move, but EARNED: near-absent at
+      .32 - .27 * hard,
+      .15 + .06 * hard,
+      .12 - .03 * hard,
+      .07 - .03 * hard,
+      .12 + .05 * hard,
+      .02 + .26 * hard,     // the signature move, but EARNED: near-absent at
                             // the gate, everywhere by the end. Seeding it
                             // from the start just moved the difficulty
                             // forward instead of building it.
-      .14 + .08 * hard,
+      .13 + .07 * hard,
+      .01 + .22 * hard,     // the wall, later still - it is the corkscrew's
+                            // idea held for ten seconds instead of one.
     ];
     let r = Math.random() * W.reduce((a, b) => a + b, 0), pick = 0;
     while (pick < W.length - 1 && r > W[pick]) { r -= W[pick]; pick++; }
@@ -96,7 +99,7 @@ export function makeCourse(count) {
       step(rnd(-.1, .1), 0, S);
       step(rnd(-.12, .12), 0, S * 1.1, false, rq(21, 28), true);
       step(rnd(-.1, .1), 0, S);
-    } else {                                            // the long sweeper
+    } else if (pick === 6) {                            // the long sweeper
       // A sustained ARC, held one way for the whole section, so the bank
       // comes on and STAYS on and you lean the length of it. The
       // serpentine's charm is the flick from side to side; a long banked
@@ -119,6 +122,23 @@ export function makeCourse(count) {
         const kk = k * (1 + i * .06);
         sw += kk;
         step(sgn * kk, rnd(-.06, .04), S);
+      }
+    } else {                                            // the wall
+      // A sweeper laid over on its side and HELD there. The corkscrew's
+      // trick is a full roll in one edge, over before you have registered
+      // it; this is the same idea stretched across eight to eleven nodes,
+      // so you ride the bend leaned right over - and, late in the run, past
+      // vertical and plainly upside down. A sine envelope takes the roll on
+      // and off, so the section joins the flat track at both ends.
+      const sgn = Math.random() < .5 ? 1 : -1, k = rnd(.13, .19);
+      const L = 8 + (Math.random() * 4 | 0);
+      const deep = 1.25 + 1.35 * hard;
+      for (let i = 0; i < L; i++) {
+        // The demand marks only the deep part - where you are actually far
+        // enough over for speed to be what keeps you on. Pink on the gentle
+        // ramps in and out would be pink for the sake of it.
+        const w = Math.sin(Math.PI * (i + 1) / (L + 1));
+        step(sgn * k, rnd(-.05, .03), S, false, w > .55 ? rq(17, 24) : 0, false, -sgn * deep * w);
       }
     }
   }

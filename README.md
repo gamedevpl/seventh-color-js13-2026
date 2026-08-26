@@ -1,62 +1,86 @@
-# The Seventh Color — js13kGames 2026 build
+# js13kGames 2026 — two entries
 
-Packs the gamedev.pl game [`seventh-color`](https://github.com/gamedevpl/www.gamedev.pl-games/tree/main/games/seventh-color)
-into a single zip small enough for [js13kGames](https://js13kgames.com/): **13,312 bytes**.
+This repo holds two finished js13kGames 2026 entries. They share a build,
+measurement and verification toolchain and **nothing else**: separate source
+trees, separate game code, separate budgets, separate size gates. Both are
+written to the 2026 theme, *rainbows and unicorns*.
 
-The game itself is not developed here. It lives on a branch in the games repo and keeps
-being developed there. This repo only ever *reads* that branch, so the two never fight over
-the same files, and the gamedev.pl gates (validate, trace, agent-play) stay the sole
-authority on whether the game is correct.
+| entry | source | zipped | limit | write-up |
+| --- | --- | ---: | ---: | --- |
+| **The Seventh Color** — a twelve-beat story game with four playable mechanics | `native/src` (9 files) | **12,160** | 13,312 | [`NATIVE.md`](./NATIVE.md) |
+| **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,202** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
 
-```
-www.gamedev.pl-games                    seventh-color-js13-2026
-  games/seventh-color/**   ──pull──▶      build/source/index.html
-  npm run build                             │
-                                            ├─ synth audio   238 KB → 4 KB
-                                            ├─ minify        esbuild + terser
-                                            ├─ roadroller    self-extracting pack
-                                            └─ zip           deflate/zopfli, best of
-                                                  ▼
-                                            build/index.zip
-```
+Rainbow Surfer: <https://js13kgames.com/2026/games/rainbow-surfer>
 
-## Commands
+Neither game depends on anything at runtime — no libraries, no assets, no
+network. The Seventh Color is raw canvas 2D with a hand-rolled tracker; Rainbow
+Surfer is raw WebGL with one shader program and a course generated fresh every
+run.
+
+## Building
+
+Each game builds through the same tools, selected with `--game`:
 
 | command | what it does |
 | --- | --- |
-| `npm run size` | the whole loop: pull, pack, verify. Start here. |
-| `npm run pull` | build the game in the games checkout, stage it under `build/source/` |
-| `npm run pack` | run the transforms, write `build/index.html` + `build/index.zip`, update `SIZE.md` |
-| `npm run verify` | unzip the archive, boot it in headless Chromium, fail on any page error |
-| `npm run weigh` | per-file table of what is costing bytes, so cuts can be aimed |
-| `npm run probe` | price each candidate cut in bytes off the *archive* |
-| `npm run probe -- --floor` | what the engine costs with no game, and the game with no engine |
-| `node tools/pack.mjs --O2` | override the roadroller search level for one run |
-| `node tools/scene-weight.mjs` | marginal compressed cost of each scene-content group (leave-one-out) |
-| `node tools/scene-weight.mjs --curve` | cumulative zip size by story chapter (scene arrays truncated at real boundaries) |
-| `node tools/pull.mjs --scenes` | list every scene id the scope dial can be set to |
-| `node tools/pull.mjs --endAt <id>` | build as if the story ended at that scene |
-| `node tools/pull.mjs --startAt <id> --endAt <id>` | build a standalone mid-story episode (see [`EPISODES.md`](./EPISODES.md)) |
-| `node tools/pull.mjs --skip <id,id,...>` | drop scenes from the middle of the window, relinking `nextSceneId` across the gap |
-| `npm run size:fast` | pack without roadroller — quicker, for A/B-ing a single change |
+| `npm run native` | build The Seventh Color |
+| `npm run native:gate` | its full release gate: puzzle checks, a scripted playthrough, coverage, worst-of-5 pack, verify, soak |
+| `npm run strands` | build Rainbow Surfer |
+| `npm run strands:gate` | its release gate: course invariants, motion smoothness, worst-of-5 pack, verify |
+| `npm run strands:ship` | the submission build — roadroller at `-O2`, which is worth ~32 bytes over `-O1` and far too slow to iterate on |
 
-`npm run pack -- --strict` exits non-zero when the zip is over budget. Nothing uses it yet,
-because the zip is over budget by a wide margin; it is there for the day that flips.
+Add `--cheats` to any build for the DEV probes the live measurement tools read;
+they compile out of a shipping build entirely.
 
-## Where it builds from
+### The measuring tools
 
-`pull` looks for a games checkout in this order:
+Most of what this project got right came from building a probe rather than
+arguing about a feel. They all drive the real page in headless Chromium and read
+telemetry back out of it:
 
-1. `--games <path>`
-2. `source.localCheckout` in `config.json` (default `../www.gamedev.pl-games`)
-3. a shallow clone it manages itself under `.cache/games-repo`
+| tool | the question it answers |
+| --- | --- |
+| `tools/verify-native.mjs` | does the zip that would actually be submitted boot, and survive being played? |
+| `tools/test-balance.mjs` | is the run winnable — and, with `--idle`, is it winnable *without playing*? |
+| `tools/test-touch.mjs` | can you steer with a thumb, two fingers included? |
+| `tools/test-audio.mjs` | is there sound where there should be, silence where the browser demands it, and is the in-game track still intact? |
+| `tools/test-course.mjs`, `test-smooth.mjs`, `test-cam.mjs`, `test-fov.mjs`, `test-bank.mjs`, `test-dust.mjs` | course invariants, motion, camera and effect geometry |
+| `tools/test-fps.mjs` | what an effect costs in frames |
+| `tools/shots.mjs` | promo frames, rendered at twice the game's own resolution |
 
-**A checkout you already have is treated as read-only.** It builds whatever is checked out
-and says so, rather than moving your branch under you. Pass `--fetch` to opt into
-fetching and fast-forwarding it, or `--branch <name>` to override the configured branch.
-Only the `.cache/` clone is driven automatically.
+## The shared toolchain
 
-## The transforms
+esbuild → terser (whole-program property mangling) → roadroller (self-extracting
+pack) → zip. The zip writer is ours rather than `zip -9`: one entry, no extra
+fields, zeroed timestamps, three zlib strategies plus zopfli, smallest kept —
+so the same input always produces the same archive.
+
+Every build is measured against a per-game milestone ceiling
+(`native-milestone.json`, `strands-milestone.json`) as **worst of N rolls**, not
+best, because a number you cannot reproduce is not a number you can ship.
+
+## The first approach, and why it was abandoned
+
+The repo began as a *packer*: it pulled the existing ~200 KB gamedev.pl game
+`seventh-color` from the games repo and squeezed it down — synthesising the
+audio from patch definitions instead of shipping WAVs, tree-shaking a global-
+publishing engine by hand, mangling properties whole-program. That work is
+below, and the numbers in it are real.
+
+It was abandoned because it was measured: the floor of that approach — a
+micro-engine emulating the GameKit API, generalized scene machinery,
+localization, telemetry — came to **~12.3 KB before the first line of story**.
+Three episodes fit under that; three never would. The native rewrite deletes the
+compatibility problem rather than compressing it, and shipped the *whole* story
+at 12,160. [`NATIVE.md`](./NATIVE.md) tells that story properly;
+[`EPISODES.md`](./EPISODES.md) and [`SIZE.md`](./SIZE.md) hold the measurements
+that led to the decision.
+
+The packer is still wired up as `npm run size` and its per-transform notes are
+kept below, because the engineering in them is sound and reusable — but neither
+entry ships through it, and it has not been exercised since the rewrite.
+
+### The transforms
 
 Each is a flag in `config.json` and each can be switched off for one run with
 `--no-<name>`, so any of them can be A/B'd against the size ledger.
@@ -132,7 +156,7 @@ The zip writer is ours rather than `zip -9`: one entry, no extra fields, zeroed 
 and it tries three zlib strategies plus zopfli and keeps the smallest. Reproducible — the
 same input always produces the same archive.
 
-## Verification is not optional
+### Verification is not optional (the packer)
 
 Three of the stages rewrite code the game never expected to be rewritten. `npm run verify`
 unzips the archive that would actually be submitted, boots it in Chromium, and fails on any
@@ -145,7 +169,7 @@ Verify is what turned `mangleProps: "max"` from reckless to routine: its first r
 the engine's required-step check (`steps[name]` over a quoted list) breaking, and its
 interaction pass is the regression net for every transform added since.
 
-## Dropping the on-screen touch controls
+### Dropping the on-screen touch controls
 
 The D-pad and ACT button in `tools/engine/input.mjs` were built for the whole game, but
 a scoped build might not need them at all. `pressedAction()` in the game's own source
@@ -161,7 +185,7 @@ invoke — none of which are in scope once the game ends at `shadow-council`. Re
 (~700 B) — but it undoes itself the moment scope widens to a scene that walks or steers,
 which is called out in the file's own comment so it isn't rediscovered as a bug.
 
-## The scope dial
+### The scope dial
 
 `scope.endAt` in `config.json` (or `--endAt <sceneId>` for a one-off) builds the game as
 if the story ended at that scene, and the result is **playable, not just smaller**. Three
@@ -186,7 +210,7 @@ produced `,,`. And the first sweep reported three different scopes at byte-ident
 stale file. **Any sweep must check the exit status of every step** — a build tool that
 fails quietly will report the last good number forever.
 
-## Pricing a cut
+### Pricing a cut
 
 `weigh` ranks files by minified size, which is a bad guide to what removing one
 would save — prose and data tables compress several times better than code. `probe`
@@ -198,11 +222,3 @@ measure, they do not run.
 with no game and the game with no engine, which is how we learned that
 `core+gfx+drawing+input` is 13,352 bytes zipped on its own — the entire budget,
 before a line of this game.
-
-## Current standing
-
-See [`SIZE.md`](./SIZE.md), regenerated by every `npm run pack`.
-
-The entry is a long way over budget — this is a thirty-scene story game that was never
-written to a byte limit, and the pipeline exists so the number is visible while it is cut
-down rather than measured once at the end.

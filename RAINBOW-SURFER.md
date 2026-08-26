@@ -59,6 +59,70 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R13 - kickers, and the black streak that was two bugs
+
+### The kicker
+
+Still too easy, and the fix was not to tighten a number but to move where
+the fuel is. **Kickers** are marked launch points - a gold gate you can see
+coming, deliberately unlike the demand pink and the rainbow hash, because
+this one is an invitation rather than a warning. 6.7 per course, placed on
+the first node of a cruise, at the bottom of a dive where the speed you
+were just handed is what a launch wants, and on sweepers where the jump
+cuts the corner in mid-air.
+
+**It arms before the marker and fires as you cross it.** Launching from
+mid-edge would either snap you back to the node the arc starts at or drop
+you in already half an arc up, and committing a moment early is a better
+ask than hitting a frame.
+
+The payload is an arc of stardust hanging over the road on the trajectory a
+well-judged launch actually flies - worth several nodes of driving. It
+demands 30 to stay up where a gap only asks 16, so launching on a dry tank
+drops you through the arc you were aiming at. And it **swings out to the
+side**, so the richest part pulls you away from the deck you have to land
+back on: come down outside 3.6 units and you have missed the road. Drifting
+out is free in the air and expensive at the moment you touch down, which is
+what makes the reward a decision rather than a pickup.
+
+Road dust dropped correspondingly, from 80% of plain edges to 30%.
+
+| policy (4 runs each) | catches | as the rainbow | tank empty |
+| --- | ---: | ---: | ---: |
+| skilled, ignores kickers | 41.8s avg | 25.5% | 51% |
+| skilled, takes kickers | 31.6s avg | **34.8%** | 34% |
+| idle, never boosts | never (3 runs) | 0% | - |
+
+Against R12's 41% for a skilled player, the baseline is now meaningfully
+harder and the kickers are the way back up.
+
+**The harness needed teaching twice more.** First it jumped with an empty
+tank - a player learns that a kicker needs 30, a policy has to be told.
+Then it kept applying the ground steering rule in the air, which moves you
+sideways off the deck, so it threw away its own landings; airborne, the
+only sane input is to centre up. Both times the instrument, not the
+mechanic, was what the first measurement was reporting.
+
+### The black streak was two bugs
+
+**One:** a 6000x6000 opaque ground plate at y = -70, in almost exactly the
+fog colour - invisible by design and therefore pure liability. Measured over
+40 courses, **32% of all track nodes sit below it** and 27 courses in 40 dip
+through it. A horizontal plane meets a curving ribbon along a thin curve,
+and the slab writes depth while the glass deck does not. Deleted; the
+skybox is the surround now and the floor had no job.
+
+**Two, and the real one:** glass writes no depth, so a far piece of deck
+composites over a near one in *mesh order* rather than depth order - and
+fogged toward the background it is **darker than the road it lands on**, so
+it paints a thin black curve across it. Glass now fades its ALPHA instead
+of fogging its colour. The overlap becomes deck-over-deck, the same hue, so
+the seam disappears, while the fade still lets distance take it away.
+
+Worth stating plainly: removing the ground did not fix the streak, and the
+screenshot after it proved that. The second bug was found by looking again
+rather than by assuming the first fix had landed.
+
 ## R12 - the chase was giving itself away
 
 "Too easy to catch, and when it goes badly it disappears - and I often
@@ -889,6 +953,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R13 kickers | 12,800 | 12,567 | kicker ramps carry the dust economy, glass alpha-fades, ground slab deleted |
 | R12 the chase | 12,500 | 12,243 | flee speed above coasting, two-stage gap leash, idle policy proves it |
 | R11 opening and closing shots | 12,500 | 12,229 | intro reveal cutscene, locked-off ending over a runout, letterboxed |
 | R10 sky, bank, phantom road | 12,000 | 11,744 | fall-grace soft-lock fix, phantom reflection removed, skybox, inverted wall sections |

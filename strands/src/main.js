@@ -135,14 +135,21 @@ let mode = 'title', timer = 0;
 // not stop, only the camera does.
 const INTRO = 4.6;
 let introT = 0, introBeat = -1, introEye = null, endEye = null, endUp = null, endT = 0;
-let course, depth, roadM, railM, groundM, bgM, braid, trailM, skyM;
+// No ground slab any more. It was a 6000x6000 opaque plate at y = -70 in
+// almost exactly the fog colour - invisible by design, and therefore pure
+// liability: measured over 60 courses, 32% of all track nodes sit BELOW it
+// and 27 courses in 40 dip through it. A horizontal plane cutting a curving
+// ribbon meets it along a thin curve, and since the slab writes depth while
+// the glass deck does not, that curve came out as a black streak painted
+// across the road. The skybox is the surround now; the floor had no job.
+let course, depth, roadM, railM, bgM, braid, trailM, skyM;
 let surge = 0, slipT = 0, fly = null, cine = 0, jumps = 0, falls = 0;
 let rainbowT = 0, rainbowTotal = 0, streak = 0, bestStreak = 0, flash = 0, msgT = 0, msg = '';
 // Best run survives a reload, or there is nothing to come back for. Any of
 // this can throw (private windows, blocked site data), so it all runs blind.
 let best = 0, isBest = false;
 try { best = +localStorage.rsBest || 0; } catch (e) { /* no store, no problem */ }
-let energy = 40, slowT = 0, graceT = 0, stars = [], laneV = 0, prevYaw = 0, turnRate = 0;
+let energy = 40, slowT = 0, graceT = 0, armed = 0, stars = [], laneV = 0, prevYaw = 0, turnRate = 0;
 const player = { r: null, speed: 10, lane: 0 };
 const cam = { e: [0, 3, -5], a: [0, 0, 0] };
 const uniM = unicornMesh();
@@ -166,7 +173,24 @@ function placeStars() {
       for (const u of [.2, .35, .5, .65, .8]) {
         stars.push({ i: a.i, p: [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u + 4 * h * u * (1 - u) + 1.2, A[2] + (B[2] - A[2]) * u] });
       }
-    } else if ((e.to.req || Math.random() < .8)) {
+    } else if (a.kick) {
+      // The kicker's payload: a bright arc of dust hanging over the road,
+      // on the trajectory a well-judged launch actually flies. It is worth
+      // several nodes of driving, and it swings out to the side - so the
+      // richest part of it pulls you away from the deck you have to land
+      // back on. That tension IS the mechanic.
+      let b2 = e.to;
+      for (let j = 0; j < 2 && b2.next.length && !b2.next[0].gap; j++) b2 = b2.next[0].to;
+      const A = a.p, B = b2.p, h = Math.min(26, d3(A, B) * .55);
+      const sx = B[2] - A[2], sz = -(B[0] - A[0]), sl = Math.hypot(sx, sz) || 1;
+      for (let j = 0; j < 7; j++) {
+        const u = .1 + .8 * j / 6, lat = Math.sin(j / 6 * Math.PI) * 3.2 * (a.i % 2 ? 1 : -1);
+        stars.push({ i: a.i, kick: 1, p: [
+          A[0] + (B[0] - A[0]) * u + sx / sl * lat,
+          A[1] + (B[1] - A[1]) * u + 4 * h * u * (1 - u) + 1.4,
+          A[2] + (B[2] - A[2]) * u + sz / sl * lat] });
+      }
+    } else if ((e.to.req || Math.random() < .3)) {
       const k = e.to.req ? 2 : 1;
       for (let j = 0; j < k; j++) {
         const t = .25 + .5 * (j + Math.random()) / k;
@@ -419,9 +443,6 @@ function newRun() {
   const tm = trackMeshes(course);
   roadM = createMesh(tm.road);
   railM = createMesh(tm.rail);
-  const gr = [];
-  pushBox(gr, 0, -70, 800, 6000, .2, 6000, .04, .035, .08);
-  groundM = createMesh(gr);
   bgM = makeBackdrop();
   placeStars();
   player.r = makeRider(course.start);
@@ -438,7 +459,7 @@ function newRun() {
   PART.length = 0; pcur = 0;
   surge = 0; slipT = 0; fly = null; cine = 0; jumps = 0; falls = 0;
   rainbowT = 0; rainbowTotal = 0; streak = 0; bestStreak = 0; isBest = false; flash = 0; msgT = 0;
-  energy = 40; slowT = 0; graceT = 0; laneV = 0; prevYaw = 0; turnRate = 0;
+  energy = 40; slowT = 0; graceT = 0; armed = 0; laneV = 0; prevYaw = 0; turnRate = 0;
   introT = 0; introBeat = -1; endEye = null; endUp = null; endT = 0;
   // AHEAD of the start and off to one side, aimed down the track at the
   // fleeing rainbow - so the unicorn is behind the lens and out of frame.
@@ -511,14 +532,17 @@ function doFall(why) {
 // further down the chain - the hole literally opens up for you - and the
 // flight is time-dilated on top, so a good launch buys a long, slow, silly
 // arc through the stars instead of a hop.
-function startFly() {
+function startFly(ramp) {
   const a = player.r.a;
   let b = player.r.b;
-  const extra = Math.max(0, Math.min(3, Math.floor((player.speed - 17) / 6)));
+  const extra = ramp ? 2 : Math.max(0, Math.min(3, Math.floor((player.speed - 17) / 6)));
   for (let i = 0; i < extra && b.next.length && !b.next[0].gap; i++) b = b.next[0].to;
   const dist = d3(a.p, b.p);
-  fly = { a, b, u: 0, v: Math.max(10, player.speed), need: 16, dist,
-    h: Math.min(18, dist * .3), sink: 0, lat: player.lane * 2.8, air: 0 };
+  // A kicker throws you much higher and demands much more speed to stay up:
+  // a gap only asks 16, this asks 30, so launching off a kicker on a dry
+  // tank drops you straight through the arc you were aiming at.
+  fly = { a, b, u: 0, v: Math.max(10, player.speed), need: ramp ? 30 : 16, dist, ramp,
+    h: Math.min(26, dist * (ramp ? .55 : .3)), sink: 0, lat: player.lane * 2.8, air: 0 };
   tone(300, .35, 'sawtooth', .09);
   tone(660, .5, 'triangle', .05);
   jumps++;
@@ -614,6 +638,11 @@ function frame(now) {
       fly.sink += deficit * dt * .9;
       if (fly.sink > 7) doFall('Fell short! Carry more speed into the jump - or boost mid-air.');
       else if (fly.u >= 1) {
+        // Off a kicker you have to come back over the road. Drifting out
+        // for the far dust is free while you are in the air and expensive
+        // at the moment you touch down, which is what makes the reward a
+        // decision rather than a pickup.
+        if (fly.ramp && Math.abs(fly.lat) > 3.6) { doFall('Missed the deck! Swing back over the road before you land.'); return; }
         placeAt(player.r, fly.b, fly.a);
         player.speed = Math.min(46, Math.max(player.speed, fly.v * .9));
         player.lane = Math.max(-1, Math.min(1, fly.lat / 2.8));
@@ -647,8 +676,14 @@ function frame(now) {
       // Gravity along the tangent: dives are FREE speed - use them.
       player.speed -= player.r.tan[1] * dt * 22;
       player.speed = Math.max(7, Math.min(46, player.speed));
+      armed = Math.max(0, armed - dt);
       ride(player.r, player.speed * dt, first);
+      // Fires as you CROSS the kicker, not when you press. Launching from
+      // mid-edge would either snap you back to the node the arc starts at
+      // or drop you in already half an arc up - and committing a moment
+      // early is a better ask of the player than hitting a frame.
       if (player.r.edge && player.r.edge.gap) startFly();
+      else if (armed > 0 && player.r.a.kick && player.r.s < 6) { armed = 0; startFly(true); }
       else {
         // Demand sections: below the minimum for half a second, you slide off.
         graceT = Math.max(0, graceT - dt);
@@ -675,8 +710,8 @@ function frame(now) {
     if (player.r) {
       const pi = player.r.a.i, pp2 = fly ? (prevP || player.r.pos) : player.r.pos;
       for (const st2 of stars) {
-        if (st2.taken || st2.i < pi - 1 || st2.i > pi + 2) continue;
-        if (d3(st2.p, pp2) < 2.7) {
+        if (st2.taken || st2.i < pi - 1 || st2.i > pi + (fly ? 6 : 2)) continue;
+        if (d3(st2.p, pp2) < (fly ? 4 : 2.7)) {
           st2.taken = true;
           energy = Math.min(100, energy + 10);
           surge = Math.max(surge, .25);
@@ -721,6 +756,10 @@ function frame(now) {
     if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
     if (mode === 'title' || mode === 'end') { newRun(); mode = 'intro'; }
     else if (mode === 'intro') introT = INTRO;      // skippable
+    else if (!fly && player.r && player.r.b && player.r.b.kick) {
+      armed = 2.2;
+      tone(520, .12, 'square', .06);
+    }
   }
 
   // --- frames: RAW for the unicorn, eased for the camera --------------------
@@ -843,7 +882,7 @@ function frame(now) {
   // Only while you are actually driving: the cutscenes hold the speed static
   // with no throttle, and letting those frames into the sample quietly drags
   // every percentage in the balance report toward "too slow".
-  if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate, braid && braid.r ? d3(player.r.pos, braid.r.pos) : 0]);
+  if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate, braid && braid.r ? d3(player.r.pos, braid.r.pos) : 0, !fly && player.r.b && player.r.b.kick ? 1 : 0, fly ? 1 : 0, fly ? fly.lat : 0]);
   if (DEV) (window.__cam = window.__cam || []).push([now, cam.e[0], cam.e[1], cam.e[2], cam.a[0], cam.a[1], cam.a[2], fovSm, cu[0], cu[1], cu[2]]);
   vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);
@@ -884,7 +923,6 @@ function frame(now) {
     gl.enable(gl.DEPTH_TEST);
     glMode(0);
 
-    drawMesh(groundM, IDENT);
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
     const S8 = .85, lx = fly ? 0 : player.lane * 2.8;
     const base = [
@@ -1082,6 +1120,14 @@ function frame(now) {
     }
 
     ctx.textAlign = 'center';
+    // The kicker prompt. It has to appear while there is still time to act,
+    // which is the same window the arming accepts.
+    if (!cs && !fly && player.r && player.r.b && player.r.b.kick) {
+      ctx.font = 'bold 15px system-ui';
+      ctx.fillStyle = armed > 0
+        ? `rgba(255,240,150,${.65 + Math.sin(now / 60) * .35})` : '#c8a24a';
+      ctx.fillText(armed > 0 ? 'JUMP ARMED' : 'SPACE - jump the kicker', VW / 2, VH - 96);
+    }
     if (mode === 'rainbow') {
       for (let i = 0; i < 7; i++) {
         const [r, gg, b] = RAINBOW[i];

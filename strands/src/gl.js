@@ -15,13 +15,21 @@ export let gl, canvas;
 // float precision is highp in the vertex shader and mediump in the fragment
 // one, and a uniform whose precision disagrees across stages is a link error.
 const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
-uniform mediump float add,dim;varying vec3 vc;varying float vf,va;
+uniform mediump float add,dim,gls;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
 float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
-vc=c*mix(l,1.,add);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,add),0.,1.);}`;
+vc=c*mix(l,1.,add);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
+// Glass does NOT fog toward the fog colour - it fades its ALPHA instead.
+// It writes no depth, so a far piece of deck composites over a near one in
+// mesh order rather than depth order; fogged, that far sliver is close to
+// the background colour and therefore DARKER than the road it lands on, and
+// it paints a thin black curve across it. Keeping its colour means the
+// overlap is deck-over-deck - the same hue, so the seam disappears - while
+// the alpha fade still lets it die away with distance.
 const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
-uniform vec3 fog;uniform float add;
+uniform vec3 fog;uniform float add,gls;
 void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
+else if(gls>.5)gl_FragColor=vec4(vc,va*(1.-vf));
 else gl_FragColor=vec4(mix(vc,fog,vf),va);}`;
 
 let prog, loc = {};
@@ -43,7 +51,7 @@ export function initGL(c) {
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim']) loc[u] = gl.getUniformLocation(prog, u);
+  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls']) loc[u] = gl.getUniformLocation(prog, u);
   gl.uniform1f(loc.dim, 1);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
@@ -69,6 +77,7 @@ export function frameGL(vp, cam, fog) {
 //            the rest of the net through the deck you are riding.
 export function mode(m) {
   gl.uniform1f(loc.add, m === 1 ? 1 : 0);
+  gl.uniform1f(loc.gls, m === 2 ? 1 : 0);
   if (!m) { gl.disable(gl.BLEND); gl.depthMask(true); return; }
   gl.enable(gl.BLEND);
   gl.depthMask(false);

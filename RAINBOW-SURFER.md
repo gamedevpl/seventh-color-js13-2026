@@ -59,6 +59,62 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R17 - touch, and a bass under the opening
+
+### Touch: it half worked, which is worse than not at all
+
+There was a `pointerdown` handler, so a tap counted as SPACE and the game
+would **start** on a phone - and then you were a passenger. `turnDir` and
+`heldFwd` read the keyboard only. Starting fine and being unsteerable is a
+worse first impression than an obvious wall.
+
+Now every live pointer is tracked, because the scheme rests on knowing
+whether both sides are down at once: **left half steers left, right half
+steers right, both together is the boost.** The top strip is the SPACE key -
+start, restart, arm a kicker - kept separate so that steering on a phone
+does not fire a ramp every time you turn. The HUD carries `touch-action:
+none`, without which the browser pans the page instead.
+
+`tools/test-touch.mjs` drives the real page with synthetic pointer events,
+two fingers included, and reads the result off the DEV probe. It caught its
+own author first: the initial assertion said the left half should push the
+lane negative, and it does the opposite - correctly, matching `ArrowLeft`.
+Which sign means "left" is an internal convention this project has had
+backwards twice, so the test now asserts the property that actually
+matters - **a thumb does what the arrow key does** - rather than a sign I
+guessed:
+
+```
+left half matches ArrowLeft    key 0.44   touch 0.92
+right half matches ArrowRight  key -0.45  touch -0.95
+both halves boost              19.4 -> 32.2
+boosting does not steer        lane -0.30
+```
+
+### The bass, and why it cannot be on the title
+
+A browser makes no sound until the page has had a real user gesture, and
+here the gesture that unlocks audio is the same SPACE that leaves the title
+behind. A title-screen loop would be silent on every cold load, which is
+every load that matters. So the bass sits under the **opening cutscene**
+instead, which is the same musical idea and can actually be heard.
+
+It is `pump(0, 0, 1)` - the same sequencer the run uses, told it has no
+speed, nothing near and a dry tank, which is already exactly "no arp, no
+lead, just the bottom end". The first attempt wrote a second loop to say
+that; ten lines for one, and a second place to keep in step with the first.
+**The music engine itself is untouched.**
+
+### What it cost
+
+Touch and the bass together came to 13,249 against a 13,312 limit - 63
+bytes, which is not shippable. The wake behind the unicorn went, as priced
+two passes ago: seven rainbow bars stretched by speed, saying what the dust
+streaks, the zoom blur and the trail already say louder. A phone that
+cannot steer is a game nobody on a phone can play; that beats a decoration.
+
+Shipping at **13,190** - 122 bytes clear.
+
 ## R16 - a shine rather than a starburst, and a free 32 bytes
 
 ### The stars again
@@ -1103,6 +1159,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R17 touch and intro bass | 13,230 | 13,190 (O2) | two-thumb touch verified by a pointer probe, kick+bass under the opening, wake cut |
 | R16 shine, and -O2 | 13,150 | 13,060 (O2) | radial glow stars, roadroller optimize level 2 |
 | R15 honest mirrors | 13,150 | 13,084 | reflections limited to their accurate range, stars flare as crosses |
 | R14b lens on the glass | 13,050 | 13,012 | on-deck camera with a rolled horizon, kicker taught on the title |

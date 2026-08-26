@@ -28,7 +28,7 @@ wrap.appendChild(glc);
 const hud = document.createElement('canvas');
 hud.width = VW;
 hud.height = VH;
-hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%';
+hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none';
 wrap.appendChild(hud);
 const ctx = hud.getContext('2d');
 
@@ -62,19 +62,45 @@ function linkAt(x, y) {
   if (mode !== 'title') return;
   for (const l of links) if (x >= l[0] && x <= l[0] + l[2] && y >= l[1] && y <= l[1] + l[3]) return l[4];
 }
-hud.addEventListener('pointermove', (e) => { [hotX, hotY] = at(e); });
+// Touch. Every live pointer is tracked, because the whole scheme rests on
+// knowing whether BOTH sides are held at once: left half steers left, right
+// half steers right, and both together is the boost. The top strip is the
+// SPACE key - start, restart, and arm a kicker - kept separate so that
+// steering on a phone does not fire a ramp every time you turn.
+const pts = new Map();
+let tL = 0, tR = 0;
+const scan = () => {
+  tL = tR = 0;
+  for (const [x, y] of pts.values()) {
+    if (y < VH * .28) continue;
+    if (x < VW / 2) tL = 1; else tR = 1;
+  }
+};
+hud.addEventListener('pointermove', (e) => {
+  [hotX, hotY] = at(e);
+  if (pts.has(e.pointerId)) { pts.set(e.pointerId, [hotX, hotY]); scan(); }
+});
 hud.addEventListener('pointerdown', (e) => {
   const [x, y] = at(e);
   // A tap that follows a link must not also start the run underneath it.
   const url = linkAt(x, y);
   // window.open is blocked in sandboxed frames - and a js13k entry spends
   // its life in one. A real anchor click carries the gesture through.
-  if (url) document.body.appendChild(Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener' })).click();
-  else acted = true;
+  if (url) {
+    document.body.appendChild(Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener' })).click();
+    return;
+  }
+  pts.set(e.pointerId, [x, y]);
+  scan();
+  if (mode !== 'run' && mode !== 'rainbow') acted = true;
+  else if (y < VH * .28) acted = true;
 });
-const heldFwd = () => held.ArrowUp || held.w;
+const drop = (e) => { pts.delete(e.pointerId); scan(); };
+hud.addEventListener('pointerup', drop);
+hud.addEventListener('pointercancel', drop);
+const heldFwd = () => held.ArrowUp || held.w || (tL && tR);
 const heldBack = () => held.ArrowDown || held.s;
-const turnDir = () => (held.ArrowLeft || held.a ? 1 : 0) - (held.ArrowRight || held.d ? 1 : 0);
+const turnDir = () => (held.ArrowLeft || held.a || (tL && !tR) ? 1 : 0) - (held.ArrowRight || held.d || (tR && !tL) ? 1 : 0);
 
 // --- audio ----------------------------------------------------------------
 let ac;
@@ -488,9 +514,11 @@ function newRun() {
   camT = null; camU = null; prevP = null;
 }
 
-const wake = [];
-RAINBOW.forEach((c, i) => pushBox(wake, (i - 3) * .22, .16, -2.8, .11, .11, 3.6, ...c.map((v) => v * 1.6), .12));
-const wakeM = createMesh(wake);
+// The speed wake behind the unicorn is gone. It was seven rainbow bars
+// stretched by speed, and by now the dust streaks, the zoom blur and the
+// trail itself all say the same thing louder. It was priced at 79 bytes,
+// and touch controls needed them: a phone that cannot steer is a game
+// nobody on a phone can play, which beats a decoration every time.
 
 function project(w) {
   const x = vp[0] * w[0] + vp[4] * w[1] + vp[8] * w[2] + vp[12];
@@ -653,6 +681,16 @@ function frame(now) {
       say(['A rainbow is running loose...', '...and you are the only one fast enough.', 'GO!'][beatI], 2.6);
       tone(beatI < 2 ? 330 : 523, .3, 'triangle', .07);
     }
+    // Kick and bass under the opening, resolving into the full track the
+    // moment you get control. This is the SAME sequencer the run uses, told
+    // it has no speed, nothing near and a dry tank - which is already
+    // exactly "no arp, no lead, just the bottom end". Writing a second loop
+    // for it, as the first attempt did, was ten lines to say one.
+    //
+    // It can only live here and not on the title: a browser makes no sound
+    // until the page has had a real user gesture, and the gesture that
+    // unlocks audio is the same SPACE that leaves the title behind.
+    pump(0, 0, 1);
     if (introT > INTRO) { mode = 'run'; say('CATCH THE RAINBOW - collect stardust to keep the boost lit', 3.5); }
   }
   if (mode === 'end') {
@@ -1071,10 +1109,6 @@ function frame(now) {
     if (starM.n) drawMesh(starM, IDENT);
     if (particleM.n) drawMesh(particleM, IDENT);
     if (dustM.n) drawMesh(dustM, IDENT);
-    if (speedN > .2 || fly || mode === 'rainbow') {
-      const st = .5 + speedN * 2 + surge + cine * 1.5;
-      drawMesh(wakeM, modelFrame(base, rSide, rUp2, [rT[0] * st, rT[1] * st, rT[2] * st], S8));
-    }
     glMode(0);
   }
 
@@ -1110,6 +1144,7 @@ function frame(now) {
     }
     ctx.fillStyle = '#7a6e5c';
     ctx.fillText('↑ boost   ↓ brake   ← → steer   SPACE at a gold gate to jump', VW / 2, 222);
+    ctx.fillText('touch: a side to steer, both to boost, top to jump', VW / 2, 240);
     ctx.fillStyle = '#e8b923';
     ctx.fillText('press SPACE', VW / 2, 258);
     // Author credit, painted piecewise so each link run owns a hit box and

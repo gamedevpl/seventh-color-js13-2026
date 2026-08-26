@@ -23,7 +23,9 @@
     "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak",
     "shots": "node tools/shots.mjs",
     "promo": "node tools/shots.mjs && node tools/promo.mjs",
-    "video": "node tools/video.mjs"
+    "video": "node tools/video.mjs",
+    "clips": "node tools/clips.mjs",
+    "trailer": "node tools/trailer.mjs"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",

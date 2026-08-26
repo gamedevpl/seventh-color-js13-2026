@@ -249,6 +249,12 @@ function frame(now) {
   }
 
   if (mode === 'title') {
+    // Where the story actually is, published for the promo capture tools:
+    // they drive the game from outside and cannot see `round`, so counting
+    // skips and taps was guesswork that silently landed a shot on the wrong
+    // beat. Dev only, like the readout below - neither reaches a submission
+    // build, and both are read before any phase can return early.
+    if (DEV) window.__at = { beat: 'title' };
     cut('title');
     clear(VW, VH, '#0a0710');
     // The rings reach 28px from their centre, so the whole stack is spaced
@@ -269,6 +275,7 @@ function frame(now) {
     // phase is reading a row that no longer applies. Harmless while every
     // beat carried dialogue; a crash the moment one did not.
     const b = currentBeat(round);
+    if (DEV) window.__at = { beat: b.id, game: round.phase === P.GAME, choice: round.phase === P.CHOICE, end: round.phase === P.END };
     cut(round.phase === P.END ? 'end' : b.id, b.card);
     setMusic(b.music);
     if (before === P.GAME && round.phase !== P.GAME) sfxWin();

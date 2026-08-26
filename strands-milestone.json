@@ -1,5 +1,5 @@
 {
-  "name": "R17 touch, and a bass under the intro",
-  "description": "two-thumb touch controls verified by a pointer-driven probe; kick and bass under the opening cutscene",
-  "ceilingBytes": 13230
+  "name": "R18 the title screen gets its music",
+  "description": "a beat and a half of title hold so the bass can land before the show starts; verified by counting oscillators",
+  "ceilingBytes": 13290
 }

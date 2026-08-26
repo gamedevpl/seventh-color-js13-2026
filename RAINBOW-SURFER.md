@@ -59,6 +59,54 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R18 - the title screen gets its music after all
+
+The ask was a quiet motif on the **title screen**, and the previous pass
+put it under the opening cutscene instead and called the matter closed. It
+wasn't: the browser rule was real, but the conclusion drawn from it was
+lazy.
+
+A browser makes no sound until the page has had a genuine user gesture, so
+on a cold load the title *must* start silent - and here the gesture that
+would unlock it was also the one that left the title behind. The way
+through is not to fight the rule but to give the title a moment on the far
+side of it: **the first press no longer leaves.** It turns the sound on,
+the bass lands, the race carries on running underneath, and a beat and a
+half later the show starts. Press again to cut it short.
+
+This costs nothing on repeat, which is the part that makes it acceptable:
+after a run you go from the end screen straight back into the intro, so
+**the title screen is a once-per-page-load thing anyway.**
+
+The rainbow bars breathe on the kick, so the moment the sound comes up you
+can see that it did - on a phone with the volume down that is the only cue
+there is.
+
+### Verified by counting oscillators
+
+"pump is called" is not the same as "the browser made a noise" - a
+suspended AudioContext swallows the lot silently. `tools/test-audio.mjs`
+patches `createOscillator` before the page boots and counts:
+
+| | oscillators | context |
+| --- | ---: | --- |
+| title, before any gesture | **0** | - |
+| title, during the hold | **14** | `running` |
+| on into the cutscene | 37 | `running` |
+
+Zero before the gesture is as much the requirement as fourteen after it:
+a game that tried to make noise on load would be doing something the
+browser is right to forbid.
+
+The music engine itself remains untouched - this is `pump(0, 0, 1)`, the
+same sequencer told it has no speed, nothing near and a dry tank.
+
+### The wall
+
+O1 gate 13,254, **shipped (O2) 13,212**, limit 13,312 - 100 bytes. The
+gate stays on O1 and therefore overstates, which is the safe direction:
+if the gate fits, the shipped file certainly does.
+
 ## R17 - touch, and a bass under the opening
 
 ### Touch: it half worked, which is worse than not at all
@@ -1159,6 +1207,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R18 title music | 13,290 | 13,212 (O2) | title holds a beat and a half so the bass can land; audio verified by probe |
 | R17 touch and intro bass | 13,230 | 13,190 (O2) | two-thumb touch verified by a pointer probe, kick+bass under the opening, wake cut |
 | R16 shine, and -O2 | 13,150 | 13,060 (O2) | radial glow stars, roadroller optimize level 2 |
 | R15 honest mirrors | 13,150 | 13,084 | reflections limited to their accurate range, stars flare as crosses |

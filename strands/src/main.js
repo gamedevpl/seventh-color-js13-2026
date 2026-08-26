@@ -159,7 +159,7 @@ let mode = 'title', timer = 0;
 // it simply never ends, because the point of it is that the running does
 // not stop, only the camera does.
 const INTRO = 4.6;
-let demoT = 0, demoEye = null, demoUp = null, demoSide = 1;
+let demoT = 0, demoEye = null, demoUp = null, demoSide = 1, titleT = 0;
 let introT = 0, introBeat = -1, introEye = null, endEye = null, endUp = null, endT = 0;
 // No ground slab any more. It was a 6000x6000 opaque plate at y = -70 in
 // almost exactly the fog colour - invisible by design, and therefore pure
@@ -621,6 +621,10 @@ function frame(now) {
   let speedN = 0, closeN = 0;
   flash = Math.max(0, flash - dt * 1.6);
   if (mode === 'title' && course) {
+    // Silent until `ac` exists, which is to say until you have touched
+    // something - pump bails on its own, so this needs no guard.
+    pump(0, 0, 1);
+    if (titleT > 0 && (titleT -= dt) <= 0) { newRun(); mode = 'intro'; demoEye = null; }
     // Attract mode: the chase actually runs behind the menu rather than a
     // still image of it. Both ride at the same speed, so the flee rule holds
     // them a few lengths apart and they keep trading ground.
@@ -854,7 +858,16 @@ function frame(now) {
 
   if (doAct) {
     if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
-    if (mode === 'title' || mode === 'end') { newRun(); mode = 'intro'; demoEye = null; }
+    // The first press at the title does NOT leave it. A browser makes no
+    // sound at all until the page has had a real user gesture, so on a cold
+    // load the title is necessarily silent - and the gesture that would
+    // unlock it was also the one that left. Holding for a beat and a half
+    // is what buys the title screen its own music: the bass lands, you see
+    // the race still running underneath, and then the show starts. It costs
+    // nothing on repeat, because after a run you go straight back into the
+    // intro and never see the title again this page load.
+    if (mode === 'title') titleT = titleT > 0 ? .01 : 1.6;   // press again to cut it short
+    else if (mode === 'end') { newRun(); mode = 'intro'; demoEye = null; }
     else if (mode === 'intro') introT = INTRO;      // skippable
     else if (!fly && player.r && player.r.b && player.r.b.kick) {
       armed = 2.2;
@@ -1127,9 +1140,11 @@ function frame(now) {
     sc.addColorStop(1, 'rgba(8,5,18,.04)');
     ctx.fillStyle = sc;
     ctx.fillRect(0, 0, VW, VH);
+    // The bars breathe on the kick, so the moment the sound comes up you can
+    // SEE that it did - on a phone with the volume down that is the only cue.
     RAINBOW.forEach(([r, gg, b], i) => {
-      ctx.fillStyle = `rgba(${r * 255},${gg * 255},${b * 255},.8)`;
-      ctx.fillRect(0, 100 + i * 7, VW, 5);
+      ctx.fillStyle = `rgba(${r * 255},${gg * 255},${b * 255},${.8 - beat * .35})`;
+      ctx.fillRect(0, 100 + i * 7 - beat * 2, VW, 5 + beat * 4);
     });
     ctx.fillStyle = '#f3ead6';
     ctx.font = 'bold 40px system-ui';
@@ -1146,7 +1161,7 @@ function frame(now) {
     ctx.fillText('↑ boost   ↓ brake   ← → steer   SPACE at a gold gate to jump', VW / 2, 222);
     ctx.fillText('touch: a side to steer, both to boost, top to jump', VW / 2, 240);
     ctx.fillStyle = '#e8b923';
-    ctx.fillText('press SPACE', VW / 2, 258);
+    ctx.fillText(titleT > 0 ? 'here we go' : 'press SPACE', VW / 2, 258);
     // Author credit, painted piecewise so each link run owns a hit box and
     // lights up under the pointer; a run with no url registers nothing.
     ctx.font = '11px system-ui';

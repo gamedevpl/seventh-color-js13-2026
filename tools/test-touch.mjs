@@ -51,7 +51,7 @@ const check = (name, ok, detail) => {
 await send('pointerdown', 1, .5, .1); await send('pointerup', 1, .5, .1);
 await page.waitForTimeout(300);
 await page.evaluate(() => { window.__st = []; });
-await page.waitForTimeout(5200);                 // sit through the intro
+await page.waitForTimeout(7200);                 // title hold, then the intro
 if (!(await st())) {
   // Bail cleanly rather than throwing ten lines later on a null: this probe
   // reads the DEV telemetry, which a shipping build does not carry.

@@ -954,6 +954,9 @@ function frame(now) {
     ctx.fillText('↑ boost (burns stardust)   ↓ brake   ← → slide / steer the jump', VW / 2, 222);
     ctx.fillStyle = '#e8b923';
     ctx.fillText('press SPACE', VW / 2, 258);
+    ctx.font = '11px system-ui';
+    ctx.fillStyle = '#5f5648';
+    ctx.fillText('@gtanczyk | gamedev.pl | 2026', VW / 2, 332);
   } else {
     // The jump is a held cinematic shot and wants to be SHARP. The blur used
     // to be boosted by `cine`, which ghosted the whole frame exactly when

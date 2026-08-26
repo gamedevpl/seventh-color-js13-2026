@@ -59,6 +59,34 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R14b - a lens on the glass
+
+The tower shots were composed but static. **Distance is the only thing a
+planted camera has to say about speed**, so the second shot type puts the
+lens down ON the deck - four units out, half a unit clear of the glass,
+inboard of the rail - and rolls its horizon with the road. They come
+through at head height a couple of metres away, the frame whips as they
+pass, and through a banked arc or a wall the whole shot lies over with the
+track. Shots alternate: wide, low, wide, low.
+
+Two small things fixed while in there. The tower had stopped alternating
+sides when the shot picker was refactored, so every wide shot was from the
+same hand; it takes its side from the node index now, for free. And the
+title never taught the kicker - a mechanic added two passes ago - so the
+controls line says `SPACE at a gold gate to jump` and the two description
+lines were tightened to pay for it.
+
+`sm` was defined twice, in track.js and again in main.js. It is exported
+once now. That is a genuine duplicate rather than a byte trick, and it
+happened to be worth about fifteen of them.
+
+**On the margin.** Worst-of-5 is 13,012 against the js13k limit of 13,312
+- **300 bytes, 2.3%**. The last twenty of those were chased with a text
+trim and a dedup, and at that point the ceiling is arbitrary and the
+spread between rolls (28 bytes) is larger than what is being chased. This
+is the end of free additions: anything further needs something removed
+first, chosen deliberately.
+
 ## R14 - the title screen becomes a broadcast
 
 The menu sits on a live race now rather than a still. A world is built at
@@ -991,6 +1019,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R14b lens on the glass | 13,050 | 13,012 | on-deck camera with a rolled horizon, kicker taught on the title |
 | R14 attract mode | 13,000 | 12,972 | live race under a translucent title, trackside broadcast camera, curtains cut |
 | R13 kickers | 12,800 | 12,567 | kicker ramps carry the dust economy, glass alpha-fades, ground slab deleted |
 | R12 the chase | 12,500 | 12,243 | flee speed above coasting, two-stage gap leash, idle policy proves it |

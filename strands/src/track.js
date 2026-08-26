@@ -114,7 +114,7 @@ export function ahead(r, D, choose) {
 }
 
 // --- the moving frame -----------------------------------------------------
-const sm = (t) => t * t * (3 - 2 * t);
+export const sm = (t) => t * t * (3 - 2 * t);
 // Corkscrews are a COURSE decision now (b.twist), not a hash - because they
 // carry a speed requirement, and demands must be authored, not accidental.
 export const twisted = (a, b) => b.twist;

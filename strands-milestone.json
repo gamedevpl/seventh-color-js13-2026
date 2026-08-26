@@ -1,5 +1,5 @@
 {
   "name": "R14 attract mode",
-  "description": "a live race running under a translucent title screen, filmed from static trackside towers",
-  "ceilingBytes": 13000
+  "description": "a live race under a translucent title, filmed from static trackside towers and from a lens lying on the deck",
+  "ceilingBytes": 13050
 }

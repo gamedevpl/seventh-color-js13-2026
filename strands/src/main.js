@@ -8,14 +8,13 @@
 
 import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelFrame, IDENT, pushBox, setDim, mask, reflector } from './gl.js';
 import { S, makeCourse, depths } from './course.js';
-import { trackMeshes, makeRider, ride, behind, ahead, placeAt, frame as tframe } from './track.js';
+import { trackMeshes, makeRider, ride, behind, ahead, placeAt, frame as tframe, sm } from './track.js';
 import { unicornMesh, headMesh, PIVOT, RAINBOW } from './uni.js';
 import { makeBraid, updateBraid, makeTrail, feedTrail, trailVerts, BUF } from './ribbon.js';
 
 const VW = 640, VH = 360;
 const FOG = [.035, .03, .08];
 const d3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-const sm = (t) => t * t * (3 - 2 * t);
 
 const glc = document.getElementById('c');
 glc.width = VW;
@@ -134,7 +133,7 @@ let mode = 'title', timer = 0;
 // it simply never ends, because the point of it is that the running does
 // not stop, only the camera does.
 const INTRO = 4.6;
-let demoT = 0, demoEye = null, demoSide = 1;
+let demoT = 0, demoEye = null, demoUp = null, demoSide = 1;
 let introT = 0, introBeat = -1, introEye = null, endEye = null, endUp = null, endT = 0;
 // No ground slab any more. It was a 6000x6000 opaque plate at y = -70 in
 // almost exactly the fog colour - invisible by design, and therefore pure
@@ -581,23 +580,40 @@ function frame(now) {
     // them would just be the game's own rig with nobody driving.
     demoT -= dt;
     if (demoT <= 0 || !demoEye) {
-      let n = braid.r.b || braid.r.a;
-      // Three nodes, not six. At six the tower stands 150 units down the
-      // road - about six seconds away at demo speed - so the cut came
-      // before they ever arrived and every shot was a distant speck. Three
-      // puts them past the lens inside the hold.
-      for (let i = 0; i < 3 && n.next.length; i++) n = n.next[0].to;
-      const sd = Math.hypot(n.dir[2], n.dir[0]) || 1;
       demoSide = -demoSide;
-      demoEye = [
-        n.p[0] + n.dir[2] / sd * 12 * demoSide,
-        // High enough that the lens looks DOWN on them: the words own the
-        // top of the frame, so the race has to be framed into the bottom of
-        // it rather than fought with.
-        n.p[1] + 11 + Math.random() * 7,
-        n.p[2] - n.dir[0] / sd * 12 * demoSide,
-      ];
-      demoT = 5;
+      // Two kinds of shot, alternating. The tower is the wide one; the deck
+      // cam is the one that makes it move - a lens lying ON the glass at the
+      // edge of the road, so they come through at head height a couple of
+      // metres away and the whole frame whips as they go by. Distance is the
+      // only thing that reads as speed in a static shot.
+      const low = demoSide > 0;
+      let n = braid.r.b || braid.r.a;
+      // Near enough that they arrive INSIDE the hold. At six nodes the tower
+      // stood 150 units off - six seconds at demo speed against a five
+      // second shot - so the cut came before they did, every time.
+      for (let i = 0; i < (low ? 2 : 3) && n.next.length; i++) n = n.next[0].to;
+      if (low && n.next.length) {
+        const f = tframe(n, n.next[0].to, .3);
+        // Just clear of the deck and inboard of the rail, and rolled with
+        // the road: through a banked arc the horizon lies over with it,
+        // which is the whole reason to put the camera down there.
+        demoEye = [f[0][0] + f[2][0] * 4.1 + f[3][0] * .5,
+          f[0][1] + f[2][1] * 4.1 + f[3][1] * .5,
+          f[0][2] + f[2][2] * 4.1 + f[3][2] * .5];
+        demoUp = f[3];
+        demoT = 3.4;
+      } else {
+        const sd = (Math.hypot(n.dir[2], n.dir[0]) || 1) * (n.i % 2 ? 1 : -1);
+        demoEye = [
+          n.p[0] + n.dir[2] / sd * 12,
+          // High enough to look DOWN on them: the words own the top of the
+          // frame, so the race is framed into the bottom rather than fought.
+          n.p[1] + 11 + Math.random() * 7,
+          n.p[2] - n.dir[0] / sd * 12,
+        ];
+        demoUp = null;
+        demoT = 5;
+      }
     }
   }
   if (mode === 'intro') {
@@ -913,7 +929,7 @@ function frame(now) {
   if (mode === 'end' && !endUp) endUp = up.map((v, i) => v - sideL[i] * (lean * .5 + shr));
   // A broadcast camera keeps its horizon level; it is bolted to the scenery,
   // not riding the road.
-  const cu = mode === 'title' ? [0, 1, 0]
+  const cu = mode === 'title' ? (demoUp || [0, 1, 0])
     : mode === 'end' ? endUp : up.map((v, i) => v - sideL[i] * (lean * .5 + shr));
   fovSm += (1.03 + speedSm * .38 + surge * .2 + cine * .16 - (mode === 'end' ? .22 : 0) - fovSm) * Math.min(1, dt * 6);
   // Dev only: the run's vital signs, so tools/test-balance.mjs can tune the
@@ -1052,14 +1068,14 @@ function frame(now) {
     ctx.fillText('RAINBOW SURFER', VW / 2, 76);
     ctx.font = '13px system-ui';
     ctx.fillStyle = '#b8ab92';
-    ctx.fillText('Stardust feeds the boost. Bends and jumps demand SPEED - too slow and you fall.', VW / 2, 164);
-    ctx.fillText('Catch the rainbow to BECOME it; jumps keep it burning. Score is your burn time.', VW / 2, 182);
+    ctx.fillText('Stardust feeds the boost. Bends and jumps demand SPEED.', VW / 2, 164);
+    ctx.fillText('Catch the rainbow to BECOME it. Score is your burn time.', VW / 2, 182);
     if (best > 0) {
       ctx.fillStyle = '#9be8ff';
       ctx.fillText('best ' + best.toFixed(1) + 's', VW / 2, 200);
     }
     ctx.fillStyle = '#7a6e5c';
-    ctx.fillText('↑ boost (burns stardust)   ↓ brake   ← → slide / steer the jump', VW / 2, 222);
+    ctx.fillText('↑ boost   ↓ brake   ← → steer   SPACE at a gold gate to jump', VW / 2, 222);
     ctx.fillStyle = '#e8b923';
     ctx.fillText('press SPACE', VW / 2, 258);
     // Author credit, painted piecewise so each link run owns a hit box and

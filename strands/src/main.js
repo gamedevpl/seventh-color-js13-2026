@@ -705,6 +705,10 @@ function frame(now) {
   }
   if (mode === 'end') {
     // It keeps going. The camera does not.
+    // ...and neither does the music: the same bare bass line the title runs
+    // on, so the run is bracketed by the same figure at both ends. Silence
+    // here read as the game having crashed rather than having finished.
+    pump(0, 0, 1, 1);
     msgT = Math.max(0, msgT - dt);
     endT += dt;
     // Eased down to a canter: at full boost it is a dot within two seconds,

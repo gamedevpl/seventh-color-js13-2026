@@ -135,9 +135,22 @@ comparing.
 The music engine itself remains untouched - `pump(0, 0, 1)`, the same
 sequencer told it has no speed, nothing near and a dry tank.
 
+### And the ending, which had gone quiet
+
+`pump` was reached from the title, the intro and the run - and nowhere
+else, so crossing the finish line dropped the sound entirely. Over a shot
+whose whole point is that the running does not stop, **silence read as the
+game having crashed rather than having finished.** The ending now runs the
+same bare bass line the title does, which brackets the run with the same
+figure at both ends for the price of one call.
+
+Verified the same way, on a deliberately shortened course so the finish is
+reachable in half a minute: **4.0 notes/s after the finish line**, where
+silence would be 0.0.
+
 ### The wall
 
-O1 gate 13,236, **shipped (O2) 13,194**, limit 13,312 - 118 bytes.
+O1 gate 13,246, **shipped (O2) 13,204**, limit 13,312 - 108 bytes.
 
 ## R17 - touch, and a bass under the opening
 

@@ -207,6 +207,7 @@ function frame(now) {
     bloom(160, 120, now / 1000, 8, 3);
     text('THE SEVENTH COLOR', VW / 2, 68, { fill: '#e8b923', font: 'bold 16px system-ui', align: 'center' });
     text('tap or press space', VW / 2, 92, { fill: '#a89', font: '9px system-ui', align: 'center' });
+    text('@gtanczyk | gamedev.pl | 2026', VW / 2, 142, { fill: '#5f5648', font: '8px system-ui', align: 'center' });
     if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; }
     dissolve(dt);
     cardOverlay();

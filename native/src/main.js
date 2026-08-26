@@ -353,7 +353,10 @@ function frame(now) {
     }
   }
 
-  if (DEV && mode === 'play') {
+  // The beat readout is a dev affordance, and promo capture is the one dev
+  // run that must not show it - #nohud turns it off without giving up the
+  // skip cheat that walks the story to the frame worth shooting.
+  if (DEV && mode === 'play' && !location.hash.includes('nohud')) {
     rect(0, 149, 152, 7, { fill: '#000c' });
     text(`${currentBeat(round).id}  [shift+shift = skip]`, 4, 155, { fill: '#4a8a5a', font: '7px system-ui' });
   }

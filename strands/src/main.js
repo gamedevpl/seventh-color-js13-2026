@@ -68,7 +68,9 @@ hud.addEventListener('pointerdown', (e) => {
   const [x, y] = at(e);
   // A tap that follows a link must not also start the run underneath it.
   const url = linkAt(x, y);
-  if (url) open(url, '_blank');
+  // window.open is blocked in sandboxed frames - and a js13k entry spends
+  // its life in one. A real anchor click carries the gesture through.
+  if (url) document.body.appendChild(Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener' })).click();
   else acted = true;
 });
 const heldFwd = () => held.ArrowUp || held.w;

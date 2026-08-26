@@ -82,7 +82,10 @@ canvas.addEventListener('pointerdown', (e) => {
   const [x, y] = at(e);
   // A tap that follows a link must not also start the game underneath it.
   const url = linkAt(x, y);
-  if (url) open(url, '_blank');
+  // window.open is blocked in sandboxed frames - and a js13k entry spends
+  // its life in one, on the compo page or an itch embed. A real anchor
+  // click carries the user gesture through where open() does not.
+  if (url) document.body.appendChild(Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener' })).click();
   else acted = heldAct = true;
 });
 canvas.addEventListener('pointerup', () => { heldAct = false; });
@@ -248,10 +251,12 @@ function frame(now) {
   if (mode === 'title') {
     cut('title');
     clear(VW, VH, '#0a0710');
-    bloom(160, 120, now / 1000, 8, 3);
-    text('THE SEVENTH COLOR', VW / 2, 68, { fill: '#e8b923', font: 'bold 16px system-ui', align: 'center' });
-    text('tap or press space', VW / 2, 92, { fill: '#a89', font: '9px system-ui', align: 'center' });
-    credit(142, 8);
+    // The rings reach 28px from their centre, so the whole stack is spaced
+    // around that: prompt clears their top, credit clears their bottom.
+    bloom(160, 110, now / 1000, 8, 3);
+    text('THE SEVENTH COLOR', VW / 2, 54, { fill: '#e8b923', font: 'bold 16px system-ui', align: 'center' });
+    text('tap or press space', VW / 2, 76, { fill: '#a89', font: '9px system-ui', align: 'center' });
+    credit(150, 8);
     if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; }
     dissolve(dt);
     cardOverlay();

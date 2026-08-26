@@ -185,6 +185,22 @@ export function trackMeshes(course) {
       }
       continue;
     }
+    // The kicker: a gold gate you can see coming. Deliberately unlike the
+    // demand pink and the rainbow hash - this one is an invitation, not a
+    // warning, and it has to be legible from far enough back to commit.
+    if (a.kick) {
+      const f = frame(a, b, .05);
+      for (const sd of [-1, 1]) {
+        quad(rail,
+          at(f[0], f[2], f[3], sd * W, .1), at(f[0], f[2], f[3], sd * W, 3.4),
+          at(f[0], f[2], f[3], sd * (W - 1.1), 3.4), at(f[0], f[2], f[3], sd * (W - 1.1), .1),
+          [0, 1, 0], [2.4, 1.8, .5], .5);
+        quad(rail,
+          at(f[0], f[2], f[3], 0, .06), at(f[0], f[2], f[3], sd * W * .8, .06),
+          at(f[0], f[2], f[3], sd * W * .8, .3), at(f[0], f[2], f[3], 0, .9),
+          [0, 1, 0], [2.6, 2, .6], .45);
+      }
+    }
     // Rails carry the demand: hot warning pink where a minimum speed
     // applies, the rainbow hash everywhere else. Read the track, not a HUD.
     const rc = b.req ? [2.2, .55, .8] : RAINBOW[(a.i * 5 + b.i * 3) % 7].map((v) => v * 1.7);

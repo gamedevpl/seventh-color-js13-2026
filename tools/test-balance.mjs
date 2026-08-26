@@ -25,6 +25,10 @@ const secs = Number(process.argv.find((a) => /^--secs=/.test(a))?.split('=')[1] 
 //            the pursuit is decoration.
 const skilled = process.argv.includes('--skill');
 const idle = process.argv.includes('--idle');
+// --jump makes the policy take the kickers. The point of the kicker is that
+// it is where the fuel is, so measuring with and without it is the only way
+// to know whether the dust economy actually rewards playing it.
+const jump = process.argv.includes('--jump');
 const archive = readFileSync(path.join(root, 'build', 'strands', 'index.zip'));
 const nl = archive.readUInt16LE(26), el = archive.readUInt16LE(28);
 const method = archive.readUInt16LE(8), comp = archive.readUInt32LE(18);
@@ -50,10 +54,20 @@ if (skilled || idle) {
   for (let i = 0; i < secs * 11; i++) {
     const st = await page.evaluate(() => {
       const a = window.__st; const r = a && a[a.length - 1];
-      return r ? [r[7], r[8]] : null;
+      return r ? [r[7], r[8], r[10], r[2], r[11], r[12]] : null;
     });
+    // Arm a kicker only with fuel to launch on: it needs 30 to stay up, and
+    // a dry tank cannot reach 30. A player learns that; the policy has to be
+    // told.
+    if (jump && st && st[2] && st[3] > 45) await page.keyboard.press('Space');
     let want = null;
-    if (st) {
+    if (st && st[4]) {
+      // AIRBORNE: the ground rule is wrong here. Steering in the air moves
+      // you sideways off the deck, and a kicker landing outside 3.6 is a
+      // fall - so the only sane input is to centre up. Left is +1 in
+      // turnDir and lat follows it, so positive lat wants Right.
+      want = st[5] > .4 ? 'ArrowRight' : st[5] < -.4 ? 'ArrowLeft' : null;
+    } else if (st) {
       const d = st[1] * 2.2 - st[0] * 1.4;
       want = d > .25 ? 'ArrowLeft' : d < -.25 ? 'ArrowRight' : null;
     }
@@ -86,7 +100,7 @@ const rainbowFrames = rows.filter((r) => r[5]).length;
 const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
 const pct = (a, f) => (a.filter(f).length / a.length * 100).toFixed(0);
 const span = (rows[rows.length - 1][0] - rows[0][0]) / 1000;
-console.log(`${span.toFixed(0)}s of full-throttle play, ${idle ? 'NO BOOST AT ALL' : skilled ? 'steering into the bends' : 'weaving blind'}\n`);
+console.log(`${span.toFixed(0)}s of full-throttle play, ${idle ? 'NO BOOST AT ALL' : jump ? 'boosting and taking the kickers' : skilled ? 'steering into the bends' : 'weaving blind'}\n`);
 console.log(`speed    mean ${mean(sp).toFixed(1)}  min ${Math.min(...sp).toFixed(1)}  max ${Math.max(...sp).toFixed(1)}`);
 console.log(`         under 20 (serpentine minimum): ${pct(sp, (v) => v < 20)}% of frames`);
 console.log(`         under 23 (corkscrew minimum):  ${pct(sp, (v) => v < 23)}% of frames`);

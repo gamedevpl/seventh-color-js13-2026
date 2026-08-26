@@ -31,7 +31,7 @@ const sweeps = (c) => {
 };
 
 let cycles = 0, orphans = 0;
-const tot = { nodes: 0, split: 0, req: 0, twist: 0, gap: 0, sweep: 0, sweepArc: 0 };
+const tot = { nodes: 0, split: 0, req: 0, twist: 0, gap: 0, sweep: 0, sweepArc: 0, kick: 0 };
 const N = 60;
 for (let i = 0; i < N; i++) {
   const c = makeCourse(120);
@@ -53,11 +53,13 @@ for (let i = 0; i < N; i++) {
   tot.req += c.nodes.filter((n) => n.req > 0).length;
   tot.twist += c.nodes.filter((n) => n.twist).length;
   tot.gap += c.nodes.reduce((a, n) => a + n.next.filter((e) => e.gap).length, 0);
+  tot.kick += c.nodes.filter((n) => n.kick).length;
   const sw = sweeps(c);
   tot.sweep += sw.length;
   tot.sweepArc += sw.reduce((a, b) => a + b, 0);
 }
 console.log(`${N} courses: avg ${(tot.nodes / N) | 0} nodes, ${(tot.req / N).toFixed(1)} demand nodes, ${(tot.twist / N).toFixed(1)} corkscrews, ${(tot.gap / N).toFixed(1)} jumps`);
+console.log(`${(tot.kick / N).toFixed(1)} kickers per course`);
 console.log(`${(tot.sweep / N).toFixed(1)} sustained arcs per course, averaging ${tot.sweep ? (tot.sweepArc / tot.sweep * 57.3).toFixed(0) : 0} degrees of held bend`);
 if (cycles || orphans) {
   console.log(`FAIL: ${cycles} cycles, ${orphans} orphaned nodes`);
@@ -65,5 +67,6 @@ if (cycles || orphans) {
 }
 if (tot.split > 0) { console.log('FAIL: the course must be a single chain now'); process.exit(1); }
 if (tot.req < N * 4 || tot.gap < N) { console.log('FAIL: not enough demands or jumps'); process.exit(1); }
+if (tot.kick < N * 3) { console.log('FAIL: too few kickers - the dust economy leans on them'); process.exit(1); }
 if (tot.sweep < N * 1.5) { console.log('FAIL: too few sustained arcs - every bend is a flick or a wiggle'); process.exit(1); }
 console.log('single chain, acyclic, with demands, corkscrews, jumps and long arcs: OK');

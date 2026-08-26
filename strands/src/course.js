@@ -19,7 +19,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 export function makeCourse(count) {
   const nodes = [];
   const add = (p) => {
-    const n = { p, dir: [0, 0, 1], next: [], i: nodes.length, req: 0, twist: false, bank: 0 };
+    const n = { p, dir: [0, 0, 1], next: [], i: nodes.length, req: 0, twist: false, bank: 0, kick: false };
     nodes.push(n);
     return n;
   };
@@ -71,8 +71,15 @@ export function makeCourse(count) {
     if (nodes.length > count - 8) pick = 0;             // land the ending calmly
 
     if (pick === 0) {                                   // cruise
-      const L = 3 + (Math.random() * 4 | 0);
-      for (let i = 0; i < L; i++) step(rnd(-.2, .2), rnd(-.07, .07), S);
+      const L = 4 + (Math.random() * 3 | 0);
+      for (let i = 0; i < L; i++) {
+        step(rnd(-.2, .2), rnd(-.07, .07), S);
+        // A KICKER - a marked place to jump from. On flat cruise only, and
+        // on its FIRST node, so there are three or more plain nodes left to
+        // land on. Jumping should be a decision, not a dice roll about what
+        // happens to be underneath when you come down.
+        if (!i && nodes.length > 14) cur.kick = true;
+      }
     } else if (pick === 1) {                            // serpentine
       // Longer than it was (four to seven flicks), because a slalom over in
       // three seconds is a decoration rather than a section, and a shade
@@ -88,6 +95,9 @@ export function makeCourse(count) {
       const L = 3 + (Math.random() * 3 | 0);
       for (let i = 0; i < L; i++) step(rnd(-.15, .15), -.16, S);
       step(rnd(-.1, .1), .1, S);
+      // A kicker at the bottom of a dive, where the speed you were just
+      // handed is exactly what a launch wants.
+      if (nodes.length > 14) cur.kick = true;
     } else if (pick === 3) {                            // climb: it costs you
       const L = 2 + (Math.random() * 2 | 0);
       for (let i = 0; i < L; i++) step(rnd(-.12, .12), .14, S * .9);
@@ -122,6 +132,10 @@ export function makeCourse(count) {
         const kk = k * (1 + i * .06);
         sw += kk;
         step(sgn * kk, rnd(-.06, .04), S);
+        // Launching off a banked arc cuts the corner in mid-air, which is
+        // both the best-looking jump in the game and the one most likely to
+        // put you down near an edge.
+        if (i === 1 && nodes.length > 14) cur.kick = Math.random() < .6;
       }
     } else {                                            // the wall
       // A sweeper laid over on its side and HELD there. The corkscrew's

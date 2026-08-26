@@ -15,6 +15,7 @@ import { makeBraid, updateBraid, makeTrail, feedTrail, trailVerts, BUF } from '.
 const VW = 640, VH = 360;
 const FOG = [.035, .03, .08];
 const d3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+const sm = (t) => t * t * (3 - 2 * t);
 
 const glc = document.getElementById('c');
 glc.width = VW;
@@ -106,6 +107,11 @@ function pump(speedN, closeN, dry) {
 
 // --- state ----------------------------------------------------------------
 let mode = 'title', timer = 0;
+// The two cutscenes. INTRO is on a clock; the outro has no clock at all -
+// it simply never ends, because the point of it is that the running does
+// not stop, only the camera does.
+const INTRO = 4.6;
+let introT = 0, introBeat = -1, introEye = null, endEye = null, endUp = null, endT = 0;
 let course, depth, roadM, railM, groundM, bgM, braid, trailM, skyM;
 let surge = 0, slipT = 0, fly = null, cine = 0, jumps = 0, falls = 0;
 let rainbowT = 0, rainbowTotal = 0, streak = 0, bestStreak = 0, flash = 0, msgT = 0, msg = '';
@@ -399,7 +405,10 @@ function newRun() {
   player.speed = 14;
   player.lane = 0;
   braid = makeBraid(course);
-  ride(braid.r, S * 6, first);
+  // Three nodes ahead, not six: at six the fog has all but eaten it, and the
+  // opening shot is meant to SHOW you the thing you are chasing. It flees
+  // through the intro and opens the gap back up by the time you have control.
+  ride(braid.r, S * 3, first);
   trailM = createMesh(new Float32Array(0), true);
   particleM = partM(); starM = partM(); dustM = partM(); skyM = partM();
   DUST.length = 0; prevEye = null;
@@ -407,6 +416,17 @@ function newRun() {
   surge = 0; slipT = 0; fly = null; cine = 0; jumps = 0; falls = 0;
   rainbowT = 0; rainbowTotal = 0; streak = 0; bestStreak = 0; isBest = false; flash = 0; msgT = 0;
   energy = 40; slowT = 0; graceT = 0; laneV = 0; prevYaw = 0; turnRate = 0;
+  introT = 0; introBeat = -1; endEye = null; endUp = null; endT = 0;
+  // AHEAD of the start and off to one side, aimed down the track at the
+  // fleeing rainbow - so the unicorn is behind the lens and out of frame.
+  // Blending to the chase rig then sweeps the camera backwards past it, and
+  // that sweep IS the unicorn's entrance. No extra machinery for a reveal.
+  const sd = [course.start.dir[2], 0, -course.start.dir[0]];
+  introEye = [
+    course.start.p[0] + course.start.dir[0] * 26 + sd[0] * 7,
+    course.start.p[1] + 3.4,
+    course.start.p[2] + course.start.dir[2] * 26 + sd[2] * 7,
+  ];
   timer = 0;
   camT = null; camU = null; prevP = null;
 }
@@ -512,6 +532,30 @@ function frame(now) {
 
   let speedN = 0, closeN = 0;
   flash = Math.max(0, flash - dt * 1.6);
+  if (mode === 'intro') {
+    introT += dt;
+    msgT = Math.max(0, msgT - dt);
+    // The rainbow is already leaving while you watch. Nothing else moves.
+    updateBraid(braid, player.r.pos, dt, depth);
+    // Three beats: what is happening, who you are, what to do about it.
+    const beatI = introT < 2.4 ? 0 : introT < 3.9 ? 1 : 2;
+    if (beatI !== introBeat) {
+      introBeat = beatI;
+      say(['A rainbow is running loose...', '...and you are the only one fast enough.', 'GO!'][beatI], 2.6);
+      tone(beatI < 2 ? 330 : 523, .3, 'triangle', .07);
+    }
+    if (introT > INTRO) { mode = 'run'; say('CATCH THE RAINBOW - collect stardust to keep the boost lit', 3.5); }
+  }
+  if (mode === 'end') {
+    // It keeps going. The camera does not.
+    msgT = Math.max(0, msgT - dt);
+    endT += dt;
+    // Eased down to a canter: at full boost it is a dot within two seconds,
+    // and the shot is supposed to let you watch it go.
+    player.speed += (25 - player.speed) * Math.min(1, dt * .8);
+    ride(player.r, player.speed * dt, first);
+    if (rainbowT > 0) rainbowT = Math.max(0, rainbowT - dt / 6);
+  }
   if (mode === 'run' || mode === 'rainbow') {
     timer += dt;
     surge = Math.max(0, surge - dt / 1.4);
@@ -591,8 +635,10 @@ function frame(now) {
           if (slowT > .5) doFall('Too slow for the bend - it threw you!');
         } else slowT = 0;
       }
-      if (!player.r.a.next.length && !player.r.b) {
+      if (player.r.a === course.finish || (!player.r.a.next.length && !player.r.b)) {
         mode = 'end';
+        endEye = [...cam.e];
+        say('', 0);
         if (rainbowTotal > best) {
           best = rainbowTotal;
           isBest = true;
@@ -650,7 +696,8 @@ function frame(now) {
 
   if (doAct) {
     if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
-    if (mode === 'title' || mode === 'end') { newRun(); mode = 'run'; }
+    if (mode === 'title' || mode === 'end') { newRun(); mode = 'intro'; }
+    else if (mode === 'intro') introT = INTRO;      // skippable
   }
 
   // --- frames: RAW for the unicorn, eased for the camera --------------------
@@ -722,7 +769,7 @@ function frame(now) {
   const shx = (Math.sin(now * .041) + Math.sin(now * .0173) * .6) * sh;
   const shy = (Math.cos(now * .031) + Math.cos(now * .0119) * .6) * sh * .7;
   const shr = Math.sin(now * .027) * sh * .06;
-  const tgtE = [
+  let tgtE = [
     bp[0] + up[0] * (high / Math.max(.55, clSm) + shy) + sideL[0] * (lean + lo + swing + shx),
     bp[1] + up[1] * (high / Math.max(.55, clSm) + shy) + sideL[1] * (lean + lo + swing + shx),
     bp[2] + up[2] * (high / Math.max(.55, clSm) + shy) + sideL[2] * (lean + lo + swing + shx),
@@ -734,16 +781,46 @@ function frame(now) {
     const ap = af ? af[0] : [p[0] + T[0] * 9, p[1] + T[1] * 9, p[2] + T[2] * 9];
     tgtA = [ap[0] + up[0] * 1.7 + sideL[0] * lo, ap[1] + up[1] * 1.7 + sideL[1] * lo, ap[2] + up[2] * 1.7 + sideL[2] * lo];
   }
-  const k = cine > .02 ? Math.min(1, dt * (3.5 + 60 * (1 - cine))) : 1;
-  for (let i = 0; i < 3; i++) {
-    cam.e[i] += (tgtE[i] - cam.e[i]) * k;
-    cam.a[i] += (tgtA[i] - cam.a[i]) * k;
+  // --- the two cutscenes, both expressed as an override on the ONE rig ---
+  // Neither gets its own camera. The opening blends the rig's own target
+  // toward a held wide shot; the closing pins the eye and lets the aim keep
+  // following. Anything else would mean a second set of rules to keep in
+  // step with corkscrews, banking and lane offset.
+  let ck = cine > .02 ? Math.min(1, dt * (3.5 + 60 * (1 - cine))) : 1;
+  if (mode === 'intro') {
+    // Held wide on the escaping rainbow, then swung round behind the
+    // unicorn - which is how the unicorn ARRIVES in the film without any
+    // extra machinery: the shot that finds it is the shot you then ride.
+    const w = 1 - sm(Math.max(0, Math.min(1, (introT - 2.7) / 1.9)));
+    const drift = introT * .6;
+    const hp2 = braid.tl.head || braid.r.pos;
+    for (let i = 0; i < 3; i++) {
+      const ie = introEye[i] + course.start.dir[i] * drift;
+      tgtE[i] += (ie - tgtE[i]) * w;
+      tgtA[i] += ((i === 1 ? hp2[i] + 1.5 : hp2[i]) - tgtA[i]) * w;
+    }
+    ck = 1;
+  } else if (mode === 'end' && endEye) {
+    tgtE = endEye;
+    tgtA = [p[0], p[1] + 1.1, p[2]];
+    ck = Math.min(1, dt * 2.2);
   }
-  const cu = up.map((v, i) => v - sideL[i] * (lean * .5 + shr));
-  fovSm += (1.03 + speedSm * .38 + surge * .2 + cine * .16 - fovSm) * Math.min(1, dt * 6);
+  for (let i = 0; i < 3; i++) {
+    cam.e[i] += (tgtE[i] - cam.e[i]) * ck;
+    cam.a[i] += (tgtA[i] - cam.a[i]) * ck;
+  }
+  // The closing shot holds its horizon too - the runout still bends, and a
+  // locked-off camera that rolled with a track it is no longer riding would
+  // read as a mistake rather than as stillness.
+  if (mode === 'end' && !endUp) endUp = up.map((v, i) => v - sideL[i] * (lean * .5 + shr));
+  const cu = mode === 'end' ? endUp : up.map((v, i) => v - sideL[i] * (lean * .5 + shr));
+  fovSm += (1.03 + speedSm * .38 + surge * .2 + cine * .16 - (mode === 'end' ? .22 : 0) - fovSm) * Math.min(1, dt * 6);
   // Dev only: the run's vital signs, so tools/test-balance.mjs can tune the
   // stardust economy against real play instead of arithmetic on paper.
-  if (DEV) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate]);
+  // Only while you are actually driving: the cutscenes hold the speed static
+  // with no throttle, and letting those frames into the sample quietly drags
+  // every percentage in the balance report toward "too slow".
+  if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate]);
   if (DEV) (window.__cam = window.__cam || []).push([now, cam.e[0], cam.e[1], cam.e[2], cam.a[0], cam.a[1], cam.a[2], fovSm, cu[0], cu[1], cu[2]]);
   vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);
@@ -922,22 +999,35 @@ function frame(now) {
       ctx.fillRect(0, 0, VW, VH);
     }
 
+    // Cutscenes get bars and no instruments. A speedo ticking over a held
+    // shot is the fastest way to tell the player it is not a film.
+    const cs = mode === 'intro' || mode === 'end';
+    if (cs) {
+      const bar = VH * (mode === 'intro' ? .1 * Math.min(1, introT * 3) : .1);
+      ctx.fillStyle = '#07050f';
+      ctx.fillRect(0, 0, VW, bar);
+      ctx.fillRect(0, VH - bar, VW, bar);
+    }
     ctx.font = '14px system-ui';
     ctx.textAlign = 'left';
     ctx.fillStyle = '#f3ead6';
-    ctx.fillText(Math.round(player.speed * 9) + ' km/h', 12, 22);
-    ctx.fillText('burn ' + rainbowTotal.toFixed(1) + 's', 12, 42);
-    // stardust tank
-    ctx.fillStyle = 'rgba(160,150,130,.25)';
-    ctx.fillRect(12, 52, 104, 9);
-    ctx.fillStyle = mode === 'rainbow' ? '#9be8ff' : '#ffd75e';
-    ctx.fillRect(14, 54, energy, 5);
-    ctx.fillStyle = '#7a6e5c';
-    ctx.font = '10px system-ui';
-    ctx.fillText('stardust', 12, 72);
+    if (!cs) {
+      ctx.fillText(Math.round(player.speed * 9) + ' km/h', 12, 22);
+      ctx.fillText('burn ' + rainbowTotal.toFixed(1) + 's', 12, 42);
+      // stardust tank
+      ctx.fillStyle = 'rgba(160,150,130,.25)';
+      ctx.fillRect(12, 52, 104, 9);
+      ctx.fillStyle = mode === 'rainbow' ? '#9be8ff' : '#ffd75e';
+      ctx.fillRect(14, 54, energy, 5);
+      ctx.fillStyle = '#7a6e5c';
+      ctx.font = '10px system-ui';
+      ctx.fillText('stardust', 12, 72);
+    }
     // How far down the line you are - the run needs a visible middle.
-    if (player.r && course) {
-      const pr = player.r.a.i / (course.nodes.length - 1);
+    // Measured against the FINISH, not the node count: the runout past it
+    // exists for the closing shot and would otherwise stop the bar filling.
+    if (player.r && course && !cs) {
+      const pr = Math.min(1, player.r.a.i / course.finish.i);
       ctx.fillStyle = 'rgba(160,150,130,.22)';
       ctx.fillRect(VW - 130, 18, 112, 4);
       ctx.fillStyle = '#b8ab92';
@@ -1000,6 +1090,14 @@ function frame(now) {
       // The end screen IS the reason to press SPACE again: the score large
       // enough to aim at, the record beside it, and the run broken into the
       // three things you can actually get better at.
+      // Hold on the shot before the numbers arrive. The panel covers most of
+      // the frame, and the frame is the point of the ending - the run does
+      // not stop, only the camera does, and you should get to see that.
+      // Faded, NOT early-returned: this block is the tail of the frame
+      // function and a return here would skip requestAnimationFrame and
+      // stop the game dead.
+      const ea = sm(Math.max(0, Math.min(1, (endT - 3.2) / 1.4)));
+      ctx.globalAlpha = ea;
       ctx.fillStyle = '#000000c4';
       ctx.fillRect(0, VH / 2 - 96, VW, 192);
       RAINBOW.forEach(([r, gg, b], i) => {
@@ -1037,6 +1135,7 @@ function frame(now) {
       });
       ctx.fillStyle = '#e8b923';
       ctx.fillText('SPACE - ride again', VW / 2, VH / 2 + 88);
+      ctx.globalAlpha = 1;
     }
   }
   requestAnimationFrame(frame);

@@ -59,6 +59,63 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R11 - the opening and closing shots
+
+Both cutscenes are an **override on the one camera rig**, not a second
+camera. The rig already knows about corkscrews, banking, lane offset and
+the spring; a parallel set of rules would have to be kept in step with all
+of it forever. So the opening blends the rig's own target toward a held
+wide shot and the closing pins the eye while the aim keeps following.
+
+### The opening
+
+The camera starts ahead of the line and off to one side, aimed down the
+track at the rainbow already leaving - so the unicorn is behind the lens
+and out of frame. Blending into the chase rig sweeps the camera backwards
+past it, and **that sweep is the unicorn's entrance**: the shot that finds
+it is the shot you then ride, so the reveal costs no extra machinery.
+
+Three beats over 4.6 seconds - what is happening, who you are, what to do
+about it - and SPACE skips it.
+
+The braid starts three nodes ahead instead of six. At six the fog has all
+but eaten it and the opening shot is meant to *show* you the thing you are
+chasing; it flees through the intro and opens the gap back to where it was
+by the time you have control.
+
+### The closing
+
+The run ends at a node, not at the end of the track. `makeCourse` now marks
+a `finish` and then lays sixteen more gentle nodes past it, so the closing
+shot has road for the unicorn to keep running along - a track that simply
+stopped would have it gallop off the end of the world.
+
+At the finish the camera stops and everything else carries on. The eye
+pins, the aim keeps following, the horizon locks (a locked-off camera that
+rolled with a track it is no longer riding reads as a mistake rather than
+as stillness), and the FOV eases in a touch. The unicorn's speed eases to a
+canter, because at full boost it is a dot within two seconds and the shot
+is meant to let you watch it go. Then the stats fade in after 3.2 seconds,
+over the shot rather than instead of it.
+
+Both cutscenes get letterbox bars and no instruments: a speedometer ticking
+over a held shot is the fastest way to tell someone it is not a film.
+
+### Two things caught on the way
+
+The end panel's fade was first written as an early `return` when the alpha
+was still zero. That block is the tail of the frame function - the `return`
+would have skipped `requestAnimationFrame` and stopped the game dead on
+arrival at the finish line. It fades with `globalAlpha` instead.
+
+And the progress bar measured against `nodes.length`, which the runout had
+just made sixteen nodes longer than the run - so it could never fill. It
+measures against `finish.i` now.
+
+The balance probe also stopped sampling during cutscenes: they hold the
+speed static with no throttle, and those frames quietly dragged every
+percentage in the report toward "too slow".
+
 ## R10 - a soft-lock, a phantom road, and a sky with no corners
 
 Six things off one screenshot, and two of them were real bugs.
@@ -779,6 +836,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R11 opening and closing shots | 12,500 | 12,229 | intro reveal cutscene, locked-off ending over a runout, letterboxed |
 | R10 sky, bank, phantom road | 12,000 | 11,744 | fall-grace soft-lock fix, phantom reflection removed, skybox, inverted wall sections |
 | R9 the long bend | 11,500 | 11,471 | sweeper sections, longer serpentines, skilled balance policy |
 | R8 flow and glass | 11,500 | 11,468 | dust weighted by optical flow, stencil-masked planar reflections in the deck |

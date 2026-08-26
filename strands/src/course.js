@@ -143,6 +143,13 @@ export function makeCourse(count) {
     }
   }
 
+  // Where the RUN ends - but not where the track ends. The finish is a node,
+  // and past it a long gentle runout carries on into the fog, so the closing
+  // shot has something for the unicorn to keep running along. A track that
+  // simply stopped would have it gallop off the end of the world.
+  const finish = cur;
+  for (let i = 0; i < 16; i++) step(rnd(-.09, .09), rnd(-.04, .03), S);
+
   // Per-node tangent from in+out, so flow through every node is continuous.
   for (const n of nodes) {
     const o = n.next.length ? norm([n.next[0].to.p[0] - n.p[0], n.next[0].to.p[1] - n.p[1], n.next[0].to.p[2] - n.p[2]]) : n.dir;
@@ -154,7 +161,7 @@ export function makeCourse(count) {
       e.to.dir = norm([e.to.dir[0] + inD[0], e.to.dir[1] + inD[1], e.to.dir[2] + inD[2]]);
     }
   }
-  return { nodes, start };
+  return { nodes, start, finish };
 }
 
 export function depths(course) {

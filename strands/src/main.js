@@ -397,39 +397,50 @@ function starVerts(now) {
 // radius from the EYE, so they never approach and never slide - and
 // billboarded, so each is a point of light from wherever you look. Drawn
 // first with depth testing off, which is what puts them behind everything.
+// A ring of unit offsets, shared by every star: each one is drawn as a
+// triangle FAN - bright in the middle, alpha zero all round the rim - so it
+// falls off smoothly in every direction instead of having arms. Two fans, a
+// tight one inside a wide faint one, because a single linear falloff reads
+// flat while two stacked additively give a hot core inside a soft halo.
+// That is what a light looks like. Crossed streaks are a camera artefact,
+// not a shine, which is why the first attempt read as junk.
+const RING = [];
+for (let i = 0; i <= 6; i++) RING.push([Math.cos(i / 6 * 6.283), Math.sin(i / 6 * 6.283)]);
 const SKY = [];
-for (let i = 0; i < 170; i++) {
+for (let i = 0; i < 130; i++) {
   const u = Math.random() * 2 - 1, th = Math.random() * 6.283, r = Math.sqrt(1 - u * u);
   // Colour resolved ONCE here rather than per star per frame: it never
-  // changes, and rebuilding it in the draw loop was 170 array allocations
-  // every frame for a constant.
+  // changes, and rebuilding it in the draw loop was an array allocation per
+  // star per frame for a constant.
   const ci = (Math.random() * 7) | 0;
   SKY.push([Math.cos(th) * r, u, Math.sin(th) * r,
-    .09 + Math.random() * .17, .35 + Math.random() * .65,
-    ci > 4 ? [1.5, 1.5, 1.7] : RAINBOW[ci].map((v) => 1.1 + v * .8),
-    .5 + Math.random() * 2.1, Math.random() * 6.283]);
+    .1 + Math.random() * .2, .4 + Math.random() * .6,
+    ci > 4 ? [1.6, 1.6, 1.8] : RAINBOW[ci].map((v) => 1.2 + v * .8),
+    .35 + Math.random() * 1.5, Math.random() * 6.283]);
 }
-const KBUF = new Float32Array(SKY.length * 120);
-// Each star is a CROSS, not a dot, and it flares. A high power of a sine
-// sits near zero and spikes briefly, which is what a glint off a lamp
-// actually does - so they hang dim and then catch, one at a time, and the
-// arms of the cross grow with the catch. A dot can only get brighter; the
-// arms are what read as glare.
+const KBUF = new Float32Array(SKY.length * 380);
 function skyVerts(t, sx, sy, sz, ux, uy, uz) {
   let n = 0;
   const R = 46;
+  const put = (x, y, z, c, a) => {
+    KBUF[n] = x; KBUF[n + 1] = y; KBUF[n + 2] = z;
+    KBUF[n + 3] = 0; KBUF[n + 4] = 1; KBUF[n + 5] = 0;
+    KBUF[n + 6] = c[0]; KBUF[n + 7] = c[1]; KBUF[n + 8] = c[2]; KBUF[n + 9] = a;
+    n += 10;
+  };
   for (const [dx, dy, dz, sz0, br, c, rt, ph] of SKY) {
-    const q = Math.max(0, Math.sin(t * rt + ph)), f = q * q * q * q * q * q;
+    // A slow swell, not a strobe: they breathe at their own rates and drift
+    // in and out of each other, which is the shimmer.
+    const f = .5 + .5 * Math.sin(t * rt + ph);
     const px = cam.e[0] + dx * R, py = cam.e[1] + dy * R, pz = cam.e[2] + dz * R;
-    const a = br * (.3 + .7 * f), w = sz0 * .34, L = sz0 * (1 + f * 6);
-    for (const [hw, hh] of [[L, w], [w, L]]) {
-      for (const [ox, oy] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) {
-        KBUF[n] = px + sx * ox * hw + ux * oy * hh;
-        KBUF[n + 1] = py + sy * ox * hw + uy * oy * hh;
-        KBUF[n + 2] = pz + sz * ox * hw + uz * oy * hh;
-        KBUF[n + 3] = 0; KBUF[n + 4] = 1; KBUF[n + 5] = 0;
-        KBUF[n + 6] = c[0]; KBUF[n + 7] = c[1]; KBUF[n + 8] = c[2]; KBUF[n + 9] = a;
-        n += 10;
+    const a0 = br * (.4 + .6 * f);
+    for (const [rad, al] of [[sz0 * (.85 + f * .4), a0], [sz0 * (2.4 + f * 1.4), a0 * .3]]) {
+      for (let i = 0; i < 6; i++) {
+        put(px, py, pz, c, al);
+        for (const k of [i, i + 1]) {
+          const ox = RING[k][0] * rad, oy = RING[k][1] * rad;
+          put(px + sx * ox + ux * oy, py + sy * ox + uy * oy, pz + sz * ox + uz * oy, c, 0);
+        }
       }
     }
   }

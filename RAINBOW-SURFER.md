@@ -59,6 +59,41 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R16 - a shine rather than a starburst, and a free 32 bytes
+
+### The stars again
+
+The crosses were wrong, and the reason is worth writing down: **crossed
+streaks are a camera artefact, not a shine.** They are what a lens does to
+a bright point, so they read as photography rather than as light, and at
+this size they read as junk.
+
+Each star is a triangle **fan** now - bright in the middle, alpha zero all
+round the rim - so it falls off smoothly in every direction with no arms.
+Two fans, a tight one inside a wide faint one, because a single linear
+falloff looks flat while two stacked additively give a hot core inside a
+soft halo. And the pulse is a slow swell rather than the previous spike:
+they breathe at their own rates and drift in and out of each other, which
+is the shimmer.
+
+### The packer had room in it
+
+`packer.optimize(level)` was being called at level 1. Level 2 - the highest
+roadroller offers - searches far harder for the same output:
+
+| | zipped |
+| --- | ---: |
+| `--O1` | 13,067 |
+| `--O2` | **13,035** |
+
+**32 bytes for nothing but build time.** The gate stays on `--O1` so
+iteration stays quick, and it is the conservative direction anyway: the
+shipped artifact is smaller than the gate reports, never larger. The
+release path is now its own script, `npm run strands:ship`, so it does not
+depend on remembering a flag.
+
+Shipping at **13,060** against 13,312 - 252 bytes.
+
 ## R15 - honest mirrors, and stars that catch the light
 
 ### The reflection was wrong, and by how much
@@ -1068,6 +1103,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R16 shine, and -O2 | 13,150 | 13,060 (O2) | radial glow stars, roadroller optimize level 2 |
 | R15 honest mirrors | 13,150 | 13,084 | reflections limited to their accurate range, stars flare as crosses |
 | R14b lens on the glass | 13,050 | 13,012 | on-deck camera with a rolled horizon, kicker taught on the title |
 | R14 attract mode | 13,000 | 12,972 | live race under a translucent title, trackside broadcast camera, curtains cut |

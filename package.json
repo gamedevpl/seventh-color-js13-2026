@@ -19,6 +19,7 @@
     "native:coverage": "npm run native:dev && node tools/verify-native.mjs 1 --skipall",
     "strands": "node tools/native.mjs --game=strands",
     "strands:verify": "node tools/verify-native.mjs --game=strands",
+    "strands:ship": "node tools/native.mjs --game=strands --O2 && node tools/verify-native.mjs 3 --game=strands --keys=space,up:5000,left:900,up:5000,right:900,up:5000",
     "strands:gate": "node tools/test-course.mjs && node tools/test-smooth.mjs && node tools/native.mjs --game=strands --O1 --rolls=5 && node tools/verify-native.mjs 3 --game=strands --keys=space,up:5000,left:900,up:5000,right:900,up:5000,down:1200,up:5000",
     "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak"
   },

@@ -28,15 +28,15 @@ await page.waitForTimeout(1500);
 const before = await page.evaluate(() => window.__osc);
 console.log(`title, no gesture yet:      ${before} oscillators   (must be 0 - nothing may sound)`);
 await page.keyboard.press('Space');
-await page.waitForTimeout(1400);                 // the title hold
+await page.waitForTimeout(2600);                 // still on the title, playing
 const during = await page.evaluate(() => window.__osc);
 const states = await page.evaluate(() => [...new Set(window.__state)]);
-console.log(`title, during the hold:     ${during} oscillators   context state seen: ${states.join(', ') || 'none'}`);
+console.log(`title, after one press:      ${during} oscillators   context state seen: ${states.join(', ') || 'none'}`);
 await page.waitForTimeout(2500);
-const intro = await page.evaluate(() => window.__osc);
-console.log(`after, into the cutscene:   ${intro} oscillators`);
+const more = await page.evaluate(() => window.__osc);
+console.log(`title, still sitting there:  ${more} oscillators   (it must keep playing, not stop)`);
 await browser.close();
-const ok = before === 0 && during > 8 && states.includes('running');
+const ok = before === 0 && during > 8 && more > during && states.includes('running');
 console.log(ok ? '\nOK: the title screen makes sound, and only after the gesture'
-  : `\nFAIL: before=${before} during=${during} states=${states.join(',')}`);
+  : `\nFAIL: before=${before} during=${during} later=${more} states=${states.join(',')}`);
 process.exit(ok ? 0 : 1);

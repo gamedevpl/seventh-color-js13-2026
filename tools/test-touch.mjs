@@ -47,11 +47,20 @@ const check = (name, ok, detail) => {
   if (!ok) fails.push(name);
 };
 
-// tap the top strip: that is the SPACE key, so it must start the run
+// The title takes two presses: the first wakes the sound and STAYS, the
+// second leaves. Assert both halves of that, because "nothing happened"
+// on the first press is exactly what a bug would look like too.
+await send('pointerdown', 1, .5, .1); await send('pointerup', 1, .5, .1);
+await page.waitForTimeout(2000);
+await page.evaluate(() => { window.__st = []; });
+await page.waitForTimeout(1200);
+check('one tap wakes the title but does not leave it',
+  (await page.evaluate(() => (window.__st || []).length)) === 0);
+
 await send('pointerdown', 1, .5, .1); await send('pointerup', 1, .5, .1);
 await page.waitForTimeout(300);
 await page.evaluate(() => { window.__st = []; });
-await page.waitForTimeout(7200);                 // title hold, then the intro
+await page.waitForTimeout(5400);                 // sit through the intro
 if (!(await st())) {
   // Bail cleanly rather than throwing ten lines later on a null: this probe
   // reads the DEV telemetry, which a shipping build does not carry.
@@ -66,16 +75,28 @@ check('a tap starts the run', true);
 // convention - twice already this project has had it backwards - so the
 // property worth asserting is that a thumb does what the arrow key does.
 const settle = async () => { await page.waitForTimeout(1100); };
-const holdKey = async (k) => {
+// A fall resets the lane to zero and a jump freezes it, so a sample taken
+// across either is not a measurement of steering at all - it reads 0.00 and
+// makes the comparison meaningless. Retry until the hold produces a real
+// deflection rather than trusting whatever the first window happened to
+// catch.
+const retry = async (take) => {
+  for (let i = 0; i < 4; i++) {
+    const v = await take();
+    if (Math.abs(v) > .12) return v;
+  }
+  return 0;
+};
+const holdKey = (k) => retry(async () => {
   await page.keyboard.down(k); await page.waitForTimeout(1300);
   const v = (await st()).lane; await page.keyboard.up(k); await settle();
   return v;
-};
-const holdTouch = async (id, fx) => {
+});
+const holdTouch = (id, fx) => retry(async () => {
   await send('pointerdown', id, fx, .7); await page.waitForTimeout(1300);
   const v = (await st()).lane; await send('pointerup', id, fx, .7); await settle();
   return v;
-};
+});
 const kL = await holdKey('ArrowLeft'), tLv = await holdTouch(2, .2);
 const kR = await holdKey('ArrowRight'), tRv = await holdTouch(3, .8);
 check('left half matches ArrowLeft', Math.sign(tLv) === Math.sign(kL) && Math.abs(tLv) > .1,

@@ -85,6 +85,17 @@ that is still what to do.
 It costs exactly one extra press per page load, because after a run you
 rejoin at the intro and never see this screen again.
 
+### Just the bass, not the bed
+
+`pump(0, 0, 1)` was still a whole backing track: kick, hi-hat, bass and the
+58Hz sub pulse. The ask was one element of it. `pump` takes a fourth
+argument now - `bare` - which silences everything except the bass line. A
+fourth argument rather than a second loop, because the run's own
+three-argument calls then behave exactly as they always did.
+
+`beat` still fires on the downbeat with no kick behind it, so the title
+bars keep breathing in time with a line that has no drums.
+
 ### Verified by counting oscillators
 
 "pump is called" is not the same as "the browser made a noise" - a
@@ -94,12 +105,22 @@ patches `createOscillator` before the page boots:
 | | oscillators | context |
 | --- | ---: | --- |
 | title, before any gesture | **0** | - |
-| title, after one press | **25** | `running` |
-| title, still sitting there | **48** | `running` |
+| title, after one press | **11** | `running` |
+| title, still sitting there | **27** | `running` |
 
-Zero before the gesture is as much the requirement as twenty-five after it.
+Zero before the gesture is as much the requirement as eleven after it.
 The third row is the one that distinguishes this pass from the last: the
 music does not stop, because the screen does not leave.
+
+**The motif is a rate, not a volume.** The bass fires every second step at
+roughly 116bpm sixteenths - about 3.9 notes a second - where the full bed
+runs near 8.7. Measuring the rate is what tells those apart; "it sounds
+quieter" would not. Measured: **4.0/s**.
+
+And the track you play to is guarded rather than promised. Two more presses
+carry the probe into the run and it measures again there: **17.6/s**, kick,
+hat, bass, sub and arp intact. Not touching the main music is a standing
+instruction, so it gets a test.
 
 `tools/test-touch.mjs` gained the matching behavioural check - *one tap
 wakes the title but does not leave it* - since "nothing happened on the

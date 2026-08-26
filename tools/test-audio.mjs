@@ -32,11 +32,35 @@ await page.waitForTimeout(2600);                 // still on the title, playing
 const during = await page.evaluate(() => window.__osc);
 const states = await page.evaluate(() => [...new Set(window.__state)]);
 console.log(`title, after one press:      ${during} oscillators   context state seen: ${states.join(', ') || 'none'}`);
-await page.waitForTimeout(2500);
+const t0 = Date.now();
+await page.waitForTimeout(4000);
 const more = await page.evaluate(() => window.__osc);
+const rate = (more - during) / ((Date.now() - t0) / 1000);
 console.log(`title, still sitting there:  ${more} oscillators   (it must keep playing, not stop)`);
+// The motif is meant to be the BASS LINE and nothing else. That is a rate,
+// not a volume: the bass fires every second step at ~116bpm sixteenths,
+// about 3.9 notes a second. The full bed - kick, hat, bass and sub pulse -
+// runs near 8.7. Measuring the rate is what tells those two apart; "it
+// sounds quieter" would not.
+console.log(`             note rate:      ${rate.toFixed(1)}/s   (bass alone ~3.9, full bed ~8.7)`);
+// And the track you actually play to must NOT have been stripped. This is a
+// standing instruction - the main music is not to be touched - so it gets a
+// guard rather than a promise: two more presses to reach the run, then the
+// same measurement. Kick, hat, bass, sub and arp together sit far above the
+// bass line on its own.
+await page.keyboard.press('Space');              // title -> intro
+await page.waitForTimeout(400);
+await page.keyboard.press('Space');              // skip the intro
+await page.waitForTimeout(1200);
+const g0 = await page.evaluate(() => window.__osc), gt = Date.now();
+await page.waitForTimeout(3000);
+const g1 = await page.evaluate(() => window.__osc);
+const gameRate = (g1 - g0) / ((Date.now() - gt) / 1000);
+console.log(`in the run, full track:      ${gameRate.toFixed(1)}/s   (must stay well above the bass line)`);
 await browser.close();
-const ok = before === 0 && during > 8 && more > during && states.includes('running');
-console.log(ok ? '\nOK: the title screen makes sound, and only after the gesture'
-  : `\nFAIL: before=${before} during=${during} later=${more} states=${states.join(',')}`);
+const bassOnly = rate > 2.5 && rate < 5.5;
+const fullInGame = gameRate > 6;
+const ok = before === 0 && during > 8 && more > during && states.includes('running') && bassOnly && fullInGame;
+console.log(ok ? '\nOK: title is bass only, after the gesture; the run keeps the full track'
+  : `\nFAIL: before=${before} during=${during} later=${more} rate=${rate.toFixed(1)} game=${gameRate.toFixed(1)} states=${states.join(',')}`);
 process.exit(ok ? 0 : 1);

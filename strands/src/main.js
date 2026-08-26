@@ -134,18 +134,25 @@ const BASS = [0, 0, 12, 0, 3, 3, 15, 3, 5, 5, 17, 5, 7, 7, 10, 3];
 const LEAD = [24, 22, 19, 17, 15, 17, 19, 22, 12, 15, 17, 19, 22, 24, 27, 24,
   19, 17, 15, 12, 10, 12, 15, 17, 19, 17, 15, 12, 15, 19, 22, 24];
 let nextT = 0, step = 0;
-function pump(speedN, closeN, dry) {
+// `bare` strips everything except the bass line - no kick, no hat, no sub
+// pulse. That is the whole title/intro motif: the bassline of the track and
+// nothing else. It is a fourth argument rather than a second loop because
+// the run's own three-argument calls then behave exactly as they always
+// did; the music you play to is untouched by this.
+function pump(speedN, closeN, dry, bare) {
   if (!ac) return;
   if (nextT < ac.currentTime) nextT = ac.currentTime + .05;
   while (nextT < ac.currentTime + .16) {
     const s = step % 32;
-    if (s % 4 === 0) { kick(nextT); beat = 1; }
-    if (s % 4 === 2) tone(6200, .03, 'square', (.012 + speedN * .035) * (dry ? .25 : 1), nextT);
+    // beat still fires on the downbeat even with no kick behind it, so the
+    // title bars keep breathing in time.
+    if (s % 4 === 0) { if (!bare) kick(nextT); beat = 1; }
+    if (s % 4 === 2 && !bare) tone(6200, .03, 'square', (.012 + speedN * .035) * (dry ? .25 : 1), nextT);
     if (s % 2 === 0) tone(NOTE(BASS[(s >> 1) % 16]), .16, 'square', .05, nextT);
     // The arp runs on stardust: an empty tank strips the track back to kick
     // and bass, so you HEAR the fuel gauge before you look at it.
     if (speedN > .2 && !dry) tone(NOTE(BASS[s % 16] + 12), .06, 'sawtooth', .015 + speedN * .03, nextT);
-    if (dry && s % 8 === 0) tone(58, .34, 'sine', .12, nextT);
+    if (dry && s % 8 === 0 && !bare) tone(58, .34, 'sine', .12, nextT);
     if (closeN > .02) tone(NOTE(LEAD[s]), .2, 'triangle', .02 + closeN * .08, nextT);
     if (mode === 'rainbow') tone(NOTE(LEAD[s] + 12), .18, 'triangle', .05, nextT);
     nextT += 15 / (116 + speedN * 52);
@@ -623,7 +630,7 @@ function frame(now) {
   if (mode === 'title' && course) {
     // Silent until `ac` exists, which is to say until you have touched
     // something - pump bails on its own, so this needs no guard.
-    pump(0, 0, 1);
+    pump(0, 0, 1, 1);
     // Attract mode: the chase actually runs behind the menu rather than a
     // still image of it. Both ride at the same speed, so the flee rule holds
     // them a few lengths apart and they keep trading ground.
@@ -693,7 +700,7 @@ function frame(now) {
     // It can only live here and not on the title: a browser makes no sound
     // until the page has had a real user gesture, and the gesture that
     // unlocks audio is the same SPACE that leaves the title behind.
-    pump(0, 0, 1);
+    pump(0, 0, 1, 1);
     if (introT > INTRO) { mode = 'run'; say('CATCH THE RAINBOW - collect stardust to keep the boost lit', 3.5); }
   }
   if (mode === 'end') {

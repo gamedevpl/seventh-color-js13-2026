@@ -63,7 +63,31 @@ addEventListener('keyup', (e) => {
   else if (e.key === 'ArrowLeft' || e.key === 'a') heldLeft = false;
   else if (e.key === 'ArrowRight' || e.key === 'd') heldRight = false;
 });
-canvas.addEventListener('pointerdown', () => { acted = heldAct = true; });
+// The title credit is two links. Pointer events arrive in CSS pixels of an
+// upscaled canvas, so everything hit-tests in viewport space after dividing
+// by the box the canvas actually occupies.
+let hotX = -9, hotY = -9, links = [];
+function at(e) {
+  const r = canvas.getBoundingClientRect();
+  return [(e.clientX - r.left) / r.width * VW, (e.clientY - r.top) / r.height * VH];
+}
+// Only the title screen ever fills `links`, and only the title screen may
+// consume a click with one - otherwise a stale box swallows a tap mid-story.
+function linkAt(x, y) {
+  if (mode !== 'title') return;
+  for (const l of links) if (x >= l[0] && x <= l[0] + l[2] && y >= l[1] && y <= l[1] + l[3]) return l[4];
+}
+canvas.addEventListener('pointermove', (e) => { [hotX, hotY] = at(e); });
+canvas.addEventListener('pointerdown', (e) => {
+  const [x, y] = at(e);
+  // A tap that follows a link must not also start the game underneath it.
+  const url = linkAt(x, y);
+  // window.open is blocked in sandboxed frames - and a js13k entry spends
+  // its life in one, on the compo page or an itch embed. A real anchor
+  // click carries the user gesture through where open() does not.
+  if (url) document.body.appendChild(Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener' })).click();
+  else acted = heldAct = true;
+});
 canvas.addEventListener('pointerup', () => { heldAct = false; });
 
 // Beat changes were hard cuts - Darkness, then instantly a moonlit glade.
@@ -141,6 +165,29 @@ let last = 0;
 const FONT = '9px system-ui', NARRATE = '10px system-ui';
 function box(y, h) { rect(0, y, VW, h, { fill: '#0008' }); }
 
+// Author credit: two link runs and the punctuation between them. Painted
+// piecewise so each link can own a hit box and light up under the pointer -
+// a run with no url is plain text and registers nothing.
+const CREDIT = [['@gtanczyk', 'https://x.com/gtanczyk'], [' | ', 0], ['gamedev.pl', 'https://www.gamedev.pl'], [' | 2026', 0]];
+function credit(cy, size) {
+  const font = size + 'px system-ui';
+  ctx.font = font;
+  let w = 0;
+  for (const p of CREDIT) w += ctx.measureText(p[0]).width;
+  let x = (VW - w) / 2, hit = 0;
+  links = [];
+  for (const p of CREDIT) {
+    const pw = ctx.measureText(p[0]).width;
+    const on = p[1] && hotX >= x && hotX <= x + pw && hotY >= cy - size && hotY <= cy + 3;
+    if (on) hit = 1;
+    text(p[0], x, cy, { fill: on ? '#e8b923' : p[1] ? '#8a7f6a' : '#5f5648', font });
+    if (on) rect(x, cy + 1.5, pw, .8, { fill: '#e8b923' });
+    if (p[1]) links.push([x, cy - size, pw, size + 3, p[1]]);
+    x += pw;
+  }
+  canvas.style.cursor = hit ? 'pointer' : '';
+}
+
 function bloom(cx, cy, t, r0, spread) {
   for (let i = 0; i < RAINBOW.length; i++) {
     circle(cx, cy, r0 + i * spread + Math.sin(t * 1.5 + i) * 1.5, { stroke: RAINBOW[i], lineWidth: 2 });
@@ -204,9 +251,12 @@ function frame(now) {
   if (mode === 'title') {
     cut('title');
     clear(VW, VH, '#0a0710');
-    bloom(160, 120, now / 1000, 8, 3);
-    text('THE SEVENTH COLOR', VW / 2, 68, { fill: '#e8b923', font: 'bold 16px system-ui', align: 'center' });
-    text('tap or press space', VW / 2, 92, { fill: '#a89', font: '9px system-ui', align: 'center' });
+    // The rings reach 28px from their centre, so the whole stack is spaced
+    // around that: prompt clears their top, credit clears their bottom.
+    bloom(160, 110, now / 1000, 8, 3);
+    text('THE SEVENTH COLOR', VW / 2, 54, { fill: '#e8b923', font: 'bold 16px system-ui', align: 'center' });
+    text('tap or press space', VW / 2, 76, { fill: '#a89', font: '9px system-ui', align: 'center' });
+    credit(150, 8);
     if (doAct) { initAudio(); round = makeRound(BEATS, BEATS[0].id); mode = 'play'; }
     dissolve(dt);
     cardOverlay();

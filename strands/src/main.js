@@ -49,7 +49,30 @@ addEventListener('keydown', (e) => {
   if (e.key === ' ' || e.key === 'Enter') acted = true;
 });
 addEventListener('keyup', (e) => { held[e.key] = false; });
-hud.addEventListener('pointerdown', () => { acted = true; });
+// The title credit is two links. Pointer events arrive in CSS pixels of an
+// upscaled canvas, so hit-testing divides by the box the HUD occupies.
+const CREDIT = [['@gtanczyk', 'https://x.com/gtanczyk'], [' | ', 0], ['gamedev.pl', 'https://www.gamedev.pl'], [' | 2026', 0]];
+let hotX = -9, hotY = -9, links = [];
+const at = (e) => {
+  const r = hud.getBoundingClientRect();
+  return [(e.clientX - r.left) / r.width * VW, (e.clientY - r.top) / r.height * VH];
+};
+// Only the title fills `links`, and only the title may consume a click with
+// one - otherwise a stale box swallows a tap mid-run.
+function linkAt(x, y) {
+  if (mode !== 'title') return;
+  for (const l of links) if (x >= l[0] && x <= l[0] + l[2] && y >= l[1] && y <= l[1] + l[3]) return l[4];
+}
+hud.addEventListener('pointermove', (e) => { [hotX, hotY] = at(e); });
+hud.addEventListener('pointerdown', (e) => {
+  const [x, y] = at(e);
+  // A tap that follows a link must not also start the run underneath it.
+  const url = linkAt(x, y);
+  // window.open is blocked in sandboxed frames - and a js13k entry spends
+  // its life in one. A real anchor click carries the gesture through.
+  if (url) document.body.appendChild(Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener' })).click();
+  else acted = true;
+});
 const heldFwd = () => held.ArrowUp || held.w;
 const heldBack = () => held.ArrowDown || held.s;
 const turnDir = () => (held.ArrowLeft || held.a ? 1 : 0) - (held.ArrowRight || held.d ? 1 : 0);
@@ -992,6 +1015,26 @@ function frame(now) {
     ctx.fillText('↑ boost (burns stardust)   ↓ brake   ← → slide / steer the jump', VW / 2, 222);
     ctx.fillStyle = '#e8b923';
     ctx.fillText('press SPACE', VW / 2, 258);
+    // Author credit, painted piecewise so each link run owns a hit box and
+    // lights up under the pointer; a run with no url registers nothing.
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'left';
+    let cw = 0;
+    for (const p of CREDIT) cw += ctx.measureText(p[0]).width;
+    let cx = (VW - cw) / 2, hit = 0;
+    links = [];
+    for (const p of CREDIT) {
+      const pw = ctx.measureText(p[0]).width;
+      const on = p[1] && hotX >= cx && hotX <= cx + pw && hotY >= 321 && hotY <= 335;
+      if (on) hit = 1;
+      ctx.fillStyle = on ? '#e8b923' : p[1] ? '#8a7f6a' : '#5f5648';
+      ctx.fillText(p[0], cx, 332);
+      if (on) ctx.fillRect(cx, 334, pw, 1);
+      if (p[1]) links.push([cx, 321, pw, 14, p[1]]);
+      cx += pw;
+    }
+    hud.style.cursor = hit ? 'pointer' : '';
+    ctx.textAlign = 'center';
   } else {
     // The jump is a held cinematic shot and wants to be SHARP. The blur used
     // to be boosted by `cine`, which ghosted the whole frame exactly when

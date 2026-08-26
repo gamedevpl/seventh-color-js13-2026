@@ -59,6 +59,44 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R14 - the title screen becomes a broadcast
+
+The menu sits on a live race now rather than a still. A world is built at
+boot, the chase runs behind the text, and the scrim is a gradient - opaque
+enough at the top to hold the words, clearing toward the bottom where the
+track and the two of them are worth looking at.
+
+The camera is **trackside**, planted at a tower twelve units off the road
+and a dozen up, panning as they come past, then cutting to the next tower.
+That is the grammar of a race broadcast, and a camera that chased them
+would only be the game's own rig with nobody driving.
+
+Three things were wrong before it read right, and all three were about
+where the shot points:
+
+- **The tower stood six nodes ahead**, about 150 units - six seconds away
+  at demo speed, against a 4.4 second hold. The cut came before they ever
+  arrived, so every shot was of an empty road. Three nodes puts them past
+  the lens inside the hold.
+- **It drifted instead of cutting.** The rig springs the eye toward its
+  target, so a "cut" crawled the seventy-odd units between towers over more
+  than a second and spent most of the shot in transit. Position is a hard
+  set now; only the aim is sprung, which is the pan.
+- **Aiming at them put them behind the title.** A camera pointed at its
+  subject centres that subject by definition, and the centre of this frame
+  is the words. Raising the tower changed the angle but not where they
+  landed on screen - lifting the AIM by a share of the range is what drops
+  them into the clear band underneath.
+
+### What paid for it
+
+The nine backdrop curtains are gone: parallax landmarks from before there
+was a skybox, drawing as big flat olive slabs hanging in the dark, more
+artefact than scenery. The track net parallaxes plenty on its own. They
+were worth **154 bytes**, which is roughly what the attract mode cost -
+worst-of-5 went 13,117 (over ceiling, and only 195 clear of the js13k
+limit) to 12,972.
+
 ## R13 - kickers, and the black streak that was two bugs
 
 ### The kicker
@@ -953,6 +991,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R14 attract mode | 13,000 | 12,972 | live race under a translucent title, trackside broadcast camera, curtains cut |
 | R13 kickers | 12,800 | 12,567 | kicker ramps carry the dust economy, glass alpha-fades, ground slab deleted |
 | R12 the chase | 12,500 | 12,243 | flee speed above coasting, two-stage gap leash, idle policy proves it |
 | R11 opening and closing shots | 12,500 | 12,229 | intro reveal cutscene, locked-off ending over a runout, letterboxed |

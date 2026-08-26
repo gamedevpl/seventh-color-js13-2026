@@ -134,6 +134,7 @@ let mode = 'title', timer = 0;
 // it simply never ends, because the point of it is that the running does
 // not stop, only the camera does.
 const INTRO = 4.6;
+let demoT = 0, demoEye = null, demoSide = 1;
 let introT = 0, introBeat = -1, introEye = null, endEye = null, endUp = null, endT = 0;
 // No ground slab any more. It was a 6000x6000 opaque plate at y = -70 in
 // almost exactly the fog colour - invisible by design, and therefore pure
@@ -142,7 +143,12 @@ let introT = 0, introBeat = -1, introEye = null, endEye = null, endUp = null, en
 // ribbon meets it along a thin curve, and since the slab writes depth while
 // the glass deck does not, that curve came out as a black streak painted
 // across the road. The skybox is the surround now; the floor had no job.
-let course, depth, roadM, railM, bgM, braid, trailM, skyM;
+// The nine backdrop curtains are gone too. They were parallax landmarks
+// from before there was a skybox, and they drew as big flat olive slabs
+// hanging in the dark - more artefact than scenery. The track net itself
+// parallaxes plenty. They also happened to be worth 154 bytes, which is
+// what paid for the attract mode.
+let course, depth, roadM, railM, braid, trailM, skyM;
 let surge = 0, slipT = 0, fly = null, cine = 0, jumps = 0, falls = 0;
 let rainbowT = 0, rainbowTotal = 0, streak = 0, bestStreak = 0, flash = 0, msgT = 0, msg = '';
 // Best run survives a reload, or there is nothing to come back for. Any of
@@ -417,22 +423,6 @@ function skyVerts(sx, sy, sz, ux, uy, uz) {
   return n;
 }
 
-function makeBackdrop() {
-  let cx = 0, cz = 0;
-  for (const n of course.nodes) { cx += n.p[0]; cz += n.p[2]; }
-  cx /= course.nodes.length; cz /= course.nodes.length;
-  const v = [];
-  for (let i = 0; i < 9; i++) {
-    const an = i / 9 * Math.PI * 2 + Math.random() * .4, r = 330;
-    const c = RAINBOW[i % 7].map((x) => x * 2.4);
-    const px = cx + Math.cos(an) * r, pz = cz + Math.sin(an) * r;
-    const sx = -Math.sin(an), sz2 = Math.cos(an);
-    const w = 50 + Math.random() * 60, h0 = -20, h1 = 120 + Math.random() * 90;
-    const quad = [[px - sx * w, h0, pz - sz2 * w], [px + sx * w, h0, pz + sz2 * w], [px + sx * w, h1, pz + sz2 * w], [px - sx * w, h1, pz - sz2 * w]];
-    for (const k of [0, 1, 2, 0, 2, 3]) v.push(quad[k][0], quad[k][1], quad[k][2], 0, 1, 0, c[0], c[1], c[2], .1);
-  }
-  return createMesh(v);
-}
 
 function newRun() {
   // ~90 seconds, not 134. A score-chase run wants to end while you still
@@ -443,7 +433,6 @@ function newRun() {
   const tm = trackMeshes(course);
   roadM = createMesh(tm.road);
   railM = createMesh(tm.rail);
-  bgM = makeBackdrop();
   placeStars();
   player.r = makeRider(course.start);
   player.speed = 14;
@@ -579,6 +568,38 @@ function frame(now) {
 
   let speedN = 0, closeN = 0;
   flash = Math.max(0, flash - dt * 1.6);
+  if (mode === 'title' && course) {
+    // Attract mode: the chase actually runs behind the menu rather than a
+    // still image of it. Both ride at the same speed, so the flee rule holds
+    // them a few lengths apart and they keep trading ground.
+    player.speed = 26;
+    updateBraid(braid, player.r.pos, 26, dt, depth);
+    ride(player.r, 26 * dt, first);
+    if (!player.r.a.next.length) newRun();
+    // A trackside tower: planted, panning as they come past, then a cut to
+    // the next one - the grammar of a race broadcast. A camera that chased
+    // them would just be the game's own rig with nobody driving.
+    demoT -= dt;
+    if (demoT <= 0 || !demoEye) {
+      let n = braid.r.b || braid.r.a;
+      // Three nodes, not six. At six the tower stands 150 units down the
+      // road - about six seconds away at demo speed - so the cut came
+      // before they ever arrived and every shot was a distant speck. Three
+      // puts them past the lens inside the hold.
+      for (let i = 0; i < 3 && n.next.length; i++) n = n.next[0].to;
+      const sd = Math.hypot(n.dir[2], n.dir[0]) || 1;
+      demoSide = -demoSide;
+      demoEye = [
+        n.p[0] + n.dir[2] / sd * 12 * demoSide,
+        // High enough that the lens looks DOWN on them: the words own the
+        // top of the frame, so the race has to be framed into the bottom of
+        // it rather than fought with.
+        n.p[1] + 11 + Math.random() * 7,
+        n.p[2] - n.dir[0] / sd * 12 * demoSide,
+      ];
+      demoT = 5;
+    }
+  }
   if (mode === 'intro') {
     introT += dt;
     msgT = Math.max(0, msgT - dt);
@@ -754,7 +775,7 @@ function frame(now) {
 
   if (doAct) {
     if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
-    if (mode === 'title' || mode === 'end') { newRun(); mode = 'intro'; }
+    if (mode === 'title' || mode === 'end') { newRun(); mode = 'intro'; demoEye = null; }
     else if (mode === 'intro') introT = INTRO;      // skippable
     else if (!fly && player.r && player.r.b && player.r.b.kick) {
       armed = 2.2;
@@ -848,8 +869,23 @@ function frame(now) {
   // toward a held wide shot; the closing pins the eye and lets the aim keep
   // following. Anything else would mean a second set of rules to keep in
   // step with corkscrews, banking and lane offset.
-  let ck = cine > .02 ? Math.min(1, dt * (3.5 + 60 * (1 - cine))) : 1;
-  if (mode === 'intro') {
+  let ck = cine > .02 ? Math.min(1, dt * (3.5 + 60 * (1 - cine))) : 1, ckA = 0;
+  if (mode === 'title' && demoEye) {
+    const hp3 = braid.tl.head || braid.r.pos;
+    tgtE = demoEye;
+    // Aim ABOVE them, not at them. A camera pointed at its subject puts that
+    // subject in the middle of the frame by definition - and the middle of
+    // this frame is the title. Raising the tower only changed the angle, not
+    // where they landed on screen; lifting the AIM by a share of the range
+    // is what drops them into the clear band under the words.
+    const mx = (hp3[0] + p[0]) / 2, my = (hp3[1] + p[1]) / 2, mz = (hp3[2] + p[2]) / 2;
+    tgtA = [mx, my + d3(demoEye, [mx, my, mz]) * .22 + 1.4, mz];
+    // A HARD cut of position and a slow pan of the aim - which is the whole
+    // grammar. Springing both, as the rig does everywhere else, meant the
+    // eye crawled the seventy-odd units between towers instead of cutting,
+    // so it spent most of the shot in transit pointing at nothing.
+    ckA = Math.min(1, dt * 2.6);
+  } else if (mode === 'intro') {
     // Held wide on the escaping rainbow, then swung round behind the
     // unicorn - which is how the unicorn ARRIVES in the film without any
     // extra machinery: the shot that finds it is the shot you then ride.
@@ -869,13 +905,16 @@ function frame(now) {
   }
   for (let i = 0; i < 3; i++) {
     cam.e[i] += (tgtE[i] - cam.e[i]) * ck;
-    cam.a[i] += (tgtA[i] - cam.a[i]) * ck;
+    cam.a[i] += (tgtA[i] - cam.a[i]) * (ckA || ck);
   }
   // The closing shot holds its horizon too - the runout still bends, and a
   // locked-off camera that rolled with a track it is no longer riding would
   // read as a mistake rather than as stillness.
   if (mode === 'end' && !endUp) endUp = up.map((v, i) => v - sideL[i] * (lean * .5 + shr));
-  const cu = mode === 'end' ? endUp : up.map((v, i) => v - sideL[i] * (lean * .5 + shr));
+  // A broadcast camera keeps its horizon level; it is bolted to the scenery,
+  // not riding the road.
+  const cu = mode === 'title' ? [0, 1, 0]
+    : mode === 'end' ? endUp : up.map((v, i) => v - sideL[i] * (lean * .5 + shr));
   fovSm += (1.03 + speedSm * .38 + surge * .2 + cine * .16 - (mode === 'end' ? .22 : 0) - fovSm) * Math.min(1, dt * 6);
   // Dev only: the run's vital signs, so tools/test-balance.mjs can tune the
   // stardust economy against real play instead of arithmetic on paper.
@@ -887,7 +926,7 @@ function frame(now) {
   vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);
 
-  if (mode !== 'title') {
+  if (course) {
     if (mode === 'rainbow' || (mode === 'end' && rainbowT > 0)) {
       const dP = prevP ? d3(p, prevP) : 0;
       feedTrail(braid.tl, p, rSide, rUp2, dP);
@@ -977,7 +1016,6 @@ function frame(now) {
     if (particleM.n) drawMesh(particleM, RFL);
     setDim(1);
     mask(0);
-    drawMesh(bgM, IDENT);
     drawMesh(railM, IDENT);
     if (trailM.n) drawMesh(trailM, IDENT);
     if (starM.n) drawMesh(starM, IDENT);
@@ -994,10 +1032,19 @@ function frame(now) {
   ctx.clearRect(0, 0, VW, VH);
   ctx.textAlign = 'center';
   if (mode === 'title') {
-    ctx.fillStyle = '#0a0714';
+    // A scrim, not a wall. The race is running live underneath, so the menu
+    // has to sit ON it: an even tint to hold the text, darkest across the
+    // band the words occupy and clearing toward the bottom, where the track
+    // and the two of them are worth looking at.
+    const sc = ctx.createLinearGradient(0, 0, 0, VH);
+    sc.addColorStop(0, 'rgba(8,5,18,.88)');
+    sc.addColorStop(.5, 'rgba(8,5,18,.8)');
+    sc.addColorStop(.72, 'rgba(8,5,18,.34)');
+    sc.addColorStop(1, 'rgba(8,5,18,.04)');
+    ctx.fillStyle = sc;
     ctx.fillRect(0, 0, VW, VH);
     RAINBOW.forEach(([r, gg, b], i) => {
-      ctx.fillStyle = `rgb(${r * 255},${gg * 255},${b * 255})`;
+      ctx.fillStyle = `rgba(${r * 255},${gg * 255},${b * 255},.8)`;
       ctx.fillRect(0, 100 + i * 7, VW, 5);
     });
     ctx.fillStyle = '#f3ead6';
@@ -1229,4 +1276,7 @@ function frame(now) {
   }
   requestAnimationFrame(frame);
 }
+// Build a world at boot, so the title screen has a race to show. The title
+// tick drives it; pressing SPACE throws it away and builds a fresh one.
+newRun();
 requestAnimationFrame(frame);

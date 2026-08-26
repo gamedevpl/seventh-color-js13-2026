@@ -50,31 +50,35 @@ export function makeCourse(count) {
     const prog = nodes.length / count;                  // 0 at the gate, 1 at the end
     const hard = Math.min(1, prog * 1.25);
     const rq = (base, top) => Math.round(base + (top - base) * hard);
-    // weights: cruise, serpentine, dive, climb, gap, corkscrew
+    // weights: cruise, serpentine, dive, climb, gap, corkscrew, sweeper
     const W = [
-      .40 - .32 * hard,
-      .19 + .09 * hard,
-      .15 - .04 * hard,
-      .09 - .04 * hard,
-      .14 + .07 * hard,
-      .02 + .34 * hard,     // the signature move, but EARNED: near-absent at
+      .34 - .28 * hard,
+      .16 + .07 * hard,
+      .13 - .03 * hard,
+      .08 - .03 * hard,
+      .13 + .06 * hard,
+      .02 + .30 * hard,     // the signature move, but EARNED: near-absent at
                             // the gate, everywhere by the end. Seeding it
                             // from the start just moved the difficulty
                             // forward instead of building it.
+      .14 + .08 * hard,
     ];
     let r = Math.random() * W.reduce((a, b) => a + b, 0), pick = 0;
-    while (pick < 5 && r > W[pick]) { r -= W[pick]; pick++; }
+    while (pick < W.length - 1 && r > W[pick]) { r -= W[pick]; pick++; }
     if (nodes.length > count - 8) pick = 0;             // land the ending calmly
 
     if (pick === 0) {                                   // cruise
       const L = 3 + (Math.random() * 4 | 0);
       for (let i = 0; i < L; i++) step(rnd(-.2, .2), rnd(-.07, .07), S);
     } else if (pick === 1) {                            // serpentine
-      const L = 4 + (Math.random() * 4 | 0);
+      // Longer than it was (four to seven flicks), because a slalom over in
+      // three seconds is a decoration rather than a section, and a shade
+      // sharper - the demand does the work, not the geometry.
+      const L = 6 + (Math.random() * 5 | 0);
       let sgn = Math.random() < .5 ? 1 : -1;
-      const amp = .34 + .22 * hard;
+      const amp = .36 + .24 * hard;
       for (let i = 0; i < L; i++) {
-        step(sgn * rnd(amp, amp + .18), rnd(-.04, .04), S * .9, false, rq(18, 25));
+        step(sgn * rnd(amp, amp + .18), rnd(-.04, .04), S * .9, false, rq(19, 26));
         if (i % 2) sgn = -sgn;
       }
     } else if (pick === 2) {                            // dive: free speed
@@ -88,10 +92,34 @@ export function makeCourse(count) {
       step(rnd(-.08, .08), .02, S);
       step(0, .04, S * .8, true);
       step(0, -.02, S);
-    } else {                                            // corkscrew
+    } else if (pick === 5) {                            // corkscrew
       step(rnd(-.1, .1), 0, S);
       step(rnd(-.12, .12), 0, S * 1.1, false, rq(21, 28), true);
       step(rnd(-.1, .1), 0, S);
+    } else {                                            // the long sweeper
+      // A sustained ARC, held one way for the whole section, so the bank
+      // comes on and STAYS on and you lean the length of it. The
+      // serpentine's charm is the flick from side to side; a long banked
+      // bend is the other thing a coaster does, and the course had none of
+      // it - every turn was either a flick or a wiggle inside a cruise.
+      // Modest per-node angle, many nodes: seven to eleven of them at ten
+      // to sixteen degrees each sweeps up to a third of a circle over 250
+      // units of track, on a radius of about a hundred.
+      // No speed demand on it, deliberately. Hot pink rails mean ONE thing -
+      // a minimum speed - and hanging that on every node of every arc put
+      // over half the course in warning colours, which is the same as
+      // marking none of it. This section tests the other skill: holding a
+      // line against a push that never lets up. It earns its teeth from
+      // geometry instead, by TIGHTENING as it goes, so you have to keep
+      // committing rather than coast the whole bend on one input.
+      const sgn = Math.random() < .5 ? 1 : -1, k = rnd(.16, .24);
+      const L = 7 + (Math.random() * 5 | 0);
+      let sw = 0;
+      for (let i = 0; i < L && sw < 2.4; i++) {
+        const kk = k * (1 + i * .06);
+        sw += kk;
+        step(sgn * kk, rnd(-.06, .04), S);
+      }
     }
   }
 

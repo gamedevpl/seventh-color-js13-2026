@@ -706,7 +706,7 @@ function frame(now) {
   fovSm += (1.03 + speedSm * .38 + surge * .2 + cine * .16 - fovSm) * Math.min(1, dt * 6);
   // Dev only: the run's vital signs, so tools/test-balance.mjs can tune the
   // stardust economy against real play instead of arithmetic on paper.
-  if (DEV) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal]);
+  if (DEV) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate]);
   if (DEV) (window.__cam = window.__cam || []).push([now, cam.e[0], cam.e[1], cam.e[2], cam.a[0], cam.a[1], cam.a[2], fovSm, cu[0], cu[1], cu[2]]);
   vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);

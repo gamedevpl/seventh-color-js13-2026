@@ -12,6 +12,14 @@ import { chromium } from 'playwright-core';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const secs = Number(process.argv.find((a) => /^--secs=/.test(a))?.split('=')[1] || 40);
+// Two policies, because they answer different questions.
+//   blind  - weaves on a fixed schedule, ignoring the track. The worst case:
+//            someone who has not learned to read a bend yet.
+//   skilled- closes the loop on the probe and steers INTO the bend, which is
+//            what the game asks of you. Without this the harness steers the
+//            wrong way through half of every sustained arc, so it charges a
+//            long banked bend for a mistake the player is not making.
+const skilled = process.argv.includes('--skill');
 const archive = readFileSync(path.join(root, 'build', 'strands', 'index.zip'));
 const nl = archive.readUInt16LE(26), el = archive.readUInt16LE(28);
 const method = archive.readUInt16LE(8), comp = archive.readUInt32LE(18);
@@ -27,12 +35,39 @@ await page.goto(pathToFileURL(pagePath).href, { waitUntil: 'load' });
 await page.waitForTimeout(500);
 await page.keyboard.press('Space');
 await page.evaluate(() => { window.__st = []; });
-// Policy: boost always, and weave gently - a player who never lifts off.
 await page.keyboard.down('ArrowUp');
-for (let i = 0; i < secs; i++) {
-  const key = i % 4 === 1 ? 'ArrowLeft' : i % 4 === 3 ? 'ArrowRight' : null;
-  if (key) { await page.keyboard.down(key); await page.waitForTimeout(420); await page.keyboard.up(key); await page.waitForTimeout(580); }
-  else await page.waitForTimeout(1000);
+if (skilled) {
+  // Steering INTO the bend means matching the sign of turnRate: left is +1
+  // in turnDir and the centrifugal term is -turnRate, so they cancel when
+  // the two signs agree. The second term pulls a drifting lane back to the
+  // middle. Held at ~90ms, well inside the lane's 0.38s time constant.
+  let cur = null;
+  for (let i = 0; i < secs * 11; i++) {
+    const st = await page.evaluate(() => {
+      const a = window.__st; const r = a && a[a.length - 1];
+      return r ? [r[7], r[8]] : null;
+    });
+    let want = null;
+    if (st) {
+      const d = st[1] * 2.2 - st[0] * 1.4;
+      want = d > .25 ? 'ArrowLeft' : d < -.25 ? 'ArrowRight' : null;
+    }
+    if (want !== cur) {
+      if (cur) await page.keyboard.up(cur);
+      if (want) await page.keyboard.down(want);
+      cur = want;
+    }
+    await page.waitForTimeout(90);
+  }
+  if (cur) await page.keyboard.up(cur);
+} else {
+  // Weave on a fixed schedule - a player who never lifts off and never reads
+  // the road.
+  for (let i = 0; i < secs; i++) {
+    const key = i % 4 === 1 ? 'ArrowLeft' : i % 4 === 3 ? 'ArrowRight' : null;
+    if (key) { await page.keyboard.down(key); await page.waitForTimeout(420); await page.keyboard.up(key); await page.waitForTimeout(580); }
+    else await page.waitForTimeout(1000);
+  }
 }
 await page.keyboard.up('ArrowUp');
 const rows = await page.evaluate(() => window.__st || []);
@@ -46,7 +81,7 @@ const rainbowFrames = rows.filter((r) => r[5]).length;
 const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
 const pct = (a, f) => (a.filter(f).length / a.length * 100).toFixed(0);
 const span = (rows[rows.length - 1][0] - rows[0][0]) / 1000;
-console.log(`${span.toFixed(0)}s of full-throttle play\n`);
+console.log(`${span.toFixed(0)}s of full-throttle play, ${skilled ? 'steering into the bends' : 'weaving blind'}\n`);
 console.log(`speed    mean ${mean(sp).toFixed(1)}  min ${Math.min(...sp).toFixed(1)}  max ${Math.max(...sp).toFixed(1)}`);
 console.log(`         under 20 (serpentine minimum): ${pct(sp, (v) => v < 20)}% of frames`);
 console.log(`         under 23 (corkscrew minimum):  ${pct(sp, (v) => v < 23)}% of frames`);

@@ -59,6 +59,54 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R9 - the long bend, and an instrument that was lying about it
+
+The course had two kinds of turn - the serpentine's flick from side to side
+and the wiggle inside a cruise - and no third kind. Nothing you *lean*
+through. A **sweeper** section: one direction held for seven to eleven
+nodes at ten to fourteen degrees each, so the bank comes on and stays on
+for around 250 units of track. Measured over 60 courses: **3.0 sustained
+arcs, averaging 147 degrees of held bend.**
+
+It TIGHTENS as it goes, six percent more angle per node, so the outward
+push builds and you have to keep committing rather than coast the whole
+bend on one input.
+
+**It carries no speed demand, deliberately.** The first cut put `req` on
+every sweeper node and demand nodes went from 39.5 to 63.3 per course -
+over half the track in hot pink. Pink rails mean one thing, a minimum
+speed, and marking half the course with it is the same as marking none.
+The sweeper tests the other skill, holding a line against a push that
+never lets up, and it earns its teeth from geometry instead. Demand nodes
+came back to 36.4.
+
+Serpentines are longer too - six to ten flicks where they were four to
+seven - and a shade sharper, with the demand raised from 18-25 to 19-26.
+
+### The harness was steering the wrong way
+
+The balance policy weaved on a fixed schedule, blind to the track. Through
+a sustained arc that means steering *out* of the bend for roughly half of
+it, so the harness charged every sweeper for a mistake a player is not
+making. It reported falls doubling and I nearly tuned the section down on
+that number.
+
+`test-balance.mjs --skill` closes the loop on the probe instead and steers
+into the bend - matching the sign of `turnRate`, since left is +1 in
+`turnDir` and the centrifugal term is `-turnRate`, so they cancel when the
+signs agree - with a second term pulling a drifting lane back to the
+middle, held at 90ms inside the lane's 0.38s time constant.
+
+| policy | falls / 40s | rainbow |
+| --- | ---: | ---: |
+| blind (never reads a bend) | 4, 2, 4 | 34%, 7%, 28% |
+| skilled (steers into it) | 0, 0, 1 | 68%, 39%, 52% |
+
+The two together are the answer, not either alone: a player who reads the
+road is barely troubled by the arcs, and one who does not is thrown by
+them. That is the difficulty being *in the right place*. The old single
+number could not tell those apart.
+
 ## R8 - light where the motion is, and a deck that behaves like glass
 
 ### The snowstorm
@@ -659,6 +707,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R9 the long bend | 11,500 | 11,471 | sweeper sections, longer serpentines, skilled balance policy |
 | R8 flow and glass | 11,500 | 11,468 | dust weighted by optical flow, stencil-masked planar reflections in the deck |
 | R7 streaks that move | 11,500 | 11,211 | streak length tied to real frame travel, tight cone, age-based fade |
 | R6 dust approaches | 11,500 | 11,192 | streak direction corrected, per-mote fade band, both effects stand down for the jump |

@@ -398,25 +398,39 @@ function starVerts(now) {
 // billboarded, so each is a point of light from wherever you look. Drawn
 // first with depth testing off, which is what puts them behind everything.
 const SKY = [];
-for (let i = 0; i < 260; i++) {
+for (let i = 0; i < 170; i++) {
   const u = Math.random() * 2 - 1, th = Math.random() * 6.283, r = Math.sqrt(1 - u * u);
+  // Colour resolved ONCE here rather than per star per frame: it never
+  // changes, and rebuilding it in the draw loop was 170 array allocations
+  // every frame for a constant.
+  const ci = (Math.random() * 7) | 0;
   SKY.push([Math.cos(th) * r, u, Math.sin(th) * r,
-    .07 + Math.random() * .16, .35 + Math.random() * .65, (Math.random() * 7) | 0]);
+    .09 + Math.random() * .17, .35 + Math.random() * .65,
+    ci > 4 ? [1.5, 1.5, 1.7] : RAINBOW[ci].map((v) => 1.1 + v * .8),
+    .5 + Math.random() * 2.1, Math.random() * 6.283]);
 }
-const KBUF = new Float32Array(SKY.length * 60);
-function skyVerts(sx, sy, sz, ux, uy, uz) {
+const KBUF = new Float32Array(SKY.length * 120);
+// Each star is a CROSS, not a dot, and it flares. A high power of a sine
+// sits near zero and spikes briefly, which is what a glint off a lamp
+// actually does - so they hang dim and then catch, one at a time, and the
+// arms of the cross grow with the catch. A dot can only get brighter; the
+// arms are what read as glare.
+function skyVerts(t, sx, sy, sz, ux, uy, uz) {
   let n = 0;
   const R = 46;
-  for (const [dx, dy, dz, sz0, br, ci] of SKY) {
-    const c = ci > 4 ? [1.5, 1.5, 1.7] : RAINBOW[ci].map((v) => 1.1 + v * .8);
+  for (const [dx, dy, dz, sz0, br, c, rt, ph] of SKY) {
+    const q = Math.max(0, Math.sin(t * rt + ph)), f = q * q * q * q * q * q;
     const px = cam.e[0] + dx * R, py = cam.e[1] + dy * R, pz = cam.e[2] + dz * R;
-    for (const [ox, oy] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) {
-      KBUF[n] = px + (sx * ox + ux * oy) * sz0;
-      KBUF[n + 1] = py + (sy * ox + uy * oy) * sz0;
-      KBUF[n + 2] = pz + (sz * ox + uz * oy) * sz0;
-      KBUF[n + 3] = 0; KBUF[n + 4] = 1; KBUF[n + 5] = 0;
-      KBUF[n + 6] = c[0]; KBUF[n + 7] = c[1]; KBUF[n + 8] = c[2]; KBUF[n + 9] = br;
-      n += 10;
+    const a = br * (.3 + .7 * f), w = sz0 * .34, L = sz0 * (1 + f * 6);
+    for (const [hw, hh] of [[L, w], [w, L]]) {
+      for (const [ox, oy] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) {
+        KBUF[n] = px + sx * ox * hw + ux * oy * hh;
+        KBUF[n + 1] = py + sy * ox * hw + uy * oy * hh;
+        KBUF[n + 2] = pz + sz * ox * hw + uz * oy * hh;
+        KBUF[n + 3] = 0; KBUF[n + 4] = 1; KBUF[n + 5] = 0;
+        KBUF[n + 6] = c[0]; KBUF[n + 7] = c[1]; KBUF[n + 8] = c[2]; KBUF[n + 9] = a;
+        n += 10;
+      }
     }
   }
   return n;
@@ -958,7 +972,8 @@ function frame(now) {
       pt.v[1] -= 7 * dt;
       pt.p[0] += pt.v[0] * dt; pt.p[1] += pt.v[1] * dt; pt.p[2] += pt.v[2] * dt;
     }
-    const nb = trailVerts(braid.tl, now / 1000, mode === 'rainbow' || mode === 'end');
+    const own = mode === 'rainbow' || mode === 'end';
+    const nb = trailVerts(braid.tl, now / 1000, own);
     if (nb) updateMesh(trailM, BUF, nb);
     updateMesh(starM, SBUF, starVerts(now));
     updateMesh(particleM, PBUF, particleVerts(now));
@@ -973,7 +988,7 @@ function frame(now) {
     const vs = X(cu, vz), vsl = Math.hypot(vs[0], vs[1], vs[2]) || 1;
     glMode(1);
     gl.disable(gl.DEPTH_TEST);
-    updateMesh(skyM, KBUF, skyVerts(vs[0] / vsl, vs[1] / vsl, vs[2] / vsl, cu[0], cu[1], cu[2]));
+    updateMesh(skyM, KBUF, skyVerts(now / 1000, vs[0] / vsl, vs[1] / vsl, vs[2] / vsl, cu[0], cu[1], cu[2]));
     drawMesh(skyM, IDENT);
     gl.enable(gl.DEPTH_TEST);
     glMode(0);
@@ -1025,10 +1040,18 @@ function frame(now) {
     // reflecting all the geometry in the level through a local plane is
     // not. Read as "the track reflects in its own glass, some kind of bug",
     // and that was exactly right.
-    if (trailM.n) drawMesh(trailM, RFL);
+    // Only what the ONE plane is actually right about. Measured, a point
+    // lying on the deck reflects onto itself to within 0.2 units at ten
+    // ahead, but 5.7 mean and 27 worst at sixty - so a distant rainbow's
+    // mirror image landed tens of units off, sliding away as the track
+    // bent. That is the "reflection goes downward" of the report.
+    // The unicorn and its sparks ARE the player, so their plane is exact.
+    // The trail is exact too once you own it, since it is fed from the
+    // player; while chasing it only draws when the braid is genuinely near.
+    // Stardust ranged sixteen nodes ahead and was the worst offender.
+    if (trailM.n && (own || d3(p, braid.r.pos) < 18)) drawMesh(trailM, RFL);
     drawMesh(uniM, mul(RFL, uniMdl));
     drawMesh(headM, mul(RFL, headMdl));
-    if (starM.n) drawMesh(starM, RFL);
     if (particleM.n) drawMesh(particleM, RFL);
     setDim(1);
     mask(0);

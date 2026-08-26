@@ -59,6 +59,55 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R15 - honest mirrors, and stars that catch the light
+
+### The reflection was wrong, and by how much
+
+"The reflections look off, especially where the track bends - the mirror
+image goes strongly downward." Correct, and measurable. The mirror is a
+single plane through the rider along the deck normal there, so its accuracy
+falls away with distance. A point lying ON the deck must reflect onto
+itself; how far it lands from itself is the error:
+
+| distance ahead | mean | p90 | worst |
+| ---: | ---: | ---: | ---: |
+| 10u | 0.2u | 0.5u | 1u |
+| 25u | 1.3u | 3.3u | 5u |
+| 40u | 2.7u | 8.0u | 12u |
+| 60u | 5.7u | 17.6u | **27u** |
+
+So a distant rainbow's mirror image could land twenty-seven units from
+where it belonged, sliding away as the track bent - exactly the report.
+
+The fix is to reflect only what the one plane is right about. The unicorn,
+its head and its sparks ARE the player, so their plane is exact. The trail
+is exact too once you own it, since it is then fed from the player; while
+chasing, it draws only when the braid is genuinely near (18 units, where
+the error is half a unit). **Stardust came out of the mirror entirely** -
+it ranged sixteen nodes ahead and was the worst offender by far.
+
+Worth being plain about: this is not a better mirror, it is an honest one.
+It shows less, and what it shows is right.
+
+### Stars that flare
+
+Each sky star is a **cross** now rather than a dot, and it flares: a high
+power of a sine sits near zero and spikes briefly, which is what a glint
+off a lamp actually does. They hang dim and then catch, one at a time, and
+the arms of the cross grow with the catch. A dot can only get brighter -
+the arms are what read as glare.
+
+Their colour is resolved once at build rather than per star per frame,
+which was 170 array allocations every frame for a constant.
+
+### The margin, stated plainly
+
+Worst-of-5 is 13,084 against the js13k limit of 13,312 - **228 bytes**.
+The wake behind the unicorn was priced at **79 bytes** as a candidate for
+removal and deliberately kept: cutting a visible effect to buy margin is a
+decision for whoever owns the game, not something to do quietly while
+fixing something else.
+
 ## R14b - a lens on the glass
 
 The tower shots were composed but static. **Distance is the only thing a
@@ -1019,6 +1068,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R15 honest mirrors | 13,150 | 13,084 | reflections limited to their accurate range, stars flare as crosses |
 | R14b lens on the glass | 13,050 | 13,012 | on-deck camera with a rolled horizon, kicker taught on the title |
 | R14 attract mode | 13,000 | 12,972 | live race under a translucent title, trackside broadcast camera, curtains cut |
 | R13 kickers | 12,800 | 12,567 | kicker ramps carry the dust economy, glass alpha-fades, ground slab deleted |

@@ -20,12 +20,16 @@
     "strands": "node tools/native.mjs --game=strands",
     "strands:verify": "node tools/verify-native.mjs --game=strands",
     "strands:gate": "node tools/test-course.mjs && node tools/test-smooth.mjs && node tools/native.mjs --game=strands --O1 --rolls=5 && node tools/verify-native.mjs 3 --game=strands --keys=space,up:5000,left:900,up:5000,right:900,up:5000,down:1200,up:5000",
-    "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak"
+    "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak",
+    "shots": "node tools/shots.mjs",
+    "promo": "node tools/shots.mjs && node tools/promo.mjs",
+    "video": "node tools/video.mjs"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",
     "acorn": "^8.18.0",
     "esbuild": "0.24.2",
+    "ffmpeg-static": "^5.3.0",
     "playwright-core": "1.56.1",
     "roadroller": "2.1.0",
     "terser": "5.50.0"

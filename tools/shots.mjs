@@ -1,10 +1,13 @@
 // Capture promo stills from the native build: boots build/native/index.zip in
 // a real browser at exactly 2x the game's 320x156 canvas and screenshots the
 // canvas element, so every frame lands pixel-aligned instead of resampled.
-// Build first: `node tools/native.mjs --no-roadroller --cheats`.
+// The cheat build is made here rather than assumed (`--no-build` reuses
+// build/native as it is): against a submission build every skip is silently a
+// no-op and every still comes from whichever beat play happened to reach.
 // Needs a --cheats build - shift+shift walks the story to a chosen beat, and
 // then plain taps advance that beat's dialogue into whatever the shot wants.
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -24,8 +27,13 @@ const SHOTS = [
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
-const out = process.argv[2] || path.join(root, 'build', 'shots');
+const out = process.argv.slice(2).find((a) => !a.startsWith('--')) || path.join(root, 'build', 'shots');
 mkdirSync(out, { recursive: true });
+
+if (!process.argv.includes('--no-build')) {
+  const built = spawnSync(process.execPath, [path.join(here, 'native.mjs'), '--no-roadroller', '--cheats'], { stdio: 'inherit', cwd: root });
+  if (built.status !== 0) process.exit(built.status ?? 1);
+}
 
 const archive = readFileSync(path.join(root, 'build', 'native', 'index.zip'));
 const nameLength = archive.readUInt16LE(26);

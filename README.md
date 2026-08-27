@@ -10,6 +10,11 @@ written to the 2026 theme, *rainbows and unicorns*.
 | **The Seventh Color** — a twelve-beat story game with four playable mechanics | `native/src` (9 files) | **12,160** | 13,312 | [`NATIVE.md`](./NATIVE.md) |
 | **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,234** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
 
+Rainbow Surfer's pack is a range, not a fixed number: roadroller `-O2` runs a
+randomised search, so consecutive ship builds of identical source measured
+13,234, 13,252 and 13,272. The table quotes the smallest of three - pack more
+than once and submit the best.
+
 Rainbow Surfer: <https://js13kgames.com/2026/games/rainbow-surfer>
 
 Neither game depends on anything at runtime — no libraries, no assets, no

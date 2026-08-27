@@ -149,8 +149,15 @@ Net, the phone fixes left the entry **better off than it started**:
 
 | basis | before R20 | after R20 |
 | --- | ---: | ---: |
-| **submission** (`strands:ship`, -O2, 200 zopfli iterations) | 13,247 | **13,234** |
-| headroom against the 13,312 limit | 65 | **78** |
+| **submission** (`strands:ship`, -O2, 200 zopfli iterations) | 13,247 | **13,234-13,272** |
+| headroom against the 13,312 limit | 65 | **40-78** |
+
+The submission build is a range, not a number, and this pass is where
+that stopped being a footnote: -O2 runs its own randomised search, so
+three consecutive ship builds of identical source measured 13,234,
+13,252 and 13,272. Pack the entry more than once before uploading and
+send the smallest - the spread is worth ~40 bytes, which at this point
+in the budget is most of the margin.
 
 ### A note on the gate's ceiling, which is not the compo limit
 
@@ -1418,7 +1425,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
-| R20 phone-shaped page | 13,330 | 13,234 (O2) | viewport meta, touch-action and user-select kill iOS selection and zoom; shell probe added to both gates |
+| R20 phone-shaped page | 13,330 | 13,234 (O2, best of 3 packs) | viewport meta, touch-action and user-select kill iOS selection and zoom; shell probe added to both gates |
 | R19 top throttle | 13,300 | 13,247 (O2) | throttle on the top strip, corners boost-and-turn, jump in a low middle band, chord kept as an alias |
 | R18 title music | 13,290 | 13,194 (O2) | first press wakes the title and stays, second leaves; audio verified by probe |
 | R17 touch and intro bass | 13,230 | 13,190 (O2) | two-thumb touch verified by a pointer probe, kick+bass under the opening, wake cut |

@@ -1,5 +1,5 @@
 {
-  "name": "R18 the title screen gets its music",
-  "description": "a beat and a half of title hold so the bass can land before the show starts; verified by counting oscillators",
-  "ceilingBytes": 13290
+  "name": "R19 the throttle moves to the top",
+  "description": "top strip boosts and its outer quarters steer, a low middle band arms kickers, steering works under boost; all zone behaviours verified by the pointer probe",
+  "ceilingBytes": 13300
 }

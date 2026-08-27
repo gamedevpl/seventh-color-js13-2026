@@ -59,6 +59,65 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R19 - the throttle moves to the top
+
+The two-thumb chord had one honest defect, and the probe's own last line
+stated it: *boosting does not steer*. Both halves held was the boost, so on
+touch there was no thumb left to steer with - a keyboard can hold ↑ and ←
+together, a phone could not. And the jump lived in the top strip, the
+wrong place for the one input in the game that is about timing: a thumb
+resting at the bottom of the screen has to travel to reach it.
+
+The zones now match what a first-time player tries anyway - press up to go
+fast:
+
+- **The top strip is the throttle.** Hold to boost. Its middle half is
+  the straight boost - wide, and off the centre of the horizon the eye
+  needs - while the **outer quarters steer as well**: one thumb in a top
+  corner rides the whole turn without letting go of the throttle. A held
+  boost no longer spends both thumbs either way - steering below the
+  strip works under it, which the chord never allowed.
+- **Both sides held still boosts.** The old chord survives as an alias; a
+  habit is not worth breaking for the bytes it costs.
+- **A low middle band (~20% of the width) is SPACE** - arm a kicker. It
+  fires only on a fresh press, never from a finger that merely drifts in,
+  and for steering the band is dead ground, because a press that jumps
+  must not also pull you off line. R17 put SPACE at the top exactly so
+  that steering could not fire a ramp; the fresh-press rule keeps that
+  guarantee with the jump under the thumb.
+- Start and restart never belonged to the strip alone - any tap outside a
+  live run already acts - so they are untouched.
+
+`test-touch.mjs` grew the matching assertions, checked against the
+keyboard as before rather than against a sign anyone guessed:
+
+Under boost a steering hold can end in a fall (lane resets to zero) or a
+jump (lane freezes), so the probe samples DURING the hold and keeps the
+peak deflection rather than trusting the endpoint - the endpoint read
+0.00 four times in a row and nearly reported working steering as broken:
+
+```
+both halves boost                        17.2 -> 32.8
+boosting does not steer                  lane 0.00
+top strip boosts                         23.6 -> 33.3
+a top corner steers its side             lane -1.16
+...while it boosts                       23.6 -> 26.2
+steering works under a top-strip boost   lane 0.95
+the jump band does not steer             lane 0.00
+```
+
+### What it cost
+
+The first cut spent bytes it did not have: corner steering as its own
+branch pushed one O1 roll to 13,319 - over the limit itself, which is
+what worst-of-N is for. Rewriting the strip's middle as the same
+`Math.abs(x - VW/2)` shape the jump band uses let roadroller store the
+two as near-clones, and the worst roll came back under: O1 worst-of-5
+13,288 against a 13,300 ceiling, the O2 ship build 13,247 against the
+13,312 limit - 65 bytes in hand, ten more than before the corners. The
+title hint reads `touch: sides to steer, top to boost, low middle to
+jump`; the corners are left for a thumb to find.
+
 ## R18 - the title screen gets its music after all
 
 The ask was a quiet motif on the **title screen**, and two attempts got the
@@ -1252,6 +1311,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R19 top throttle | 13,300 | 13,247 (O2) | throttle on the top strip, corners boost-and-turn, jump in a low middle band, chord kept as an alias |
 | R18 title music | 13,290 | 13,194 (O2) | first press wakes the title and stays, second leaves; audio verified by probe |
 | R17 touch and intro bass | 13,230 | 13,190 (O2) | two-thumb touch verified by a pointer probe, kick+bass under the opening, wake cut |
 | R16 shine, and -O2 | 13,150 | 13,060 (O2) | radial glow stars, roadroller optimize level 2 |

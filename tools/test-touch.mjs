@@ -105,7 +105,7 @@ check('right half matches ArrowRight', Math.sign(tRv) === Math.sign(kR) && Math.
   `key ${kR.toFixed(2)}  touch ${tRv.toFixed(2)}`);
 check('the two sides disagree', Math.sign(tLv) !== Math.sign(tRv), `${tLv.toFixed(2)} vs ${tRv.toFixed(2)}`);
 
-// both halves at once = boost
+// both halves at once = boost (the old chord survives as an alias)
 const before = (await st()).speed;
 await send('pointerdown', 4, .2, .7);
 await send('pointerdown', 5, .8, .7);
@@ -116,6 +116,60 @@ await send('pointerup', 5, .8, .7);
 check('both halves boost', both.speed > before + 2, `${before.toFixed(1)} -> ${both.speed.toFixed(1)}`);
 // ...and two fingers must NOT also steer, or the boost drags you off line
 check('boosting does not steer', Math.abs(both.lane) < .5, `lane ${both.lane.toFixed(2)}`);
+
+// The top strip is the throttle - and because it is its own zone, a thumb
+// can steer WHILE boosting, which the two-thumb chord never allowed.
+await page.waitForTimeout(1100);
+const calm = (await st()).speed;
+await send('pointerdown', 6, .5, .1);
+await page.waitForTimeout(1800);
+const topB = await st();
+await send('pointerup', 6, .5, .1);
+check('top strip boosts', topB.speed > calm + 2, `${calm.toFixed(1)} -> ${topB.speed.toFixed(1)}`);
+
+// Peak-tracking hold: under boost a steering hold can end in a fall (lane
+// resets to zero) or a jump (lane freezes), so sample DURING the hold and
+// keep the largest deflection rather than trusting the endpoint.
+const holdPeak = async (id, fx, fy, ms) => {
+  await send('pointerdown', id, fx, fy);
+  let lane = 0, speed = 0;
+  for (let t = 0; t < ms; t += 200) {
+    await page.waitForTimeout(200);
+    const s = await st();
+    if (Math.abs(s.lane) > Math.abs(lane)) lane = s.lane;
+    speed = Math.max(speed, s.speed);
+  }
+  await send('pointerup', id, fx, fy);
+  await settle();
+  return { lane, speed };
+};
+
+// A top corner is boost-and-turn on one thumb: the strip's outer quarters
+// steer their side while the throttle stays open.
+await settle();
+const cornerBase = (await st()).speed;
+const corner = await holdPeak(9, .95, .1, 1600);
+check('a top corner steers its side',
+  Math.sign(corner.lane) === Math.sign(kR) && Math.abs(corner.lane) > .1, `lane ${corner.lane.toFixed(2)}`);
+check('...while it boosts', corner.speed > cornerBase + 2,
+  `${cornerBase.toFixed(1)} -> ${corner.speed.toFixed(1)}`);
+
+// ...and a thumb below the strip steers under a middle-of-strip boost.
+await send('pointerdown', 6, .5, .1);
+let sb = { lane: 0 };
+for (let i = 0; i < 3 && Math.abs(sb.lane) < .12; i++) sb = await holdPeak(7, .2, .7, 1500);
+await send('pointerup', 6, .5, .1);
+check('steering works under a top-strip boost',
+  Math.sign(sb.lane) === Math.sign(kL) && Math.abs(sb.lane) > .1, `lane ${sb.lane.toFixed(2)}`);
+
+// The low middle band is the jump. For steering it is dead ground - a press
+// that arms a kicker must not also pull the line.
+await settle();
+await send('pointerdown', 8, .5, .7);
+await page.waitForTimeout(1300);
+const band = await st();
+await send('pointerup', 8, .5, .7);
+check('the jump band does not steer', Math.abs(band.lane) < .12, `lane ${band.lane.toFixed(2)}`);
 
 await browser.close();
 console.log(fails.length ? `\n${fails.length} FAILED` : '\ntouch is playable');

@@ -49,6 +49,7 @@ telemetry back out of it:
 | `tools/test-balance.mjs` | is the run winnable — and, with `--idle`, is it winnable *without playing*? |
 | `tools/test-touch.mjs` | can you steer with a thumb, two fingers included? |
 | `tools/test-shell.mjs` | at a phone's size, is the page a game - or a document that selects and zooms? |
+| `tools/test-resume.mjs` | does the music survive the player switching away from the game and coming back? |
 | `tools/test-audio.mjs` | is there sound where there should be, silence where the browser demands it, and is the in-game track still intact? |
 | `tools/test-course.mjs`, `test-smooth.mjs`, `test-cam.mjs`, `test-fov.mjs`, `test-bank.mjs`, `test-dust.mjs` | course invariants, motion, camera and effect geometry |
 | `tools/test-fps.mjs` | what an effect costs in frames |

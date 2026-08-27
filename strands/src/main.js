@@ -108,6 +108,13 @@ hud.addEventListener('pointerdown', (e) => {
   }
   pts.set(e.pointerId, [x, y]);
   scan();
+  // Coming back to the game is a gesture too. A phone suspends the audio
+  // context whenever the player switches away - a notification, a locked
+  // screen - and never resumes it on its own, so without this the music
+  // is dead for the rest of the session and only a reload brings it back.
+  // Every touch is a chance to fix that; resume() on a running context is
+  // a no-op.
+  if (ac) ac.resume();
   if (mode !== 'run' && mode !== 'rainbow') acted = true;
   else if (inBand(x, y)) acted = true;
 });

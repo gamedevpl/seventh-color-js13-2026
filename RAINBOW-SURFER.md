@@ -159,6 +159,37 @@ three consecutive ship builds of identical source measured 13,234,
 send the smallest - the spread is worth ~40 bytes, which at this point
 in the budget is most of the margin.
 
+### The bug a checklist found that the probes did not
+
+A list of mobile advice turned up one item worth the read: **resume the
+audio context on interaction, not just create it**. Everything else on it
+was already here (pointer events throughout, gestures unlocking the sound,
+`preventDefault` superseded by `touch-action`) or wrong for this page -
+`user-scalable=no` has been ignored by iOS Safari since iOS 10, and
+`object-fit` saves no GPU work when the backing store is already fixed at
+640x360. But the audio point was real, and it was a live bug in both
+entries:
+
+```
+context after the first tap: running
+after backgrounding:         suspended
+after tapping to come back:  suspended   2 oscillators since
+```
+
+A phone suspends the context whenever the player switches away - a
+notification, a locked screen - and never resumes it. Both games only
+ever CREATED the context, behind an `if (ctx) return`, so coming back
+left the music dead for the rest of the session and only a reload
+brought it back. Every touch now resumes it (a no-op on a running
+context). Rainbow Surfer resumes inline; The Seventh Color got a separate
+`resumeAudio` export so that coming back cannot create a context the game
+has not asked for yet, leaving its "audio starts when the game does"
+flow untouched.
+
+`tools/test-resume.mjs` is the probe: it captures the context the game
+builds, suspends it the way a backgrounded phone does, taps the way a
+returning player does, and counts oscillators after. In both gates.
+
 ### A note on the gate's ceiling, which is not the compo limit
 
 R20 also exposed that the two numbers this project quotes are different

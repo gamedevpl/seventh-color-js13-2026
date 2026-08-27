@@ -11,6 +11,13 @@
 
 let ctx, noiseBuf, track, trackName, step = 0, next = 0, timer;
 
+// A phone suspends the audio context whenever the player switches away -
+// a notification, a locked screen - and never resumes it on its own, so
+// without this the music is dead for the rest of the session. Separate
+// from initAudio so that coming back cannot create a context the game has
+// not asked for yet; resume() on a running context is a no-op.
+export const resumeAudio = () => { if (ctx) ctx.resume(); };
+
 export function initAudio() {
   if (ctx) return;
   ctx = new (window.AudioContext || window.webkitAudioContext)();

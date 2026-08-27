@@ -4,7 +4,7 @@ import { paintFace } from './faces.js';
 import { GAMES } from './games.js';
 import { BEATS } from './data.js';
 import { makeRound, currentBeat, tick, press, moveChoice, finish, cutLength, P } from './story.js';
-import { initAudio, setMusic, sfxTap, sfxYes, sfxNo, sfxWin } from './audio.js';
+import { initAudio, resumeAudio, setMusic, sfxTap, sfxYes, sfxNo, sfxWin } from './audio.js';
 import { fxUpdate, fxBegin, fxEnd } from './fx.js';
 
 const VW = 320, VH = 156;
@@ -86,6 +86,7 @@ function linkAt(x, y) {
 }
 canvas.addEventListener('pointermove', (e) => { [hotX, hotY] = at(e); });
 canvas.addEventListener('pointerdown', (e) => {
+  resumeAudio();          // every touch is a chance to survive a switch away
   const [x, y] = at(e);
   // A tap that follows a link must not also start the game underneath it.
   const url = linkAt(x, y);

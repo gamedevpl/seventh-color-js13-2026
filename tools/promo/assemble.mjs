@@ -50,7 +50,7 @@ const seg = (c, i) => {
   if (c.card) {
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-loop', '1', '-t', String(c.dur),
       '-i', path.join(cards, c.card), '-vf', vf.join(','), '-r', String(FPS),
-      '-c:v', 'libx264', '-crf', '12', '-preset', 'fast', '-pix_fmt', 'yuv420p', f]);
+      '-c:v', 'libx264', '-crf', '12', '-preset', 'fast', '-pix_fmt', 'yuv420p', f], { stdio: ['ignore', 'inherit', 'inherit'] });
   } else {
     const dir = path.join(cap, c.src);
     const start = Math.round((c.from || 0) * FPS);
@@ -60,7 +60,7 @@ const seg = (c, i) => {
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(FPS),
       '-start_number', String(start), '-i', path.join(dir, '%05d.jpg'),
       '-frames:v', String(frames), '-vf', vf.join(','),
-      '-c:v', 'libx264', '-crf', '12', '-preset', 'fast', '-pix_fmt', 'yuv420p', f]);
+      '-c:v', 'libx264', '-crf', '12', '-preset', 'fast', '-pix_fmt', 'yuv420p', f], { stdio: ['ignore', 'inherit', 'inherit'] });
   }
   return f;
 };
@@ -86,12 +86,12 @@ for (const c of plan.cuts) for (const tx of c.texts || []) {
     `:alpha='if(lt(t,${a0}),0,if(lt(t,${a0 + .4}),(t-${a0})/.4,if(lt(t,${a1 - .4}),1,if(lt(t,${a1}),(${a1}-t)/.4,0))))'`);
 }
 graph += `${prev}${texts.length ? texts.join(',') + ',' : ''}` +
-  `fade=t=in:d=.6,fade=t=out:st=${(total - 1).toFixed(2)}:d=1[v]`;
+  `fade=t=in:d=0.6,fade=t=out:st=${(total - 1).toFixed(2)}:d=1[v]`;
 
 execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...inputs, '-i', wav,
   '-filter_complex', graph,
   '-map', '[v]', '-map', `${files.length}:a`,
   '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11',
   '-c:v', 'libx264', '-crf', '18', '-preset', 'slow', '-pix_fmt', 'yuv420p',
-  '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out]);
+  '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out], { stdio: ['ignore', 'inherit', 'inherit'] });
 console.log('film ->', out);

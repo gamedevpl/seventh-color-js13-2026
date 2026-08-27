@@ -9,7 +9,7 @@
         { "t0": 0.7, "t1": 2.8, "s": "A rainbow is running loose...", "size": "h/20" },
         { "t0": 3.1, "t1": 5.2, "s": "...and you are the only one fast enough.", "size": "h/20" }
       ] },
-    { "src": "chase", "from": 1.0, "dur": 5.5,
+    { "src": "chase", "from": 0.4, "dur": 5.0,
       "mus": { "speedN": 0.6, "closeN": 0.25 } },
     { "src": "orbit", "from": 0.3, "dur": 5.0,
       "mus": { "speedN": 0.7, "closeN": 0.3 },

@@ -252,7 +252,7 @@ const SHOTS = {
     // stardust economy and all - and an ever-full tank catches the rainbow
     // mid-take, which is the other shot's job.
     await t.page.evaluate(() => { window.__god = 0; });
-    await ff(t, { god: false, until: (s, m, sim) => sim >= 6000 });
+    await ff(t, { god: false, until: (s, m, sim) => sim >= 1200 });
     await roll(t, path.join(out, 'chase'), 9, { drive: true, spaceKickers: false });
   },
 

@@ -39,11 +39,6 @@ hud.height = VH;
 // build's shell adds - without it Safari lays the page out at 980px and
 // zooms taps regardless of anything set here.
 hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;-webkit-user-select:none';
-// Holding is how this game is PLAYED - the throttle is a held strip - and
-// a long press over a canvas otherwise raises the browser's own menu on
-// top of it. Measured before adding: nothing else on the page cancels
-// that event.
-hud.oncontextmenu = () => false;
 wrap.appendChild(hud);
 const ctx = hud.getContext('2d');
 
@@ -109,18 +104,30 @@ function linkAt(x, y) {
 // turn. For steering the band is dead ground rather than a third lane,
 // because a press that jumps must not also pull you off line.
 const pts = new Map();
-let tL = 0, tR = 0, tT = 0;
+let tL = 0, tR = 0, tT = 0, tB = 0;
 const inBand = (x, y) => y >= VH * .28 && Math.abs(x - VW / 2) < VW * .1;
 const scan = () => {
   tL = tR = tT = tB = 0;
+  let mx = 0, n = 0;
   for (const [x, y] of pts.values()) {
     // In the strip the middle HALF is the straight boost; its outer
     // quarters fall through to the side test below, so one corner thumb
     // rides the whole turn without letting go of the throttle.
     if (y < VH * .28) { tT = 1; if (Math.abs(x - VW / 2) < VW * .25) continue; }
     else if (inBand(x, y)) continue;
-    if (x < VW / 2) tL = 1; else tR = 1;
+    mx += x; n++;
   }
+  // ONE rule where there were three. The steer is where the live thumbs
+  // SIT, averaged: one thumb on a side turns that way as it always did, a
+  // thumb in a top corner turns its side while the strip holds the
+  // throttle, and two thumbs on opposite sides average to the middle and
+  // cancel - until you SLIDE them, which is the turn-under-boost this
+  // could not do before. Two thumbs down is the throttle whatever they
+  // then do. No guard on n: with no thumbs mx/n is NaN and both
+  // comparisons below are false, which is exactly "not steering".
+  tB = n > 1;
+  const c = mx / n;
+  tL = c < VW / 2 - 12; tR = c > VW / 2 + 12;
 };
 hud.addEventListener('pointermove', (e) => {
   [hotX, hotY] = at(e);
@@ -133,7 +140,14 @@ hud.addEventListener('pointerdown', (e) => {
   // window.open is blocked in sandboxed frames - and a js13k entry spends
   // its life in one. A real anchor click carries the gesture through.
   if (url) {
-    document.body.appendChild(Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener' })).click();
+    // Written out rather than via Object.assign, and without rel=noopener,
+    // which a target=_blank link gets implicitly in every browser that
+    // matters now: ~35 bytes, and the links keep working exactly as they
+    // did. The appendChild stays - a detached anchor's click is not
+    // reliably followed inside the sandboxed frame a js13k entry lives in.
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank';
+    document.body.appendChild(a).click();
     return;
   }
   pts.set(e.pointerId, [x, y]);
@@ -156,9 +170,9 @@ hud.addEventListener('pointerdown', (e) => {
 const drop = (e) => { pts.delete(e.pointerId); scan(); };
 hud.addEventListener('pointerup', drop);
 hud.addEventListener('pointercancel', drop);
-const heldFwd = () => held.ArrowUp || held.w || tT || (tL && tR);
+const heldFwd = () => held.ArrowUp || held.w || tT || tB;
 const heldBack = () => held.ArrowDown || held.s;
-const turnDir = () => (held.ArrowLeft || held.a || (tL && !tR) ? 1 : 0) - (held.ArrowRight || held.d || (tR && !tL) ? 1 : 0);
+const turnDir = () => (held.ArrowLeft || held.a || tL ? 1 : 0) - (held.ArrowRight || held.d || tR ? 1 : 0);
 
 // --- audio ----------------------------------------------------------------
 let ac;

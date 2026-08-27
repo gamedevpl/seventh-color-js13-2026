@@ -71,7 +71,12 @@ check('viewport is device-width', /width=device-width/.test(r.viewport || ''), r
 check('the touch surface blocks pan and double-tap zoom', r.touchAction === 'none', `touch-action ${r.touchAction}`);
 check('the touch surface blocks the selection loupe', r.userSelect === 'none', `user-select ${r.userSelect}`);
 check('the page itself cannot scroll', r.bodyOverflow === 'hidden', r.bodyOverflow);
-check('a long press does not raise the browser menu', !r.menuOpens);
+// Rainbow Surfer traded this away for thumb-slide steering: at ~20 bytes
+// from its limit, natural steering beat blocking a menu that mostly
+// appears on Android, since iOS does not raise one over a canvas with
+// user-select and touch-action already set. The Seventh Color has the
+// budget and keeps it.
+if (game !== 'strands') check('a long press does not raise the browser menu', !r.menuOpens);
 // This viewport is a phone held UPRIGHT, and both entries are landscape
 // games. Turning the picture is the only thing that works on iOS - there
 // is no orientation lock in Safari, and a "please rotate" card does

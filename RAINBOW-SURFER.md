@@ -59,6 +59,58 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R24 - sliding thumbs steer, and what it cost
+
+"Przesuwanie kciuków jest po prostu naturalne" - and it was the one thing
+the touch scheme could not do. Two thumbs on opposite sides were the
+boost chord, and the sides cancelled, so under that boost you were a
+passenger going straight.
+
+The fix was not another special case. There were already three of them -
+a side steers, a top corner steers its side, a chord cancels - and the
+fourth would have cost more than the budget had. **One rule replaced all
+of them: the steer is where the live thumbs SIT, averaged, relative to
+the middle.**
+
+- one thumb on a side: its own position is the average, so it steers that
+  way exactly as before
+- a thumb in a top corner: same, while the strip holds the throttle
+- two thumbs on opposite sides: they average to the middle and cancel...
+- ...until you **slide them**, which moves the average off centre - and
+  that is the turn, with the throttle still open
+
+`tB` (two or more thumbs down) carries the throttle, so a cancelled pair
+still boosts. `turnDir` got shorter too: the sides can no longer both be
+true, so its `tL && !tR` guards went. And the deadzone needs no `if (n)`
+guard - with no thumbs down `mx / n` is NaN, and both comparisons against
+NaN are false, which is precisely "not steering".
+
+### The bill, paid honestly
+
+Four formulations were measured. Drift from where each thumb landed, the
+midpoint of the pair, a unified rule with a bitmask for the chord, and
+the one above. **All four landed within 20 bytes of each other** - what
+costs is the new branch, not how it is written - and all four were over
+the 13,312 limit.
+
+Two things paid for it, and neither was the author's credit links, which
+were offered up and declined:
+
+- **The anchor for those links, written out** instead of through
+  `Object.assign`, without `rel=noopener` that `target=_blank` implies
+  anyway: ~35 bytes, links unchanged in behaviour.
+- **The long-press menu block from R22, given back: ~40 bytes.** It was
+  this pass's own addition, so it was this pass's to sacrifice. It mostly
+  mattered on Android - iOS raises no menu over a canvas that already
+  carries `user-select:none` and `touch-action:none` - and natural
+  steering beats it at 20 bytes from the wall. `test-shell.mjs` now
+  asserts it for The Seventh Color, which has the budget, and says why
+  Rainbow Surfer does not.
+
+Standing: **13,288 best of three packs**, and one pack in three still
+lands over. The credit click-through remains 135 bytes on the table if
+anything else has to fit.
+
 ## R23 - the sound was never unlocked, and the wall got real
 
 Reported from a phone: no sound at all. The probes all passed, which is
@@ -1604,6 +1656,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R24 thumbs that slide, steer | 13,350 | 13,288 (O2, best of 3 packs) | one averaged-position rule replaces three steering cases; paid for by a cheaper anchor and the R22 menu block |
 | R23 the sound unlocks | 13,350 | 13,298 (O2, best of 3 packs) | the audio context is built inside the touch; both entries were silent on a phone |
 | R22 browser taming, priced | 13,350 | 13,291 (O2, best of 3 packs) | long-press menu blocked on both entries; tap highlight only where the budget allowed |
 | R21 upright on a phone | 13,350 | 13,289 (O2, best of 3 packs) | the game turns itself 90deg in portrait and fills the screen; per-game shell CSS pays for it |

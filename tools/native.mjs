@@ -57,11 +57,17 @@ if (!cheats && /ShiftLeft|ShiftRight/.test(minified)) {
 }
 
 const markup = '<canvas id=c></canvas>';
-// Grid centering over flex purely for the bytes - same result, 15 fewer
-// characters in a stretch of the page roadroller never touches. The phone
-// gesture defences live on the HUD element inside the packed JS instead,
+// Every character here is spent at 1:1 - the shell never meets roadroller
+// - so each game gets only the rules it actually uses. Rainbow Surfer
+// turns itself upright on a phone and therefore centres its own wrapper
+// from a fixed position, leaving the body with no in-flow content at all:
+// no centring to do, and no height to do it in. A body background paints
+// the whole viewport regardless, because it propagates to the root.
+// The phone gesture defences live on the canvas inside the packed JS,
 // where near-clone text is nearly free.
-const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:grid;place-items:center}';
+const css = game === 'strands'
+  ? 'body{margin:0;background:#0b0f14;overflow:hidden}'
+  : 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:grid;place-items:center}';
 
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {

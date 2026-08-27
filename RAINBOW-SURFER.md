@@ -59,6 +59,61 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R21 - the game turns itself upright on a phone
+
+Held in portrait, the game had 32% of the screen (measured: a 640x365
+band on a 640x1139 window) and playing it there is hopeless. The obvious
+fixes do not exist on the device this was reported from:
+
+- **`screen.orientation.lock()` is not implemented in Safari on iOS**, and
+  the Fullscreen API it would need is absent on iPhone entirely. There is
+  no way to force landscape.
+- **A "please rotate your phone" card is worse than useless to anyone
+  playing with rotation LOCKED** - which is a lot of people. They turn the
+  phone, the page does not re-lay-out, and the card is still there telling
+  them to do the thing they just did.
+
+So the game turns ITSELF: when the window is taller than it is wide, the
+wrapper rotates 90 degrees and is fitted against the swapped window, so
+the long side of the screen is the long side of the game. It now covers
+**101%** of the screen (the canvas overhangs slightly, as a fit against
+the long side should), whichever way the phone is held and whatever the
+rotation lock says.
+
+Two details cost more than the rotation itself:
+
+- **The centring had to move off the page.** Turned, the game's
+  un-rotated layout box is wider than the window, and a box that
+  overflows its grid cell is not centred - it is clipped on both sides,
+  and the turn then pivots around the wrong point. The first attempt
+  looked like this: the title sheared off the top of the screen. The
+  wrapper now centres itself from a fixed position.
+- **The turn moves the picture, not the events.** `at()` undoes it, so
+  every zone, hit box and steering rule downstream still thinks in
+  landscape and none of them had to learn about this. `tools/test-portrait.mjs`
+  presses in SCREEN space, the way a thumb does - picture-left is
+  screen-top when the game is turned - and checks the zones follow the
+  picture. It needs the DEV telemetry, so like `test-touch.mjs` it is a
+  probe you run rather than a gate step; the gate's `test-shell.mjs` asks
+  the rendered matrix whether the game turned and what fraction of the
+  screen it covers, which needs no telemetry.
+
+### What it cost, and what paid for it
+
+The rotation is about 60 bytes, which the entry did not have - the first
+working version packed at 13,313-13,331 against a 13,312 limit, over on
+every roll. What paid for it was noticing that **the shell's centring
+rules had become dead weight for this entry**: the wrapper centres itself
+now, and with it fixed the body has no in-flow content at all, so
+`height:100vh` and `display:grid;place-items:center` were doing nothing.
+Both games no longer get the same stylesheet; each gets the rules it
+uses. That is ~45 characters at 1:1 in a stretch of the page roadroller
+never sees, and it more than paid the rotation back.
+
+Standing: **13,289 best of three packs, 23 bytes under the limit**, and
+one pack in three now lands over it. Packing repeatedly and submitting
+the smallest has stopped being good practice and become the procedure.
+
 ## R20 - the page behaves like a game on a phone
 
 Reported from an iPhone SE: touching the canvas selected it, and small
@@ -1456,6 +1511,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R21 upright on a phone | 13,350 | 13,289 (O2, best of 3 packs) | the game turns itself 90deg in portrait and fills the screen; per-game shell CSS pays for it |
 | R20 phone-shaped page | 13,330 | 13,234 (O2, best of 3 packs) | viewport meta, touch-action and user-select kill iOS selection and zoom; shell probe added to both gates |
 | R19 top throttle | 13,300 | 13,247 (O2) | throttle on the top strip, corners boost-and-turn, jump in a low middle band, chord kept as an alias |
 | R18 title music | 13,290 | 13,194 (O2) | first press wakes the title and stays, second leaves; audio verified by probe |

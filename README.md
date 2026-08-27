@@ -8,12 +8,13 @@ written to the 2026 theme, *rainbows and unicorns*.
 | entry | source | zipped | limit | write-up |
 | --- | --- | ---: | ---: | --- |
 | **The Seventh Color** — a twelve-beat story game with four playable mechanics | `native/src` (9 files) | **12,160** | 13,312 | [`NATIVE.md`](./NATIVE.md) |
-| **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,234** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
+| **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,289** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
 
 Rainbow Surfer's pack is a range, not a fixed number: roadroller `-O2` runs a
 randomised search, so consecutive ship builds of identical source measured
-13,234, 13,252 and 13,272. The table quotes the smallest of three - pack more
-than once and submit the best.
+13,289, 13,300 and 13,326 — one of those is over the limit. The table quotes the
+smallest of three: pack repeatedly and submit the best. This is the procedure,
+not a nicety.
 
 Rainbow Surfer: <https://js13kgames.com/2026/games/rainbow-surfer>
 
@@ -50,6 +51,7 @@ telemetry back out of it:
 | `tools/test-touch.mjs` | can you steer with a thumb, two fingers included? |
 | `tools/test-shell.mjs` | at a phone's size, is the page a game - or a document that selects and zooms? |
 | `tools/test-resume.mjs` | does the music survive the player switching away from the game and coming back? |
+| `tools/test-portrait.mjs` | held upright, the game turns itself — do the touch zones follow the picture? |
 | `tools/test-audio.mjs` | is there sound where there should be, silence where the browser demands it, and is the in-game track still intact? |
 | `tools/test-course.mjs`, `test-smooth.mjs`, `test-cam.mjs`, `test-fov.mjs`, `test-bank.mjs`, `test-dust.mjs` | course invariants, motion, camera and effect geometry |
 | `tools/test-fps.mjs` | what an effect costs in frames |

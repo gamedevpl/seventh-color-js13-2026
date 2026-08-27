@@ -38,13 +38,21 @@ const r = await page.evaluate(() => {
   const cs = document.querySelectorAll('canvas');
   // The last canvas is the one every touch lands on - the HUD where a game
   // mounts its pointer handlers, or the only canvas in a one-canvas game.
-  const s = getComputedStyle(cs[cs.length - 1]);
+  const el = cs[cs.length - 1];
+  const s = getComputedStyle(el);
   const vp = document.querySelector('meta[name=viewport]');
+  const b = el.getBoundingClientRect();
+  // A rotation shows up in the matrix' off-diagonal terms, wherever in the
+  // ancestry it was applied - so this asks the rendered result, not the
+  // markup, whether the game turned itself.
+  const m = new DOMMatrix(getComputedStyle(el.parentNode).transform);
   return {
     touchAction: s.touchAction,
     userSelect: s.webkitUserSelect || s.userSelect,
     viewport: vp && vp.getAttribute('content'),
     bodyOverflow: getComputedStyle(document.body).overflow,
+    turned: Math.abs(m.b) > .5 || Math.abs(m.c) > .5,
+    covers: b.width * b.height / (innerWidth * innerHeight),
   };
 });
 
@@ -60,6 +68,16 @@ check('viewport is device-width', /width=device-width/.test(r.viewport || ''), r
 check('the touch surface blocks pan and double-tap zoom', r.touchAction === 'none', `touch-action ${r.touchAction}`);
 check('the touch surface blocks the selection loupe', r.userSelect === 'none', `user-select ${r.userSelect}`);
 check('the page itself cannot scroll', r.bodyOverflow === 'hidden', r.bodyOverflow);
+// This viewport is a phone held UPRIGHT, and both entries are landscape
+// games. Turning the picture is the only thing that works on iOS - there
+// is no orientation lock in Safari, and a "please rotate" card does
+// nothing for the many players who keep rotation locked. A game that only
+// letterboxes here is playing on about a third of the screen.
+if (game === 'strands') {
+  check('held upright, the game turns itself', r.turned);
+  check('...and fills the screen rather than a third of it', r.covers > .9,
+    `${Math.round(r.covers * 100)}% of the screen`);
+}
 
 await browser.close();
 console.log(fails.length ? `\n${fails.length} FAILED` : '\nthe page behaves like a game on a phone');

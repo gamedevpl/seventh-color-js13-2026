@@ -22,7 +22,11 @@ glc.height = VH;
 initGL(glc);
 
 const wrap = document.createElement('div');
-wrap.style.position = 'relative';
+// Centred by the wrap itself rather than by the page: turned, the game's
+// un-rotated layout box is wider than the window, and a box that overflows
+// its grid cell is no longer centred - it is clipped on both sides and the
+// turn then pivots around the wrong point.
+wrap.style.cssText = 'position:fixed;left:50%;top:50%';
 glc.parentNode.insertBefore(wrap, glc);
 wrap.appendChild(glc);
 const hud = document.createElement('canvas');
@@ -38,10 +42,24 @@ hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;touch
 wrap.appendChild(hud);
 const ctx = hud.getContext('2d');
 
+// A phone held upright gives the game 32% of its screen, which is not
+// playing it. Landscape cannot be forced on an iPhone - Safari does not
+// implement screen.orientation.lock and iOS has no fullscreen on phones -
+// and a "please rotate" card is worse than useless to the many players who
+// keep rotation LOCKED: they turn the phone and nothing happens. So the
+// game turns ITSELF when the window is taller than it is wide, and fills
+// the screen whichever way the phone is held and whatever the lock says.
+let rot = 0;
 function resize() {
-  const sc = Math.min(innerWidth / VW, innerHeight / VH);
+  rot = innerWidth < innerHeight;
+  // Fit against the swapped window when turned - the long side of the
+  // screen is the long side of the game. The second dimension is the sum
+  // minus the first, which is a ternary this does not have to pay for.
+  const a = rot ? innerHeight : innerWidth;
+  const sc = Math.min(a / VW, (innerWidth + innerHeight - a) / VH);
   glc.style.width = VW * sc + 'px';
   glc.style.height = VH * sc + 'px';
+  wrap.style.transform = 'translate(-50%,-50%)rotate(' + rot * 90 + 'deg)';
 }
 addEventListener('resize', resize);
 resize();
@@ -60,7 +78,12 @@ const CREDIT = [['@gtanczyk', 'https://x.com/gtanczyk'], [' | ', 0], ['gamedev.p
 let hotX = -9, hotY = -9, links = [];
 const at = (e) => {
   const r = hud.getBoundingClientRect();
-  return [(e.clientX - r.left) / r.width * VW, (e.clientY - r.top) / r.height * VH];
+  let u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
+  // The turn moves the picture, not the events, so undo it here - every
+  // zone, hit box and steering rule downstream keeps thinking in
+  // landscape and none of them had to learn about this.
+  if (rot) { const t = u; u = v; v = 1 - t; }
+  return [u * VW, v * VH];
 };
 // Only the title fills `links`, and only the title may consume a click with
 // one - otherwise a stale box swallows a tap mid-run.

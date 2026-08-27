@@ -14,6 +14,13 @@ canvas.width = VW;
 canvas.height = VH;
 initDraw(canvas.getContext('2d'));
 
+// touch-action stops a phone panning and double-tap-zooming the game it
+// is supposed to be playing; user-select stops a long press raising the
+// selection loupe over it. Set here rather than in the shell stylesheet
+// because the shell never meets roadroller - inside the packed JS these
+// characters are nearly free.
+canvas.style.cssText = 'touch-action:none;-webkit-user-select:none';
+
 function resize() {
   const scale = Math.min(innerWidth / VW, innerHeight / VH);
   canvas.style.width = VW * scale + 'px';

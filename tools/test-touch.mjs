@@ -38,7 +38,7 @@ const send = (type, id, fx, fy) => page.evaluate(([type, id, fx, fy]) => {
 
 const st = async () => page.evaluate(() => {
   const a = window.__st; const r = a && a[a.length - 1];
-  return r ? { speed: r[1], lane: r[7] } : null;
+  return r ? { speed: r[1], energy: r[2], lane: r[7], steer: r[13] } : null;
 });
 
 const fails = [];
@@ -105,71 +105,88 @@ check('right half matches ArrowRight', Math.sign(tRv) === Math.sign(kR) && Math.
   `key ${kR.toFixed(2)}  touch ${tRv.toFixed(2)}`);
 check('the two sides disagree', Math.sign(tLv) !== Math.sign(tRv), `${tLv.toFixed(2)} vs ${tRv.toFixed(2)}`);
 
-// both halves at once = boost (the old chord survives as an alias)
-const before = (await st()).speed;
-await send('pointerdown', 4, .2, .7);
-await send('pointerdown', 5, .8, .7);
-await page.waitForTimeout(1800);
-const both = await st();
-await send('pointerup', 4, .2, .7);
-await send('pointerup', 5, .8, .7);
-check('both halves boost', both.speed > before + 2, `${before.toFixed(1)} -> ${both.speed.toFixed(1)}`);
-// ...and two fingers must NOT also steer, or the boost drags you off line
-check('boosting does not steer', Math.abs(both.lane) < .5, `lane ${both.lane.toFixed(2)}`);
-
-// The top strip is the throttle - and because it is its own zone, a thumb
-// can steer WHILE boosting, which the two-thumb chord never allowed.
-await page.waitForTimeout(1100);
-const calm = (await st()).speed;
-await send('pointerdown', 6, .5, .1);
-await page.waitForTimeout(1800);
-const topB = await st();
-await send('pointerup', 6, .5, .1);
-check('top strip boosts', topB.speed > calm + 2, `${calm.toFixed(1)} -> ${topB.speed.toFixed(1)}`);
-
-// Peak-tracking hold: under boost a steering hold can end in a fall (lane
-// resets to zero) or a jump (lane freezes), so sample DURING the hold and
-// keep the largest deflection rather than trusting the endpoint.
-const holdPeak = async (id, fx, fy, ms) => {
-  await send('pointerdown', id, fx, fy);
-  let lane = 0, speed = 0;
+// Peak-tracking hold, over any number of fingers. Two properties of the
+// live run make an endpoint sample lie, and both bit this probe before
+// they were handled: under boost a steering hold can end in a fall (which
+// resets the lane to zero) or a jump (which freezes it), so DEFLECTION is
+// sampled during the hold and kept at its peak; and `lane` is a carried
+// value, not an input, so a "does not steer" claim has to be about
+// movement AWAY from where the press started, never about the absolute
+// number a previous hold left behind. `drift` is that delta.
+const holdPeak = async (pts, ms) => {
+  for (const [id, fx, fy] of pts) await send('pointerdown', id, fx, fy);
+  const from = (await st()).lane;
+  let lane = 0, drift = 0, speed = 0, dust = 0, steer = 0;
   for (let t = 0; t < ms; t += 200) {
     await page.waitForTimeout(200);
     const s = await st();
     if (Math.abs(s.lane) > Math.abs(lane)) lane = s.lane;
+    if (Math.abs(s.lane - from) > Math.abs(drift)) drift = s.lane - from;
     speed = Math.max(speed, s.speed);
+    dust = Math.max(dust, s.energy);
+    if (Math.abs(s.steer) > Math.abs(steer)) steer = s.steer;
   }
-  await send('pointerup', id, fx, fy);
+  for (const [id, fx, fy] of pts) await send('pointerup', id, fx, fy);
   await settle();
-  return { lane, speed };
+  return { lane, drift, speed, dust, steer };
 };
+
+// Boost exists only while there is stardust to burn (canBoost in main.js)
+// and this probe boosts repeatedly, so EVERY boost claim goes through
+// here: retry until a hold catches a tank with dust in it. Without it the
+// assertion reads "this zone does not boost" when what actually happened
+// is "there was nothing to boost with" - which is how a dry tank failed
+// three different zones across three runs of an unchanged game.
+const boostHold = async (pts) => {
+  let last;
+  for (let i = 0; i < 5; i++) {
+    const base = await st();
+    last = await holdPeak(pts, 1600);
+    if (last.speed > base.speed + 2 || last.dust > 5) return { base: base.speed, ...last, dry: false };
+    await page.waitForTimeout(1500);          // let the run gather dust
+  }
+  return { base: 0, ...last, dry: true };
+};
+const boosted = (r) => !r.dry && r.speed > r.base + 2;
+const boostDetail = (r) => r.dry ? 'never caught a tank with dust' : `${r.base.toFixed(1)} -> ${r.speed.toFixed(1)}`;
+
+// both halves at once = boost (the old chord survives as an alias)
+const both = await boostHold([[4, .2, .7], [5, .8, .7]]);
+check('both halves boost', boosted(both), boostDetail(both));
+// ...and two fingers must NOT also steer, or the boost drags you off line.
+// Asserted on the steering INPUT the game reads, because the lane moves
+// on its own: bends throw the player outward (a = v x turn rate), so both
+// an absolute lane and a drift-from-press measure the track, not the
+// thumbs - each read as a failure here on a game that was steering
+// correctly.
+check('boosting does not steer', both.steer === 0, `steer ${both.steer}`);
+
+// The top strip is the throttle - and because it is its own zone, a thumb
+// can steer WHILE boosting, which the two-thumb chord never allowed.
+const topB = await boostHold([[6, .5, .1]]);
+check('top strip boosts', boosted(topB), boostDetail(topB));
 
 // A top corner is boost-and-turn on one thumb: the strip's outer quarters
 // steer their side while the throttle stays open.
-await settle();
-const cornerBase = (await st()).speed;
-const corner = await holdPeak(9, .95, .1, 1600);
+const corner = await boostHold([[9, .95, .1]]);
 check('a top corner steers its side',
   Math.sign(corner.lane) === Math.sign(kR) && Math.abs(corner.lane) > .1, `lane ${corner.lane.toFixed(2)}`);
-check('...while it boosts', corner.speed > cornerBase + 2,
-  `${cornerBase.toFixed(1)} -> ${corner.speed.toFixed(1)}`);
+check('...while it boosts', boosted(corner), boostDetail(corner));
 
 // ...and a thumb below the strip steers under a middle-of-strip boost.
 await send('pointerdown', 6, .5, .1);
 let sb = { lane: 0 };
-for (let i = 0; i < 3 && Math.abs(sb.lane) < .12; i++) sb = await holdPeak(7, .2, .7, 1500);
+for (let i = 0; i < 3 && Math.abs(sb.lane) < .12; i++) sb = await holdPeak([[7, .2, .7]], 1500);
 await send('pointerup', 6, .5, .1);
 check('steering works under a top-strip boost',
   Math.sign(sb.lane) === Math.sign(kL) && Math.abs(sb.lane) > .1, `lane ${sb.lane.toFixed(2)}`);
 
 // The low middle band is the jump. For steering it is dead ground - a press
-// that arms a kicker must not also pull the line.
+// that arms a kicker must not also pull the line - asserted on the input,
+// for the same reason the chord above is.
 await settle();
-await send('pointerdown', 8, .5, .7);
-await page.waitForTimeout(1300);
-const band = await st();
-await send('pointerup', 8, .5, .7);
-check('the jump band does not steer', Math.abs(band.lane) < .12, `lane ${band.lane.toFixed(2)}`);
+const band = await holdPeak([[8, .5, .7]], 1300);
+check('the jump band does not steer', band.steer === 0, `steer ${band.steer}`);
 
 await browser.close();
 console.log(fails.length ? `\n${fails.length} FAILED` : '\ntouch is playable');

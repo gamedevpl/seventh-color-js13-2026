@@ -8,7 +8,7 @@ written to the 2026 theme, *rainbows and unicorns*.
 | entry | source | zipped | limit | write-up |
 | --- | --- | ---: | ---: | --- |
 | **The Seventh Color** — a twelve-beat story game with four playable mechanics | `native/src` (9 files) | **12,160** | 13,312 | [`NATIVE.md`](./NATIVE.md) |
-| **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,247** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
+| **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,234** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
 
 Rainbow Surfer: <https://js13kgames.com/2026/games/rainbow-surfer>
 
@@ -43,6 +43,7 @@ telemetry back out of it:
 | `tools/verify-native.mjs` | does the zip that would actually be submitted boot, and survive being played? |
 | `tools/test-balance.mjs` | is the run winnable — and, with `--idle`, is it winnable *without playing*? |
 | `tools/test-touch.mjs` | can you steer with a thumb, two fingers included? |
+| `tools/test-shell.mjs` | at a phone's size, is the page a game - or a document that selects and zooms? |
 | `tools/test-audio.mjs` | is there sound where there should be, silence where the browser demands it, and is the in-game track still intact? |
 | `tools/test-course.mjs`, `test-smooth.mjs`, `test-cam.mjs`, `test-fov.mjs`, `test-bank.mjs`, `test-dust.mjs` | course invariants, motion, camera and effect geometry |
 | `tools/test-fps.mjs` | what an effect costs in frames |

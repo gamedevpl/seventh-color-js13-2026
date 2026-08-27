@@ -59,6 +59,113 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R20 - the page behaves like a game on a phone
+
+Reported from an iPhone SE: touching the canvas selected it, and small
+double-tap zooms crept in. Both are the browser treating the game as a
+document, and neither is visible from the desktop probes - which is the
+real finding here, because R17 through R19 built and verified a whole
+touch scheme without ever loading the page at a phone's size.
+
+Three defences, at the two levels that matter:
+
+- **`<meta name=viewport content="width=device-width">`** in the build's
+  shell. Without it Safari lays the page out at a virtual 980px and runs
+  its double-tap-to-zoom heuristics against the scaled canvas, whatever
+  the canvas itself asks for. This is the expensive one - the shell never
+  meets roadroller, so its characters cost 1:1 in the zip.
+- **`touch-action: none`** on the HUD, which is the element every touch
+  lands on. Kills pan and double-tap zoom.
+- **`-webkit-user-select: none`** on the same element, which is what stops
+  a long press raising the selection loupe. `touch-action` does not.
+
+The last two live in the packed JS rather than the shell stylesheet, where
+near-clone text is nearly free. Paid for by two deletions that measured:
+flex centring became `display:grid;place-items:center` (15 characters of
+un-packed shell), and `new (window.AudioContext || window.webkitAudioContext)`
+became `new AudioContext` - 34 characters of caution for a prefix Safari
+dropped in 14.1.
+
+**The Seventh Color had the same bug**, and the new probe is what found
+it: its canvas carried neither defence. Fixed the same way, in its own
+source, where it had 600+ bytes of room.
+
+### The probe, and what it caught in the probe
+
+`tools/test-shell.mjs` loads the built zip at an iPhone SE viewport with
+touch enabled and reads the computed styles off the running page - the
+only way to see any of this, since `touch-action` is set from inside
+roadroller-packed JS and cannot be grepped out of the built document. It
+is wired into both release gates.
+
+Rewriting the touch scheme also exposed two assertions in
+`test-touch.mjs` that had been passing by luck, and both failed a game
+that was working correctly:
+
+- **Boost needs stardust.** `canBoost` is `heldFwd() && energy > 0`, and
+  the probe boosts repeatedly, so by the later zones the tank was dry -
+  three different zones "failed to boost" across three runs of an
+  unchanged game. Every boost claim now retries until a hold catches a
+  tank with dust in it, and says so when it never does.
+- **"Does not steer" was measuring the track.** First it asserted an
+  absolute lane, which is a carried value a previous hold had already
+  moved. Replacing that with drift-from-press was no better: bends throw
+  the player outward on their own (`a = v x turn rate`), so drift reads
+  the course, not the thumbs. The assertion now reads the steering INPUT
+  the game acts on, added to the DEV telemetry - which costs a shipping
+  build nothing, since terser deletes the whole probe line at `DEV=false`
+  (checked: no `__st` survives into the packed page).
+
+```
+viewport is device-width                     width=device-width
+the touch surface blocks pan and zoom        touch-action none
+the touch surface blocks the selection loupe user-select none
+the page itself cannot scroll                hidden
+```
+
+### What it cost - and the 20 bytes that were never needed
+
+The viewport meta is ~48 characters of un-packed shell, and paying it
+took the submission from 65 bytes of headroom to 26. Two attempts to win
+that back are worth recording, because only one of them was real.
+
+Shortening the title hint measured **worse** (13,302 against 13,299) -
+noise, not a saving, and the standing lesson holds: deleting whole things
+pays, rewording survivors does not.
+
+What did pay was noticing that **`<meta charset=utf-8>` had been dead
+weight all along**. A roadrolled payload is ASCII-safe, so every code
+point the game draws - the arrows in this very hint among them - is
+reconstructed arithmetically at runtime and the document's own encoding
+never enters into it. Measured rather than assumed: both entries' packed
+documents contain zero non-ASCII bytes, and a title screenshot with the
+declaration and without it renders the arrows identically. `shell()` now
+spends those 20 bytes only when the document it just built actually
+carries a non-ASCII byte - which a `--no-roadroller` build does, and gets
+the declaration back automatically (checked: 12 non-ASCII bytes, meta
+restored).
+
+Net, the phone fixes left the entry **better off than it started**:
+
+| basis | before R20 | after R20 |
+| --- | ---: | ---: |
+| **submission** (`strands:ship`, -O2, 200 zopfli iterations) | 13,247 | **13,234** |
+| headroom against the 13,312 limit | 65 | **78** |
+
+### A note on the gate's ceiling, which is not the compo limit
+
+R20 also exposed that the two numbers this project quotes are different
+measurements, which stopped mattering only because the entry used to have
+slack. The gate packs five rolls at `--O1` with a randomised roadroller
+search and 15 zopfli iterations for speed; the submission packs once at
+`--O2` with 200. The gate's spread across runs is about **70 bytes**
+(13,253-13,321 observed), so a ceiling set near 13,312 does not ratchet -
+it fails honest builds on the search's bad luck, which it did three times
+here on code that ships at 13,234.
+
+The ceiling is therefore 13,330: a working ratchet on the gate's own
+basis. **The compo limit applies to `strands:ship`, and nothing else.**
+
 ## R19 - the throttle moves to the top
 
 The two-thumb chord had one honest defect, and the probe's own last line
@@ -1311,6 +1418,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R20 phone-shaped page | 13,330 | 13,234 (O2) | viewport meta, touch-action and user-select kill iOS selection and zoom; shell probe added to both gates |
 | R19 top throttle | 13,300 | 13,247 (O2) | throttle on the top strip, corners boost-and-turn, jump in a low middle band, chord kept as an alias |
 | R18 title music | 13,290 | 13,194 (O2) | first press wakes the title and stays, second leaves; audio verified by probe |
 | R17 touch and intro bass | 13,230 | 13,190 (O2) | two-thumb touch verified by a pointer probe, kick+bass under the opening, wake cut |

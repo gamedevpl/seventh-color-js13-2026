@@ -28,7 +28,13 @@ wrap.appendChild(glc);
 const hud = document.createElement('canvas');
 hud.width = VW;
 hud.height = VH;
-hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none';
+// touch-action kills iOS pan and double-tap zoom on the one element every
+// touch lands on; user-select kills the long-press selection loupe. Both
+// live here, in packed JS, rather than in the shell CSS the packer never
+// sees. The page-level half of the same defence is the viewport meta the
+// build's shell adds - without it Safari lays the page out at 980px and
+// zooms taps regardless of anything set here.
+hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;-webkit-user-select:none';
 wrap.appendChild(hud);
 const ctx = hud.getContext('2d');
 
@@ -877,7 +883,9 @@ function frame(now) {
   }
 
   if (doAct) {
-    if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    // Bare AudioContext: unprefixed since Safari 14.1, and the webkit
+    // fallback was 34 characters of shell-era caution.
+    if (!ac) ac = new AudioContext();
     // The first press at the title does NOT leave it. A browser makes no
     // sound at all until the page has had a real user gesture, so on a cold
     // load the title is necessarily silent - and the gesture that would
@@ -1043,7 +1051,7 @@ function frame(now) {
   // Only while you are actually driving: the cutscenes hold the speed static
   // with no throttle, and letting those frames into the sample quietly drags
   // every percentage in the balance report toward "too slow".
-  if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate, braid && braid.r ? d3(player.r.pos, braid.r.pos) : 0, !fly && player.r.b && player.r.b.kick ? 1 : 0, fly ? 1 : 0, fly ? fly.lat : 0]);
+  if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate, braid && braid.r ? d3(player.r.pos, braid.r.pos) : 0, !fly && player.r.b && player.r.b.kick ? 1 : 0, fly ? 1 : 0, fly ? fly.lat : 0, turnDir()]);
   if (DEV) (window.__cam = window.__cam || []).push([now, cam.e[0], cam.e[1], cam.e[2], cam.a[0], cam.a[1], cam.a[2], fovSm, cu[0], cu[1], cu[2]]);
   vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);

@@ -1,5 +1,5 @@
 {
-  "name": "R19 the throttle moves to the top",
-  "description": "top strip boosts and its outer quarters steer, a low middle band arms kickers, steering works under boost; all zone behaviours verified by the pointer probe",
-  "ceilingBytes": 13300
+  "name": "R20 the page behaves like a game on a phone",
+  "description": "viewport meta plus touch-action and user-select on the touch surface, so iOS stops selecting and zooming the canvas; verified on an iPhone SE viewport by tools/test-shell.mjs. Ceiling is on the GATE's basis (--O1, randomised roadroller search, 15-iteration zopfli), whose spread is ~70 bytes; the submission basis (strands:ship, --O2, 200 iterations) is what the 13,312 limit applies to and stands at 13,234.",
+  "ceilingBytes": 13330
 }

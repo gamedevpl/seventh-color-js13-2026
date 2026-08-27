@@ -57,7 +57,11 @@ if (!cheats && /ShiftLeft|ShiftRight/.test(minified)) {
 }
 
 const markup = '<canvas id=c></canvas>';
-const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center}';
+// Grid centering over flex purely for the bytes - same result, 15 fewer
+// characters in a stretch of the page roadroller never touches. The phone
+// gesture defences live on the HUD element inside the packed JS instead,
+// where near-clone text is nearly free.
+const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:grid;place-items:center}';
 
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {

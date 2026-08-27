@@ -1,74 +1,64 @@
 name: size
 
-# push is deliberately NOT a trigger here. It was, until every single run on
-# every push failed the same way: the games-repo checkout below needs
-# GAMES_REPO_TOKEN (read access to the private games repo) and that secret
-# was never added to this repo's settings, so the job dies at "Input required
-# and not supplied: token" before it builds anything. That's a repo-settings
-# gap, not something a workflow fix can paper over - add the secret
-# (Settings -> Secrets and variables -> Actions -> GAMES_REPO_TOKEN, a token
-# with read access to gamedevpl/www.gamedev.pl-games) and restore
-# `push: {branches: [main]}` alongside workflow_dispatch below once it's set.
+# Both entries are native now (NATIVE.md, RAINBOW-SURFER.md): they build from
+# this repo alone, so the games-repo checkout - and the GAMES_REPO_TOKEN
+# secret it needed, which was never added and failed every run at "Input
+# required and not supplied: token" - is gone from CI entirely. The legacy
+# packer pipeline (tools/pull.mjs + pack.mjs, `npm run size`) still exists
+# for local archaeology but no longer gates anything.
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      branch:
-        description: Games-repo branch to pack (defaults to config.json's source.branch)
-        required: false
 
 jobs:
-  pack:
+  entries:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      # The branch to pack is config.json's source of truth (`source.branch`),
-      # not a hardcoded default here - one drifting out of sync with the other
-      # is exactly how this workflow spent a whole session failing every push,
-      # checking out a branch (codex/seventh-color-cast-prototype) that had
-      # since been renamed away and no longer existed at all. A manual dispatch
-      # can still override it for a one-off trial.
-      - name: Resolve games-repo branch
-        id: branch
-        run: echo "ref=${{ github.event.inputs.branch }}" >> "$GITHUB_OUTPUT"
-        if: github.event.inputs.branch != ''
-      - name: Resolve games-repo branch from config.json
-        id: branch-config
-        run: echo "ref=$(node -pe "require('./config.json').source.branch")" >> "$GITHUB_OUTPUT"
-        if: github.event.inputs.branch == ''
-
-      # The games repo is private, so this needs a token with read access to it.
-      # Add it as the GAMES_REPO_TOKEN secret; without it the checkout fails and
-      # the job says so rather than packing something stale.
-      - uses: actions/checkout@v4
-        with:
-          repository: gamedevpl/www.gamedev.pl-games
-          ref: ${{ steps.branch.outputs.ref || steps.branch-config.outputs.ref }}
-          token: ${{ secrets.GAMES_REPO_TOKEN }}
-          path: games-repo
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - run: npm install --no-audit --no-fund
       - run: npm ci --no-audit --no-fund
-        working-directory: games-repo
 
-      # playwright-core ships no downloader; borrow the matching full package's.
+      # playwright-core ships no downloader; borrow the matching full
+      # package's. Keep the version in step with package.json's
+      # playwright-core pin.
       - run: npx --yes playwright@1.56.1 install --with-deps chromium
 
-      - run: node tools/pull.mjs --games ./games-repo
-      - run: node tools/pack.mjs
-      - run: node tools/verify.mjs
+      # Each build enforces its own milestone ceiling (native-milestone.json /
+      # strands-milestone.json), so an over-budget entry fails right here.
+      # --O1 matches the release gates - the plain default packs looser and
+      # trips the ceiling on bytes an actual submission would never carry.
+      # One roll per entry: CI answers "does it build, fit and play", the
+      # worst-of-5 ratchet stays a local release-gate concern.
+      - name: Build The Seventh Color
+        run: npm run native -- --O1
+      - name: Verify The Seventh Color
+        run: npm run native:verify
+      - name: Build Rainbow Surfer
+        run: npm run strands -- --O1
+      - name: Verify Rainbow Surfer
+        run: npm run strands:verify
 
       - name: Publish the ledger
-        run: cat SIZE.md >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          {
+            echo "| entry | zipped | limit |"
+            echo "| --- | ---: | ---: |"
+            echo "| The Seventh Color | $(stat -c %s build/native/index.zip) | 13312 |"
+            echo "| Rainbow Surfer | $(stat -c %s build/strands/index.zip) | 13312 |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
           name: seventh-color-js13
           path: |
-            build/index.zip
-            build/verify.png
-            SIZE.md
+            build/native/index.zip
+            build/native/verify.png
+            build/strands/index.zip
+            build/strands/verify.png

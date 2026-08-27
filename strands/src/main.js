@@ -718,6 +718,10 @@ function frame(now) {
     if (rainbowT > 0) rainbowT = Math.max(0, rainbowT - dt / 6);
   }
   if (mode === 'run' || mode === 'rainbow') {
+    // Promo capture only (DEV builds; terser deletes this from the shipped
+    // zip): __god keeps the tank full so the boost never dies mid-shot, and
+    // __god > 1 keeps the rainbow lit for as long as the camera needs it.
+    if (DEV && window.__god) { energy = 100; if (mode === 'rainbow' && window.__god > 1) rainbowT = Math.max(rainbowT, 5); }
     timer += dt;
     surge = Math.max(0, surge - dt / 1.4);
     slipT = Math.max(0, slipT - dt);
@@ -1034,8 +1038,33 @@ function frame(now) {
   // with no throttle, and letting those frames into the sample quietly drags
   // every percentage in the balance report toward "too slow".
   if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate, braid && braid.r ? d3(player.r.pos, braid.r.pos) : 0, !fly && player.r.b && player.r.b.kick ? 1 : 0, fly ? 1 : 0, fly ? fly.lat : 0]);
+  // The capture harness steers by mode as well as by the run telemetry, and
+  // __st only reports while driving - so the mode rides its own channel.
+  if (DEV) window.__mo = [mode, timer, introT, endT, falls, flash];
   if (DEV) (window.__cam = window.__cam || []).push([now, cam.e[0], cam.e[1], cam.e[2], cam.a[0], cam.a[1], cam.a[2], fovSm, cu[0], cu[1], cu[2]]);
-  vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
+  // Promo rig (DEV builds only): the capture harness installs __rig to stage
+  // shots the game itself never frames - orbits, trackside dollies, reveals.
+  // It runs after the whole rig has settled, so a shot can also START from
+  // whatever the real camera was doing and depart from there.
+  let fov2 = fovSm;
+  if (DEV && window.__rig) {
+    const o = window.__rig({
+      now, mode, dt, p, t: rT, up: rUp, side: dSide, e: cam.e, a: cam.a, cu,
+      fov: fovSm, head: braid && braid.tl ? braid.tl.head : null,
+      rb: braid && braid.r ? braid.r.pos : null, speed: player.speed,
+      energy, fly: !!fly, introT, endT, timer, rainbowT,
+    });
+    if (o) {
+      if (o.e) for (let i = 0; i < 3; i++) cam.e[i] = o.e[i];
+      if (o.a) for (let i = 0; i < 3; i++) cam.a[i] = o.a[i];
+      if (o.up) for (let i = 0; i < 3; i++) cu[i] = o.up[i];
+      if (o.fov) fov2 = o.fov;
+      // A hard cut: the dust streaks are drawn along the camera's per-frame
+      // velocity, so a teleporting eye must not smear one giant streak.
+      if (o.cut) prevEye = null;
+    }
+  }
+  vp = mul(perspective(fov2, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);
 
   if (course) {
@@ -1206,7 +1235,11 @@ function frame(now) {
     // The jump is a held cinematic shot and wants to be SHARP. The blur used
     // to be boosted by `cine`, which ghosted the whole frame exactly when
     // the camera was swinging - it reads as double vision.
-    const blur = (Math.max(0, speedSm - .28) + surge * .5) * (1 - cine * .9);
+    // The zoom blur smears outward from the screen centre, which is only
+    // honest while the camera flies down its own axis - the promo rig's
+    // trackside and orbiting shots read it as double vision, so the harness
+    // can turn it off (DEV builds only).
+    const blur = DEV && window.__noBlur ? 0 : (Math.max(0, speedSm - .28) + surge * .5) * (1 - cine * .9);
     // REAL radial blur: redraw the rendered frame over itself a few times,
     // scaled up about the viewport centre. Successive scaled copies at low
     // alpha smear every pixel outward along its own radius - a zoom blur,
@@ -1246,6 +1279,10 @@ function frame(now) {
       ctx.fillStyle = `rgba(255,250,240,${flash * .7})`;
       ctx.fillRect(0, 0, VW, VH);
     }
+    // Promo capture (DEV builds only): a clean plate keeps the zoom blur and
+    // the flash - they are photography - and drops every meter, prompt and
+    // panel, which are UI. The film re-typesets its own words in post.
+    if (DEV && window.__cleanHud) { requestAnimationFrame(frame); return; }
 
     // Cutscenes get bars and no instruments. A speedo ticking over a held
     // shot is the fastest way to tell the player it is not a film.

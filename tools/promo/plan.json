@@ -1,0 +1,35 @@
+{
+  "fps": 60,
+  "xfade": 0.5,
+  "musicFadeOut": 6,
+  "cuts": [
+    { "src": "intro", "from": 0, "dur": 6.8,
+      "mus": { "speedN": 0, "closeN": 0, "dry": 1, "bare": 1 },
+      "texts": [
+        { "t0": 0.7, "t1": 2.8, "s": "A rainbow is running loose...", "size": "h/20" },
+        { "t0": 3.1, "t1": 5.2, "s": "...and you are the only one fast enough.", "size": "h/20" }
+      ] },
+    { "src": "chase", "from": 1.0, "dur": 5.5,
+      "mus": { "speedN": 0.6, "closeN": 0.25 } },
+    { "src": "orbit", "from": 0.3, "dur": 5.0,
+      "mus": { "speedN": 0.7, "closeN": 0.3 },
+      "texts": [ { "t0": 0.8, "t1": 3.6, "s": "Run the rainbow down...", "size": "h/20" } ] },
+    { "src": "deck", "from": 0.2, "dur": 3.6,
+      "mus": { "speedN": 0.75, "closeN": 0.35 } },
+    { "src": "jump", "from": 0, "dur": 5.4,
+      "mus": { "speedN": 0.8, "closeN": 0.45 } },
+    { "src": "catch", "from": 0.2, "dur": 4.8,
+      "mus": { "speedN": 0.85, "closeN": 1 },
+      "musEvents": [ { "t": 1.45, "kind": "catch" } ] },
+    { "src": "surf", "from": 0, "dur": 6.5,
+      "mus": { "speedN": 0.9, "closeN": 1, "rainbow": 1 },
+      "texts": [ { "t0": 1.2, "t1": 4.0, "s": "...then BECOME it.", "size": "h/20" } ] },
+    { "src": "end", "from": 0.3, "dur": 5.0,
+      "mus": { "speedN": 0, "closeN": 0, "dry": 1, "bare": 1 },
+      "musEvents": [ { "t": 0.7, "kind": "fanfare" } ] },
+    { "card": "title.png", "dur": 3.4,
+      "mus": { "speedN": 0, "closeN": 0, "dry": 1, "bare": 1 } },
+    { "card": "end.png", "dur": 5.5,
+      "mus": { "speedN": 0, "closeN": 0, "dry": 1, "bare": 1 } }
+  ]
+}

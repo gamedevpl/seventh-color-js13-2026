@@ -1,5 +1,5 @@
 {
   "name": "R19 the throttle moves to the top",
-  "description": "top strip boosts, a low middle band arms kickers, steering works under boost; all five zone behaviours verified by the pointer probe",
-  "ceilingBytes": 13290
+  "description": "top strip boosts and its outer quarters steer, a low middle band arms kickers, steering works under boost; all zone behaviours verified by the pointer probe",
+  "ceilingBytes": 13300
 }

@@ -63,9 +63,10 @@ function linkAt(x, y) {
   for (const l of links) if (x >= l[0] && x <= l[0] + l[2] && y >= l[1] && y <= l[1] + l[3]) return l[4];
 }
 // Touch. Every live pointer is tracked. The top strip is the throttle -
-// hold it to boost, full width so a thumb can live in a corner instead of
-// on the horizon it needs to see - and both sides held at once still
-// boosts, so a second thumb is never wrong. Left and right of the lower
+// hold it to boost. Its outer quarters steer as well, so a corner is
+// boost-and-turn on one thumb; the middle half is the straight boost,
+// wide enough to hold off the centre of the horizon. Both sides held at
+// once still boosts, so a second thumb is never wrong. Left and right of the lower
 // area steer, EXCEPT a narrow middle band: that band is the SPACE key -
 // arm a kicker - and it fires only on a fresh press, never from a finger
 // that merely drifts in, so steering cannot fire a ramp every time you
@@ -77,8 +78,11 @@ const inBand = (x, y) => y >= VH * .28 && Math.abs(x - VW / 2) < VW * .1;
 const scan = () => {
   tL = tR = tT = 0;
   for (const [x, y] of pts.values()) {
-    if (y < VH * .28) { tT = 1; continue; }
-    if (inBand(x, y)) continue;
+    // In the strip the middle HALF is the straight boost; its outer
+    // quarters fall through to the side test below, so one corner thumb
+    // rides the whole turn without letting go of the throttle.
+    if (y < VH * .28) { tT = 1; if (Math.abs(x - VW / 2) < VW * .25) continue; }
+    else if (inBand(x, y)) continue;
     if (x < VW / 2) tL = 1; else tR = 1;
   }
 };

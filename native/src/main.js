@@ -19,7 +19,12 @@ initDraw(canvas.getContext('2d'));
 // selection loupe over it. Set here rather than in the shell stylesheet
 // because the shell never meets roadroller - inside the packed JS these
 // characters are nearly free.
-canvas.style.cssText = 'touch-action:none;-webkit-user-select:none';
+canvas.style.cssText = 'touch-action:none;-webkit-user-select:none;-webkit-tap-highlight-color:#0000';
+// A long press over a canvas otherwise raises the browser's own menu on
+// top of the game. This entry has the budget for the tap-highlight rule
+// above as well; Rainbow Surfer, 20 bytes from its limit, carries only
+// this one.
+canvas.oncontextmenu = () => false;
 
 function resize() {
   const scale = Math.min(innerWidth / VW, innerHeight / VH);

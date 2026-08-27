@@ -39,6 +39,11 @@ hud.height = VH;
 // build's shell adds - without it Safari lays the page out at 980px and
 // zooms taps regardless of anything set here.
 hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none;-webkit-user-select:none';
+// Holding is how this game is PLAYED - the throttle is a held strip - and
+// a long press over a canvas otherwise raises the browser's own menu on
+// top of it. Measured before adding: nothing else on the page cancels
+// that event.
+hud.oncontextmenu = () => false;
 wrap.appendChild(hud);
 const ctx = hud.getContext('2d');
 

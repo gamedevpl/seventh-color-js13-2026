@@ -59,6 +59,41 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R22 - the rest of the browser-taming list, priced
+
+A checklist doing the rounds in the js13k Slack, audited item by item
+against what was already here rather than pasted in:
+
+| the advice | standing |
+| --- | --- |
+| `margin:0` | already in the shell |
+| `overflow:hidden` | already in the shell |
+| `touch-action:none` | already on the touch surface (R20) |
+| `oncontextmenu` | **a real gap - fixed** |
+| disable the tap highlight | **a real gap - fits one entry, not the other** |
+
+The context menu is not cosmetic here. **Holding is how this game is
+played** - the throttle is a held strip and the boost chord is two held
+thumbs - and a long press over a canvas raises the browser's own menu on
+top of it. Measured before writing anything: `dispatchEvent` of a
+cancelable `contextmenu` came back uncancelled on both entries, so
+nothing on either page was stopping it. `test-shell.mjs` asks that
+question now, in both gates.
+
+The tap highlight is the one that did not fit. Chromium reports
+`rgba(51, 181, 229, 0.4)` on the touch surface, so a tap flashes blue.
+Both fixes together measured 13,315-13,322 across three packs against a
+13,312 limit - over on every one. The context-menu rule alone packs at
+13,291-13,293, so **Rainbow Surfer carries the fix that changes play and
+not the one that changes a flash**; The Seventh Color, 600 bytes from
+its own ceiling, carries both.
+
+A cheaper centring (`inset:0;margin:auto`, which centres an overflowing
+box without spelling out a translate) was tried to pay for the rest and
+measured *worse* - 13,331 against 13,318, fewer characters and a bigger
+zip. Third time this pass that a smaller source packed larger; the
+reverted version is the one a screenshot had already proven.
+
 ## R21 - the game turns itself upright on a phone
 
 Held in portrait, the game had 32% of the screen (measured: a 640x365
@@ -1511,6 +1546,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R22 browser taming, priced | 13,350 | 13,291 (O2, best of 3 packs) | long-press menu blocked on both entries; tap highlight only where the budget allowed |
 | R21 upright on a phone | 13,350 | 13,289 (O2, best of 3 packs) | the game turns itself 90deg in portrait and fills the screen; per-game shell CSS pays for it |
 | R20 phone-shaped page | 13,330 | 13,234 (O2, best of 3 packs) | viewport meta, touch-action and user-select kill iOS selection and zoom; shell probe added to both gates |
 | R19 top throttle | 13,300 | 13,247 (O2) | throttle on the top strip, corners boost-and-turn, jump in a low middle band, chord kept as an alias |

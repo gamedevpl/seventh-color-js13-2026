@@ -59,6 +59,50 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R19 - the throttle moves to the top
+
+The two-thumb chord had one honest defect, and the probe's own last line
+stated it: *boosting does not steer*. Both halves held was the boost, so on
+touch there was no thumb left to steer with - a keyboard can hold ↑ and ←
+together, a phone could not. And the jump lived in the top strip, the
+wrong place for the one input in the game that is about timing: a thumb
+resting at the bottom of the screen has to travel to reach it.
+
+The zones now match what a first-time player tries anyway - press up to go
+fast:
+
+- **The top strip is the throttle.** Hold to boost. Full width, so a
+  thumb can live in a corner rather than on the horizon it needs to
+  watch - and a held boost no longer spends both thumbs, so steering
+  works under it, which the chord never allowed.
+- **Both sides held still boosts.** The old chord survives as an alias; a
+  habit is not worth breaking for the bytes it costs.
+- **A low middle band (~20% of the width) is SPACE** - arm a kicker. It
+  fires only on a fresh press, never from a finger that merely drifts in,
+  and for steering the band is dead ground, because a press that jumps
+  must not also pull you off line. R17 put SPACE at the top exactly so
+  that steering could not fire a ramp; the fresh-press rule keeps that
+  guarantee with the jump under the thumb.
+- Start and restart never belonged to the strip alone - any tap outside a
+  live run already acts - so they are untouched.
+
+`test-touch.mjs` grew the matching assertions, checked against the
+keyboard as before rather than against a sign anyone guessed:
+
+```
+both halves boost                        16.4 -> 30.5
+boosting does not steer                  lane 0.00
+top strip boosts                         21.6 -> 24.3
+steering works under a top-strip boost   lane 0.36
+the jump band does not steer             lane 0.00
+```
+
+### What it cost
+
+O1 worst-of-5 went 13,246 -> 13,276 against the 13,290 ceiling; the O2
+ship build 13,257 against the 13,312 limit - 55 bytes in hand. The title
+hint now reads `touch: sides to steer, top to boost, low middle to jump`.
+
 ## R18 - the title screen gets its music after all
 
 The ask was a quiet motif on the **title screen**, and two attempts got the
@@ -1252,6 +1296,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R19 top throttle | 13,290 | 13,257 (O2) | throttle on the top strip with steer-under-boost, jump in a low middle band, chord kept as an alias |
 | R18 title music | 13,290 | 13,194 (O2) | first press wakes the title and stays, second leaves; audio verified by probe |
 | R17 touch and intro bass | 13,230 | 13,190 (O2) | two-thumb touch verified by a pointer probe, kick+bass under the opening, wake cut |
 | R16 shine, and -O2 | 13,150 | 13,060 (O2) | radial glow stars, roadroller optimize level 2 |

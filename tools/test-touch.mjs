@@ -105,7 +105,7 @@ check('right half matches ArrowRight', Math.sign(tRv) === Math.sign(kR) && Math.
   `key ${kR.toFixed(2)}  touch ${tRv.toFixed(2)}`);
 check('the two sides disagree', Math.sign(tLv) !== Math.sign(tRv), `${tLv.toFixed(2)} vs ${tRv.toFixed(2)}`);
 
-// both halves at once = boost
+// both halves at once = boost (the old chord survives as an alias)
 const before = (await st()).speed;
 await send('pointerdown', 4, .2, .7);
 await send('pointerdown', 5, .8, .7);
@@ -116,6 +116,32 @@ await send('pointerup', 5, .8, .7);
 check('both halves boost', both.speed > before + 2, `${before.toFixed(1)} -> ${both.speed.toFixed(1)}`);
 // ...and two fingers must NOT also steer, or the boost drags you off line
 check('boosting does not steer', Math.abs(both.lane) < .5, `lane ${both.lane.toFixed(2)}`);
+
+// The top strip is the throttle - and because it is its own zone, a thumb
+// can steer WHILE boosting, which the two-thumb chord never allowed.
+await page.waitForTimeout(1100);
+const calm = (await st()).speed;
+await send('pointerdown', 6, .9, .1);
+await page.waitForTimeout(1800);
+const topB = await st();
+check('top strip boosts', topB.speed > calm + 2, `${calm.toFixed(1)} -> ${topB.speed.toFixed(1)}`);
+const steerBoost = await retry(async () => {
+  await send('pointerdown', 7, .2, .7); await page.waitForTimeout(1300);
+  const v = (await st()).lane; await send('pointerup', 7, .2, .7); await settle();
+  return v;
+});
+await send('pointerup', 6, .9, .1);
+check('steering works under a top-strip boost',
+  Math.sign(steerBoost) === Math.sign(kL) && Math.abs(steerBoost) > .1, `lane ${steerBoost.toFixed(2)}`);
+
+// The low middle band is the jump. For steering it is dead ground - a press
+// that arms a kicker must not also pull the line.
+await settle();
+await send('pointerdown', 8, .5, .7);
+await page.waitForTimeout(1300);
+const band = await st();
+await send('pointerup', 8, .5, .7);
+check('the jump band does not steer', Math.abs(band.lane) < .12, `lane ${band.lane.toFixed(2)}`);
 
 await browser.close();
 console.log(fails.length ? `\n${fails.length} FAILED` : '\ntouch is playable');

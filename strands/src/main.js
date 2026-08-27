@@ -62,17 +62,23 @@ function linkAt(x, y) {
   if (mode !== 'title') return;
   for (const l of links) if (x >= l[0] && x <= l[0] + l[2] && y >= l[1] && y <= l[1] + l[3]) return l[4];
 }
-// Touch. Every live pointer is tracked, because the whole scheme rests on
-// knowing whether BOTH sides are held at once: left half steers left, right
-// half steers right, and both together is the boost. The top strip is the
-// SPACE key - start, restart, and arm a kicker - kept separate so that
-// steering on a phone does not fire a ramp every time you turn.
+// Touch. Every live pointer is tracked. The top strip is the throttle -
+// hold it to boost, full width so a thumb can live in a corner instead of
+// on the horizon it needs to see - and both sides held at once still
+// boosts, so a second thumb is never wrong. Left and right of the lower
+// area steer, EXCEPT a narrow middle band: that band is the SPACE key -
+// arm a kicker - and it fires only on a fresh press, never from a finger
+// that merely drifts in, so steering cannot fire a ramp every time you
+// turn. For steering the band is dead ground rather than a third lane,
+// because a press that jumps must not also pull you off line.
 const pts = new Map();
-let tL = 0, tR = 0;
+let tL = 0, tR = 0, tT = 0;
+const inBand = (x, y) => y >= VH * .28 && Math.abs(x - VW / 2) < VW * .1;
 const scan = () => {
-  tL = tR = 0;
+  tL = tR = tT = 0;
   for (const [x, y] of pts.values()) {
-    if (y < VH * .28) continue;
+    if (y < VH * .28) { tT = 1; continue; }
+    if (inBand(x, y)) continue;
     if (x < VW / 2) tL = 1; else tR = 1;
   }
 };
@@ -93,12 +99,12 @@ hud.addEventListener('pointerdown', (e) => {
   pts.set(e.pointerId, [x, y]);
   scan();
   if (mode !== 'run' && mode !== 'rainbow') acted = true;
-  else if (y < VH * .28) acted = true;
+  else if (inBand(x, y)) acted = true;
 });
 const drop = (e) => { pts.delete(e.pointerId); scan(); };
 hud.addEventListener('pointerup', drop);
 hud.addEventListener('pointercancel', drop);
-const heldFwd = () => held.ArrowUp || held.w || (tL && tR);
+const heldFwd = () => held.ArrowUp || held.w || tT || (tL && tR);
 const heldBack = () => held.ArrowDown || held.s;
 const turnDir = () => (held.ArrowLeft || held.a || (tL && !tR) ? 1 : 0) - (held.ArrowRight || held.d || (tR && !tL) ? 1 : 0);
 
@@ -1179,7 +1185,7 @@ function frame(now) {
     }
     ctx.fillStyle = '#7a6e5c';
     ctx.fillText('↑ boost   ↓ brake   ← → steer   SPACE at a gold gate to jump', VW / 2, 222);
-    ctx.fillText('touch: a side to steer, both to boost, top to jump', VW / 2, 240);
+    ctx.fillText('touch: sides to steer, top to boost, low middle to jump', VW / 2, 240);
     ctx.fillStyle = '#e8b923';
     ctx.fillText('press SPACE', VW / 2, 258);
     // Author credit, painted piecewise so each link run owns a hit box and

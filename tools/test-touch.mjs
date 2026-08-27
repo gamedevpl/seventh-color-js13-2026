@@ -227,6 +227,37 @@ await send('pointerup', 6, .5, .1);
 check('steering works under a top-strip boost',
   Math.sign(sb.steer) === Math.sign(kL) && sb.steer !== 0, `steer ${sb.steer}`);
 
+// The reach problem the band had, in the player's own words: "I hold the
+// throttle with two fingers and I want to lift one for a moment and press
+// it again to jump." That gesture has to arm the kicker, because the hand
+// on the throttle cannot go hunting for a strip of screen while a gate
+// closes. Asserted on `armed` itself, which the DEV probe now carries.
+const kickNear = async () => {
+  const r = await page.evaluate(() => { const a = window.__st, x = a && a[a.length-1]; return x ? [x[10], x[14]] : [0, 0]; });
+  return { near: r[0], armed: r[1] };
+};
+await settle();
+await send('pointerdown', 50, .25, .7);      // two fingers on the throttle
+await send('pointerdown', 51, .75, .7);
+let armedByLift = 0, sawGate = 0;
+for (let i = 0; i < 90 && !armedByLift; i++) {
+  await page.waitForTimeout(200);
+  const k = await kickNear();
+  if (!k.near) continue;
+  sawGate = 1;
+  await send('pointerup', 51, .75, .7);      // lift one for a moment...
+  await page.waitForTimeout(60);
+  await send('pointerdown', 51, .75, .7);    // ...and press it again
+  await page.waitForTimeout(120);
+  armedByLift = (await kickNear()).armed > 0;
+}
+await send('pointerup', 50, .25, .7);
+await send('pointerup', 51, .75, .7);
+await settle();
+check('lifting a finger off the throttle and pressing again arms the kicker',
+  !!armedByLift, sawGate ? (armedByLift ? 'armed without leaving the throttle' : 'a gate came round but nothing armed')
+    : 'no gold gate came round in time');
+
 // The low middle band is the jump. For steering it is dead ground - a press
 // that arms a kicker must not also pull the line - asserted on the input,
 // for the same reason the chord above is.

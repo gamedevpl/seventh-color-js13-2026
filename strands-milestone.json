@@ -1,5 +1,5 @@
 {
-  "name": "R21 the game turns itself upright on a phone",
-  "description": "held in portrait the game rotates 90deg and fills the screen instead of using 32% of it, with the touch zones following the picture; landscape cannot be forced on iOS and a rotate-your-phone card is useless under a rotation lock. Ceiling is on the GATE's basis (--O1, randomised roadroller search, 15-iteration zopfli), whose spread is ~70 bytes. The 13,312 limit applies to the submission basis (strands:ship, --O2): 13,289 best of three packs, and one pack in three now exceeds the limit - pack repeatedly and submit the smallest.",
-  "ceilingBytes": 13350
+  "name": "R25 the jump comes to the thumb that is already busy",
+  "description": "a second finger landing while another is held arms the kicker, so the hand on the throttle never has to hunt for the jump band; the mid-run prompt says TAP TO JUMP rather than naming a key a phone does not have. Ceiling is on the GATE's basis (--O1, randomised roadroller search, 15-iteration zopfli), whose spread is ~70 bytes. The 13,312 limit applies to the submission basis (strands:ship, --O2): 13,298 best of three packs, with packs landing over it - pack repeatedly and submit the smallest.",
+  "ceilingBytes": 13370
 }

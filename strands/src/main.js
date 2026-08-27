@@ -164,8 +164,13 @@ hud.addEventListener('pointerdown', (e) => {
   // coming back after a phone suspended it; on a running context it is a
   // no-op, and on the first touch it is what actually starts the sound.
   (ac = ac || new AudioContext()).resume();
-  if (mode !== 'run' && mode !== 'rainbow') acted = true;
-  else if (inBand(x, y)) acted = true;
+  // Three ways to say "act", because on a phone the narrow band was one
+  // too few: a thumb ALREADY down and a second one landing is the gesture
+  // you actually have when the kicker prompt appears, since the hand
+  // holding the throttle cannot also go hunting for a strip of screen.
+  // Arming is harmless anywhere else - it only takes at a gold gate - so
+  // the extra way in costs nothing but the reach it saves.
+  if (mode !== 'run' && mode !== 'rainbow' || inBand(x, y) || pts.size > 1) acted = true;
 });
 const drop = (e) => { pts.delete(e.pointerId); scan(); };
 hud.addEventListener('pointerup', drop);
@@ -1107,7 +1112,7 @@ function frame(now) {
   // Only while you are actually driving: the cutscenes hold the speed static
   // with no throttle, and letting those frames into the sample quietly drags
   // every percentage in the balance report toward "too slow".
-  if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate, braid && braid.r ? d3(player.r.pos, braid.r.pos) : 0, !fly && player.r.b && player.r.b.kick ? 1 : 0, fly ? 1 : 0, fly ? fly.lat : 0, turnDir()]);
+  if (DEV && (mode === 'run' || mode === 'rainbow')) (window.__st = window.__st || []).push([now, player.speed, energy, falls, jumps, mode === 'rainbow' ? 1 : 0, rainbowTotal, player.lane, turnRate, braid && braid.r ? d3(player.r.pos, braid.r.pos) : 0, !fly && player.r.b && player.r.b.kick ? 1 : 0, fly ? 1 : 0, fly ? fly.lat : 0, turnDir(), armed]);
   if (DEV) (window.__cam = window.__cam || []).push([now, cam.e[0], cam.e[1], cam.e[2], cam.a[0], cam.a[1], cam.a[2], fovSm, cu[0], cu[1], cu[2]]);
   vp = mul(perspective(fovSm, VW / VH, .1, 700), lookAt(cam.e, cam.a, cu));
   frameGL(vp, cam.e, FOG);
@@ -1253,7 +1258,7 @@ function frame(now) {
     }
     ctx.fillStyle = '#7a6e5c';
     ctx.fillText('↑ boost   ↓ brake   ← → steer   SPACE at a gold gate to jump', VW / 2, 222);
-    ctx.fillText('touch: sides to steer, top to boost, low middle to jump', VW / 2, 240);
+    ctx.fillText('touch: sides steer, top boosts, 2nd finger jumps', VW / 2, 240);
     ctx.fillStyle = '#e8b923';
     ctx.fillText('press SPACE', VW / 2, 258);
     // Author credit, painted piecewise so each link run owns a hit box and
@@ -1367,7 +1372,7 @@ function frame(now) {
       ctx.font = 'bold 15px system-ui';
       ctx.fillStyle = armed > 0
         ? `rgba(255,240,150,${.65 + Math.sin(now / 60) * .35})` : '#c8a24a';
-      ctx.fillText(armed > 0 ? 'JUMP ARMED' : 'SPACE - jump the kicker', VW / 2, VH - 96);
+      ctx.fillText(armed > 0 ? 'JUMP ARMED' : 'TAP TO JUMP', VW / 2, VH - 96);
     }
     if (mode === 'rainbow') {
       for (let i = 0; i < 7; i++) {

@@ -59,6 +59,50 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R25 - the jump comes to the thumb that is already busy
+
+"Kompletnie nie potrafię skakać." The band was a strip of screen you had
+to aim at, and the moment you need it is the moment both thumbs are
+occupied: you are boosting, the gate is closing, and the hand holding the
+throttle cannot go hunting. Two things were wrong, and the player named
+both.
+
+**The prompt named a key a phone does not have.** Mid-run it read
+`SPACE - jump the kicker`. It now reads **`TAP TO JUMP`**, with no device
+test at all - a mouse click in the band arms it just as a thumb does, so
+naming the gesture both devices actually have is both correct and 40
+bytes cheaper than the `tch ? 'TAP' : 'SPACE'` it replaced.
+
+**A second finger landing now arms the kicker.** The player's own
+description: *"trzymam gaz dwoma palcami i chciałbym na chwilę oderwać i
+ponownie docisnąć"* - lift one, press it again, without ever leaving the
+throttle. That works, because at the moment the finger lands the other is
+still down. So does lifting both and pressing both, on the second one.
+And it is safe anywhere else: arming only takes on a segment with a gold
+gate, so a stray extra finger on open deck does nothing at all. `acted`
+now has three ways in - any press outside a run, the band, or
+`pts.size > 1` - and they collapsed into one condition shorter than the
+two branches before it.
+
+`armed` joined the DEV telemetry (free in a shipping build) so the probe
+can assert the gesture rather than infer it. It plays the exact sequence
+the player described:
+
+```
+lifting a finger off the throttle and pressing again arms the kicker
+   armed without leaving the throttle
+```
+
+### What it cost
+
+Four measured attempts, and the shape of the answer was the usual one.
+The device-aware prompt fitted at 13,314-13,318 - over. Shortening its
+text to `TAP TO JUMP` and `ARMED!` measured **worse** (13,322-13,368):
+the fourth time this pass that a smaller source packed larger, because
+roadroller is pricing shared structure, not characters. Deleting the
+device test outright - the flag, the ternary and the second string - is
+what paid: **13,298 best of three packs**, 14 bytes under.
+
 ## R24 - sliding thumbs steer, and what it cost
 
 "Przesuwanie kciuków jest po prostu naturalne" - and it was the one thing
@@ -1656,6 +1700,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R25 the jump reaches the busy thumb | 13,370 | 13,298 (O2, best of 3 packs) | a second finger landing arms the kicker; the prompt says TAP TO JUMP, not SPACE |
 | R24 thumbs that slide, steer | 13,350 | 13,288 (O2, best of 3 packs) | one averaged-position rule replaces three steering cases; paid for by a cheaper anchor and the R22 menu block |
 | R23 the sound unlocks | 13,350 | 13,298 (O2, best of 3 packs) | the audio context is built inside the touch; both entries were silent on a phone |
 | R22 browser taming, priced | 13,350 | 13,291 (O2, best of 3 packs) | long-press menu blocked on both entries; tap highlight only where the budget allowed |

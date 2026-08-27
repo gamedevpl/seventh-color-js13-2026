@@ -8,11 +8,11 @@ written to the 2026 theme, *rainbows and unicorns*.
 | entry | source | zipped | limit | write-up |
 | --- | --- | ---: | ---: | --- |
 | **The Seventh Color** — a twelve-beat story game with four playable mechanics | `native/src` (9 files) | **12,160** | 13,312 | [`NATIVE.md`](./NATIVE.md) |
-| **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,288** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
+| **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,298** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
 
 Rainbow Surfer's pack is a range, not a fixed number: roadroller `-O2` runs a
 randomised search, so consecutive ship builds of identical source measured
-13,288, 13,291 and 13,313. The table quotes the
+13,298, 13,312 and 13,314. The table quotes the
 smallest of three: pack repeatedly and submit the best. This is the procedure,
 not a nicety.
 

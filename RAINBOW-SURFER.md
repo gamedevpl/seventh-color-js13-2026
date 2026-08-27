@@ -59,6 +59,64 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R23 - the sound was never unlocked, and the wall got real
+
+Reported from a phone: no sound at all. The probes all passed, which is
+the interesting part.
+
+**The context was built in the wrong place.** `new AudioContext()` sat in
+the `frame()` loop, reached through the `acted` flag a touch sets - so it
+was created in the animation frame AFTER the gesture, not inside it. A
+phone will not start audio for a context created outside the gesture.
+Desktop Chromium keeps a gesture "sticky" for seconds afterwards, so the
+context started running there and every existing probe - including the
+audio one, which asserts a `running` state and counts oscillators - saw
+nothing wrong. The build that was uploaded had no `resume()` either, so
+the silence was permanent.
+
+`tools/test-unlock.mjs` asks the question the phone asks. It cannot ask
+"does it play", because on desktop it does; it records, at construction
+time, whether a touch was mid-dispatch:
+
+```
+built in gesture: false      <- before
+built in gesture: true       <- after
+```
+
+Both entries failed it. Both now build the context inside the pointer
+handler; The Seventh Color's `resumeAudio` folded back into `initAudio`,
+which resumes when it already has one, since creating on the first touch
+is what the phone wanted anyway. In both gates.
+
+### The wall, and what is now behind it
+
+The same report asked for two more things, and this is where the budget
+finally said no. Measured, three packs each:
+
+| state | packs | verdict |
+| --- | --- | --- |
+| unlock fix alone | 13,298 / 13,306 / 13,307 | fits |
+| + tap highlight | 13,300 / 13,312 / 13,330 | two of three at or over |
+| + steering under the two-thumb chord | 13,342 / 13,355 / 13,363 | over on every pack |
+
+The chord steering costs ~45 bytes in every formulation tried - drift
+from where each thumb landed, the midpoint of the pair, and a unified
+"steer is where the thumbs sit" rule that subsumed the corner case as
+well. All three measured within 20 bytes of each other, because what
+costs is the new branch, not how it is written.
+
+And the small cuts do not pay any more. **Dropping the corner steering
+entirely saved 5 bytes** - roadroller stores its `Math.abs(x - VW/2)`
+test as a near-clone of the jump band's, which was deliberate two passes
+ago and is now the reason it cannot be sold back.
+
+What does pay is the same thing that always pays here: deleting a whole
+thing. **The credit's click-through - the hit boxes, the anchor
+construction, the hover cursor - is 135 bytes** (13,348 -> 13,211), and
+the credit TEXT would stay on the title either way. That is enough for
+the chord steering and the tap highlight together, with room left. It is
+the author's own links, so it is not a call this pass made on its own.
+
 ## R22 - the rest of the browser-taming list, priced
 
 A checklist doing the rounds in the js13k Slack, audited item by item
@@ -1546,6 +1604,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R23 the sound unlocks | 13,350 | 13,298 (O2, best of 3 packs) | the audio context is built inside the touch; both entries were silent on a phone |
 | R22 browser taming, priced | 13,350 | 13,291 (O2, best of 3 packs) | long-press menu blocked on both entries; tap highlight only where the budget allowed |
 | R21 upright on a phone | 13,350 | 13,289 (O2, best of 3 packs) | the game turns itself 90deg in portrait and fills the screen; per-game shell CSS pays for it |
 | R20 phone-shaped page | 13,330 | 13,234 (O2, best of 3 packs) | viewport meta, touch-action and user-select kill iOS selection and zoom; shell probe added to both gates |

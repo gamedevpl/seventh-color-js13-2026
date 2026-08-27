@@ -137,9 +137,16 @@ const holdPeak = async (pts, ms) => {
 // assertion reads "this zone does not boost" when what actually happened
 // is "there was nothing to boost with" - which is how a dry tank failed
 // three different zones across three runs of an unchanged game.
+// Speed decays toward cruise over seconds, so a boost claim measured
+// straight after another boost starts from 30 and cannot show a rise -
+// that is a stopwatch problem, not a throttle problem. Coast first.
+const coast = async () => {
+  for (let i = 0; i < 20 && (await st()).speed > 23; i++) await page.waitForTimeout(300);
+};
 const boostHold = async (pts) => {
   let last;
   for (let i = 0; i < 5; i++) {
+    await coast();
     const base = await st();
     last = await holdPeak(pts, 1600);
     if (last.speed > base.speed + 2 || last.dust > 5) return { base: base.speed, ...last, dry: false };
@@ -169,17 +176,56 @@ check('top strip boosts', boosted(topB), boostDetail(topB));
 // A top corner is boost-and-turn on one thumb: the strip's outer quarters
 // steer their side while the throttle stays open.
 const corner = await boostHold([[9, .95, .1]]);
+// Direction claims read the INPUT, not the lane: a fall mid-hold resets
+// the lane to zero and a jump freezes it, and either turns a working
+// corner into "steers 0.00". The lane is a consequence; turnDir is what
+// the zone actually asked for.
 check('a top corner steers its side',
-  Math.sign(corner.lane) === Math.sign(kR) && Math.abs(corner.lane) > .1, `lane ${corner.lane.toFixed(2)}`);
+  Math.sign(corner.steer) === Math.sign(kR) && corner.steer !== 0, `steer ${corner.steer}`);
 check('...while it boosts', boosted(corner), boostDetail(corner));
+
+// Hold the chord and DRAG it. Two thumbs on opposite sides cancel each
+// other, so the only thing left that can mean "turn" is the drift from
+// where each thumb landed - and the throttle has to stay open while they
+// slide, or the turn costs you the boost you were holding for.
+const chordDrag = async (dir) => {
+  const y = .7;
+  await send('pointerdown', 30, .3, y);
+  await send('pointerdown', 31, .7, y);
+  let steer = 0, speed = 0, dust = 0;
+  for (let i = 1; i <= 7; i++) {
+    await send('pointermove', 30, .3 + dir * i * .02, y);
+    await send('pointermove', 31, .7 + dir * i * .02, y);
+    await page.waitForTimeout(200);
+    const st1 = await st();
+    if (Math.abs(st1.steer) > Math.abs(steer)) steer = st1.steer;
+    speed = Math.max(speed, st1.speed);
+    dust = Math.max(dust, st1.energy);
+  }
+  await send('pointerup', 30, .3 + dir * .14, y);
+  await send('pointerup', 31, .7 + dir * .14, y);
+  await settle();
+  return { steer, speed, dust };
+};
+await coast();
+const dragBase = (await st()).speed;
+const dragL = await chordDrag(-1);
+check('dragging the chord left steers like ArrowLeft',
+  Math.sign(dragL.steer) === Math.sign(kL) && dragL.steer !== 0, `steer ${dragL.steer}`);
+check('...and the boost stays on while it turns',
+  dragL.speed > dragBase + 2 || dragL.dust < 5,
+  dragL.dust < 5 ? 'tank ran dry, boost not provable here' : `${dragBase.toFixed(1)} -> ${dragL.speed.toFixed(1)}`);
+const dragR = await chordDrag(1);
+check('dragging the chord right steers the other way',
+  dragR.steer !== 0 && Math.sign(dragR.steer) !== Math.sign(dragL.steer), `${dragL.steer} vs ${dragR.steer}`);
 
 // ...and a thumb below the strip steers under a middle-of-strip boost.
 await send('pointerdown', 6, .5, .1);
-let sb = { lane: 0 };
-for (let i = 0; i < 3 && Math.abs(sb.lane) < .12; i++) sb = await holdPeak([[7, .2, .7]], 1500);
+let sb = { steer: 0 };
+for (let i = 0; i < 3 && !sb.steer; i++) sb = await holdPeak([[7, .2, .7]], 1500);
 await send('pointerup', 6, .5, .1);
 check('steering works under a top-strip boost',
-  Math.sign(sb.lane) === Math.sign(kL) && Math.abs(sb.lane) > .1, `lane ${sb.lane.toFixed(2)}`);
+  Math.sign(sb.steer) === Math.sign(kL) && sb.steer !== 0, `steer ${sb.steer}`);
 
 // The low middle band is the jump. For steering it is dead ground - a press
 // that arms a kicker must not also pull the line - asserted on the input,

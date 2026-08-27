@@ -100,7 +100,9 @@ function linkAt(x, y) {
 // hold it to boost. Its outer quarters steer as well, so a corner is
 // boost-and-turn on one thumb; the middle half is the straight boost,
 // wide enough to hold off the centre of the horizon. Both sides held at
-// once still boosts, so a second thumb is never wrong. Left and right of the lower
+// once still boosts, and sliding both thumbs the same way steers under
+// that boost - the sides cancel each other, so the DRIFT from where each
+// thumb landed is the only thing left that can mean "turn". Left and right of the lower
 // area steer, EXCEPT a narrow middle band: that band is the SPACE key -
 // arm a kicker - and it fires only on a fresh press, never from a finger
 // that merely drifts in, so steering cannot fire a ramp every time you
@@ -110,7 +112,7 @@ const pts = new Map();
 let tL = 0, tR = 0, tT = 0;
 const inBand = (x, y) => y >= VH * .28 && Math.abs(x - VW / 2) < VW * .1;
 const scan = () => {
-  tL = tR = tT = 0;
+  tL = tR = tT = tB = 0;
   for (const [x, y] of pts.values()) {
     // In the strip the middle HALF is the straight boost; its outer
     // quarters fall through to the side test below, so one corner thumb
@@ -142,7 +144,12 @@ hud.addEventListener('pointerdown', (e) => {
   // is dead for the rest of the session and only a reload brings it back.
   // Every touch is a chance to fix that; resume() on a running context is
   // a no-op.
-  if (ac) ac.resume();
+  // Built HERE, inside the touch, not in the frame that follows it: a phone
+  // will not start audio for a context created outside the gesture, and
+  // the animation frame that used to build it is not one. resume() covers
+  // coming back after a phone suspended it; on a running context it is a
+  // no-op, and on the first touch it is what actually starts the sound.
+  (ac = ac || new AudioContext()).resume();
   if (mode !== 'run' && mode !== 'rainbow') acted = true;
   else if (inBand(x, y)) acted = true;
 });

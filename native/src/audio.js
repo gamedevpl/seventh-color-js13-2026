@@ -11,15 +11,13 @@
 
 let ctx, noiseBuf, track, trackName, step = 0, next = 0, timer;
 
-// A phone suspends the audio context whenever the player switches away -
-// a notification, a locked screen - and never resumes it on its own, so
-// without this the music is dead for the rest of the session. Separate
-// from initAudio so that coming back cannot create a context the game has
-// not asked for yet; resume() on a running context is a no-op.
-export const resumeAudio = () => { if (ctx) ctx.resume(); };
-
+// Called from the touch itself, not from the frame that follows it: a
+// phone will not start audio for a context created outside the gesture,
+// and an animation frame is not one. The same call covers coming back
+// after a phone suspended the context - a notification, a locked screen -
+// which it never resumes on its own; resume() on a running one is a no-op.
 export function initAudio() {
-  if (ctx) return;
+  if (ctx) { ctx.resume(); return; }
   ctx = new (window.AudioContext || window.webkitAudioContext)();
   noiseBuf = ctx.createBuffer(1, 4096, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0);

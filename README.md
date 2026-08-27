@@ -52,6 +52,7 @@ telemetry back out of it:
 | `tools/test-shell.mjs` | at a phone's size, is the page a game - or a document that selects and zooms? |
 | `tools/test-resume.mjs` | does the music survive the player switching away from the game and coming back? |
 | `tools/test-portrait.mjs` | held upright, the game turns itself — do the touch zones follow the picture? |
+| `tools/test-pickup.mjs` | is the dust you visibly drove through actually collected? |
 | `tools/test-unlock.mjs` | is the audio context built inside the touch, which is the only way a phone starts sound? |
 | `tools/test-audio.mjs` | is there sound where there should be, silence where the browser demands it, and is the in-game track still intact? |
 | `tools/test-course.mjs`, `test-smooth.mjs`, `test-cam.mjs`, `test-fov.mjs`, `test-bank.mjs`, `test-dust.mjs` | course invariants, motion, camera and effect geometry |

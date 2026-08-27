@@ -59,6 +59,85 @@ strands/src/
   it stands on - only the camera gets the smoothing. It was visibly
   aligned to the eased camera frame before, which read as floaty.
 
+## R26 - the dust you drive through
+
+Two suspicions, reported from play: *"czasem wizualnie przejeżdżam przez
+pył, a go nie zbieram"* and *"czasem dziwnie jakby walnął w bandę ale
+wizualnie nie walnąłem"*. One is a real bug with a number on it. The
+other is the game working as designed, and the player had already guessed
+why.
+
+### The dust: the lane was never part of the pickup
+
+The pickup measured `d3(star.p, player.r.pos) < 2.7` - and `player.r.pos`
+is the **centreline**. The lane you steer into never entered into it. The
+unicorn is DRAWN at `lane * 2.8`, up to 3.5 off centre, and deck motes are
+placed at `sin(i*.9 + j*2) * 2.8`, up to 2.8 off centre and 1.1 above the
+deck. So:
+
+| | |
+| --- | ---: |
+| greatest lateral offset still within a 2.7 reach | 2.466 |
+| furthest a mote is actually placed | 3.01 |
+| **deck motes that could never be collected, at any lane** | **31.4%** |
+
+Both halves were wrong at once: a mote at the edge could not be taken
+however exactly you drove through it, and a mote on the centreline came to
+you while you were three and a half units away at the rail. Steering had
+no effect on collection at all - which is the opposite of the design note
+this write-up has carried since R2, that the lane exists for gathering
+stardust.
+
+**The air path was always right**, and that is why it survived: in flight
+the pickup uses `prevP`, which carries `fly.lat`, so it follows where you
+actually fly. Only the deck measured a place the player was not.
+
+The fix moves the pickup down to where the deck frame exists and tests
+against `p + dSide * lane * 2.8` - the position the unicorn is drawn at.
+One position now, for ground and air alike.
+
+`tools/test-pickup.mjs` is the probe, and it is written as the player's
+own question: watch the drawn unicorn, watch the live mote list, and count
+anything passed through and left behind. It was checked against the OLD
+code first, because a probe that cannot fail is not evidence:
+
+```
+before:  6 motes driven through, 3 left behind (closest miss 1.48u)
+after:   everything the unicorn passed through was collected
+```
+
+### The band: there is no band
+
+Nothing in this game collides with a rail. Four things end a run, and
+only one of them has any visual to go with it:
+
+- flight sank more than 7 below the arc - you fell short of the far lip
+- a ramp landing more than 3.6 off line - you missed the deck
+- `|lane| > 1.25`, which is 3.5 lateral
+- **half a second below a demand's required speed** - `slowT > .5`
+
+The last one is almost certainly what was felt, and the player's own guess
+- *"chyba że to chodzi o za niską prędkość"* - was right. It throws you
+with no contact and nothing to see: the deck simply stops holding you.
+There IS a flashing `SPEED UP!` over the horizon and demand sections carry
+pink rails, and the fall says *Too slow for the bend*, but none of that is
+a collision, so it does not read as one.
+
+Worth recording for a future pass: the edge case is thrown at 3.5 lateral
+while the flat deck runs to 3.3 and the visible neon rail sits at 5.0. You
+are on the raised lip when it happens, which is defensible - but there is
+a unit and a half of lit road still outside you, and at a glance that
+reads as being thrown off the middle of the track.
+
+### What it cost
+
+The fix is about 15 bytes - the mode guard the pickup needs in its new
+home, less the `fly ?` ternary it no longer needs. Three packs came to
+13,311 / 13,321 / 13,348 against a 13,312 limit: **only the best one
+fits.** The credit click-through, still 135 bytes and still the author's
+call, would cover this with room to spare, and this is no longer a polish
+item - a third of the stardust in the game cannot be collected.
+
 ## R25 - the jump comes to the thumb that is already busy
 
 "Kompletnie nie potrafię skakać." The band was a strip of screen you had
@@ -1700,6 +1779,7 @@ seeing the rest of it, and lips 1.5 units tall hid exactly that. So:
 | R3 signs and balance | 11,500 | 10,474 | two sign bugs, centrifugal lane physics, earned jumps, economy measured |
 | R4 shape and score | 11,500 | 10,885 | difficulty ramp, persistent best, richer end screen |
 | R5 speed dust | 11,500 | 11,156 | world-anchored motes, blur cost measured and cut to three passes |
+| R26 the dust you drive through | 13,370 | 13,311 (O2, best of 3 packs; most land over) | the pickup follows the lane instead of the centreline - 31.4% of motes were unreachable |
 | R25 the jump reaches the busy thumb | 13,370 | 13,298 (O2, best of 3 packs) | a second finger landing arms the kicker; the prompt says TAP TO JUMP, not SPACE |
 | R24 thumbs that slide, steer | 13,350 | 13,288 (O2, best of 3 packs) | one averaged-position rule replaces three steering cases; paid for by a cheaper anchor and the R22 menu block |
 | R23 the sound unlocks | 13,350 | 13,298 (O2, best of 3 packs) | the audio context is built inside the touch; both entries were silent on a phone |

@@ -315,6 +315,7 @@ function placeStars() {
       }
     }
   }
+  if (DEV) window.__stars = stars;
 }
 
 // --- particles: bloomy star sparks ---------------------------------------
@@ -897,21 +898,6 @@ function frame(now) {
       }
     }
 
-    // stardust pickup
-    if (player.r) {
-      const pi = player.r.a.i, pp2 = fly ? (prevP || player.r.pos) : player.r.pos;
-      for (const st2 of stars) {
-        if (st2.taken || st2.i < pi - 1 || st2.i > pi + (fly ? 6 : 2)) continue;
-        if (d3(st2.p, pp2) < (fly ? 4 : 2.7)) {
-          st2.taken = true;
-          energy = Math.min(100, energy + 10);
-          surge = Math.max(surge, .25);
-          burst(st2.p, 8, 5);
-          tone(880 + Math.random() * 220, .12, 'triangle', .07);
-        }
-      }
-    }
-
     speedN = (player.speed - 7) / 39;
     speedSm += (speedN - speedSm) * Math.min(1, dt * 1.5);
 
@@ -1022,6 +1008,31 @@ function frame(now) {
   const rSide0 = X(rUp, rT);
   const rUp2 = [rUp[0] * cR + rSide0[0] * sR, rUp[1] * cR + rSide0[1] * sR, rUp[2] * cR + rSide0[2] * sR];
   const rSide = X(rUp2, rT);
+  // Stardust pickup, here rather than up in the update pass, because THIS
+  // is where the lane exists as a place. It used to measure from
+  // `player.r.pos` - the centreline - so where you steered made no
+  // difference to what you collected: a mote at the deck's edge sat 3.01
+  // away from a 2.7 reach and could never be taken however exactly you
+  // drove through it (31% of them), while one on the centreline came to
+  // you from the far edge. The air path was always right, which is why
+  // this survived: in flight `p` already carries `fly.lat`. Now both use
+  // the same thing - where the unicorn is drawn.
+  const lx = fly ? 0 : player.lane * 2.8;
+  if ((mode === 'run' || mode === 'rainbow') && player.r) {
+    const pi = player.r.a.i;
+    const pp2 = [p[0] + dSide[0] * lx, p[1] + dSide[1] * lx, p[2] + dSide[2] * lx];
+    if (DEV) window.__uni = pp2;
+    for (const st2 of stars) {
+      if (st2.taken || st2.i < pi - 1 || st2.i > pi + (fly ? 6 : 2)) continue;
+      if (d3(st2.p, pp2) < (fly ? 4 : 2.7)) {
+        st2.taken = true;
+        energy = Math.min(100, energy + 10);
+        surge = Math.max(surge, .25);
+        burst(st2.p, 8, 5);
+        tone(880 + Math.random() * 220, .12, 'triangle', .07);
+      }
+    }
+  }
   lean += (turnDir() * .1 - lean) * Math.min(1, dt * 4);
 
   const high = (2.0 - speedSm * .15) + cine * 2.2;
@@ -1155,7 +1166,7 @@ function frame(now) {
     glMode(0);
 
     const bob = Math.abs(Math.sin(now / 1000 * 11)) * Math.min(1, player.speed / 14) * .1;
-    const S8 = .85, lx = fly ? 0 : player.lane * 2.8;
+    const S8 = .85;
     const base = [
       p[0] + rUp[0] * (bob + .04) + dSide[0] * lx,
       p[1] + rUp[1] * (bob + .04) + dSide[1] * lx,

@@ -124,14 +124,58 @@ Worst-of-3 at `--O1`: **5,384** against 13,312 — **7,928 bytes in hand** for
 the game itself. Stated now so that later passes are spending a measured
 budget rather than a hoped-for one.
 
+## R2 — the studio
+
+The meadow is gone. This is a game about a photo shoot, so the set is a
+**seamless cyclorama**: the floor sweeps up into the back wall through a
+quarter-circle curve with no visible join, which is the backdrop every real
+photograph of a posing subject is taken against. Warm paper, lightly shaded.
+
+Three things make it read as a studio rather than as a coloured box:
+
+- **The shading is baked into vertex colours**, not lit and not shadered.
+  The renderer has one program, and a studio needs exactly one thing that
+  program does not do: a soft pool of light falling off toward the edges. A
+  dense enough sheet with per-vertex brightness gives that for free — no
+  uniform, no branch, no second shader — and because the falloff is computed
+  from world position it never bands the way a texture would. The first cut
+  bottomed out at 0.34 and the far corners went olive; a sweep is an even
+  field with a gentle pool in it, not a spotlight in a dark room, and it
+  bottoms out at 0.55 now.
+- **The floor shades differently from the wall.** Lit as evenly as each
+  other they read as the inside of a cardboard box; the fall-off along the
+  floor toward the lens is what gives the sweep its depth.
+- **A contact shadow**, as a unit fan scaled to the subject. On a seamless
+  sweep there is no horizon line and no texture, so the shadow is the *only*
+  cue for where the floor is — without it the unicorn hangs in front of the
+  backdrop instead of standing on it.
+
+### What the backdrop cost the mane
+
+The mane was purely additive, and against Rainbow Surfer's night sky it
+glowed beautifully. Against a lit studio sweep additive is very nearly a
+no-op: adding light to an already-bright surface changes almost nothing, and
+the rainbow washed out to the colour of the paper.
+
+So the hair is two materials now. The **core is solid** — opaque coloured
+geometry that holds its hue against anything behind it — and the additive
+pass is demoted to a thin rim that reads as sheen rather than as the hair
+itself. Both are filled in one walk of the strands: the two ribbons differ
+only in width and alpha, so the cross product that turns each segment toward
+the lens is computed once and used twice.
+
+This is worth stating as a general rule for the rest of the build: **on a
+bright background, glow is not a colour, it is a highlight.** Anything that
+needs to be *seen* has to be solid.
+
 ## Where it goes next
 
 - **The photograph.** Aim, shutter, and a score computed from world state at
   the moment it fires: framing against the thirds, how much of the frame the
-  unicorn fills, which pose it was caught mid-way through, eye contact, and
-  what was behind it — the arc, the stars, its own reflection.
-- **A unicorn with opinions.** It should live in the meadow on its own
-  schedule and be *shy*: closer is a bigger subject and a better picture,
-  too close and it leaves. That tension is the game.
+  unicorn fills, which pose it was caught mid-way through, and eye contact.
+- **A unicorn with opinions.** It should work the set on its own schedule —
+  striking poses, getting bored, playing up to the lens when it feels like
+  it. What replaces the meadow's shyness as the source of tension is an open
+  question the next pass has to answer.
 - **The music.** A strutting catwalk vamp — the joke the idea was born with,
   written rather than borrowed.

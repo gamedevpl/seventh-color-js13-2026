@@ -1,24 +1,29 @@
-// Unicorn Snap - point a camera at a unicorn that knows it looks good.
+// Unicorn Snap - point a camera at a unicorn that knows exactly how good it
+// looks.
 //
-// This pass is the rig harness: an orbit camera, a meadow to stand on, and
-// every pose reachable so they can be looked at. The photography comes
-// next; getting the animal right first is the whole point of the game.
+// This pass is the rig harness plus the set it stands on: an orbit camera,
+// a studio sweep, and every pose reachable so they can be looked at. The
+// photography comes next; getting the animal and the light right first is
+// the whole point of the game.
 
 import {
-  initGL, frameGL, mode, drawMesh, createMesh, updateMesh, pushBox,
+  initGL, frameGL, mode, drawMesh, createMesh, updateMesh,
   perspective, lookAt, mul, modelTR, IDENT,
 } from './gl.js';
-import { buildUnicorn, makePose, solve, RAINBOW } from './uni.js';
-import { makeMane, updateMane, maneVerts, MANE_BUF } from './mane.js';
-import { makeAnim, applyPose, POSE_NAME, GRAZE, IDLE, WALK, TROT, GALLOP, REAR, TOSS, SHAKE, SLEEP, PRANCE } from './pose.js';
+import { buildUnicorn, makePose, solve } from './uni.js';
+import { studioMesh, shadowMesh, lightsMesh } from './studio.js';
+import { makeMane, updateMane, maneVerts, MANE_CORE, MANE_HALO } from './mane.js';
+import { makeAnim, applyPose, POSE_NAME } from './pose.js';
 
-const FOG = [.07, .06, .13];
+// Warm and dark, so the frame beyond the paper's edge reads as the unlit
+// depth of a studio rather than as a hole in the world.
+const FOG = [.09, .07, .05];
 
 const c = document.getElementById('c');
 initGL(c);
 
 const hud = document.createElement('div');
-hud.style.cssText = 'position:fixed;left:12px;top:10px;font:16px system-ui,sans-serif;color:#cfc6ff;text-shadow:0 2px 6px #000;pointer-events:none';
+hud.style.cssText = 'position:fixed;left:12px;top:10px;font:16px system-ui,sans-serif;color:#3a2a12;pointer-events:none';
 document.body.appendChild(hud);
 
 function resize() {
@@ -31,64 +36,20 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-// --- the meadow ----------------------------------------------------------
-function groundMesh() {
-  const v = [];
-  pushBox(v, 0, -.4, 0, 80, .8, 80, .16, .18, .26);
-  return createMesh(v);
-}
-
-// Glowing tufts, scattered on a fixed lattice so the field is the same
-// every run and the camera has something to parallax against.
-function fieldMesh() {
-  const v = [];
-  let s = 7;
-  const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  for (let i = 0; i < 420; i++) {
-    const a = rnd() * 6.283, r = 2 + rnd() * 30;
-    const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    const col = RAINBOW[(rnd() * 7) | 0];
-    // Rooted in the grass and short. Tall bright bars read as confetti
-    // hanging in the air rather than as a meadow with light in it.
-    const h = .05 + rnd() * .07;
-    pushBox(v, x, h / 2, z, .03, h, .03, col[0], col[1], col[2], .38);
-  }
-  return createMesh(v);
-}
-
-// A sky that is mostly empty and one rainbow arc, because the theme is
-// rainbows and unicorns and the arc is what a photograph wants behind it.
-function skyMesh() {
-  const v = [];
-  let s = 91;
-  const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-  for (let i = 0; i < 160; i++) {
-    const a = rnd() * 6.283, e = rnd() * 1.2 + .05, r = 120;
-    const y = Math.sin(e) * r, h = Math.cos(e) * r;
-    pushBox(v, Math.cos(a) * h, y, Math.sin(a) * h, .5, .5, .5, .9, .92, 1, .5 + rnd() * .5);
-  }
-  // The arc has to be sampled densely enough that it reads as a band and
-  // not as a dotted line: at 24 steps the gaps between boxes were wider
-  // than the boxes, and it came out as a ladder lying on its side.
-  RAINBOW.forEach((col, i) => {
-    const r = 46 + i * 2.4;
-    for (let k = 0; k <= 90; k++) {
-      const a = Math.PI * (k / 90);
-      pushBox(v, Math.cos(a) * r, Math.sin(a) * r, -70, 2.6, 2.6, 2.6, col[0], col[1], col[2], .2);
-    }
-  });
-  return createMesh(v);
-}
-
-const ground = groundMesh(), field = fieldMesh(), sky = skyMesh();
+const studio = studioMesh(), shadow = shadowMesh(), lights = lightsMesh();
 const parts = buildUnicorn();
 const P = makePose();
 const anim = makeAnim();
 const M = makeMane();
-const maneMesh = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
+const maneCore = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
+const maneHalo = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
 
 // --- camera --------------------------------------------------------------
-const cam = { yaw: .6, pitch: .18, dist: 5.2 };
+// The sweep only exists in front of the subject, which is what a cyclorama
+// is - so the lens stays on the near side of it. That is not a limitation
+// to work around, it is the room.
+const YAW = 1.25;
+const cam = { yaw: .35, pitch: .12, dist: 5.6 };
 const keys = {};
 addEventListener('keydown', (e) => {
   keys[e.code] = 1;
@@ -102,12 +63,12 @@ addEventListener('pointerdown', (e) => { drag = [e.clientX, e.clientY]; });
 addEventListener('pointerup', () => { drag = null; });
 addEventListener('pointermove', (e) => {
   if (!drag) return;
-  cam.yaw -= (e.clientX - drag[0]) * .006;
-  cam.pitch = Math.max(-.2, Math.min(1.1, cam.pitch + (e.clientY - drag[1]) * .004));
+  cam.yaw = Math.max(-YAW, Math.min(YAW, cam.yaw - (e.clientX - drag[0]) * .006));
+  cam.pitch = Math.max(-.12, Math.min(.9, cam.pitch + (e.clientY - drag[1]) * .004));
   drag = [e.clientX, e.clientY];
 });
 addEventListener('wheel', (e) => {
-  cam.dist = Math.max(2, Math.min(16, cam.dist + e.deltaY * .003));
+  cam.dist = Math.max(2, Math.min(14, cam.dist + e.deltaY * .003));
 });
 
 // The dev harness picks a pose from the URL so a screenshot can be taken of
@@ -123,13 +84,11 @@ function frame(now) {
   anim.t += dt;
   anim.hold += dt;
 
-  if (keys.ArrowLeft) cam.yaw += dt * 1.4;
-  if (keys.ArrowRight) cam.yaw -= dt * 1.4;
-  if (keys.ArrowUp) cam.pitch = Math.min(1.1, cam.pitch + dt);
-  if (keys.ArrowDown) cam.pitch = Math.max(-.2, cam.pitch - dt);
+  if (keys.ArrowLeft) cam.yaw = Math.min(YAW, cam.yaw + dt * 1.4);
+  if (keys.ArrowRight) cam.yaw = Math.max(-YAW, cam.yaw - dt * 1.4);
+  if (keys.ArrowUp) cam.pitch = Math.min(.9, cam.pitch + dt);
+  if (keys.ArrowDown) cam.pitch = Math.max(-.12, cam.pitch - dt);
 
-  // Where the unicorn is looking: at the camera, so the rig's gaze code
-  // gets exercised while the poses are being judged.
   anim.gaze = keys.Space ? 1 : 0;
   anim.lookYaw = Math.atan2(Math.sin(cam.yaw - P.yaw), Math.cos(cam.yaw - P.yaw));
   anim.lookPitch = cam.pitch;
@@ -137,36 +96,42 @@ function frame(now) {
   applyPose(P, anim, dt);
   solve(P);
 
+  // The hair is solved AFTER the rig, because every root rides a bone that
+  // this frame's pose has just moved - solving it first would hang the mane
+  // off where the head was a frame ago, which reads as a rubbery lag.
+  updateMane(M, P.w, anim.t, dt);
+
   const aim = [0, .8, 0];
   const eye = [
     aim[0] + Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist,
     aim[1] + Math.sin(cam.pitch) * cam.dist,
     aim[2] + Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist,
   ];
+  const [nc, nh] = maneVerts(M, eye);
+  updateMesh(maneCore, MANE_CORE, nc);
+  updateMesh(maneHalo, MANE_HALO, nh);
   const vp = mul(perspective(1.15, c.width / c.height, .1, 400), lookAt(eye, aim));
-
-  // The hair is solved AFTER the rig, because every root rides a bone that
-  // this frame's pose has just moved - solving it first would hang the mane
-  // off where the head was a frame ago, which reads as a rubbery lag.
-  updateMane(M, P.w, anim.t, dt);
-  updateMesh(maneMesh, MANE_BUF, maneVerts(M, eye));
 
   frameGL(vp, eye, FOG);
   mode(0);
-  drawMesh(ground, IDENT);
+  drawMesh(studio, IDENT);
   for (let i = 0; i < parts.length; i++) drawMesh(parts[i], P.w[i]);
+  drawMesh(maneCore, IDENT);
+  mode(2);
+  // Just clear of the paper: coplanar with it, this z-fights across the
+  // whole disc and flickers as the camera moves.
+  drawMesh(shadow, modelTR(P.x, .012, P.z, 0, 1.15));
   mode(1);
-  drawMesh(sky, modelTR(eye[0], 0, eye[2]));
-  drawMesh(field, IDENT);
-  drawMesh(maneMesh, IDENT);
+  drawMesh(lights, IDENT);
+  drawMesh(maneHalo, IDENT);
 
   hud.textContent = `${POSE_NAME[anim.mode]}   [0-9 poses, drag to orbit, SPACE to be looked at]`;
 
-  // The rig probe. "Is it standing on the grass?" is not a question to
+  // The rig probe. "Is it standing on the floor?" is not a question to
   // settle by looking at a screenshot - a pose can float or sink by a few
   // centimetres and read as merely a bit odd, and every bone above the root
   // inherits the root's pitch, so the failure mode is systematic rather
-  // than rare. The lowest hoof is the number that decides it.
+  // than rare. The lowest contact point is the number that decides it.
   if (DEV) {
     let lo = 9;
     for (const b of [5, 7, 9, 11]) {

@@ -134,51 +134,66 @@ export function updateMane(M, W, t, dt) {
           b[0] = c[0] + dx * s2; b[1] = c[1] + dy * s2; b[2] = c[2] + dz * s2;
         }
       }
-      if (b[1] < .02) b[1] = .02;        // never through the grass
+      if (b[1] < .02) b[1] = .02;        // never through the floor
     }
   }
 }
 
 // Billboarded quads along each strand, tapering to nothing at the tip.
-// Additive, because a rainbow mane on a unicorn under a night sky should
-// give light rather than merely reflect it - and additive strands sum where
-// they cross, which is what makes a thick mane read as thick.
-const BUF = new Float32Array(24 * L * 6 * 10 * 2);
-let bi = 0;
-const V = (x, y, z, c, a) => {
-  BUF[bi++] = x; BUF[bi++] = y; BUF[bi++] = z;
-  BUF[bi++] = 0; BUF[bi++] = 1; BUF[bi++] = 0;
-  BUF[bi++] = c[0]; BUF[bi++] = c[1]; BUF[bi++] = c[2]; BUF[bi++] = a;
+//
+// TWO MATERIALS, and the reason is the backdrop. On Rainbow Surfer's night
+// sky the mane was purely additive and glowed beautifully; against a lit
+// studio sweep additive is nearly a no-op, because adding light to an
+// already-bright surface changes almost nothing - the rainbow washed out to
+// the colour of the paper. So the core is now SOLID, opaque, coloured
+// geometry that holds its hue against anything behind it, and the additive
+// pass is demoted to a thin rim that reads as sheen rather than as the hair
+// itself.
+const CORE = new Float32Array(24 * L * 6 * 10);
+const HALO = new Float32Array(24 * L * 6 * 10);
+let ci = 0, hi = 0;
+const V = (buf, i, x, y, z, c, a) => {
+  buf[i++] = x; buf[i++] = y; buf[i++] = z;
+  buf[i++] = 0; buf[i++] = 1; buf[i++] = 0;
+  buf[i++] = c[0]; buf[i++] = c[1]; buf[i++] = c[2]; buf[i++] = a;
+  return i;
 };
-const Q = (a, b, c, d) => { V(...a); V(...b); V(...c); V(...a); V(...c); V(...d); };
+// One quad as two triangles, into whichever buffer it belongs to.
+const Q = (buf, i, a, b, c, d) => {
+  i = V(buf, i, ...a); i = V(buf, i, ...b); i = V(buf, i, ...c);
+  i = V(buf, i, ...a); i = V(buf, i, ...c); i = V(buf, i, ...d);
+  return i;
+};
 
+// Fills BOTH buffers in one walk of the strands and returns their two vertex
+// counts. The core and the halo are the same ribbon at two widths, so the
+// cross product that orients it toward the lens is computed once and used
+// twice rather than the whole solve being run per material.
 export function maneVerts(M, eye) {
-  bi = 0;
+  ci = 0; hi = 0;
   for (const s of M.strands) {
     for (let i = 1; i < L; i++) {
       const a = s.p[i - 1], b = s.p[i];
       // A strand's width is perpendicular to both the strand and the line
       // of sight, so it faces the lens from every angle - a fixed-plane
       // ribbon disappears edge-on, and this game is all about angles.
-      let dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
-      let ex = a[0] - eye[0], ey = a[1] - eye[1], ez = a[2] - eye[2];
+      const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+      const ex = a[0] - eye[0], ey = a[1] - eye[1], ez = a[2] - eye[2];
       let sx = dy * ez - dz * ey, sy = dz * ex - dx * ez, sz = dx * ey - dy * ex;
       const sl = Math.hypot(sx, sy, sz) || 1;
       sx /= sl; sy /= sl; sz /= sl;
-      // Two passes: a narrow core inside a wide faint halo. The alphas are
-      // low because additive draws SUM where strands overlap, and a mane is
-      // nothing but overlapping strands - at 0.85 the crest saturated to
-      // pure white and the only rainbow left was the fringe at its edge.
-      for (const [w, al] of [[.035, .42], [.10, .12]]) {
-        const w0 = w * (1 - (i - 1) / L * .6), w1 = w * (1 - i / L * .6);
-        const a0 = al * (1 - (i - 1) / L * .5), a1 = al * (1 - i / L * .5);
-        Q([a[0] - sx * w0, a[1] - sy * w0, a[2] - sz * w0, s.c, a0],
-          [a[0] + sx * w0, a[1] + sy * w0, a[2] + sz * w0, s.c, a0],
-          [b[0] + sx * w1, b[1] + sy * w1, b[2] + sz * w1, s.c, a1],
-          [b[0] - sx * w1, b[1] - sy * w1, b[2] - sz * w1, s.c, a1]);
-      }
+      const t0 = 1 - (i - 1) / L * .55, t1 = 1 - i / L * .55;
+      const f0 = 1 - (i - 1) / L * .3, f1 = 1 - i / L * .3;
+      const rib = (w, a0, a1) => [
+        [a[0] - sx * w * t0, a[1] - sy * w * t0, a[2] - sz * w * t0, s.c, a0],
+        [a[0] + sx * w * t0, a[1] + sy * w * t0, a[2] + sz * w * t0, s.c, a0],
+        [b[0] + sx * w * t1, b[1] + sy * w * t1, b[2] + sz * w * t1, s.c, a1],
+        [b[0] - sx * w * t1, b[1] - sy * w * t1, b[2] - sz * w * t1, s.c, a1],
+      ];
+      ci = Q(CORE, ci, ...rib(.055, f0, f1));
+      hi = Q(HALO, hi, ...rib(.105, .16 * f0, .16 * f1));
     }
   }
-  return bi;
+  return [ci, hi];
 }
-export { BUF as MANE_BUF };
+export { CORE as MANE_CORE, HALO as MANE_HALO };

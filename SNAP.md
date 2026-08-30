@@ -1517,6 +1517,38 @@ both because the halo had been quietly doing work nobody asked it to do:
   there was nothing left to tell one strand from the next. The shade is
   dealt out by strand index so neighbours always differ.
 
+### Three faults, one shortcut
+
+Then, on the same hair: *it looks like cut tissue paper, there are little
+gaps between the segments, and it does not react to the light at all.* All
+three were the same shortcut — a quad is not a surface.
+
+**The gaps.** The sideways vector was computed per segment, from that
+segment's own direction, so where a strand bends the two quads meeting at a
+point were rotated slightly differently and their corners did not touch. It
+is computed per **point** now, off the average of the segments either side,
+so consecutive quads share their corners exactly and a strand is one
+continuous band.
+
+**The light.** Every hair vertex carried a hard-coded normal of straight up,
+which made the one lambert term in the shader a constant. The hair could not
+be lit, shaded, or turned away from the light — it read as cut paper because
+that is precisely what it was. Each edge of the ribbon now gets a normal
+tilted **outward** from the strand's plane, as if the band were the front of
+a round tuft: the middle faces the lens, the edges lean away, and the
+gradient across every strand is what says *hair* rather than *sticker*.
+
+One correction fell out of that immediately. A billboard's own normal points
+at the lens, which is at right angles to a light coming from above, so
+shading it honestly made every strand dark — the mane went murky the moment
+it stopped being flat-lit. The normals carry a standing up-component too, so
+the hair catches the key light the way the body does and the side lean
+supplies the gradient.
+
+With real shading in place the per-strand tint went from ±18% to ±10%: it
+only has to break neighbours apart now, not carry the whole impression of
+depth on its own.
+
 ### And a gate that had been quietly diluted
 
 The suite caught something the hair work had nothing to do with: a bored

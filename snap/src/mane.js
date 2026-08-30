@@ -132,7 +132,10 @@ export function recolour(M, deco, g, c) {
     // one strand from the next, and a pink mane read as a single moulded
     // piece. A few percent of shade, dealt out so neighbours differ, is
     // enough to see the hair as hair.
-    const k = .82 + .18 * ((s.i * 3) % 5) / 4;
+    // A narrower spread than it was: the strands are shaded by the light
+    // now, so this only has to break up neighbours, not carry the whole
+    // impression of depth by itself.
+    const k = .9 + .1 * ((s.i * 3) % 5) / 4;
     s.c = [col[0] * k, col[1] * k, col[2] * k];
   }
 }
@@ -246,46 +249,83 @@ export function updateMane(M, W, t, dt) {
 // sitting inside a haze, and it costs half the geometry it used to.
 const CORE = new Float32Array(24 * L * 6 * 10);
 let ci = 0;
-const V = (buf, i, x, y, z, c, a) => {
+const V = (buf, i, x, y, z, n, c) => {
   buf[i++] = x; buf[i++] = y; buf[i++] = z;
-  buf[i++] = 0; buf[i++] = 1; buf[i++] = 0;
-  buf[i++] = c[0]; buf[i++] = c[1]; buf[i++] = c[2]; buf[i++] = a;
+  buf[i++] = n[0]; buf[i++] = n[1]; buf[i++] = n[2];
+  buf[i++] = c[0]; buf[i++] = c[1]; buf[i++] = c[2]; buf[i++] = 1;
   return i;
 };
-// One quad as two triangles, into whichever buffer it belongs to.
 const Q = (buf, i, a, b, c, d) => {
   i = V(buf, i, ...a); i = V(buf, i, ...b); i = V(buf, i, ...c);
   i = V(buf, i, ...a); i = V(buf, i, ...c); i = V(buf, i, ...d);
   return i;
 };
 
+// Scratch, filled once per strand: the sideways vector and the ribbon's own
+// normal AT EACH POINT rather than along each segment.
+const SIDE = [], NRM = [];
+
 // One walk of the strands, one buffer, and the vertex count back.
+//
+// Three things were wrong with the ribbons at once, and all three were the
+// same shortcut - a quad is not a surface.
+//
+// GAPS BETWEEN SEGMENTS. The sideways vector was computed per segment, from
+// that segment's own direction, so where a strand bends the two quads
+// meeting at a point were rotated slightly differently and the corners did
+// not touch. It is computed per POINT now, off the average of the segments
+// either side, so consecutive quads share their corners exactly and a
+// strand is one continuous band.
+//
+// NO LIGHT ON IT. Every vertex carried a hard-coded normal of straight up,
+// which means the one lambert term in the shader was a constant and the
+// hair could not be lit, shaded or turned away from the light. It read as
+// cut tissue paper, and that is exactly what it was.
+//
+// So each edge of the ribbon gets a normal TILTED OUTWARD from the strand's
+// own plane, as if the band were the front of a round tuft: the middle
+// faces the lens, the edges lean away. One cross product per point buys the
+// shading gradient across every strand that says "this is hair" rather than
+// "this is a sticker".
 export function maneVerts(M, eye) {
   ci = 0;
   for (const s of M.strands) {
-    for (let i = 1; i < L; i++) {
-      const a = s.p[i - 1], b = s.p[i];
-      // A strand's width is perpendicular to both the strand and the line
-      // of sight, so it faces the lens from every angle - a fixed-plane
-      // ribbon disappears edge-on, and this game is all about angles.
+    const P = s.p;
+    for (let i = 0; i < L; i++) {
+      const a = P[i > 0 ? i - 1 : 0], b = P[i < L - 1 ? i + 1 : L - 1];
       const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
-      const ex = a[0] - eye[0], ey = a[1] - eye[1], ez = a[2] - eye[2];
+      // Toward the lens, so the band never disappears edge-on - this game
+      // is all about angles.
+      const ex = P[i][0] - eye[0], ey = P[i][1] - eye[1], ez = P[i][2] - eye[2];
       let sx = dy * ez - dz * ey, sy = dz * ex - dx * ez, sz = dx * ey - dy * ex;
       const sl = Math.hypot(sx, sy, sz) || 1;
       sx /= sl; sy /= sl; sz /= sl;
+      let nx = sy * dz - sz * dy, ny = sz * dx - sx * dz, nz = sx * dy - sy * dx;
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      nx /= nl; ny /= nl; nz /= nl;
+      SIDE[i] = [sx, sy, sz];
+      // The two edge normals, leaned out to either side.
+      // ...and leaned UP as well as out. A billboard's own normal points
+      // at the lens, which is at right angles to a light coming from above,
+      // so shading it honestly made every strand dark - the hair went murky
+      // the moment it stopped being flat-lit. Real hair catches the key
+      // light on top, so the normal carries a standing up-component and the
+      // side lean supplies the gradient across the band.
+      NRM[i] = [
+        [nx * .42 - sx * .66, ny * .42 - sy * .66 + .62, nz * .42 - sz * .66],
+        [nx * .42 + sx * .66, ny * .42 + sy * .66 + .62, nz * .42 + sz * .66],
+      ];
+    }
+    for (let i = 1; i < L; i++) {
+      const a = P[i - 1], b = P[i], s0 = SIDE[i - 1], s1 = SIDE[i];
       // Tapering toward the tip, which is what hair does and what keeps a
       // strand from ending in a blunt square.
-      const t0 = 1 - (i - 1) / L * .55, t1 = 1 - i / L * .55;
-      // Wider than it was under the halo, because the halo used to fill
-      // the gaps between strands and its removal left the neck showing
-      // through the mane. Still under the segment length, so a quad is
-      // taller than it is wide and reads as hair rather than as tiling.
-      const w = .064;
+      const w0 = .064 * (1 - (i - 1) / L * .55), w1 = .064 * (1 - i / L * .55);
       ci = Q(CORE, ci,
-        [a[0] - sx * w * t0, a[1] - sy * w * t0, a[2] - sz * w * t0, s.c, 1],
-        [a[0] + sx * w * t0, a[1] + sy * w * t0, a[2] + sz * w * t0, s.c, 1],
-        [b[0] + sx * w * t1, b[1] + sy * w * t1, b[2] + sz * w * t1, s.c, 1],
-        [b[0] - sx * w * t1, b[1] - sy * w * t1, b[2] - sz * w * t1, s.c, 1]);
+        [a[0] - s0[0] * w0, a[1] - s0[1] * w0, a[2] - s0[2] * w0, NRM[i - 1][0], s.c],
+        [a[0] + s0[0] * w0, a[1] + s0[1] * w0, a[2] + s0[2] * w0, NRM[i - 1][1], s.c],
+        [b[0] + s1[0] * w1, b[1] + s1[1] * w1, b[2] + s1[2] * w1, NRM[i][1], s.c],
+        [b[0] - s1[0] * w1, b[1] - s1[1] * w1, b[2] - s1[2] * w1, NRM[i][0], s.c]);
     }
   }
   return ci;

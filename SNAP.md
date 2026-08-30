@@ -134,8 +134,9 @@ budget rather than a hoped-for one.
 | R6, the tripod, roaming and balance | 10,026 | 227 |
 | R7, title, contact sheet and coaching | 10,619 | 593 |
 | R8, the viewfinder, pinch and a shutter | 11,266 | 647 |
+| R9, aiming with the phone | 11,603 | 337 |
 
-**2,046 bytes still in hand.**
+**1,709 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -696,6 +697,70 @@ twice is a tooling defect, not a lapse.
 Re-measured with the viewfinder in: **2.57x**, against 2.65x before it —
 unchanged within the run-to-run spread, which is what a HUD ought to do to
 a score.
+
+## R9 — aiming the camera by moving the phone
+
+The ask was WebXR. **What shipped is not WebXR, and that was a deliberate
+call worth writing down**, because the request named an API and described an
+experience, and only one of the two was a good fit.
+
+`immersive-ar` needs ARCore, so it is Android-and-Chrome — **iOS Safari has
+no WebXR at all** — and the DOM heads-up display would additionally need the
+`dom-overlay` feature, narrowing it again. Beyond support: an AR session
+puts the unicorn in your living room, and the one thing this game is about
+standing in is a lit studio cove. A VR session on a phone wants a headset.
+
+`DeviceOrientation` delivers the part that was actually asked for — *turn
+the phone, turn the lens* — on both platforms, for 337 bytes.
+
+### Relative, and accumulated
+
+Two decisions, both of which the probe had opinions about.
+
+**Relative to the pose it was switched on in**, not to compass north.
+Absolute headings need a calibrated magnetometer, drift indoors, and would
+point the player at a corner of the cove they never chose. Switching it off
+and on again is therefore also a recentre.
+
+**Yaw accumulates the wrapped step between consecutive readings** rather
+than measuring against a fixed origin. The first cut did the latter, and the
+test caught what that costs: `alpha` wraps at north, so a heading held
+against one base flips the long way round the moment the player turns more
+than half a circle from where they began — **a 10 degree movement across
+north swung the lens 350 degrees.** Pitch stays absolute against its base,
+because `beta` does not wrap for a phone anyone is holding and accumulating
+it would drift against the clamp.
+
+The button also exists because iOS will not deliver a single event until
+`requestPermission()` is granted from inside a real gesture — so this could
+never have been something the game switches on by itself.
+
+### What the probe can and cannot settle
+
+`tools/test-motion.mjs` emulates a touch device, dispatches orientation
+events and checks that the button appears only where the gesture can work,
+that each axis turns the lens the way a person holding the phone would
+expect, that a finger drag stands down while the phone is aiming, and that
+switching it off really stops it.
+
+What it **cannot** settle is the one thing only hardware can: whether a real
+phone reports the axes the way this assumes. The signs asserted in that file
+are the *intent* — turn right, lens goes right — so if a device disagrees,
+that is where the correction belongs, and the test will say which way it
+went.
+
+```
+  hidden on the styling bench                          hidden  ok
+  offered on a touch device, in the shoot               shown  ok
+  ignored until it is switched on                 no movement  ok
+  turning the phone right turns the lens right         -0.349  ok
+  turning it left turns the lens left                   0.349  ok
+  tipping it back looks up                              0.349  ok
+  tipping it forward looks down                        -0.349  ok
+  a drag stands down while the phone aims             unmoved  ok
+  crossing north is a small step                        0.175  ok
+  switching it off really stops it                    unmoved  ok
+```
 
 ## Where it goes next
 

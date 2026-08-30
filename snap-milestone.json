@@ -1,5 +1,5 @@
 {
-  "name": "R8 the viewfinder",
-  "description": "live FRAME and MOMENT gauges, thirds guides, the brief as a ticking checklist, pinch to zoom and a real shutter button - the score is now visible before the shutter rather than six frames later",
+  "name": "R9 aiming by phone",
+  "description": "turn the phone and the lens turns with it, on both platforms - DeviceOrientation rather than WebXR, which iOS does not have and which would put the studio in your living room",
   "ceilingBytes": 13312
 }

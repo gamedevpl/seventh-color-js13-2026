@@ -139,7 +139,7 @@ const cBtns = [RB, 0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
 el('div', 'font:800 min(13vw,54px)/1 system-ui,sans-serif;color:#fff6dd;letter-spacing:.02em;text-shadow:0 3px 14px #0007', title, 'UNICORN SNAP');
 el('div', 'font:600 15px system-ui,sans-serif;color:#ffeec4;text-shadow:0 2px 8px #0008;margin-top:6px', title, 'It knows how good it looks. Prove it.');
 el('div', 'font:500 13px/1.7 system-ui,sans-serif;color:#f0dcae;text-shadow:0 2px 8px #0008;max-width:34em', title,
-  'Style the unicorn for the job, then shoot it. Drag to aim - wheel or W/S to zoom - Q/E to walk round the set. Tap or SPACE takes the picture.');
+  'Style the unicorn for the job, then shoot it. Drag or pinch to aim and zoom - wheel or W/S on a desktop, Q/E to walk round the set. Tap, SPACE or the shutter takes the picture. On a phone, MOTION aims by moving the phone itself.');
 const startBtn = el('button', GO + ';margin-top:10px;font-size:17px', title, 'OPEN THE STUDIO');
 
 // A real button for the shutter. Tap-anywhere works on a phone, but on a
@@ -246,6 +246,7 @@ function layout() {
   }
   vf.style.display = phase === 1 ? 'block' : 'none';
   shutBtn.style.display = phase === 1 ? 'block' : 'none';
+  gyroBtn.style.display = phase === 1 && canGyro ? 'block' : 'none';
   const c2 = phase === 1 ? coach() : '';
   hint.textContent = c2;
   hint.style.opacity = c2 ? '1' : '0';
@@ -300,6 +301,67 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
     newRound();
   };
 }
+
+// --- aiming with the phone itself -----------------------------------------
+// Not WebXR. immersive-ar needs ARCore, so it is Android-only - iOS Safari
+// has no WebXR at all - and the DOM HUD would need the dom-overlay feature,
+// which narrows it further. An AR session would also put the unicorn in your
+// living room, which is the opposite of the one thing this game is about
+// standing in: a lit studio cove.
+//
+// DeviceOrientation gives the part that was actually asked for - turn the
+// phone, turn the lens - on both platforms, for a few hundred bytes.
+//
+// Everything is RELATIVE to the pose it was switched on in, rather than to
+// absolute compass north. Absolute headings need a calibrated magnetometer,
+// drift indoors, and would point the player at a corner of the cove they
+// never chose; a relative frame means "wherever you are pointing now is
+// where you were pointing", and switching it off and on again is a recentre.
+let gyroBase = null, gyroPrev = 0;
+const canGyro = typeof DeviceOrientationEvent !== 'undefined' && matchMedia('(pointer:coarse)').matches;
+
+function onOrient(e) {
+  if (e.alpha == null || !gyroBtn.dataset.on) return;
+  const rot = (screen.orientation || {}).angle || 0;
+  const a = e.alpha * Math.PI / 180;
+  // Pitch rides a different axis depending on how the phone is held: beta is
+  // the front-to-back tilt upright, and gamma is that same movement once the
+  // device is turned on its side.
+  const p = (rot === 90 ? -e.gamma : rot === 270 ? e.gamma : e.beta - 90) * Math.PI / 180;
+  if (!gyroBase) { gyroBase = { p, cp: cam.p }; gyroPrev = a; return; }
+  // Yaw ACCUMULATES the wrapped step between consecutive readings instead of
+  // measuring from a fixed origin. Alpha wraps at north, and a heading held
+  // against one base flips the long way round as soon as the player turns
+  // more than half a circle from where they started - measured at a 350
+  // degree swing for a 10 degree movement across north.
+  const d = ((a - gyroPrev + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  gyroPrev = a;
+  cam.a += d;
+  // Pitch stays absolute against its base: beta does not wrap for a phone
+  // anyone is holding, and accumulating it would drift against the clamp.
+  cam.p = Math.max(-.5, Math.min(.6, gyroBase.cp + (p - gyroBase.p)));
+  learnt.aim = 1;
+}
+
+const gyroBtn = el('button', 'position:fixed;right:14px;bottom:34px;padding:9px 13px;border:0;border-radius:10px;cursor:pointer;display:none;font:700 12px system-ui,sans-serif;letter-spacing:.06em;background:#0000005e;color:#fff3d6', null, 'MOTION');
+gyroBtn.onclick = async () => {
+  wake();
+  if (gyroBtn.dataset.on) {
+    delete gyroBtn.dataset.on;
+    gyroBase = null;
+    gyroBtn.style.background = '#0000005e';
+    return;
+  }
+  // iOS 13 and later will not deliver a single event until this is granted,
+  // and it must be asked for from inside a real gesture - which is the whole
+  // reason this is a button rather than something the game turns on itself.
+  const R = DeviceOrientationEvent.requestPermission;
+  if (R) { try { if (await R() !== 'granted') return; } catch (err) { return; } }
+  gyroBtn.dataset.on = '1';
+  gyroBase = null;
+  gyroBtn.style.background = '#c07a12';
+};
+if (canGyro) addEventListener('deviceorientation', onOrient);
 
 // --- the camera -----------------------------------------------------------
 // A TRIPOD, not an orbit. The orbit rig this started with always looked at
@@ -367,6 +429,8 @@ addEventListener('pointermove', (e) => {
   }
   dragDist += Math.abs(dx) + Math.abs(dy);
   if (dragDist > 24) learnt.aim = 1;
+  // While the phone is aiming, a drag would be two hands on one wheel.
+  if (gyroBtn.dataset.on) return;
   // Scaled by the field of view, so a long lens aims slowly. Without this,
   // zooming in makes the camera unusably twitchy at exactly the moment
   // precision starts to matter.

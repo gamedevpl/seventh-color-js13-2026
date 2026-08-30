@@ -98,13 +98,32 @@ for (let i = 0; i < 60; i++) {
 }
 check('it works the set on its own', seen.size >= 3, `${seen.size} poses`);
 
+// THE VERDICT BEFORE THE SHUTTER. The gallery tells a player at the end of
+// a job what they needed to know during it; the same sentence on the
+// viewfinder is the lesson while there is still something to do about it.
+const said = () => page.evaluate(() => [...document.querySelectorAll('div')]
+  .filter((d) => !d.children.length && /^[\u{1F44D}\u{1F44E}] \S/u.test(d.textContent))
+  .map((d) => d.textContent)[0] || '');
+check('the viewfinder says what it thinks', /\S/.test(await said()), await said());
+
+// A running total that climbs as the roll fills. It is eased toward the
+// real figure, so the probe waits for it to arrive rather than reading the
+// frame the shutter fired on.
+const chip = () => page.evaluate(() => [...document.querySelectorAll('div')]
+  .filter((d) => !d.children.length && /^\d+$/.test(d.textContent)).map((d) => +d.textContent)[0]);
+const t0 = await chip();
+await page.keyboard.press('Space');
+await page.waitForTimeout(900);
+const t1 = await chip();
+check('the score climbs while you shoot', t1 > t0, `${t0} -> ${t1}`);
+
 // Score the current frame directly, so a bad number is caught here rather
 // than being averaged into a total later.
 const sc = await shot();
 check('a frame scores something', sc.total > 0 && sc.parts.length > 0, `${sc.total} pts`);
 check('the score is itemised', sc.parts.every((p) => p[1] > 0), `${sc.parts.length} lines`);
 
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < 7; i++) {
   await page.keyboard.press('Space');
   await page.waitForTimeout(260);
 }
@@ -129,9 +148,11 @@ check('it kept an actual photograph', img && img.len > 4000, img ? `${(img.len /
 const feed = await page.evaluate(() => ({
   shots: document.querySelectorAll('img').length,
   // The caption, not the wrapper around it: both carry the same
-  // textContent, so count only the element that actually holds the words.
+  // textContent, so count only the element that actually holds the words -
+  // and only the ones on screen, or the viewfinder's own live verdict,
+  // hidden behind the result card, counts as a ninth photograph.
   said: [...document.querySelectorAll('div')]
-    .filter((d) => !d.children.length && /^[\u{1F44D}\u{1F44E}] \S/u.test(d.textContent)).length,
+    .filter((d) => d.offsetParent && !d.children.length && /^[\u{1F44D}\u{1F44E}] \S/u.test(d.textContent)).length,
 }));
 check('every frame is in the feed', feed.shots === 8, `${feed.shots} photographs`);
 check('and every one says why', feed.said === 8, `${feed.said} verdicts`);

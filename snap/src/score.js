@@ -121,15 +121,25 @@ export function verdict(s) {
   return [1, POSE_NAME[s.pose] + '!'];
 }
 
-export function scoreShot(P, vp, eye, anim, deco, roll = []) {
-  const b = frameBox(P, vp);
-  const bearing = Math.atan2(eye[0] - P.x, eye[2] - P.z);
+// How many of the frames already on the roll are THIS shot: the same pose
+// from within half a radian of the same bearing. Lifted out of scoreShot
+// because the viewfinder needs it too - the live verdict has to be able to
+// say "the same shot again" before the shutter, not after.
+export function repeats(roll, pose, bearing) {
   let seen = 0;
   for (const f of roll) {
-    if (f.pose !== anim.mode) continue;
+    if (f.pose !== pose) continue;
     const d = ((f.bearing - bearing + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
     if (Math.abs(d) < .5) seen++;
   }
+  return seen;
+}
+export const bearingOf = (P, eye) => Math.atan2(eye[0] - P.x, eye[2] - P.z);
+
+export function scoreShot(P, vp, eye, anim, deco, roll = []) {
+  const b = frameBox(P, vp);
+  const bearing = bearingOf(P, eye);
+  const seen = repeats(roll, anim.mode, bearing);
   // 0.68, not 0.55. At the steeper rate a policy that waits for good poses
   // from one spot fell BELOW one that shot at random - random shooting is
   // more varied by construction, so the harsher penalty taught "do not

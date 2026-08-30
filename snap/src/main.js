@@ -15,7 +15,7 @@ import { makeMane, updateMane, maneVerts, recolour, MANE_CORE, MANE_HALO } from 
 import { makeAnim, applyPose, POSE_NAME, SHAKE, IDLE } from './pose.js';
 import { makeDeco, makeGlitter, glitterVerts, GLITTER_BUF, PALETTE, RB, MAX_GLITTER, swatch } from './deco.js';
 import { makeActor, act, move, poke, temper } from './act.js';
-import { scoreShot, verdict, frameBox, frameQuality, eyeContact, POSE_WORTH } from './score.js';
+import { scoreShot, verdict, repeats, bearingOf, frameBox, frameQuality, eyeContact, POSE_WORTH } from './score.js';
 import { makeBrief, briefText, briefStyle, warmMatch, GLIT_WORD, POSE_BONUS } from './brief.js';
 import { wake, awake, music, shutter, sparkle, pleased } from './snd.js';
 
@@ -85,7 +85,7 @@ const tell = el('div', 'font:600 12px system-ui,sans-serif;color:#3a2a12;opacity
 const flash = el('div', 'position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none');
 // Taught in the order the controls are needed, one at a time, low on the
 // screen where a viewfinder overlay belongs.
-const hint = el('div', 'position:fixed;left:0;right:0;bottom:158px;text-align:center;pointer-events:none;transition:opacity .3s;font:600 14px system-ui,sans-serif;color:#fff3d6;text-shadow:0 2px 10px #000a');
+const hint = el('div', 'position:fixed;left:0;right:0;bottom:248px;text-align:center;pointer-events:none;transition:opacity .3s;font:600 14px system-ui,sans-serif;color:#fff3d6;text-shadow:0 2px 10px #000a');
 
 // --- the viewfinder -------------------------------------------------------
 // The score used to arrive six frames late, on a card, after every decision
@@ -109,6 +109,21 @@ function gauge(label) {
 }
 const gFrame = gauge('FRAME');
 const gMoment = gauge('MOMENT');
+// THE VERDICT ARRIVES BEFORE THE SHUTTER. The gallery says what each
+// photograph was worth once the roll is spent, which teaches a player at
+// the end of a job what they should have known during it. The same sentence
+// on the viewfinder - a thumb and the one thing wrong or right with the
+// shot you are looking at - is the whole lesson, live, while there is still
+// something to do about it.
+const live = el('div', 'position:fixed;left:0;right:0;bottom:158px;text-align:center;pointer-events:none;'
+  + 'font:800 17px system-ui,sans-serif;text-shadow:0 2px 12px #000c', vf, '');
+// Points that climb as you shoot. The score used to be a number you met
+// after the fact; a total that ticks up when a good frame lands is the same
+// information arriving at the moment it means something.
+// It rises toward the running total rather than sitting in the middle of
+// the viewfinder, where it landed on the coaching line and on the subject.
+const pop = el('div', 'position:fixed;left:0;right:0;top:106px;text-align:center;pointer-events:none;opacity:0;'
+  + 'font:800 27px system-ui,sans-serif;color:#ffe9a8;text-shadow:0 2px 14px #000c', vf, '');
 const onbrief = el('div', 'position:fixed;left:0;right:0;bottom:190px;text-align:center;pointer-events:none;opacity:0;transition:opacity .18s;font:800 15px system-ui,sans-serif;letter-spacing:.08em;color:#ffe9a8;text-shadow:0 2px 12px #000c', vf, 'THE POSE THEY ASKED FOR');
 const sheet = el('div', 'position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#00000055;backdrop-filter:blur(3px);padding:16px');
 // The title sits over a LIVE set rather than a still: the unicorn is already
@@ -120,7 +135,7 @@ const title = el('div', 'position:fixed;inset:0;display:flex;flex-direction:colu
 const CHIP = 'font:600 13px system-ui,sans-serif;padding:5px 11px;border-radius:999px;background:#0000005e;color:#fff3d6';
 // Each requirement is its own chip and ticks when it is met, so the brief
 // is a checklist you can glance at rather than a sentence you re-read.
-let poseChip = null;
+let poseChip = null, ptsChip = null, shown = 0, popT = 0;
 function briefChips(row) {
   const w = warmMatch(brief, deco);
   el('div', CHIP, row, (brief.warm > 0 ? 'warm' : 'cool') + (w > .25 ? ' OK' : ''));
@@ -342,7 +357,11 @@ function layout() {
     const row = el('div', 'display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center', top);
     el('div', 'font:800 14px system-ui,sans-serif;letter-spacing:.06em', row, brief.title);
     briefChips(row);
-    if (phase === 1) el('div', CHIP + ';font-weight:800', row, `FILM ${film}`);
+    if (phase === 1) {
+      el('div', CHIP + ';font-weight:800', row, `FILM ${film}`);
+      ptsChip = el('div', CHIP + ';font-weight:800;background:#3a2a12b0', row, '0');
+      shown = rollPts;
+    }
   }
   vf.style.display = phase === 1 ? 'block' : 'none';
   shutBtn.style.display = phase === 1 ? 'block' : 'none';
@@ -717,7 +736,8 @@ function frame(now) {
     // The two gauges are the two skills, shown separately on purpose: a
     // single "shot quality" number would tell a player they are doing badly
     // without telling them which half to fix.
-    const q = frameQuality(frameBox(P, vp));
+    const b2 = frameBox(P, vp);
+    const q = frameQuality(b2);
     const e = eyeContact(P, eye);
     const mom = Math.min(1, ((POSE_WORTH[anim.mode] || 40) / 320) + Math.max(0, e - .55) * .5);
     gFrame.style.width = (q * 100).toFixed(0) + '%';
@@ -727,10 +747,30 @@ function frame(now) {
     const good = q > .7 && mom > .55;
     gFrame.style.background = q > .7 ? '#9fe08a' : '#ffd977';
     gMoment.style.background = mom > .55 ? '#9fe08a' : '#ffd977';
+    // The same call the gallery makes, on the frame you are aiming at.
+    const [up, why] = verdict({
+      box: b2, pose: anim.mode, eye: e, glitAir: deco.glitter > 0 && anim.mode === SHAKE,
+      fresh: .68 ** repeats(roll, anim.mode, bearingOf(P, eye)),
+    });
+    const say = (up ? '\u{1F44D} ' : '\u{1F44E} ') + why;
+    if (live.textContent !== say) {
+      live.textContent = say;
+      live.style.color = up ? '#9fe08a' : '#ffd0a8';
+    }
+    // Eased rather than snapped: a number that counts up reads as earned,
+    // and it also survives the eight frames of a good roll landing at once.
+    shown += (rollPts - shown) * Math.min(1, dt * 5);
+    const n = `${Math.round(shown)}`;
+    if (ptsChip && ptsChip.textContent !== n) ptsChip.textContent = n;
     const ob = anim.mode === brief.pose;
     onbrief.style.opacity = ob ? '1' : '0';
     if (poseChip) poseChip.style.background = ob ? '#c07a12' : '#0000005e';
     shutBtn.style.borderColor = good ? '#9fe08add' : '#fff3d6cc';
+  }
+  if (popT > 0) {
+    popT = Math.max(0, popT - dt * 1.1);
+    pop.style.opacity = popT;
+    pop.style.transform = `translateY(${(1 - popT) * -22}px)`;
   }
   if (flashT > 0) {
     flashT = Math.max(0, flashT - dt * 3.4);
@@ -793,6 +833,8 @@ function takeShot() {
     onBrief++;
   }
   rollPts += s.total;
+  pop.textContent = `+${s.total}`;
+  popT = 1;
   // JPEG, not PNG: these are photographs, six of them are held in memory at
   // once, and a full-window PNG data URL is megabytes of string.
   s.img = c.toDataURL('image/jpeg', .82);

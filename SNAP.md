@@ -1221,6 +1221,32 @@ two-finger drag keeps the inverted signs that make it the same gesture. The
 probe asserts the convention directly — drag right, `box.cx` goes up — so it
 cannot quietly flip back.
 
+## R14 — the verdict arrives before the shutter
+
+Proposed as a question: *what if the thumbs and the feedback were live, and
+the score climbed as you shot?* Both, and they are the same idea — the
+gallery tells a player at the end of a job what they needed to know during
+it.
+
+The viewfinder now carries the **same sentence the gallery will use**, on
+the frame you are currently aiming at: a thumb and the one thing wrong or
+right with it. It is literally the same `verdict()` call, which is what
+makes it trustworthy — a live hint computed a second way would eventually
+disagree with the screen that scores you, and then it would be teaching a
+different game.
+
+Making that possible needed one thing lifted out of `scoreShot`: the
+repetition count. "The same shot again" is the one verdict that depends on
+what is already on the roll, and the viewfinder has to be able to say it
+*before* the frame joins the roll. `repeats(roll, pose, bearing)` is now
+shared by both.
+
+Alongside it, a running total in the top row and a `+N` that rises toward it
+each time the shutter fires. The total is **eased rather than snapped**, so
+it reads as counting up rather than jumping, and the `+N` sits high enough
+to miss both the coaching line and the subject — it landed on both in the
+first cut.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

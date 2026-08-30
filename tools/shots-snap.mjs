@@ -19,7 +19,7 @@ const CAM = process.argv.find((a) => /^--cam=/.test(a))?.split('=')[1] || '0.9,0
 
 mkdirSync(out, { recursive: true });
 const file = path.join(root, 'build', 'snap', 'index.html');
-const NAMES = ['graze', 'idle', 'walk', 'trot', 'gallop', 'rear', 'toss', 'shake', 'sleep', 'prance'];
+const NAMES = ['graze', 'idle', 'walk', 'trot', 'gallop', 'rear', 'toss', 'shake', 'sleep', 'prance', 'bow'];
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 900, height: 620 } });

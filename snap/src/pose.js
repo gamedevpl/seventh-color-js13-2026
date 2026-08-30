@@ -8,16 +8,17 @@
 // would damp the very thing being animated.
 
 import { NB, LEGS } from './uni.js';
+import { BPM } from './snd.js';
 
 // Pose ids. Kept as small ints because behaviour, scoring and the HUD all
 // speak in them.
 export const GRAZE = 0, IDLE = 1, WALK = 2, TROT = 3, GALLOP = 4,
-  REAR = 5, TOSS = 6, SHAKE = 7, SLEEP = 8, PRANCE = 9;
+  REAR = 5, TOSS = 6, SHAKE = 7, SLEEP = 8, PRANCE = 9, BOW = 10;
 
 // Names double as the photo caption vocabulary, so they read as English.
 export const POSE_NAME = [
   'grazing', 'standing', 'walking', 'trotting', 'galloping',
-  'rearing', 'mane toss', 'shaking out', 'asleep', 'prancing',
+  'rearing', 'mane toss', 'shaking out', 'asleep', 'prancing', 'taking a bow',
 ];
 
 // Gait phase offsets per leg, in the rig's leg order (hindL hindR foreL
@@ -28,8 +29,15 @@ const GAITS = {
   [TROT]: [0, .5, .5, 0],
   [GALLOP]: [0, .12, .5, .62],
 };
-// cycles per second, and how far the legs swing
-const GAIT_HZ = { [WALK]: 1.1, [TROT]: 1.9, [GALLOP]: 2.6 };
+// LOCKED TO THE TRACK. Every gait is a whole number of beats per stride, so
+// the hooves land on the music instead of near it - which for a game whose
+// subject is a unicorn showing off to a strut is most of the difference
+// between an animal moving and an animal performing.
+//
+// Worth recording: these were tuned by eye first, at 1.1 / 1.9 / 2.6, and
+// the tempo-locked values come out at 0.97 / 1.93 / 2.58. The lock is free.
+const BPS = BPM / 60;
+const GAIT_HZ = { [WALK]: BPS / 2, [TROT]: BPS, [GALLOP]: BPS / .75 };
 const GAIT_SWING = { [WALK]: .34, [TROT]: .52, [GALLOP]: .78 };
 
 const T = new Float32Array(NB * 3);
@@ -115,12 +123,16 @@ export function poseTarget(st) {
     // A mane toss: the head whips up and sideways, and the hair does the
     // rest. Short, sharp, and worth pointing a camera at.
     const u = Math.sin(Math.min(3.14, st.hold * 5.2));
+    const w = Math.sin(st.hold * 12);
     standLegs(.04);
-    set(1, -.5 * u);
-    set(2, -.3 * u, Math.sin(st.hold * 9) * .8 * u, Math.sin(st.hold * 9) * .5 * u);
-    set(3, -.2, Math.sin(t * 5) * .5);
-    roll = Math.sin(st.hold * 9) * .08 * u;
-    lift = u * .03;
+    // The whip has to be sharp AND wide, because the mane is solved from
+    // the head's motion - a gentle nod moves the roots slowly enough that
+    // follow-the-leader keeps every strand tidy, and nothing flies.
+    set(1, -.62 * u, w * .35 * u);
+    set(2, -.35 * u, w * 1.15 * u, w * .6 * u);
+    set(3, -.25, Math.sin(t * 5) * .6);
+    roll = w * .11 * u;
+    lift = u * .04;
   } else if (m === SHAKE) {
     // A whole-body shimmy that travels from the withers back.
     const u = Math.min(1, st.hold * 4) * Math.min(1, (1.4 - st.hold) * 4);
@@ -144,8 +156,10 @@ export function poseTarget(st) {
     set(2, .35, .55);                            // head curled round
     set(3, .5, .3);
   } else if (m === PRANCE) {
-    // Knows exactly how good it looks. High knees, arched neck, tail up.
-    const ph = t * 1.6 * 6.283;
+    // Knows exactly how good it looks. High knees, arched neck, tail up -
+    // one step per beat, which is what makes it read as a catwalk rather
+    // than as a horse that happens to be lifting its feet.
+    const ph = t * BPS * 6.283;
     for (let i = 0; i < 4; i++) {
       const u = LEGS[i], p = ph + [0, .5, .5, 0][i] * 6.283;
       set(u, -.3 * Math.sin(p));
@@ -156,6 +170,28 @@ export function poseTarget(st) {
     set(2, .5);
     set(3, -.75, Math.sin(ph) * .25);            // tail carried high
     roll = Math.sin(ph) * .05;
+  } else if (m === BOW) {
+    // Front end down, hindquarters up, forelegs reaching out along the
+    // floor. Same inheritance rule as rearing, with the sign flipped: the
+    // root tips nose-down by B, so the hind legs cancel B to stay standing
+    // and the forelegs need B taken off the angle they actually want.
+    const B = .5, u = Math.min(1, st.hold * 2.4);
+    pitch = B * u;
+    // The hip goes UP, not down. Tipping the body nose-down swings the
+    // reaching forelegs below the floor - measured at 9.6 cm under it - and
+    // raising the hindquarters is what a bow does anyway.
+    lift = .04 * u;
+    for (let i = 0; i < 2; i++) {
+      set(LEGS[i], -B * u);
+      T[(LEGS[i] + 1) * 3] = .12 * u;
+    }
+    for (let i = 2; i < 4; i++) {
+      set(LEGS[i], (-1.35 - B) * u + .06 * i);
+      T[(LEGS[i] + 1) * 3] = .1 * u;
+    }
+    set(1, .55 * u);
+    set(2, .3 * u);
+    set(3, -.55 * u, Math.sin(t * 2.2) * .3);
   }
 
   // Looking at the camera is applied ON TOP of whatever the pose is doing,

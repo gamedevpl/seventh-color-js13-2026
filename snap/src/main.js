@@ -14,6 +14,7 @@ import { buildUnicorn, makePose, solve } from './uni.js';
 import { studioMesh, shadowMesh, lightsMesh, shadowMat } from './studio.js';
 import { makeMane, updateMane, maneVerts, MANE_CORE, MANE_HALO } from './mane.js';
 import { makeAnim, applyPose, POSE_NAME } from './pose.js';
+import { wake, awake, music, shutter, sparkle } from './snd.js';
 
 // Warm and dark, so the frame beyond the paper's edge reads as the unlit
 // depth of a studio rather than as a hole in the world.
@@ -51,15 +52,20 @@ const maneHalo = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
 const YAW = 1.25;
 const cam = { yaw: .35, pitch: .12, dist: 5.6 };
 const keys = {};
+// A browser makes no sound until the page has had a real user gesture, so
+// the context is created from the first press and from nowhere else.
 addEventListener('keydown', (e) => {
+  wake();
   keys[e.code] = 1;
+  if (e.code === 'KeyF') shutter();
+  if (e.code === 'KeyG') sparkle();
   const n = 'Digit0 Digit1 Digit2 Digit3 Digit4 Digit5 Digit6 Digit7 Digit8 Digit9'.split(' ').indexOf(e.code);
   if (n >= 0) { anim.mode = n; anim.hold = 0; }
 });
 addEventListener('keyup', (e) => { keys[e.code] = 0; });
 
 let drag = null;
-addEventListener('pointerdown', (e) => { drag = [e.clientX, e.clientY]; });
+addEventListener('pointerdown', (e) => { wake(); drag = [e.clientX, e.clientY]; });
 addEventListener('pointerup', () => { drag = null; });
 addEventListener('pointermove', (e) => {
   if (!drag) return;
@@ -92,6 +98,11 @@ function frame(now) {
   anim.gaze = keys.Space ? 1 : 0;
   anim.lookYaw = Math.atan2(Math.sin(cam.yaw - P.yaw), Math.cos(cam.yaw - P.yaw));
   anim.lookPitch = cam.pitch;
+
+  // The strut runs whenever the page has been touched. Intensity is a stand
+  // in until the shoot exists: the hook comes in for the poses that are
+  // worth photographing.
+  if (awake()) music(anim.mode === 9 || anim.mode === 5 ? .8 : .2, 0);
 
   applyPose(P, anim, dt);
   solve(P);

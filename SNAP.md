@@ -122,8 +122,15 @@ reports.
 
 Worst-of-3 at `--O1`: **5,384** against 13,312 — **7,928 bytes in hand** for
 the game itself. Stated now so that later passes are spending a measured
-budget rather than a hoped-for one. After the studio and its shadow:
-**5,725**, so the set and its lighting came to 341 bytes.
+budget rather than a hoped-for one.
+
+| after | worst-of-3 | added |
+| --- | ---: | ---: |
+| R1, the rig | 5,384 | — |
+| R2, the studio and its shadow | 5,725 | 341 |
+| R3, the track and the bow | 6,498 | 773 |
+
+**6,814 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -209,6 +216,84 @@ the lens is computed once and used twice.
 This is worth stating as a general rule for the rest of the build: **on a
 bright background, glow is not a colour, it is a highlight.** Anything that
 needs to be *seen* has to be solid.
+
+## R3 — the strut
+
+### The music
+
+The brief was the swagger of a catwalk vamp, and what carries that is not a
+tune anyone owns — it is the furniture: four on the floor, a clap on two and
+four, and a bassline that keeps jumping an octave and dropping back. The
+hook over the top is written for this game. One scheduler running ahead of
+the clock in short blocks, exactly as Rainbow Surfer's does, because a
+`setInterval` sequencer drifts and audio that drifts against an animation
+locked to the same tempo is worse than no music at all.
+
+Claps and hats are **filtered noise**, not tones: one buffer of white noise
+band-passed differently per hit. That is most of the distance between a
+drum kit and two beeps, and it pays for itself again in the shutter — a real
+camera is two events, the mirror and then the blades, and the *pair* is what
+the ear recognises as a camera rather than a click.
+
+### The gaits are locked to the track
+
+Every gait is now a whole number of beats per stride, and the prance is one
+strutting step per beat. For a game whose subject is a unicorn showing off
+to a strut, that is most of the difference between an animal moving and an
+animal performing.
+
+Worth recording: the gaits were tuned by eye first, at 1.1 / 1.9 / 2.6 Hz,
+and the tempo-locked values come out at 0.97 / 1.93 / 2.58. **The lock was
+free** — which is some evidence that the eye was already looking for it.
+
+### The instrument, and what it caught
+
+`tools/test-audio-snap.mjs` patches `createOscillator` and
+`createBufferSource` before the page boots and counts what the running game
+actually asks for. "`music()` was called" is not the same claim as "the
+browser made a noise": a suspended context swallows the lot in silence, and
+a page that builds its context before a user gesture gets suspended exactly
+that way.
+
+| | oscillators | noise | context |
+| --- | ---: | ---: | --- |
+| before any gesture | **0** | **0** | none |
+| after one press, ordinary pose | 6.0/s | 4.5/s | `running` |
+| on a pose worth photographing | **9.0/s** | 4.5/s | `running` |
+
+The last row is the one that caught something. The hook was gated at an
+intensity of 0.15, which every pose already exceeded — so it played
+constantly and only its *volume* changed, which the ear reads as a mix
+wobble rather than as the track arriving. The probe reported it as what it
+was: no change at all, 8.5/s against 9.0/s. Gated at 0.5 the hook now
+enters, and the counts say so.
+
+### The bow
+
+An eleventh pose, and the same inheritance rule as rearing with the sign
+flipped: the root tips nose-down by `B`, so the hind legs cancel `B` to stay
+standing and the forelegs need `B` taken off the angle they want. The probe
+caught the rest — the reaching forelegs sat 9.6 cm *under* the floor, fixed
+by raising the hip rather than lowering it, which is what a bow does anyway.
+
+### The set became a cove
+
+The flat sweep was wrong in a way only the camera could show: a flat
+backdrop always ends somewhere, and swung far enough round the lens found
+the edge, with the dark beyond it reading as a hole torn in the corner of
+the picture. Widening it twice only moved the angle at which that happened.
+
+It is now the same profile **revolved about the vertical axis** — a full
+infinity cove, no edge to find from any angle, and a real thing rather than
+a trick. Two details it needed:
+
+- The pool of light is centred on the subject, so on a surface that wraps
+  the whole way round the falloff is equal in every direction.
+- `Math.PI * 2`, not `6.283`. The cove is a closed loop, so the last
+  segment's end angle must be bit-identical to the first one's start;
+  truncated tau leaves the ring 0.0002 rad short, which at this radius is a
+  4 mm crack running across the floor — faint, dotted, and unmistakable
+  once seen.
 
 ## Where it goes next
 

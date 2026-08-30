@@ -20,7 +20,7 @@ import { chromium } from 'playwright-core';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const file = path.join(root, 'build', 'snap', 'index.html');
-const NAMES = ['graze', 'idle', 'walk', 'trot', 'gallop', 'rear', 'toss', 'shake', 'sleep', 'prance'];
+const NAMES = ['graze', 'idle', 'walk', 'trot', 'gallop', 'rear', 'toss', 'shake', 'sleep', 'prance', 'bow'];
 
 // pose -> [lowest allowed hoof, highest allowed hoof] over the sample window.
 // A hoof a shade under zero is the leg reaching into the turf and reads
@@ -28,7 +28,7 @@ const NAMES = ['graze', 'idle', 'walk', 'trot', 'gallop', 'rear', 'toss', 'shake
 const BOUND = {
   0: [-.06, .06], 1: [-.06, .06], 2: [-.06, .09], 3: [-.06, .12],
   4: [-.06, .22], 5: [-.08, .10], 6: [-.06, .07], 7: [-.06, .08],
-  8: [-.08, .06], 9: [-.06, .14],
+  8: [-.08, .06], 9: [-.06, .14], 10: [-.06, .06],
 };
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });

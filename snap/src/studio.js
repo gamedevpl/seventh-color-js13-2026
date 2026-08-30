@@ -1,6 +1,6 @@
-// The studio. A seamless cyclorama - floor sweeping up into the back wall
-// through a curve, with no visible join - which is the backdrop every real
-// photograph of a posing subject is taken against.
+// The studio. A seamless infinity cove - a disc of floor sweeping up into a
+// wall through a curve, with no visible join and no edge anywhere, which is
+// the backdrop every real photograph of a posing subject is taken against.
 //
 // The shading is BAKED INTO VERTEX COLOURS rather than lit or shadered. The
 // renderer has one program and three materials, and a studio needs exactly
@@ -16,30 +16,70 @@ import { createMesh, pushBox, LIGHT } from './gl.js';
 // backdrop takes over the photograph, and the unicorn is the subject.
 const PAPER = [.93, .78, .31];
 
-// The sweep, in the z/y plane: floor out to the curve, a quarter circle of
-// radius R, then the wall going up. Swept along x, this is the whole set.
-const Z0 = 9, ZC = -6, R = 4, TOP = 17, HX = 30;
-const NX = 26, NA = 8, NB = 7, NC = 7;
+// The cove, as a profile REVOLVED about the vertical axis: a disc of floor,
+// a quarter-circle cove, and a wall going up, all the way round.
+//
+// It began as a flat sweep and that was wrong in a way only the camera
+// could show. A flat backdrop always ends somewhere, and swung far enough
+// round the lens found the edge and the void beyond it read as a hole torn
+// in the corner of the picture. Widening it twice only moved the angle at
+// which that happened. A full revolution has no edge to find, and it is a
+// real thing rather than a trick - an infinity cove is exactly this shape.
+const RF = 16, R = 4, TOP = 26;    // floor radius, cove radius, wall height
+const NT = 44, NA = 6, NB = 7, NC = 8;
 
-// Brightness at a point on the paper. One soft pool centred behind and a
-// little above where the subject stands, plus a fall-off along the floor
-// toward the lens - a floor lit as evenly as the wall reads as a cardboard
-// box, and the near shading is what gives the sweep its depth.
+// Brightness at a point on the paper. One soft pool centred on the subject,
+// which on a surface that wraps the whole way round means the light falls
+// off in every direction at the same rate - the pool is a pool rather than
+// a patch that happens to face the camera.
 function shade(x, y, z) {
-  // ONE distance from ONE point, weighted only mildly per axis, so the pool
-  // is a circle centred on the subject. The previous version divided each
-  // axis by a wildly different number (17, 12, 30) and added a separate
-  // fall-off along the floor, which made the bright region a broad
-  // horizontal band with a darker top - it read as a gradient laid over the
-  // picture rather than as a light aimed at the middle of it.
-  const dx = x, dy = (y - 2.1) * 1.15, dz = (z + 4.5) * .8;
-  const d = Math.hypot(dx, dy, dz) / 13;
+  const dx = x, dy = (y - 2.1) * 1.15, dz = (z + 2) * .85;
+  const d = Math.hypot(dx, dy, dz) / 14;
   const f = 1 / (1 + d * d * 2.2);
   // Bottoming out at 0.5 rather than 0.34: the first cut fell so far that
   // the far corners went olive and the paper read as dirty rather than as
-  // lit. A studio sweep is an even field with a gentle pool in it, not a
+  // lit. A studio cove is an even field with a gentle pool in it, not a
   // spotlight in a dark room.
   return .5 + .5 * f;
+}
+
+// The profile as [radius, height, normalRadial, normalY], pointing into the
+// room. Floor and wall are the two ends of the same arc - the floor is the
+// cove at angle 0 and the wall is it at 90 degrees - so all three pieces
+// share one normal rule and the joins cannot be visibly creased.
+function profile() {
+  const p = [];
+  for (let k = 0; k <= NA; k++) p.push([RF * k / NA, 0, 0, 1]);
+  for (let k = 1; k <= NB; k++) {
+    const a = Math.PI / 2 * k / NB;
+    p.push([RF + R * Math.sin(a), R - R * Math.cos(a), -Math.sin(a), Math.cos(a)]);
+  }
+  for (let k = 1; k <= NC; k++) p.push([RF + R, R + (TOP - R) * k / NC, -1, 0]);
+  return p;
+}
+
+export function studioMesh() {
+  const v = [], p = profile();
+  const V = (th, q) => {
+    const [r, y, nr, ny] = q, c = Math.cos(th), sn = Math.sin(th);
+    const x = r * c, z = r * sn, s = shade(x, y, z);
+    v.push(x, y, z, nr * c, ny, nr * sn, PAPER[0] * s, PAPER[1] * s, PAPER[2] * s, 1);
+  };
+  // Math.PI * 2, not 6.283. The cove is a CLOSED loop, so the last segment's
+  // end angle has to be bit-identical to the first one's start; truncating
+  // tau leaves the ring 0.0002 rad short, which at this radius is a 4 mm
+  // crack running across the floor - faint, dotted, and unmistakable once
+  // you have seen it.
+  const TAU = Math.PI * 2;
+  for (let i = 0; i < NT; i++) {
+    const t0 = TAU * i / NT, t1 = TAU * (i + 1) / NT;
+    for (let j = 0; j < p.length - 1; j++) {
+      const a = p[j], b = p[j + 1];
+      V(t0, a); V(t1, a); V(t1, b);
+      V(t0, a); V(t1, b); V(t0, b);
+    }
+  }
+  return createMesh(v);
 }
 
 // Flatten the world onto the paper from the same direction the shader lights
@@ -55,38 +95,6 @@ export const shadowMat = (h) => [
   0, 0, 1, 0,
   KX * h, h, KZ * h, 1,
 ];
-
-// The profile as [y, z, normalY, normalZ]. Floor and wall are the two ends
-// of the same arc - the floor is the curve at angle 0 and the wall is it at
-// 90 degrees - so all three pieces share one normal rule and the join can
-// never be visibly creased.
-function profile() {
-  const p = [];
-  for (let k = 0; k <= NA; k++) p.push([0, Z0 + (ZC - Z0) * k / NA, 1, 0]);
-  for (let k = 1; k <= NB; k++) {
-    const a = Math.PI / 2 * k / NB;
-    p.push([R - R * Math.cos(a), ZC - R * Math.sin(a), Math.cos(a), Math.sin(a)]);
-  }
-  for (let k = 1; k <= NC; k++) p.push([R + (TOP - R) * k / NC, ZC - R, 0, 1]);
-  return p;
-}
-
-export function studioMesh() {
-  const v = [], p = profile();
-  const V = (x, q) => {
-    const [y, z, ny, nz] = q, s = shade(x, y, z);
-    v.push(x, y, z, 0, ny, nz, PAPER[0] * s, PAPER[1] * s, PAPER[2] * s, 1);
-  };
-  for (let i = 0; i < NX; i++) {
-    const x0 = -HX + 2 * HX * i / NX, x1 = -HX + 2 * HX * (i + 1) / NX;
-    for (let j = 0; j < p.length - 1; j++) {
-      const a = p[j], b = p[j + 1];
-      V(x0, a); V(x1, a); V(x1, b);
-      V(x0, a); V(x1, b); V(x0, b);
-    }
-  }
-  return createMesh(v);
-}
 
 // The ambient contact patch, as a unit fan drawn flat on the paper. The cast
 // shadow above is a hard-edged silhouette, which is what one key light

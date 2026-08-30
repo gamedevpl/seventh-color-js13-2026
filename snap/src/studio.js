@@ -33,7 +33,12 @@ const NT = 44, NA = 6, NB = 7, NC = 8;
 // off in every direction at the same rate - the pool is a pool rather than
 // a patch that happens to face the camera.
 function shade(x, y, z) {
-  const dx = x, dy = (y - 2.1) * 1.15, dz = (z + 2) * .85;
+  // The pool sits higher and falls off more gently upward than sideways. A
+  // phone held upright sees far more of the cove's top than a monitor does,
+  // and at the first centring the upper third of every portrait photograph
+  // came out near black - the vignette was reading as an unlit room rather
+  // than as a lit backdrop.
+  const dx = x, dy = (y - 3.4) * .78, dz = (z + 2) * .85;
   const d = Math.hypot(dx, dy, dz) / 14;
   const f = 1 / (1 + d * d * 2.2);
   // Bottoming out at 0.5 rather than 0.34: the first cut fell so far that

@@ -83,6 +83,20 @@ const img = await page.evaluate(() => {
   return i ? { src: i.src.slice(0, 24), len: i.src.length } : null;
 });
 check('it kept an actual photograph', img && img.len > 4000, img ? `${(img.len / 1024) | 0} KB` : 'none');
+
+// Every frame on the contact sheet is inspectable, not only the keeper: the
+// job scores the whole roll, so a player who can see one breakdown cannot
+// learn why the other five were worth what they were.
+const thumbs = page.locator('img').nth(1);
+const before = await page.evaluate(() => document.querySelector('img').src.length);
+const capBefore = await page.evaluate(() => document.querySelectorAll('div')[0] && [...document.querySelectorAll('div')].map((d) => d.textContent).find((t) => /^frame \d+ of/.test(t)));
+await thumbs.click();
+await page.waitForTimeout(250);
+const after = await page.evaluate(() => document.querySelector('img').src.length);
+const capAfter = await page.evaluate(() => [...document.querySelectorAll('div')].map((d) => d.textContent).find((t) => /^frame \d+ of/.test(t)));
+check('a frame names itself', /^frame \d+ of \d+/.test(capBefore || ''), capBefore || 'none');
+check('tapping a thumbnail opens that frame', after !== before || capAfter !== capBefore,
+  `${capBefore} -> ${capAfter}`);
 if (out) {
   await page.screenshot({ path: path.join(out, '2-result.png') });
   const data = await page.evaluate(() => document.querySelector('img').src);

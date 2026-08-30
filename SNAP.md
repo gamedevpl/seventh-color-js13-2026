@@ -138,8 +138,9 @@ budget rather than a hoped-for one.
 | R9b, walking round it, and the button that did nothing | 11,728 | 125 |
 | R9c, the diagnostic panel out again | 11,689 | −39 |
 | R10, styling that changes behaviour | 12,153 | 464 |
+| R10b, a contact sheet you can read | 12,203 | 50 |
 
-**1,159 bytes still in hand.**
+**1,109 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -906,6 +907,34 @@ to frame than a strut. Whether that is the game being fair (harder shots for
 better poses) or the harness's zoom servo coping badly cannot be separated
 at this sample size. What *can* be said is that dressing to the brief no
 longer costs 23% of the score, which is what it did before this pass.
+
+## R10b — the contact sheet became readable
+
+Reported from a phone: *"a shame you cannot click the photographs at the end
+to understand what was good and what was bad."* Exactly right, and it was the
+result screen contradicting its own scoring — **the job scores the whole
+roll**, but only the keeper was inspectable, so five of the six numbers a
+player was being judged on had no explanation attached.
+
+Every frame opens now. Tapping a thumbnail swaps the large photograph and
+its breakdown, and the caption names which frame it is. A 24-point frame
+beside a 280-point one is the clearest lesson this game has to offer, once
+you can put them side by side.
+
+### Two things the same screenshot showed that nobody had mentioned
+
+**The hint was teaching a move that loses.** Measured on a 390-wide phone:
+the default framing scores 0.51, and zooming to the stop puts the subject
+**94% outside the frame** and the shot's quality at zero — while the coach
+said *"zoom in — fill the frame"*. Advice that stops being true halfway is
+worse than none. It points at the gauge now: *zoom until FRAME turns green*,
+which is where the answer actually lives.
+
+**Portrait photographs came out black at the top.** A phone held upright
+sees far more of the cove's ceiling than a monitor does, and the light pool
+was centred for a landscape frame, so the upper third of every phone photo
+read as an unlit room rather than a lit backdrop. The pool sits higher now
+and falls off more gently upward than sideways.
 
 ## Where it goes next
 

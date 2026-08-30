@@ -285,26 +285,37 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
   } else {
     el('div', 'font-size:20px;font-weight:800', card, best ? `${total} points` : 'No usable frames');
     if (best) {
-      el('div', 'font-weight:500;font-size:13px', card,
-        `your best of ${FILM}` + (onBrief ? ` - ${onBrief} on brief` : ''));
+      // EVERY frame is inspectable, not only the keeper. The whole roll is
+      // what the job scores, so a player looking at one photograph and one
+      // breakdown cannot see why the other five were worth what they were -
+      // and a 24-point frame beside a 280-point one is the clearest lesson
+      // this game has to offer, if you can put them side by side.
+      const cap = el('div', 'font-weight:500;font-size:13px', card, '');
       const im = el('img', 'width:min(62vw,290px);border-radius:8px;display:block', card);
-      im.src = best.img;
       const list = el('div', 'font-weight:500;font-size:13px;line-height:1.6', card);
-      for (const [n, p] of best.parts.concat(bs.lines)) {
-        el('div', '', list, `${n} +${p}`);
-      }
       el('div', 'font-weight:700;font-size:13px', card, `whole roll ${rollPts} + styling ${bs.pts}`);
-      // The contact sheet. Every frame counts toward the job, so every frame
-      // has to be visible - a result that shows only the keeper hides the
-      // five decisions that actually moved the number, and a player cannot
-      // learn from a frame they never see.
+      for (const [n, p] of bs.lines) el('div', 'font-weight:500;font-size:12px;opacity:.8', card, `${n} +${p}`);
       const cs = el('div', 'display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:2px', card);
-      for (const f of roll) {
-        const t = el('div', 'position:relative;width:62px', cs);
-        const ti = el('img', `width:62px;display:block;border-radius:4px;outline:${f === best ? '2px solid #a05a10' : '1px solid #0002'}`, t);
+      const thumbs = [];
+      const show = (f) => {
+        im.src = f.img;
+        cap.textContent = `frame ${roll.indexOf(f) + 1} of ${roll.length}`
+          + (f === best ? ' - your best' : '') + ` - ${f.total} points`;
+        list.textContent = '';
+        for (const [n, p] of f.parts) el('div', '', list, `${n} +${p}`);
+        thumbs.forEach((t, i) => {
+          t.style.outline = roll[i] === f ? '2px solid #a05a10' : '1px solid #0002';
+        });
+      };
+      roll.forEach((f) => {
+        const t = el('div', 'position:relative;width:62px;cursor:pointer', cs);
+        const ti = el('img', 'width:62px;display:block;border-radius:4px;outline:1px solid #0002', t);
         ti.src = f.img;
         el('div', 'font:600 11px system-ui,sans-serif;color:#6b5320', t, String(f.total));
-      }
+        t.onclick = () => { wake(); show(f); };
+        thumbs.push(ti);
+      });
+      show(best);
     }
   }
   const b = el('button', GO, card, phase === 3 ? 'SHOOT ANOTHER SEASON' : 'NEXT JOB');
@@ -518,7 +529,12 @@ const learnt = { aim: 0, zoom: 0, shot: 0 };
 // to use a mouse wheel is worse than saying nothing: it teaches them the
 // hint is not about them.
 const coach = () => (!learnt.aim ? (canGyro ? 'drag to aim - or WALK to turn on the spot' : 'drag to aim the camera')
-  : !learnt.zoom ? (canGyro ? 'pinch to zoom - fill the frame' : 'wheel or W/S to zoom in - fill the frame')
+  // Points at the GAUGE, not at a direction. "Zoom in to fill the frame" is
+  // advice that stops being true halfway: measured on a phone, zooming to
+  // the stop puts the subject 94% outside the frame and the score at zero.
+  // The gauge already knows where the sweet spot is; the hint's job is to
+  // send the player there rather than to imply that more is always better.
+  : !learnt.zoom ? (canGyro ? 'pinch to zoom until FRAME turns green' : 'wheel or W/S to zoom until FRAME turns green')
   : !learnt.shot ? (canGyro ? 'tap or the shutter takes the picture' : 'tap or SPACE to take the picture')
   : '');
 let last = performance.now();

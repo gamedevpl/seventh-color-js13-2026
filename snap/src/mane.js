@@ -22,10 +22,15 @@ const DAMP = .93;            // high, because hair keeps its swing
 // and the tail falls from the dock.
 // The crest is doubled either side of the centre line: a mane grown from a
 // single row of roots is a fin, and reads as one from the front.
+// Four of these sit further out on the neck's sides than the crest line
+// does. The mane was two rows a centimetre apart, which reads as a painted
+// stripe from the side and as a fin from the front; a third pair of rows
+// draped over the shoulder of the neck is what gives it a body.
 const CREST = [
   [-.03, .42, .05], [.03, .42, .05], [-.04, .32, .03], [.04, .32, .03],
   [-.04, .22, .01], [.04, .22, .01], [-.04, .12, -.01], [.04, .12, -.01],
   [0, .02, -.03],
+  [-.08, .36, .02], [.08, .36, .02], [-.08, .18, 0], [.08, .18, 0],
 ];
 const FORE = [[-.05, .16, .08], [.05, .16, .08], [0, .14, .14]];
 const TAILR = [[0, .02, -.14], [-.06, -.02, -.15], [.06, -.02, -.15], [0, -.08, -.16], [-.03, -.10, -.14], [.03, -.10, -.14]];
@@ -39,10 +44,29 @@ const GROUPS = [
   { bone: 3, roots: TAILR, dir: [0, -.7, -1] },     // dock: tail falls back and down
 ];
 
-// Two spheres the hair must not sink into: the skull and the neck. Written
-// in world space each frame from the bones themselves, so they follow the
-// pose rather than approximating it.
-const BLOCK = [[2, 0, .04, .16, .26], [1, 0, .24, .06, .24]]; // bone, local xyz, radius
+// THE ANIMAL THE HAIR HAS TO STAY OUT OF, as the boxes it is actually made
+// of: bone, centre in that bone's space, half sizes.
+//
+// This started as two spheres - one skull, one neck - with nothing at all
+// on the barrel, and measured against the drawn geometry a seventh of every
+// strand's points sat more than 3.5 cm inside the animal, the worst of them
+// 20 cm in: the crest fell through the withers and the tail hung inside the
+// rump. Stringing more spheres along the body got that to 7 cm and stopped
+// there, because a sphere inscribed in a box leaves the box's corners
+// sticking out of it - and the shoulder is a corner.
+//
+// So the collider is the box. It matches what the renderer draws, it needs
+// no radius tuned by eye, and it is the same shape the probe measures
+// against, which is why the probe can be trusted to notice if these numbers
+// ever drift away from uni.js.
+const HULL = [
+  [0, 0, 0, .30, .23, .20, .45],        // barrel
+  [0, 0, .02, -.10, .22, .19, .15],     // rump
+  [0, 0, -.03, .74, .21, .18, .14],     // chest
+  [1, 0, .12, .02, .12, .17, .14],      // neck, lower
+  [1, 0, .34, .12, .105, .15, .125],    // neck, upper
+  [2, 0, .02, .14, .14, .13, .20],      // skull
+];
 
 const xf = (m, p) => [
   m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
@@ -92,7 +116,7 @@ export function recolour(M, deco, g, c) {
 
 export function updateMane(M, W, t, dt) {
   M.wind = Math.sin(t * .9) * .5 + Math.sin(t * 2.3) * .25;
-  const blocks = BLOCK.map(([b, x, y, z, r]) => [xf(W[b], [x, y, z]), r]);
+  const hulls = HULL.map(([b, ...h]) => [W[b], h]);
 
   for (const s of M.strands) {
     const g = GROUPS[s.g], m = W[g.bone];
@@ -141,14 +165,24 @@ export function updateMane(M, W, t, dt) {
       let dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
       const d = Math.hypot(dx, dy, dz) || 1e-4, f = SEG / d;
       b[0] = a[0] + dx * f; b[1] = a[1] + dy * f; b[2] = a[2] + dz * f;
-      // and out of the skull
-      for (const [c, r] of blocks) {
-        dx = b[0] - c[0]; dy = b[1] - c[1]; dz = b[2] - c[2];
-        const l = Math.hypot(dx, dy, dz);
-        if (l < r && l > 1e-4) {
-          const s2 = r / l;
-          b[0] = c[0] + dx * s2; b[1] = c[1] + dy * s2; b[2] = c[2] + dz * s2;
-        }
+      // and out of the animal. A bone matrix is a rotation and a
+      // translation, so its inverse is the transposed rotation applied to
+      // (point - origin) - no general inverse needed, and none affordable.
+      for (const [m, h] of hulls) {
+        const px = b[0] - m[12], py = b[1] - m[13], pz = b[2] - m[14];
+        let lx = m[0] * px + m[1] * py + m[2] * pz - h[0];
+        let ly = m[4] * px + m[5] * py + m[6] * pz - h[1];
+        let lz = m[8] * px + m[9] * py + m[10] * pz - h[2];
+        const ox = h[3] - Math.abs(lx), oy = h[4] - Math.abs(ly), oz = h[5] - Math.abs(lz);
+        if (ox <= 0 || oy <= 0 || oz <= 0) continue;
+        // Out through the nearest face, which is the shallowest overlap.
+        if (ox < oy && ox < oz) lx = lx < 0 ? -h[3] : h[3];
+        else if (oy < oz) ly = ly < 0 ? -h[4] : h[4];
+        else lz = lz < 0 ? -h[5] : h[5];
+        lx += h[0]; ly += h[1]; lz += h[2];
+        b[0] = m[0] * lx + m[4] * ly + m[8] * lz + m[12];
+        b[1] = m[1] * lx + m[5] * ly + m[9] * lz + m[13];
+        b[2] = m[2] * lx + m[6] * ly + m[10] * lz + m[14];
       }
       if (b[1] < .02) b[1] = .02;        // never through the floor
     }
@@ -206,8 +240,11 @@ export function maneVerts(M, eye) {
         [b[0] + sx * w * t1, b[1] + sy * w * t1, b[2] + sz * w * t1, s.c, a1],
         [b[0] - sx * w * t1, b[1] - sy * w * t1, b[2] - sz * w * t1, s.c, a1],
       ];
-      ci = Q(CORE, ci, ...rib(.055, f0, f1));
-      hi = Q(HALO, hi, ...rib(.105, .16 * f0, .16 * f1));
+      // Narrower than the segment is long. At .055 a half-width the quads
+      // were wider than they were tall and the hair read as a row of tiles;
+      // hair is made of strands, and a strand is longer than it is wide.
+      ci = Q(CORE, ci, ...rib(.042, f0, f1));
+      hi = Q(HALO, hi, ...rib(.088, .16 * f0, .16 * f1));
     }
   }
   return [ci, hi];

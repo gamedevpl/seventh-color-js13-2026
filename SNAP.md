@@ -1264,6 +1264,58 @@ Sleep keeps its own line, because it is not a dull pose like the others: it
 is the game saying it is bored, and the fix is a control the player already
 has. *Fast asleep — flash it awake.*
 
+## R15 — the hair was inside the horse
+
+Reported from play, and it was real: *"czasem włosy wchodzą w ciało"*. This
+is the kind of fault a screenshot argues about and a number settles, so the
+first thing built was the number.
+
+`tools/test-hair.mjs` asks how deep inside the drawn geometry each strand
+point gets — and it asks against **the boxes the renderer actually draws**,
+read out of the build under DEV rather than copied into the probe, because a
+second table of body sizes drifts away from the first and quietly starts
+testing nothing. A point counts as inside only if it is 3.5 cm past the
+surface on every axis at once; hair is allowed to lie against the skin.
+
+The first measurement, every pose:
+
+```
+  pose        deepest   points inside   of
+  idle          0.199           730     5040
+  rear          0.200           722     5040
+```
+
+**A seventh of the hair was inside the animal, the worst of it 20 cm in.**
+The collider was two spheres — one skull, one neck — and the barrel had
+none at all, so the crest fell through the withers and the tail hung inside
+the rump.
+
+Stringing eight more spheres along the body got the worst case from 20 cm to
+7 cm and then stopped, for a reason worth writing down: **a sphere inscribed
+in a box leaves the box's corners outside it**, and a shoulder is a corner.
+So the collider became the box. A bone matrix is a rotation and a
+translation, so the inverse is the transposed rotation applied to
+`point - origin` — no general inverse, and none affordable — and a point
+inside all three half-extents is pushed out through its shallowest face.
+
+Six boxes: barrel, rump, chest, two neck segments, skull. **Zero points
+inside, in all eleven poses.**
+
+### And the hair itself
+
+The second half of the report was that the mane looks odd next to the full
+version in the games repo. It will: that one drives a kit hair system with
+four times the strands, per-root slabs along the nape and its own collider
+hulls, and none of that fits in what is left of 13,312 bytes. Two things
+that did fit and are most of the visible difference:
+
+- **A third pair of root rows**, out on the sides of the neck rather than on
+  the crest line. Two rows a centimetre apart read as a painted stripe from
+  the side and as a fin from the front.
+- **Narrower ribbons**: a half-width of 0.055 against a segment length of
+  0.095 made every quad wider than it was tall, so the hair read as a row of
+  tiles. A strand is longer than it is wide.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

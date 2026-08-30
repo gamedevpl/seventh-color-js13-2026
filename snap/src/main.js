@@ -9,7 +9,7 @@ import {
   gl, initGL, frameGL, mode, drawMesh, createMesh, updateMesh,
   perspective, lookAt, mul, modelTR, mask, setDim, setSdw, IDENT,
 } from './gl.js';
-import { buildUnicorn, paint, flushPaint, makePose, solve, COAT, HORN, HOOF } from './uni.js';
+import { buildUnicorn, paint, flushPaint, makePose, solve, BOXES, MESH_OF, COAT, HORN, HOOF } from './uni.js';
 import { studioMesh, shadowMesh, lightsMesh, shadowMat } from './studio.js';
 import { makeMane, updateMane, maneVerts, recolour, MANE_CORE, MANE_HALO } from './mane.js';
 import { makeAnim, applyPose, POSE_NAME, SHAKE, IDLE } from './pose.js';
@@ -792,6 +792,13 @@ function frame(now) {
       cam: [cam.a, cam.p, cam.fov, cam.ang], sub: [P.x, P.z],
     };
     window.SNAPSHOT = () => scoreShot(P, vp, eye, anim, deco, roll);
+    // The rig and the hair as the renderer sees them, so a probe can ask
+    // whether a strand has gone inside the animal.
+    window.SNAPHAIR = () => ({
+      boxes: BOXES, meshOf: MESH_OF,
+      w: P.w.map((m) => [...m]),
+      hair: M.strands.map((s) => s.p.map((q) => [...q])),
+    });
     // The balance policies drive the game through these rather than through
     // synthetic input events: what is being measured is a way of PLAYING,
     // and routing it through keyboard timing would measure the harness.

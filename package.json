@@ -24,7 +24,7 @@
     "snap": "node tools/native.mjs --game=snap",
     "snap:dev": "node tools/native.mjs --game=snap --no-roadroller --cheats",
     "snap:poses": "node tools/shots-snap.mjs",
-    "snap:test": "npm run snap:dev && node tools/test-pose.mjs && node tools/test-audio-snap.mjs && node tools/test-deco.mjs && node tools/test-shoot.mjs && node tools/test-phone.mjs && node tools/test-temper.mjs",
+    "snap:test": "npm run snap:dev && node tools/test-pose.mjs && node tools/test-hair.mjs && node tools/test-audio-snap.mjs && node tools/test-deco.mjs && node tools/test-shoot.mjs && node tools/test-phone.mjs && node tools/test-temper.mjs",
     "snap:balance": "npm run snap:dev && node tools/test-balance-snap.mjs --jobs=8",
     "snap:gate": "npm run snap:test && npm run snap:balance && node tools/native.mjs --game=snap --O1 --rolls=5",
     "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak"

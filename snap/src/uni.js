@@ -54,7 +54,7 @@ export const NB = BONES.length;
 // four different matrices, so they share their geometry - and, usefully,
 // their paint. A player who dyes the hooves dyes all four at once, which is
 // what they meant.
-const MESH_OF = [0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5];
+export const MESH_OF = [0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5];
 
 // Zones are recorded as vertex RANGES while the meshes are built, so paint
 // is a rewrite of a slice of an existing buffer rather than a rebuild. The
@@ -63,12 +63,21 @@ const MESH_OF = [0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5];
 // anyway, which is the same bookkeeping for more work.
 export const COAT = 0, HORN = 1, HOOF = 2;
 
+// Every box the unicorn is made of, recorded as it is built - mesh index,
+// centre and size, in that mesh's own space. DEV only, and it exists for
+// one reason: the hair probe has to ask whether a strand is inside the
+// ANIMAL, and the only honest answer comes from the geometry that is
+// actually drawn rather than from a second table that can drift away from
+// it. A shipping build references nothing here and drops it.
+export const BOXES = [];
+
 export function buildUnicorn() {
   const arrs = [], zones = [[], [], []];
   let cur = null, ci = -1;
   const open = () => { cur = []; ci = arrs.length; arrs.push(cur); };
   const box = (zone, ...a) => {
     const s = cur.length;
+    if (DEV) BOXES.push([ci, ...a.slice(0, 6)]);
     pushBox(cur, ...a);
     if (zone >= 0) zones[zone].push([ci, s, cur.length]);
   };

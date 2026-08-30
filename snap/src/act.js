@@ -130,7 +130,13 @@ export function move(A, anim, P, dt) {
   }
 }
 
-export function act(A, anim, dt, deco) {
+// What it will do while you are dressing it. THE POSES ARE THE SURPRISE:
+// a unicorn that rears and tosses its mane on the styling bench has spent
+// the best thing the shoot has to offer before the shoot starts. On the
+// bench it mooches - stands, grazes, wanders - and everything showy waits
+// for the camera.
+const CALM = [IDLE, GRAZE, WALK];
+export function act(A, anim, dt, deco, calm) {
   A.hold += dt;
   A.gazeNext -= dt;
   A.spark = Math.max(0, A.spark - dt / 1.6);
@@ -159,12 +165,13 @@ export function act(A, anim, dt, deco) {
   if (A.hold < A.next) return;
   // Weights are recomputed per pick rather than cached: the look can change
   // between rounds and the mood changes within one.
-  const ws = REPERTOIRE.map((e) => weightOf(e, t, A.spark, A.bored));
-  let r = Math.random() * ws.reduce((a, b) => a + b, 0), pick = REPERTOIRE[0];
-  for (let i = 0; i < REPERTOIRE.length; i++) { r -= ws[i]; if (r <= 0) { pick = REPERTOIRE[i]; break; } }
+  const rep = calm ? REPERTOIRE.filter((e) => CALM.includes(e[0])) : REPERTOIRE;
+  const ws = rep.map((e) => weightOf(e, t, A.spark, A.bored));
+  let r = Math.random() * ws.reduce((a, b) => a + b, 0), pick = rep[0];
+  for (let i = 0; i < rep.length; i++) { r -= ws[i]; if (r <= 0) { pick = rep[i]; break; } }
   // Never twice in a row: repeating a pose reads as the animal being stuck,
   // and it also lets a patient player farm one rare pose by waiting.
-  if (pick[0] === anim.mode) pick = REPERTOIRE[0];
+  if (pick[0] === anim.mode) pick = rep[0];
   anim.mode = pick[0];
   anim.hold = 0;
   A.hold = 0;

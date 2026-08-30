@@ -79,10 +79,14 @@ export function makeMane() {
 // Mane and forelock take one choice, the tail another - they are the two
 // things a player thinks of as separate, and groups 0 and 1 are both hair
 // on the head. A slot of RB means leave it the unicorn's own spectrum.
-export function recolour(M, deco) {
+// `g` and `c` are the wink: one hair group is forced to a colour so the
+// bench can flash the part the player just chose. Everything else takes the
+// colour it is painted.
+export function recolour(M, deco, g, c) {
   for (const s of M.strands) {
     const pick = s.g === 2 ? deco.tail : deco.mane;
-    s.c = pick === RB ? RAINBOW[s.i % 7] : PALETTE[pick];
+    s.c = c && (s.g === 2 ? 2 : 1) === g ? c
+      : pick === RB ? RAINBOW[s.i % 7] : PALETTE[pick];
   }
 }
 

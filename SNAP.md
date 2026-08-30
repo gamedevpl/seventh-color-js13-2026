@@ -1171,6 +1171,42 @@ frames rather than six** — asked for directly, and the feed is what makes it
 free: eight photographs scroll exactly as well as six, where eight
 thumbnails would only have been smaller thumbnails.
 
+## R13 — the studio calms down, and the part winks
+
+Three from the same session, two of them about the styling bench.
+
+### The feed would not scroll on a trackpad
+
+The camera took **every** wheel event on the page, `preventDefault` and all,
+which is right while you are aiming and wrong the moment a card taller than
+the window is on screen: the result feed simply refused to move. It stands
+aside on phase rather than on the event target — the sheet is the only thing
+on screen once the roll is spent, and asking a `Window` whether it is inside
+a `div` throws, which is how the first fix broke the pinch instead.
+
+### The poses are the surprise
+
+R11 gave the bench a living unicorn, and it went too far: it reared and
+tossed its mane while the player was still choosing colours, which spends
+the best thing the shoot has to offer before the shoot begins. The bench now
+draws from the mooching half of the repertoire — stand, graze, wander — and
+everything showy waits for the camera. The probe watches twelve seconds of
+bench and fails if it sees a single showy pose.
+
+### The part you pick winks
+
+The icons say which zone a button edits; the wink says it on the animal,
+where the player is actually looking. It flashes **light and then dark**
+rather than twice toward white: the default coat is 93% grey, so lightening
+it moved eleven levels out of 255 — measured, not guessed — while a dark
+beat reads against any colour in the palette. Both beats are that zone's own
+colour scaled, so the flash never lies about what the part is painted.
+
+The probe samples the barrel as a **burst** rather than at two named
+instants. A flash under a second long, checked at a moment the probe
+calculates for itself, tests the probe's arithmetic about its own clock as
+much as it tests the game.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

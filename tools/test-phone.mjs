@@ -46,13 +46,23 @@ await page.waitForTimeout(500);
 // The bench. It used to stand square to the camera and wait - a styling
 // screen that never turns hides half of what the player just painted, the
 // tail above all.
-const a = await page.evaluate(() => [SNAP.cam[3], SNAP.sub[0], SNAP.sub[1], SNAP.pose]);
-await page.waitForTimeout(2600);
-const b = await page.evaluate(() => [SNAP.cam[3], SNAP.sub[0], SNAP.sub[1], SNAP.pose]);
+//
+// But THE POSES ARE THE SURPRISE: a unicorn that rears and tosses its mane
+// while you are still choosing colours has spent the best thing the shoot
+// has to offer before the shoot starts. So the bench has to be alive and
+// unspectacular at once, and both halves are read off the same window.
+const SHOWY = [5, 6, 7, 9, 10];
+const a = await page.evaluate(() => [SNAP.cam[3], SNAP.sub[0], SNAP.sub[1]]);
+const seen = new Set();
+for (let i = 0; i < 60; i++) {
+  seen.add(await page.evaluate(() => SNAP.pose));
+  await page.waitForTimeout(200);
+}
+const b = await page.evaluate(() => [SNAP.cam[3], SNAP.sub[0], SNAP.sub[1]]);
+const showy = [...seen].filter((p) => SHOWY.includes(p));
 check('the bench camera goes round it', Math.abs(b[0] - a[0]) > .3, (b[0] - a[0]).toFixed(2) + ' rad');
-check('and the unicorn is alive on it',
-  Math.hypot(b[1] - a[1], b[2] - a[2]) > .03 || b[3] !== a[3],
-  b[3] !== a[3] ? 'it posed' : Math.hypot(b[1] - a[1], b[2] - a[2]).toFixed(2) + ' m');
+check('and the unicorn is alive on it', seen.size > 1, `${seen.size} poses`);
+check('but keeps the showy ones back', !showy.length, showy.length ? `posed ${showy}` : 'mooching');
 
 // Nothing on this page may be smaller than a fingertip. 44 CSS pixels is
 // Apple's own figure; the bench buttons were 30.

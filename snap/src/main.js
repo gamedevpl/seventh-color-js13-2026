@@ -166,7 +166,7 @@ const zBtns = ZONES.map((z, i) => {
   const cv = el('canvas', 'width:42px;height:42px;display:block;image-rendering:pixelated', b);
   cv.width = cv.height = 10;
   icons.push(cv);
-  b.onclick = () => { wake(); zone = i; sync(); };
+  b.onclick = () => { wake(); zone = i; winkT = .78; sync(); };
   return b;
 });
 const glitBtn = el('button', BTN + ';font-size:23px;letter-spacing:.04em;padding:6px 10px', rowZ, '\u2728');
@@ -213,6 +213,26 @@ function apply(i) {
     flushPaint(U);
   }
   sync();
+}
+
+// A WINK FROM THE PART YOU JUST PICKED. The icons say which bit a button
+// edits; this says it on the animal itself, which is where the player is
+// actually looking.
+//
+// It flashes LIGHT AND THEN DARK rather than twice toward white. The coat
+// starts at 93% grey, so lightening it is nearly invisible - measured at
+// eleven levels out of 255 - while a dark beat reads on any colour there
+// is. Both beats are that zone's own colour, scaled, so the flash never
+// lies about what the part is painted.
+let winkT = 0, winkOn = -1;
+function wink(k) {
+  const col = swatch(deco[ZONES[zone]]);
+  const c = k ? col.map((v) => (k > 1 ? v * .4 : v * .3 + .7)) : col;
+  if (zone < 2) recolour(M, deco, zone + 1, k && c);
+  else {
+    paint(U, zone === 2 ? COAT : zone === 3 ? HORN : HOOF, c);
+    flushPaint(U);
+  }
 }
 
 function sync() {
@@ -499,6 +519,13 @@ addEventListener('dblclick', (e) => e.preventDefault());
 // notch on one axis, or a line-mode delta. They have to be told apart from
 // each other, because the same event means zoom, pan and zoom again.
 addEventListener('wheel', (e) => {
+  // NOT ON THE RESULT SCREEN. Taking every wheel event for the camera means
+  // taking the ones aimed at a scrolling card too, and the feed of eight
+  // photographs was unscrollable on a trackpad the moment it grew taller
+  // than the window - the page simply refused to move. Phase, not the event
+  // target: the sheet is the only thing on screen once the roll is spent,
+  // and asking a Window whether it is inside a div throws.
+  if (phase >= 2) return;
   e.preventDefault();
   if (e.ctrlKey) return zoomBy(1 + e.deltaY * .01);
   if (e.deltaMode || (!e.deltaX && Math.abs(e.deltaY) >= 50)) {
@@ -575,7 +602,14 @@ function frame(now) {
   // are painting" and was reported straight back as the unicorn standing
   // like a post - you never saw the tail, and a horse that ignores you
   // while you dress it is not the character this game is about.
-  if (phase < 2 && !FROZEN) { act(A, anim, dt, deco); move(A, anim, P, dt); }
+  // Calm on the bench: everything showy waits for the camera.
+  if (phase < 2 && !FROZEN) { act(A, anim, dt, deco, phase === 0); move(A, anim, P, dt); }
+  if (winkT > 0) {
+    winkT = Math.max(0, winkT - dt);
+    // Light, back, dark, back.
+    const on = winkT > .58 ? 1 : winkT > .2 && winkT < .39 ? 2 : 0;
+    if (on !== winkOn) { winkOn = on; wink(on); }
+  }
 
   // The title's camera works the subject by itself: it drifts round the
   // cove and keeps the lens on the unicorn, which is the shot the player is

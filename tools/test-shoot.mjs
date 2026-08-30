@@ -83,6 +83,11 @@ check('a two-finger drag turns the camera', Math.abs(c2[0] - c1[0]) > .01 && Mat
 await wheel({ deltaY: 120 });
 const c3 = await cam();
 check('and a mouse wheel still zooms out', c3[2] > c2[2] + .05, `${c2[2].toFixed(2)} -> ${c3[2].toFixed(2)}`);
+// The other side of the scrolling fix: while the camera is live it must
+// still swallow the wheel, or the page scrolls under the viewfinder.
+check('the camera takes the wheel while shooting', await page.evaluate(() =>
+  !document.querySelector('canvas').dispatchEvent(
+    new WheelEvent('wheel', { deltaY: 90, bubbles: true, cancelable: true }))), 'wheel handled');
 
 // A frozen unicorn would make this meaningless - the whole point of the
 // shoot is that the pose changes under the shutter.
@@ -133,6 +138,18 @@ check('and every one says why', feed.said === 8, `${feed.said} verdicts`);
 const season = await page.evaluate(() => [...document.querySelectorAll('div')]
   .map((d) => d.textContent).find((t) => /^season \d/.test(t)));
 check('the running season total is on it', !!season, season || 'none');
+
+// The feed has to SCROLL. The camera takes every wheel event on the page,
+// and a card taller than the screen that refuses to move is what that costs
+// if the handler does not stand aside - reported from a trackpad, where the
+// feed was simply stuck. Asserted as the handler's own behaviour rather than
+// through a scroll position, because a synthetic wheel event does not move a
+// real scroller.
+const eaten = (sel) => page.evaluate((s) => {
+  const t = document.querySelector(s);
+  return !t.dispatchEvent(new WheelEvent('wheel', { deltaY: 90, bubbles: true, cancelable: true }));
+}, sel);
+check('the feed scrolls on a trackpad', !(await eaten('img')), 'wheel left alone');
 
 if (out) {
   await page.screenshot({ path: path.join(out, '2-result.png') });

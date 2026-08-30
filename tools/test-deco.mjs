@@ -51,6 +51,25 @@ check('the coat starts pale', base[0] > 120 && Math.abs(base[0] - base[2]) < 70,
 // By title, not by label: the bench buttons are pictures now, because the
 // player this game was made for cannot read yet.
 await page.locator('[title=COAT]').click();
+
+// THE PART WINKS WHEN YOU PICK IT. The icons say which zone a button edits;
+// this says it on the animal, where the player is looking. Sampled twice on
+// the barrel: once while the flash is up, once after it has finished, and
+// the first has to be the lighter of the two - and the second has to be back
+// to where it started, or the "flash" is just a repaint.
+// Sampled as a burst rather than at two guessed instants: the flash is
+// under a second long and a probe that names the moment tests its own
+// arithmetic about the clock.
+const lum = (c) => (c[0] + c[1] + c[2]) / 3;
+const burst = [];
+for (let i = 0; i < 14; i++) { burst.push(lum(await coat())); await page.waitForTimeout(70); }
+const b0 = lum(base);
+check('picking a zone winks it light', Math.max(...burst) > b0 + 4, `+${(Math.max(...burst) - b0).toFixed(0)}`);
+check('...and then dark', Math.min(...burst) < b0 - 25, `${(Math.min(...burst) - b0).toFixed(0)}`);
+await page.waitForTimeout(600);
+const unlit = await coat();
+check('and it goes back afterwards', Math.abs(unlit[0] - base[0]) < 6, rgb(unlit));
+
 await page.locator('button[data-i="1"]').click();          // rose
 await page.waitForTimeout(300);
 const rose = await coat();

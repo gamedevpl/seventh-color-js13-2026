@@ -1,5 +1,5 @@
 {
-  "name": "R18 the hair is opaque",
-  "description": "the additive halo that made the mane and tail look like tinsel is gone, along with half the hair's geometry, and the boredom gate is resized against the table three new poses had diluted - 12,827 packed, 485 bytes free",
+  "name": "R18 the hair is a surface",
+  "description": "the additive halo is gone, consecutive segments share their corners so the strands are continuous, and each ribbon edge carries a normal leaned outward and up so the hair is lit and shaded instead of reading as cut paper - 12,930 packed, 382 bytes free",
   "ceilingBytes": 13312
 }

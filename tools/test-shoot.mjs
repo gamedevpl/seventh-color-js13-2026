@@ -21,6 +21,11 @@ const page = await browser.newPage({ viewport: { width: 900, height: 620 } });
 page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
 await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
 await page.waitForTimeout(700);
+if (out) await page.screenshot({ path: path.join(out, '0-title.png') });
+// The game opens on its title now, so every probe has to walk in through
+// the front door like a player does.
+await page.getByRole('button', { name: 'OPEN THE STUDIO' }).click();
+await page.waitForTimeout(350);
 
 const probe = () => page.evaluate(() => window.SNAP);
 const shot = () => page.evaluate(() => window.SNAPSHOT());

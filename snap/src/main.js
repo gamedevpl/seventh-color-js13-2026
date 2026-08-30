@@ -66,7 +66,15 @@ const rowZ = el('div', 'display:flex;gap:6px;flex-wrap:wrap;justify-content:cent
 const rowC = el('div', 'display:flex;gap:6px;flex-wrap:wrap;justify-content:center', bar);
 const rowG = el('div', 'display:flex;gap:8px;align-items:center;justify-content:center', bar);
 const flash = el('div', 'position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none');
+// Taught in the order the controls are needed, one at a time, low on the
+// screen where a viewfinder overlay belongs.
+const hint = el('div', 'position:fixed;left:0;right:0;bottom:9vh;text-align:center;pointer-events:none;transition:opacity .3s;font:600 14px system-ui,sans-serif;color:#fff3d6;text-shadow:0 2px 10px #000a');
 const sheet = el('div', 'position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#00000055;backdrop-filter:blur(3px);padding:16px');
+// The title sits over a LIVE set rather than a still: the unicorn is already
+// working and the camera is already following it, so the first thing anyone
+// sees is the thing the game is about. A menu over a frozen frame would be
+// advertising a different game.
+const title = el('div', 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px;padding:0 16px 8vh;text-align:center;background:linear-gradient(#00000059,#00000000 34%,#00000012 50%,#000000a6)');
 
 const ZONES = ['mane', 'tail', 'coat', 'horn', 'hoof'];
 let zone = 0;
@@ -91,6 +99,13 @@ const cBtns = [RB, 0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
   b.onclick = () => { wake(); apply(i); sparkle(3); };
   return b;
 });
+el('div', 'font:800 min(13vw,54px)/1 system-ui,sans-serif;color:#fff6dd;letter-spacing:.02em;text-shadow:0 3px 14px #0007', title, 'UNICORN SNAP');
+el('div', 'font:600 15px system-ui,sans-serif;color:#ffeec4;text-shadow:0 2px 8px #0008;margin-top:6px', title, 'It knows how good it looks. Prove it.');
+el('div', 'font:500 13px/1.7 system-ui,sans-serif;color:#f0dcae;text-shadow:0 2px 8px #0008;max-width:34em', title,
+  'Style the unicorn for the job, then shoot it. Drag to aim - wheel or W/S to zoom - Q/E to walk round the set. Tap or SPACE takes the picture.');
+const startBtn = el('button', GO + ';margin-top:10px;font-size:17px', title, 'OPEN THE STUDIO');
+startBtn.onclick = () => { wake(); phase = 0; benchCam(); layout(); };
+
 const goBtn = el('button', GO, rowG, 'START THE SHOOT');
 goBtn.onclick = () => { wake(); startShoot(); };
 
@@ -122,25 +137,37 @@ function sync() {
 // --- the game -------------------------------------------------------------
 let phase = 0;                 // 0 style, 1 shoot, 2 result, 3 season over
 let round = 0, film = FILM, seasonPts = 0, best = null, brief = null, lastJob = 0;
-let rollPts = 0, onBrief = 0;
+let rollPts = 0, onBrief = 0, roll = [];
 let bestEver = 0;
 try { bestEver = +localStorage.usBest || 0; } catch (e) { /* no store, no problem */ }
+
+// The bench wants a good look at the unicorn, because the player is
+// painting it. The shoot hands over a WIDE lens instead: the attract mode
+// leaves the title's camera perfectly composed on the subject, and carrying
+// that into the job gave a player who never touched the controls a framing
+// of 0.96 - the balance probe read the whole game back at 0.90x, worse than
+// not playing. A shoot starts with an unzoomed camera, like every camera.
+const benchCam = () => { if (!FROZEN) { cam.a = Math.PI; cam.p = -.10; cam.fov = .62; cam.ang = 0; } };
+const wideCam = () => { if (!FROZEN) { cam.a = Math.PI; cam.p = -.02; cam.fov = 1.15; cam.ang = 0; } };
 
 function newRound() {
   brief = makeBrief(round);
   best = null;
   rollPts = 0;
   onBrief = 0;
+  roll = [];
   film = FILM;
   phase = 0;
   anim.mode = IDLE;
   P.x = P.z = P.yaw = 0;
+  benchCam();
   layout();
 }
 
 function startShoot() {
   phase = 1;
   A.hold = 99;                 // get it working immediately, not after a beat
+  wideCam();
   layout();
 }
 
@@ -161,16 +188,25 @@ function endRound() {
 }
 
 function layout() {
+  title.style.display = phase < 0 ? 'flex' : 'none';
   bar.style.display = phase === 0 ? 'flex' : 'none';
   sheet.style.display = phase >= 2 ? 'flex' : 'none';
   top.textContent = phase === 0
     ? `JOB ${round + 1}/${SEASON} - ${briefText(brief)}`
     : phase === 1 ? `${briefText(brief)}      FILM ${film}` : '';
+  if (phase < 0) top.textContent = '';
+  const c2 = phase === 1 ? coach() : '';
+  hint.textContent = c2;
+  hint.style.opacity = c2 ? '1' : '0';
 }
 
 function showSheet(bs, total) {
   sheet.textContent = '';
-  const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;max-width:min(92vw,460px);display:flex;flex-direction:column;align-items:center;gap:10px;' + TXT, sheet);
+  // Scrollable, and capped to the viewport. The contact sheet made this card
+// taller than a phone screen, which pushed the only button off the bottom -
+// a result screen you cannot leave is a soft lock, and it looks exactly
+// like a working result screen until you try.
+const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;max-width:min(92vw,460px);max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:9px;' + TXT, sheet);
   if (phase === 3) {
     el('div', 'font-size:22px;font-weight:800', card, 'THAT IS A WRAP');
     el('div', '', card, `Season total ${seasonPts}`);
@@ -184,13 +220,24 @@ function showSheet(bs, total) {
     if (best) {
       el('div', 'font-weight:500;font-size:13px', card,
         `your best of ${FILM}` + (onBrief ? ` - ${onBrief} on brief` : ''));
-      const im = el('img', 'width:min(78vw,380px);border-radius:8px;display:block', card);
+      const im = el('img', 'width:min(62vw,290px);border-radius:8px;display:block', card);
       im.src = best.img;
       const list = el('div', 'font-weight:500;font-size:13px;line-height:1.6', card);
       for (const [n, p] of best.parts.concat(bs.lines)) {
         el('div', '', list, `${n} +${p}`);
       }
       el('div', 'font-weight:700;font-size:13px', card, `whole roll ${rollPts} + styling ${bs.pts}`);
+      // The contact sheet. Every frame counts toward the job, so every frame
+      // has to be visible - a result that shows only the keeper hides the
+      // five decisions that actually moved the number, and a player cannot
+      // learn from a frame they never see.
+      const cs = el('div', 'display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:2px', card);
+      for (const f of roll) {
+        const t = el('div', 'position:relative;width:62px', cs);
+        const ti = el('img', `width:62px;display:block;border-radius:4px;outline:${f === best ? '2px solid #a05a10' : '1px solid #0002'}`, t);
+        ti.src = f.img;
+        el('div', 'font:600 11px system-ui,sans-serif;color:#6b5320', t, String(f.total));
+      }
     }
   }
   const b = el('button', GO, card, phase === 3 ? 'SHOOT ANOTHER SEASON' : 'NEXT JOB');
@@ -244,12 +291,14 @@ addEventListener('pointermove', (e) => {
   // Scaled by the field of view, so a long lens aims slowly. Without this,
   // zooming in makes the camera unusably twitchy at exactly the moment
   // precision starts to matter.
+  if (dragDist > 24) learnt.aim = 1;
   cam.a -= dx * .0022 * cam.fov;
   cam.p = Math.max(-.5, Math.min(.6, cam.p - dy * .0022 * cam.fov));
   drag = [e.clientX, e.clientY];
 });
 addEventListener('wheel', (e) => {
   cam.fov = Math.max(.34, Math.min(1.15, cam.fov + e.deltaY * .0012));
+  if (cam.fov < 1) learnt.zoom = 1;
 });
 
 const q = new URLSearchParams(location.search);
@@ -267,9 +316,22 @@ const FROZEN = q.has('pose');
 if (q.has('ui')) bar.style.display = 'none';
 
 newRound();
+// The title is where a page load lands. newRound builds the first job
+// underneath it, so opening the studio is instant rather than a second
+// wait.
+phase = -1;
+layout();
 sync();
 
 let glitN = 0, vp = null, eye = null, flashT = 0;
+// What the player has actually done, so the coaching can stop the moment
+// each control has been used. A hint that stays up after you have obeyed it
+// is noise, and noise is how players learn to ignore the next hint.
+const learnt = { aim: 0, zoom: 0, shot: 0 };
+const coach = () => (!learnt.aim ? 'drag to aim the camera'
+  : !learnt.zoom ? 'wheel or W/S to zoom in - fill the frame'
+  : !learnt.shot ? 'tap or SPACE to take the picture'
+  : '');
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000);
@@ -283,13 +345,34 @@ function frame(now) {
   if (keys.ArrowDown) cam.p = Math.max(-.5, cam.p - dt * cam.fov);
   if (keys.KeyQ) cam.ang += dt * .8;
   if (keys.KeyE) cam.ang -= dt * .8;
-  if (keys.KeyW) cam.fov = Math.max(.34, cam.fov - dt * .6);
+  if (keys.KeyW) { cam.fov = Math.max(.34, cam.fov - dt * .6); if (cam.fov < 1) learnt.zoom = 1; }
   if (keys.KeyS) cam.fov = Math.min(1.15, cam.fov + dt * .6);
 
-  // The unicorn only performs while it is being photographed. On the bench
-  // it stands and waits, so the player can actually see what they are
-  // painting.
-  if (phase === 1 && !FROZEN) { act(A, anim, dt); move(A, anim, P, dt); }
+  // The unicorn only performs while it is being photographed - or on the
+  // title, which is an attract mode and wants exactly that. On the bench it
+  // stands and waits, so the player can see what they are painting.
+  if ((phase === 1 || phase < 0) && !FROZEN) { act(A, anim, dt); move(A, anim, P, dt); }
+
+  // The title's camera works the subject by itself: it drifts round the
+  // cove and keeps the lens on the unicorn, which is the shot the player is
+  // about to be asked to take.
+  // Not while a probe is holding the scene still: FROZEN means a fixed
+  // camera was asked for, and an attract mode that keeps driving would
+  // quietly overwrite it - which is how a styling probe ended up sampling
+  // the backdrop instead of the coat.
+  if (phase < 0 && !FROZEN) {
+    cam.ang += dt * .11;
+    const ex = Math.sin(cam.ang) * R, ez = Math.cos(cam.ang) * R;
+    const want = Math.atan2(P.x - ex, P.z - ez);
+    cam.a += ((want - cam.a + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 2.2);
+    cam.fov += (.62 - cam.fov) * Math.min(1, dt * 1.4);
+    // Aimed BELOW the subject on purpose. A camera pointed at what it is
+    // photographing centres it by definition, and the centre of this frame
+    // is the words - the first cut put the title straight across the
+    // unicorn's chest. Dropping the lens lifts the animal into the top of
+    // the frame and leaves the band underneath clear.
+    cam.p += (-.23 - cam.p) * Math.min(1, dt * 1.4);
+  }
   if (awake()) music(phase === 1 ? .8 : .2, phase !== 1);
 
   // The lens is placed BEFORE anything reads it. It depends only on the
@@ -356,6 +439,10 @@ function frame(now) {
     wantShot = 0;
     takeShot();
   }
+  if (phase === 1) {
+    const h = coach();
+    if (hint.textContent !== h) { hint.textContent = h; hint.style.opacity = h ? '1' : '0'; }
+  }
   if (flashT > 0) {
     flashT = Math.max(0, flashT - dt * 3.4);
     flash.style.opacity = flashT * .75;
@@ -396,6 +483,7 @@ function frame(now) {
 function takeShot() {
   if (phase !== 1 || film <= 0) return;
   film--;
+  learnt.shot = 1;
   shutter();
   flashT = 1;
   const s = scoreShot(P, vp, eye, anim, deco);
@@ -412,6 +500,7 @@ function takeShot() {
   // JPEG, not PNG: these are photographs, six of them are held in memory at
   // once, and a full-window PNG data URL is megabytes of string.
   s.img = c.toDataURL('image/jpeg', .82);
+  roll.push(s);
   if (!best || s.total > best.total) best = s;
   layout();
   if (film <= 0) setTimeout(endRound, 700);

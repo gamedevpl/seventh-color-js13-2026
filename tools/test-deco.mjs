@@ -29,6 +29,8 @@ const page = await browser.newPage({ viewport: { width: W, height: H }, deviceSc
 page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
 await page.goto(`${pathToFileURL(file).href}?pose=1&cam=0,-0.115,0.5`, { waitUntil: 'load' });
 await page.waitForTimeout(800);
+await page.getByRole('button', { name: 'OPEN THE STUDIO' }).click();
+await page.waitForTimeout(300);
 
 const coat = () => page.evaluate((b) => window.SNAPPIX(...b), BOX);
 const probe = () => page.evaluate(() => window.SNAP);

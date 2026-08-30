@@ -132,8 +132,9 @@ budget rather than a hoped-for one.
 | R4, styling and glitter | 7,797 | 1,299 |
 | R5, the shoot, the brief and the season | 9,799 | 2,002 |
 | R6, the tripod, roaming and balance | 10,026 | 227 |
+| R7, title, contact sheet and coaching | 10,619 | 593 |
 
-**3,286 bytes still in hand.**
+**2,693 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -566,6 +567,59 @@ steps across a whole job and never converged — the harness was measuring a
 player who intends to compose and then shoots before finishing, which is
 nobody.
 
+## R7 — the front door
+
+### The title
+
+It sits over a **live set**: the unicorn is already working and the camera is
+already following it, so the first thing anyone sees is the thing the game
+is about. A menu over a frozen frame advertises a different game.
+
+Rainbow Surfer's R14 lesson arrived again unchanged, and was solved the same
+way. A camera pointed at its subject *centres that subject by definition*,
+and the centre of the frame is where the words are — the first cut put
+`UNICORN SNAP` straight across the unicorn's chest. Aiming the lens **below**
+the subject lifts the animal into the top of the frame and leaves the band
+underneath clear.
+
+### The contact sheet
+
+Every frame counts toward the job, so every frame is now on the result
+screen with its own score, the keeper outlined. A result that shows only the
+best frame hides the five decisions that actually moved the number, and a
+player cannot learn from a photograph they never see.
+
+It also immediately broke the result screen: the taller card pushed the only
+button off the bottom of the viewport. **A result screen you cannot leave is
+a soft lock, and it looks exactly like a working result screen until you try
+it** — the card is capped to the viewport and scrolls now.
+
+### Coaching, one control at a time
+
+A hint low on the screen, where a viewfinder overlay belongs: *drag to aim*,
+then *zoom in — fill the frame*, then *tap or SPACE to take the picture*.
+Each disappears the moment its control has actually been used, because a
+hint that stays up after you have obeyed it is noise, and noise is how
+players learn to ignore the next one.
+
+### The attract mode was handing out free framing
+
+The balance probe caught this within minutes of the title existing, and it
+was a genuine design fault rather than a harness problem. The title's camera
+composes itself on the subject; carrying that into the job gave a player who
+touched nothing a framing of **0.96**, and the whole game measured back at
+**0.90x — worse than not playing at all.**
+
+The bench keeps a good view, because the player is painting and needs to see
+what they are painting. **The shoot hands over a wide lens**, like every
+camera. Balance came back to 2.19x.
+
+A second, quieter version of the same fault: the attract camera also
+overrode the fixed camera the styling probe asks for by URL, so that probe
+started sampling the backdrop instead of the coat. Both are the same rule —
+*an attract mode must not be driving anything a caller has asked to hold
+still.*
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens
@@ -574,7 +628,9 @@ nobody.
   the best one, so a player can see the near misses they took.
 - **A unicorn with moods.** It performs on a fixed table; it should play up
   to a player who is styling it well and sulk at one who is not.
-- **A tutorial that is not a wall of text.** The controls are a
-  photographer's, but nothing on screen says so yet.
+- **Sound for the shutter's aftermath** — a frame that scores well should
+  be audibly better than one that does not.
+- **More jobs than six.** The commission list is short enough that a second
+  season repeats it.
 - **The music.** A strutting catwalk vamp — the joke the idea was born with,
   written rather than borrowed.

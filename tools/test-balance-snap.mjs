@@ -118,6 +118,8 @@ for (const pol of POLICIES) {
   if (ONLY && pol.name !== ONLY) continue;
   await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
   await wait(600);
+  await page.getByRole('button', { name: 'OPEN THE STUDIO' }).click();
+  await wait(300);
   // Style it identically for every policy. Styling is a different skill and
   // mixing it in here would blur the one thing being measured.
   await page.getByRole('button', { name: 'COAT' }).click();

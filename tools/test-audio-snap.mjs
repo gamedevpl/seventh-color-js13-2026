@@ -56,7 +56,7 @@ check('no context before any gesture', !before.state, String(before.state));
 // The styling bench runs the bare version - the bassline and nothing else -
 // so that the full track ARRIVES when the shoot starts. That arrival is a
 // musical event, and an event that is only a volume change is not one.
-await page.getByRole('button', { name: 'MANE' }).click();
+await page.getByRole('button', { name: 'OPEN THE STUDIO' }).click();
 await page.waitForTimeout(500);
 const [o1, b1, s1] = await rate(2000);
 check('context running after a press', s1 === 'running', String(s1));

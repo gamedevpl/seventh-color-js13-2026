@@ -97,11 +97,14 @@ const sayText = () => page.evaluate(() => {
     .find((t) => /^[\u{1F44D}\u{1F44E}] ./u.test(t));
   return d || '';
 });
-// Which thumbnail the big picture is showing, read off the highlight - the
+// Which thumbnail the big picture is showing, read off the highlight, by
+// its COLOUR rather than its width: the ring got thicker for a phone and a
+// probe keyed to "2px" duly went blind to a screen that was working.
+// Which thumbnail the big picture is showing - the
 // verdict line alone cannot answer it, since two frames of the same mistake
 // honestly say the same thing.
 const lit = () => page.evaluate(() => [...document.querySelectorAll('img')].slice(1)
-  .findIndex((i) => /\b2px\b/.test(i.style.outline)));
+  .findIndex((i) => i.style.outline.includes('160, 90, 16')));
 const capBefore = await sayText();
 const litBefore = await lit();
 await page.locator('img').nth(litBefore === 0 ? 2 : 1).click();

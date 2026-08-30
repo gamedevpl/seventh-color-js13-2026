@@ -238,6 +238,13 @@ function newRound() {
 function startShoot() {
   phase = 1;
   A.hold = 99;                 // get it working immediately, not after a beat
+  // The bench got a living unicorn in R11, and with it the boredom clock
+  // started running while the player painted. A child spends a minute on
+  // the colours; boredom climbs at dt/55, so the shoot would open on an
+  // animal that was already yawning and about to lie down. The clock is
+  // for the SHOOT - it measures a photographer who has stopped working,
+  // not one who has not started.
+  A.bored = 0;
   wideCam();
   layout();
 }

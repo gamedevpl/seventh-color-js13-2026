@@ -108,13 +108,14 @@ function weightOf(e, t, spark, bored) {
   // the main event once the player has stopped. At the first weighting it
   // reached only 8% of pose changes at full boredom - a consequence nobody
   // would ever see, which is the same as no consequence.
-  // 17, not 9. R16 put three new poses into the table and gave the
+  // 13, not 9. R16 put three new poses into the table and gave the
   // travelling gaits a third of its weight, and sleep - which is gated on
   // boredom rather than weighted against anything - was quietly diluted by
   // all of it: the probe measured a bored subject lying down 6% and 13% of
-  // the time, against the 18-22% it used to. The gate has to be sized
-  // against the table it competes with, not set once and left.
-  if (pose === SLEEP) return base * bored * bored * 17;
+  // the time, against the 18-22% it used to. A gate has to be sized against
+  // the table it competes with, not set once and left while the table grows
+  // around it. 17 was the first try and overshot to 32%.
+  if (pose === SLEEP) return base * bored * bored * 13;
   // The flash helps; it must not decide. At four times the odds, spraying
   // the shutter summoned showy poses reliably enough that waiting for one
   // was strictly worse than not waiting - which turns the provocation into a

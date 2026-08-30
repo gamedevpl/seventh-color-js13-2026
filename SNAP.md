@@ -706,6 +706,11 @@ a score.
 
 ## R9 — walking round the unicorn with the phone
 
+> **Removed in R11.** It worked, it was measured, and it was not playable
+> in a child's hands. The reasoning below is kept because the decision it
+> records — an API named, an experience described, and only one of them a
+> good fit — is still the right way to have read that request.
+
 The ask was WebXR. **What shipped is not WebXR, and that was a deliberate
 call worth writing down**, because the request named an API and described an
 experience, and only one of the two was a good fit.
@@ -1031,6 +1036,65 @@ change — which the gallery would have broken silently, and which would not
 work anyway now that two frames with the same fault honestly say the same
 sentence. It reads the highlight ring instead: click a thumbnail that is not
 the lit one, and the ring has to move to it.
+
+## R11 — the phone session
+
+Played on an iPhone with the person the game was made for. Six problems came
+back in one message, and five of them are things a desktop can never show
+you.
+
+### The accelerometer is gone
+
+It demoed beautifully and it did not survive contact with a nine-year-old:
+the yaw wanders, the permission prompt is a coin flip inside an in-app
+browser, and every drag fought the sensor for the same camera. **A control
+that is delightful one time in three is worse than one that is not there.**
+Out with it, along with its probe — 0.4 KB of source that was buying
+frustration.
+
+### The shutter was firing by itself
+
+The worst of the six, because it spent film: *"jak sie kadruje kamera to sie
+robia zdjecia samoistnie"*. A tap and a drag were told apart by asking
+whether **one** pointer was left and whether a **shared** drag counter was
+small — and both are true for the second finger leaving a pinch. Two-finger
+zoom therefore ended in a photograph of wherever the camera had drifted to,
+every time.
+
+Every test is now about *this* pointer: how far it personally travelled, how
+long it was down, and whether a second finger joined at any point before the
+hand left the glass. The probe pinches, drags and taps in turn and checks
+the film counter after each.
+
+### The page was never told it was a page on a phone
+
+There was no `<meta name=viewport>` at all. Mobile Safari lays such a page
+out at 980 CSS pixels and scales it down, which is — in one stroke — why
+every control read as too small and why the game could be pinched and
+double-tapped into a zoomed page with its shutter off the bottom of the
+screen. The shell now ships the viewport, `touch-action:none`,
+`overscroll-behavior:none` and a no-select rule, and the game swallows
+`gesturestart` for the iOS pinch that the meta does not stop.
+
+On top of that, every control carries `min-height:44px` — Apple's own
+figure, and the bench buttons were **30**. The probe walks every visible
+button and fails on anything smaller than a fingertip.
+
+### The bench was showing a statue
+
+*"podczas kolorowania unicorn sie nie obraca i nie przemieszcza, stoi jak
+słup"*. It did, and it was deliberate — "so the player can see what they are
+painting" — and it was wrong: **you never saw the tail**, which is the part
+a child paints first and then wants to look at. The unicorn now performs on
+the bench as it does on the set, and the camera drifts round it until the
+player takes hold of it.
+
+### The thumbnails were six brown stamps
+
+At 62 pixels on a 390-wide screen, the subject inside a contact-sheet frame
+is a tenth of its width. Three to a row, sized off the card rather than off
+a number, with the thumb badge on a dark chip so it reads against a bright
+photograph.
 
 ## Where it goes next
 

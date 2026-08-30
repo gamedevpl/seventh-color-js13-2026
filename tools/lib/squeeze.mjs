@@ -32,15 +32,15 @@ export async function roadroll(js, level = 0) {
   return firstLine + secondLine;
 }
 
-export function shell({ title, css, markup, script }) {
-  return `<!doctype html><meta charset=utf-8><title>${title}</title>`
+export function shell({ title, css, markup, script, head = '' }) {
+  return `<!doctype html><meta charset=utf-8><title>${title}</title>${head}`
     + `<style>${css}</style>${markup}<script>${script}</script>`;
 }
 
 /** Minified JS + page parts → the archive that would be submitted. */
-export async function squeeze({ js, css, markup, title, roadroller = true, level = 0, zopfliIterations = 200 }) {
+export async function squeeze({ js, css, markup, title, head = '', roadroller = true, level = 0, zopfliIterations = 200 }) {
   const payload = roadroller ? await roadroll(js, level) : js;
-  const document = shell({ title, css, markup, script: payload });
+  const document = shell({ title, css, markup, head, script: payload });
   const zipped = await zipSingleFile('index.html', document, { zopfliIterations });
   return { payload, document, ...zipped, archiveBytes: zipped.archive.length };
 }

@@ -57,12 +57,23 @@ if (!cheats && /ShiftLeft|ShiftRight/.test(minified)) {
 }
 
 const markup = '<canvas id=c></canvas>';
-const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center}';
+// A PAGE THAT CANNOT BE ZOOMED OR DRAGGED. Without a viewport meta, mobile
+// Safari lays the page out at 980px and scales it down - which is why every
+// control read as too small on an iPhone and why the game could be pinched
+// and double-tapped into a zoomed page with its shutter off the bottom of
+// the screen. touch-action:none hands every gesture to the game instead of
+// the browser; overscroll-behavior stops the rubber-band drag.
+const MOBILE = '<meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">';
+const TOUCHCSS = 'html,body{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;'
+  + '-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}';
+const head = game === 'snap' ? MOBILE : '';
+const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center}'
+  + (game === 'snap' ? TOUCHCSS : '');
 
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {
   const out = await squeeze({
-    js: minified, css, markup, title: TITLES[game] || game,
+    js: minified, css, markup, head, title: TITLES[game] || game,
     roadroller: !noRoadroller, level, zopfliIterations: rolls > 1 ? 15 : 200,
   });
   console.log(`  roll ${i + 1}/${rolls}: index.zip = ${num(out.archiveBytes)}`);

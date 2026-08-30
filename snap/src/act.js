@@ -7,22 +7,30 @@
 // needs is that a big pose can arrive at any moment, not that it is reachable
 // only from standing.
 
-import { IDLE, WALK, TROT, PRANCE, REAR, TOSS, SHAKE, BOW, GRAZE, SLEEP } from './pose.js';
+import { IDLE, WALK, TROT, GALLOP, PRANCE, REAR, TOSS, SHAKE, BOW, GRAZE, SLEEP, JUMP, BUCK, SPIN } from './pose.js';
 import { warmth, PALETTE, RB } from './deco.js';
 
 // [pose, weight, how long it holds]. The showy four are rare AND brief,
 // which is the same lever pulled twice: a rearing unicorn is worth more
 // because it is worth more, and because you might miss it.
 const REPERTOIRE = [
-  [IDLE, 5, 2.4],
+  [IDLE, 4, 2.4],
   [GRAZE, 2, 2.6],
-  [WALK, 2, 2.6],
-  [TROT, 1, 2.0],
+  // IT SHOULD MOVE MORE. Standing and grazing used to be a third of the
+  // table between them and the only travelling gait with any weight was a
+  // walk, so a session was mostly a stationary animal - and a subject that
+  // does not cross the set never teaches the player to follow it.
+  [WALK, 3, 2.6],
+  [TROT, 2.5, 2.2],
+  [GALLOP, 2, 1.8],
   [PRANCE, 3, 3.2],
   [TOSS, 2, 1.0],
   [SHAKE, 2, 1.5],
   [BOW, 1, 1.8],
   [REAR, 1, 1.3],
+  [JUMP, 1.6, 1.1],
+  [BUCK, 1.4, .9],
+  [SPIN, 1.2, 1.4],
   // Base weight is almost irrelevant: sleep is gated on boredom below, so
   // it never happens to a player who is shooting and always happens to one
   // who is not. A subject that lies down is the clearest possible statement
@@ -34,13 +42,20 @@ const REPERTOIRE = [
 // the same list on purpose - what the unicorn does rarely and what is worth
 // catching have to be the same set, or the game asks for one and rewards
 // the other.
-export const SHOWY = [PRANCE, TOSS, SHAKE, BOW, REAR];
+export const SHOWY = [PRANCE, TOSS, SHAKE, BOW, REAR, JUMP, BUCK, SPIN];
 
 // How fast each gait actually travels. Roughly stride length times stride
 // rate, so the hooves do not skate - and, more to the point, so that a
 // walking unicorn LEAVES where it was standing.
-const SPEED = { [WALK]: .58, [TROT]: 1.06, [PRANCE]: .34 };
-const ROAM = 1.35;             // how far from the middle of the set it strays
+// A gallop that does not travel is a treadmill: GALLOP had no entry here at
+// all, so the fastest gait in the game covered no ground. A jump carries
+// the animal further still, because that is what a jump is for.
+const SPEED = { [WALK]: .58, [TROT]: 1.06, [GALLOP]: 2.3, [JUMP]: 2.8, [PRANCE]: .34 };
+// Just inside the taped circle on the floor. The mark and the leash are
+// the same idea seen twice: the set has an edge, and the subject works
+// inside it - which is also what makes travel legible, because now there is
+// something for it to travel across.
+const ROAM = 1.7;
 
 export function makeActor() {
   return { hold: 0, next: 1.5, gaze: 0, gazeNext: 2, turn: 0, spark: 0, bored: 0 };
@@ -176,5 +191,7 @@ export function act(A, anim, dt, deco, calm) {
   anim.hold = 0;
   A.hold = 0;
   A.next = pick[2];
-  A.turn = (Math.random() * 2 - 1) * .7;
+  // A spin needs a real yaw rate under it, or the footwork animates a turn
+  // that never happens.
+  A.turn = pick[0] === SPIN ? (Math.random() < .5 ? -1 : 1) * 3.4 : (Math.random() * 2 - 1) * .7;
 }

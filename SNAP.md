@@ -1316,6 +1316,66 @@ that did fit and are most of the visible difference:
   0.095 made every quad wider than it was tall, so the hair read as a row of
   tiles. A strand is longer than it is wide.
 
+## R16 — the brief is gone, the set has an edge, and it jumps
+
+Three asks in one message, and the first was a reversal of an earlier one.
+
+### "Nobody will get the session goals, children certainly not"
+
+The brief was asked for eight rounds ago, on the grounds that a commission
+system would make the game look more finished for the competition. Played
+with the person it is for, it read as homework: three requirements in
+chips at the top of the screen, two of them about colour theory, and a
+bonus that only pays if you remember them while a unicorn is running about.
+*"Ja bym po prostu robił sesje i tyle."*
+
+So it is gone — `brief.js`, the chips, the pose bonus, the styling bonus,
+the season arc of pose pools. **It freed 456 bytes**, which is most of what
+paid for what follows, and it leaves the styling standing on the thing that
+was always the better argument for it: the look changes what the unicorn
+*does*, and showy poses are worth more points. That is a strategy a child
+can find by playing rather than one that has to be read.
+
+The top row is `SESSION 1/3` now. The score, the film counter and the live
+verdict are the whole HUD.
+
+### Three new poses, and a gallop that goes somewhere
+
+`JUMP`, `BUCK` and `SPIN`. The jump is the only pose in the game that
+leaves the ground, which makes it the hardest to catch and the best paid at
+340. And `GALLOP` had **no entry in the speed table at all** — the fastest
+gait in the game covered no ground, which is a treadmill. Walking, trotting
+and galloping between them now carry a third of the table's weight, because
+a subject that never crosses the set never teaches anyone to follow it.
+
+### The set has an edge
+
+An infinity cove is a backdrop with no join and no corner anywhere. That is
+exactly what a photographer wants and exactly what makes movement invisible:
+a unicorn crossing a featureless field of paper only ever reads as a unicorn
+getting bigger. There is a **taped circle on the floor** now, dashed, the
+way a real studio marks the ground a subject works on — and the roaming
+leash sits just inside it, so the mark and the behaviour say the same thing.
+
+### The probe that had stopped being a probe
+
+Fixing the jump meant looking at `?pose=`, and `?pose=` had been broken
+since the title screen was added: the query was parsed *before* `newRound()`,
+which resets the mode to standing. **Every pose screenshot and every run of
+`test-pose` since then was of a standing unicorn** — and all of them passed,
+because a standing unicorn does stand on the ground.
+
+A probe that cannot fail is not a probe. With it working again all eleven
+old poses still hold, which is the good news, and the jump immediately did
+not: at a 0.62 lift the lowest hoof reached **90 cm** of air, a unicorn on a
+trampoline. It is 0.34 now, and the probe asserts both halves of a jump —
+that it leaves the ground, and that it comes back.
+
+The buck failed the same way in the same session, visibly rather than
+numerically: the first cut had the sign inverted and swung both hind legs
+forward under the belly. Backward is positive, and a bone above the root
+inherits the root's pitch.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

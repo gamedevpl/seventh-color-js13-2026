@@ -54,6 +54,8 @@ const page = await browser.newPage({ viewport: { width: 900, height: 620 } });
 page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
 
 const probe = () => page.evaluate(() => window.SNAP);
+// The roll got longer; a policy has to spend all of it.
+const FILM = 8;
 
 
 const fire = () => page.evaluate(() => window.SNAPFIRE());
@@ -62,19 +64,24 @@ const wait = (ms) => page.waitForTimeout(ms);
 
 await requireDevBuild(page, browser, file, pathToFileURL);
 
-// The brief changes every job, so the look has to be chosen every job.
+// Dressing to WIN, now that there is no brief to dress to. The look is
+// still a strategy and this is the strategy: warm colours buy struts and
+// rears, glitter buys shakes, and both are worth more than the poses a
+// plain unicorn offers. If `dressed` stops beating `skilled` after this,
+// the styling has quietly become decoration again.
+//
+// Clicked by title, because the bench buttons are pictures rather than
+// words - and this probe went unrun for two rounds after that changed,
+// which is its own small lesson about suites that are slow to run.
 async function dress(policy) {
   if (!policy.styles) return;                    // whatever it came with
-  const b = (await probe()).brief;
-  const swatch = b.warm > 0 ? '6' : '2';         // coral, or sky
   for (const zoneName of ['COAT', 'MANE']) {
-    await page.getByRole('button', { name: zoneName }).click();
-    await page.locator(`button[data-i="${swatch}"]`).click();
+    await page.locator(`[title=${zoneName}]`).click();
+    await page.locator('button[data-i="6"]').click();   // coral: warm
   }
-  // GLITTER cycles 0..3, and it starts wherever the last job left it.
   for (let i = 0; i < 4; i++) {
-    if ((await probe()).deco.glitter === b.glit) break;
-    await page.getByRole('button', { name: /GLITTER/ }).click();
+    if ((await probe()).deco.glitter === 3) break;
+    await page.locator('[title=GLITTER]').click();
   }
 }
 
@@ -85,7 +92,7 @@ async function runJob(policy) {
 
   let shots = 0, waited = 0, settle = 0;
   const qs = [];
-  while (shots < 6) {
+  while (shots < FILM) {
     settle++;
     const s = await page.evaluate(() => ({ p: window.SNAP, sh: window.SNAPSHOT() }));
     if (s.p.phase !== 1) break;
@@ -115,7 +122,7 @@ async function runJob(policy) {
     // then shoots before finishing, which is nobody.
     let take = !policy.aims || settle >= 9;
     if (policy.only !== undefined) {
-      // One pose, one camera position, six times: the laziest strategy the
+      // One pose, one camera position, every frame: the laziest strategy the
       // scoring permits. If this wins, the game is asking to be farmed.
       take = take && (s.p.pose === policy.only || waited > 90);
     } else if (policy.waits) {
@@ -172,10 +179,10 @@ for (const pol of POLICIES) {
   // run - a warm coat and some glitter, chosen once and never revisited - so
   // that what `dressed` earns is the choosing, not the wearing.
   if (!pol.styles) {
-    await page.getByRole('button', { name: 'COAT' }).click();
+    await page.locator('[title=COAT]').click();
     await page.locator('button[data-i="6"]').click();
-    await page.getByRole('button', { name: /GLITTER/ }).click();
-    await page.getByRole('button', { name: /GLITTER/ }).click();
+    await page.locator('[title=GLITTER]').click();
+    await page.locator('[title=GLITTER]').click();
   }
 
   const jobs = [];

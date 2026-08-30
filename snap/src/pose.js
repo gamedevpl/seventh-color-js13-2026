@@ -13,12 +13,14 @@ import { BPM } from './snd.js';
 // Pose ids. Kept as small ints because behaviour, scoring and the HUD all
 // speak in them.
 export const GRAZE = 0, IDLE = 1, WALK = 2, TROT = 3, GALLOP = 4,
-  REAR = 5, TOSS = 6, SHAKE = 7, SLEEP = 8, PRANCE = 9, BOW = 10;
+  REAR = 5, TOSS = 6, SHAKE = 7, SLEEP = 8, PRANCE = 9, BOW = 10,
+  JUMP = 11, BUCK = 12, SPIN = 13;
 
 // Names double as the photo caption vocabulary, so they read as English.
 export const POSE_NAME = [
   'grazing', 'standing', 'walking', 'trotting', 'galloping',
   'rearing', 'mane toss', 'shaking out', 'asleep', 'prancing', 'taking a bow',
+  'mid-air!', 'bucking', 'spinning',
 ];
 
 // Gait phase offsets per leg, in the rig's leg order (hindL hindR foreL
@@ -192,6 +194,69 @@ export function poseTarget(st) {
     set(1, .55 * u);
     set(2, .3 * u);
     set(3, -.55 * u, Math.sin(t * 2.2) * .3);
+  } else if (m === JUMP) {
+    // A LEAP, and the only pose that leaves the ground. The arc is a half
+    // sine over the hold, so the take-off and the landing are the same
+    // shape and the animal is highest exactly half way through - which is
+    // also the moment worth photographing, and the moment the flash is
+    // most likely to catch.
+    const u = Math.sin(Math.min(3.14, st.hold * 3.1));
+    // 0.34, not 0.62. The lowest hoof is what leaves the ground, and with
+    // the legs tucked it sits well above the root - measured at 90 cm of
+    // air for a 62 cm lift, which is a unicorn on a trampoline rather than
+    // a unicorn jumping.
+    lift = u * .34;
+    pitch = -.30 * u;
+    // Fore legs reach out ahead, hind legs trail: the classic jump
+    // silhouette, and the one a child draws when asked to draw a horse.
+    for (let i = 0; i < 2; i++) {
+      set(LEGS[i], (.75 + .30) * u);
+      T[(LEGS[i] + 1) * 3] = 1.15 * u;
+    }
+    for (let i = 2; i < 4; i++) {
+      set(LEGS[i], (-.95 + .30) * u);
+      T[(LEGS[i] + 1) * 3] = .55 * u;
+    }
+    set(1, .34 * u);
+    set(2, .1 * u);
+    set(3, -.85 * u, Math.sin(t * 6) * .3);
+  } else if (m === BUCK) {
+    // Both hind legs snap out behind while the shoulders drop. A quick,
+    // rude, extremely photogenic thing for a unicorn to do.
+    const u = Math.sin(Math.min(3.14, st.hold * 4.4));
+    pitch = .42 * u;
+    lift = .10 * u;
+    // BACKWARD IS POSITIVE, and the first cut had the sign inverted, which
+    // swung both hind legs forward under the belly - a unicorn folding up
+    // rather than kicking. The same rule as rearing and bowing: a bone
+    // above the root inherits the root's pitch, so the local angle is the
+    // world angle it wants minus that pitch.
+    for (let i = 0; i < 2; i++) {
+      set(LEGS[i], (1.45 - .42) * u);
+      T[(LEGS[i] + 1) * 3] = .2 * u;
+    }
+    for (let i = 2; i < 4; i++) {
+      set(LEGS[i], -.42 * u);
+      T[(LEGS[i] + 1) * 3] = .12 * u;
+    }
+    set(1, .5 * u);
+    set(2, .25 * u);
+    set(3, -1.1 * u, Math.sin(t * 9) * .5);
+  } else if (m === SPIN) {
+    // A tight turn on the spot, tail flying. The yaw itself is the actor's
+    // job - this is the lean and the footwork that make it read as a turn
+    // rather than as an animal being rotated by an invisible hand.
+    const ph = t * BPS * 2 * 6.283;
+    for (let i = 0; i < 4; i++) {
+      const u = LEGS[i], p = ph + [0, .5, .25, .75][i] * 6.283;
+      set(u, -.4 * Math.sin(p));
+      T[(u + 1) * 3] = Math.max(0, Math.sin(p - .5)) * 1.1;
+    }
+    roll = .16;
+    lift = Math.abs(Math.sin(ph)) * .04;
+    set(1, -.3, .35);
+    set(2, .2, .3);
+    set(3, -.5, Math.sin(ph) * .9);
   }
 
   // Looking at the camera is applied ON TOP of whatever the pose is doing,

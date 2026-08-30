@@ -10,13 +10,12 @@ import {
   perspective, lookAt, mul, modelTR, mask, setDim, setSdw, IDENT,
 } from './gl.js';
 import { buildUnicorn, paint, flushPaint, makePose, solve, BOXES, MESH_OF, COAT, HORN, HOOF } from './uni.js';
-import { studioMesh, shadowMesh, lightsMesh, shadowMat } from './studio.js';
+import { studioMesh, shadowMesh, lightsMesh, markMesh, shadowMat } from './studio.js';
 import { makeMane, updateMane, maneVerts, recolour, MANE_CORE, MANE_HALO } from './mane.js';
 import { makeAnim, applyPose, POSE_NAME, SHAKE, IDLE } from './pose.js';
 import { makeDeco, makeGlitter, glitterVerts, GLITTER_BUF, PALETTE, RB, MAX_GLITTER, swatch } from './deco.js';
 import { makeActor, act, move, poke, temper } from './act.js';
 import { scoreShot, verdict, repeats, bearingOf, frameBox, frameQuality, eyeContact, POSE_WORTH } from './score.js';
-import { makeBrief, briefText, briefStyle, warmMatch, GLIT_WORD, POSE_BONUS } from './brief.js';
 import { wake, awake, music, shutter, sparkle, pleased } from './snd.js';
 
 const FOG = [.09, .07, .05];
@@ -39,7 +38,7 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-const studio = studioMesh(), shadow = shadowMesh(), lights = lightsMesh();
+const studio = studioMesh(), shadow = shadowMesh(), lights = lightsMesh(), mark = markMesh();
 const U = buildUnicorn();
 const P = makePose();
 const anim = makeAnim();
@@ -124,7 +123,6 @@ const live = el('div', 'position:fixed;left:0;right:0;bottom:158px;text-align:ce
 // the viewfinder, where it landed on the coaching line and on the subject.
 const pop = el('div', 'position:fixed;left:0;right:0;top:106px;text-align:center;pointer-events:none;opacity:0;'
   + 'font:800 27px system-ui,sans-serif;color:#ffe9a8;text-shadow:0 2px 14px #000c', vf, '');
-const onbrief = el('div', 'position:fixed;left:0;right:0;bottom:190px;text-align:center;pointer-events:none;opacity:0;transition:opacity .18s;font:800 15px system-ui,sans-serif;letter-spacing:.08em;color:#ffe9a8;text-shadow:0 2px 12px #000c', vf, 'THE POSE THEY ASKED FOR');
 const sheet = el('div', 'position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#00000055;backdrop-filter:blur(3px);padding:16px');
 // The title sits over a LIVE set rather than a still: the unicorn is already
 // working and the camera is already following it, so the first thing anyone
@@ -133,15 +131,7 @@ const sheet = el('div', 'position:fixed;inset:0;display:none;flex-direction:colu
 const title = el('div', 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px;padding:0 16px 8vh;text-align:center;background:linear-gradient(#00000059,#00000000 34%,#00000012 50%,#000000a6)');
 
 const CHIP = 'font:600 13px system-ui,sans-serif;padding:5px 11px;border-radius:999px;background:#0000005e;color:#fff3d6';
-// Each requirement is its own chip and ticks when it is met, so the brief
-// is a checklist you can glance at rather than a sentence you re-read.
-let poseChip = null, ptsChip = null, shown = 0, popT = 0;
-function briefChips(row) {
-  const w = warmMatch(brief, deco);
-  el('div', CHIP, row, (brief.warm > 0 ? 'warm' : 'cool') + (w > .25 ? ' OK' : ''));
-  el('div', CHIP, row, GLIT_WORD[brief.glit] + (deco.glitter === brief.glit ? ' OK' : ''));
-  poseChip = el('div', CHIP, row, POSE_NAME[brief.pose]);
-}
+let ptsChip = null, shown = 0, popT = 0;
 
 const ZONES = ['mane', 'tail', 'coat', 'horn', 'hoof'];
 let zone = 0;
@@ -275,8 +265,8 @@ function sync() {
 
 // --- the game -------------------------------------------------------------
 let phase = 0;                 // 0 style, 1 shoot, 2 result, 3 season over
-let round = 0, film = FILM, seasonPts = 0, best = null, brief = null, lastJob = 0, used = [];
-let rollPts = 0, onBrief = 0, roll = [];
+let round = 0, film = FILM, seasonPts = 0, best = null, lastJob = 0;
+let rollPts = 0, roll = [];
 let bestEver = 0;
 try { bestEver = +localStorage.usBest || 0; } catch (e) { /* no store, no problem */ }
 
@@ -300,11 +290,8 @@ const benchCam = () => { spin = 1; if (!FROZEN) { cam.a = Math.PI; cam.p = -.10;
 const wideCam = () => { if (!FROZEN) { cam.a = Math.PI; cam.p = -.02; cam.fov = 1.15; cam.ang = 0; } };
 
 function newRound() {
-  brief = makeBrief(round, used);
-  used.push(brief.title);
   best = null;
   rollPts = 0;
-  onBrief = 0;
   roll = [];
   film = FILM;
   phase = 0;
@@ -337,13 +324,12 @@ function endRound() {
   // aimed at 0.73 of one who did, because six draws from the pose table
   // almost always contain one good one. Summing every frame means a wasted
   // frame is a wasted frame.
-  const b = briefStyle(brief, deco, rollPts);
-  const total = rollPts + b.pts;
+  const total = rollPts;
   lastJob = total;
   seasonPts += total;
   if (best) pleased();
   layout();                    // the sheet is display:none until this runs
-  showSheet(b, total);
+  showSheet(total);
 }
 
 function layout() {
@@ -355,8 +341,7 @@ function layout() {
   top.textContent = '';
   if (phase >= 0) {
     const row = el('div', 'display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center', top);
-    el('div', 'font:800 14px system-ui,sans-serif;letter-spacing:.06em', row, brief.title);
-    briefChips(row);
+    el('div', 'font:800 14px system-ui,sans-serif;letter-spacing:.06em', row, `SESSION ${round + 1}/${SEASON}`);
     if (phase === 1) {
       el('div', CHIP + ';font-weight:800', row, `FILM ${film}`);
       ptsChip = el('div', CHIP + ';font-weight:800;background:#3a2a12b0', row, '0');
@@ -370,7 +355,7 @@ function layout() {
   hint.style.opacity = c2 ? '1' : '0';
 }
 
-function showSheet(bs, total) {
+function showSheet(total) {
   sheet.textContent = '';
   // Scrollable, and capped to the viewport. The contact sheet made this card
 // taller than a phone screen, which pushed the only button off the bottom -
@@ -399,7 +384,7 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
     // of a season - a score you cannot see until three jobs later is not a
     // score anyone is playing for.
     el('div', 'font-size:14px;font-weight:700;opacity:.7', card,
-      `season ${seasonPts}` + (bs.pts ? ` - brief +${bs.pts}` : '') + (bestEver ? ` - best ${bestEver}` : ''));
+      `season ${seasonPts}` + (bestEver ? ` - best ${bestEver}` : ''));
     for (const f of roll) {
       const [up, why] = verdict(f);
       const w = el('div', 'width:100%;position:relative', card);
@@ -420,7 +405,7 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
     wake();
     if (phase === 3) { round = 0; seasonPts = 0; used = []; }
     else round++;
-    if (round >= SEASON) { phase = 3; showSheet(null, 0); layout(); return; }
+    if (round >= SEASON) { phase = 3; showSheet(0); layout(); return; }
     newRound();
   };
 }
@@ -569,7 +554,6 @@ addEventListener('wheel', (e) => {
 }, { passive: false });
 
 const q = new URLSearchParams(location.search);
-if (q.has('pose')) { anim.mode = +q.get('pose'); }
 if (q.has('cam')) { const p = q.get('cam').split(','); cam.ang = +p[0]; cam.p = +p[1]; cam.fov = +p[2]; }
 if (q.has('deco')) {
   const d = q.get('deco').split(',').map(Number);
@@ -583,6 +567,13 @@ const FROZEN = q.has('pose');
 if (q.has('ui')) bar.style.display = 'none';
 
 newRound();
+// AFTER newRound, which resets the mode to IDLE. It used to be set before,
+// and the day the title screen was added - newRound moved to boot to build
+// the first job under it - ?pose= silently stopped working. Every pose
+// screenshot and every run of test-pose from then on was of a standing
+// unicorn, and they all passed, because a standing unicorn does stand on
+// the ground. A probe that cannot fail is not a probe.
+if (FROZEN) anim.mode = +q.get('pose');
 // The title is where a page load lands. newRound builds the first job
 // underneath it, so opening the studio is instant rather than a second
 // wait.
@@ -700,6 +691,7 @@ function frame(now) {
   frameGL(vp, eye, FOG);
   mode(0);
   drawMesh(studio, IDENT);
+  drawMesh(mark, IDENT);
 
   mode(2);
   setDim(.4);
@@ -762,9 +754,6 @@ function frame(now) {
     shown += (rollPts - shown) * Math.min(1, dt * 5);
     const n = `${Math.round(shown)}`;
     if (ptsChip && ptsChip.textContent !== n) ptsChip.textContent = n;
-    const ob = anim.mode === brief.pose;
-    onbrief.style.opacity = ob ? '1' : '0';
-    if (poseChip) poseChip.style.background = ob ? '#c07a12' : '#0000005e';
     shutBtn.style.borderColor = good ? '#9fe08add' : '#fff3d6cc';
   }
   if (popT > 0) {
@@ -788,7 +777,7 @@ function frame(now) {
     window.SNAP = {
       pose: anim.mode, hoof: lo, belly, contact: Math.min(lo, belly), t: anim.t,
       deco, name: POSE_NAME[anim.mode], glit: glitN / 10,
-      phase, film, round, best: best && best.total, seasonPts, lastJob, brief,
+      phase, film, round, best: best && best.total, seasonPts, lastJob,
       cam: [cam.a, cam.p, cam.fov, cam.ang], sub: [P.x, P.z],
     };
     window.SNAPSHOT = () => scoreShot(P, vp, eye, anim, deco, roll);
@@ -830,15 +819,6 @@ function takeShot() {
   shutter();
   flashT = 1;
   const s = scoreShot(P, vp, eye, anim, deco, roll);
-  // Scaled by the frame like everything else: a badly composed photograph of
-  // the pose they asked for is still a badly composed photograph, and paying
-  // it in full would let a player ignore the lens and just wait.
-  if (s.pose === brief.pose) {
-    const bp = Math.round(POSE_BONUS * s.q * s.fresh);
-    s.parts.push(['the pose they asked for', bp]);
-    s.total += bp;
-    onBrief++;
-  }
   rollPts += s.total;
   pop.textContent = `+${s.total}`;
   popT = 1;

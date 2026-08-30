@@ -21,7 +21,7 @@ import { requireDevBuild } from './lib/require-dev.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const file = path.join(root, 'build', 'snap', 'index.html');
-const NAMES = ['graze', 'idle', 'walk', 'trot', 'gallop', 'rear', 'toss', 'shake', 'sleep', 'prance', 'bow'];
+const NAMES = ['graze', 'idle', 'walk', 'trot', 'gallop', 'rear', 'toss', 'shake', 'sleep', 'prance', 'bow', 'jump', 'buck', 'spin'];
 
 // pose -> [lowest allowed hoof, highest allowed hoof] over the sample window.
 // A hoof a shade under zero is the leg reaching into the turf and reads
@@ -30,7 +30,13 @@ const BOUND = {
   0: [-.06, .06], 1: [-.06, .06], 2: [-.06, .09], 3: [-.06, .12],
   4: [-.06, .22], 5: [-.08, .10], 6: [-.06, .07], 7: [-.06, .08],
   8: [-.08, .06], 9: [-.06, .14], 10: [-.06, .06],
+  // A jump is the one pose that is SUPPOSED to leave the ground, so its
+  // bound is the only generous one here - and it is paired below with the
+  // opposite assertion, that it comes back down. An animation that takes
+  // off and never lands passes a ceiling test and is still broken.
+  11: [-.06, .70], 12: [-.06, .10], 13: [-.06, .16],
 };
+const AIRBORNE = 11;
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 480, height: 320 } });
@@ -45,7 +51,11 @@ for (let i = 0; i < NAMES.length; i++) {
   // Let the pose settle out of the ease-in, then sample across more than a
   // full gait cycle - a single reading lands wherever the cycle happens to
   // be and would pass a leg that spends half its time underground.
-  await page.waitForTimeout(1200);
+  //
+  // Except the jump, which is a ONE-SHOT: waiting for it to settle means
+  // sampling an animal that has already landed, so the window starts at
+  // take-off.
+  await page.waitForTimeout(i === AIRBORNE ? 120 : 1200);
   const s = await page.evaluate(async () => {
     const out = [];
     for (let k = 0; k < 90; k++) {
@@ -56,7 +66,8 @@ for (let i = 0; i < NAMES.length; i++) {
   });
   const lo = Math.min(...s), hi = Math.max(...s);
   const [bl, bh] = BOUND[i];
-  const ok = lo >= bl && hi <= bh;
+  // The jump has to do both: leave the ground, and come back to it.
+  const ok = lo >= bl && hi <= bh && (i !== AIRBORNE || (hi > .3 && lo < .06));
   if (!ok) bad++;
   console.log(`  ${NAMES[i].padEnd(10)} ${lo.toFixed(3).padStart(7)} ${hi.toFixed(3).padStart(9)} ${`${bl}..${bh}`.padStart(10)}  ${ok ? 'ok' : 'FAIL'}`);
 }

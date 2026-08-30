@@ -15,6 +15,7 @@ import { createMesh, pushBox, LIGHT } from './gl.js';
 // The paper. Warm and slightly dusty rather than pure - a saturated
 // backdrop takes over the photograph, and the unicorn is the subject.
 const PAPER = [.93, .78, .31];
+const TAU = Math.PI * 2;
 
 // The cove, as a profile REVOLVED about the vertical axis: a disc of floor,
 // a quarter-circle cove, and a wall going up, all the way round.
@@ -75,7 +76,6 @@ export function studioMesh() {
   // tau leaves the ring 0.0002 rad short, which at this radius is a 4 mm
   // crack running across the floor - faint, dotted, and unmistakable once
   // you have seen it.
-  const TAU = Math.PI * 2;
   for (let i = 0; i < NT; i++) {
     const t0 = TAU * i / NT, t1 = TAU * (i + 1) / NT;
     for (let j = 0; j < p.length - 1; j++) {
@@ -121,6 +121,31 @@ export function shadowMesh() {
 // glow cards rather than geometry - the shader has no second light - so
 // what they contribute is the bloom above the subject that says "studio"
 // rather than any actual illumination.
+// THE SET HAS AN EDGE NOW. An infinity cove is a backdrop with no join and
+// no corner anywhere, which is exactly what a photographer wants and
+// exactly what makes it impossible to tell that anything is moving: a
+// unicorn crossing a featureless field of paper only ever reads as a
+// unicorn getting bigger. A taped circle on the floor is what a real studio
+// puts down for the same reason - it marks the ground the subject works on,
+// and it gives the eye something to measure travel against.
+//
+// Dashed rather than solid, because a solid ring at this radius reads as a
+// plate the animal is standing on.
+export function markMesh() {
+  const v = [], N = 54;
+  for (let k = 0; k < N; k++) {
+    if (k % 3 === 2) continue;
+    const a = k / N * TAU, b = (k + 1) / N * TAU;
+    const p = (r, ang) => [Math.sin(ang) * r, .006, Math.cos(ang) * r];
+    const q = [p(1.98, a), p(2.14, a), p(2.14, b), p(1.98, b)];
+    for (const i of [0, 1, 2, 0, 2, 3]) {
+      const [x, y, z] = q[i], c = shade(x, y, z) * .58;
+      v.push(x, y, z, 0, 1, 0, PAPER[0] * c, PAPER[1] * c, PAPER[2] * c, 1);
+    }
+  }
+  return createMesh(v);
+}
+
 export function lightsMesh() {
   const v = [];
   for (const [x, c] of [[-7, [1, .86, .62]], [7, [1, .86, .62]], [0, [.86, .92, 1]]]) {

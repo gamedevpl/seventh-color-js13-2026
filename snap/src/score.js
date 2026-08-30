@@ -13,7 +13,7 @@
 // when it needs to know which skill a policy is actually being paid for.
 
 import { NB } from './uni.js';
-import { GRAZE, IDLE, WALK, TROT, GALLOP, REAR, TOSS, SHAKE, SLEEP, PRANCE, BOW, POSE_NAME } from './pose.js';
+import { GRAZE, IDLE, WALK, TROT, GALLOP, REAR, TOSS, SHAKE, SLEEP, PRANCE, BOW, JUMP, BUCK, SPIN, POSE_NAME } from './pose.js';
 
 // What each pose is worth to a photographer. The showy ones are worth more
 // AND are rarer - the same lever pulled twice, deliberately.
@@ -25,6 +25,9 @@ import { GRAZE, IDLE, WALK, TROT, GALLOP, REAR, TOSS, SHAKE, SLEEP, PRANCE, BOW,
 export const POSE_WORTH = {
   [SLEEP]: 25, [IDLE]: 30, [GRAZE]: 40, [WALK]: 45, [TROT]: 70, [GALLOP]: 110,
   [PRANCE]: 200, [SHAKE]: 220, [BOW]: 230, [TOSS]: 250, [REAR]: 320,
+  // Airborne is the hardest thing in the game to catch - it lasts about a
+  // second and it moves fastest - so it pays the most.
+  [SPIN]: 190, [BUCK]: 260, [JUMP]: 340,
 };
 
 // Bone origins cover the animal; the horn tip and the four hooves are added

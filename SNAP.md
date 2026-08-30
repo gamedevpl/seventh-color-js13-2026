@@ -1466,7 +1466,18 @@ when the shake - which swings the whole body over its feet - turned out to
 bury the tail in a hind leg. Guessing put them in and out; the probe decided
 it.
 
-Zero points inside, all fourteen poses, three runs.
+And then the shake failed once more, at 3.5 cm - dead on the threshold -
+and the diagnostic named the chest again, which by then was *inside* the
+merged body hull and could not be reached from outside it. Merging the body
+had not removed the argument, it had moved it: pushed out of a leg or the
+neck, a point lands back inside the body, which is checked first in the list
+and never revisited. **The hull list is walked twice per point now.** Same
+fix as the strand solver, one level up.
+
+Zero points inside, all fourteen poses, three runs, with the worst reading
+in the shake down from 8.3 cm to 2.5 - comfortably under the 3.5 cm the
+probe allows for hair lying against skin, and about half a strand's own
+width.
 
 ### The floor mark read as gaffer tape
 

@@ -195,6 +195,14 @@ export function updateMane(M, W, t, dt) {
       // and out of the animal. A bone matrix is a rotation and a
       // translation, so its inverse is the transposed rotation applied to
       // (point - origin) - no general inverse needed, and none affordable.
+      //
+      // The hull list is walked TWICE. Merging the body into one box killed
+      // the argument between the barrel and the chest, and left the same
+      // argument between the body and its neighbours: pushed out of a leg
+      // or the neck, a point can land back inside the body, which was
+      // checked first and is not revisited. A second walk settles what the
+      // first one moved.
+      for (let k = 0; k < 2; k++)
       for (const [m, h] of hulls) {
         const px = b[0] - m[12], py = b[1] - m[13], pz = b[2] - m[14];
         let lx = m[0] * px + m[1] * py + m[2] * pz - h[0];

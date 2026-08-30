@@ -62,6 +62,14 @@ const small = await page.evaluate(() => [...document.querySelectorAll('button')]
   .filter(([, h]) => h < 44));
 check('every button is thumb-sized', !small.length, small.length ? small[0].join(' ') : '44px+');
 
+// The bench has to work for a player who cannot read yet: the five zone
+// buttons are a picture of the unicorn with one part lit up, and the only
+// words left on the styling row belong to the button that starts the shoot.
+const wordy = await page.evaluate(() => [...document.querySelectorAll('button')]
+  .filter((el) => el.offsetParent !== null && /[a-z]/i.test(el.textContent))
+  .map((el) => el.textContent.trim()));
+check('the bench speaks in pictures', wordy.length === 1, wordy.join('|') || 'none');
+
 await page.getByRole('button', { name: 'START THE SHOOT' }).click();
 await page.waitForTimeout(400);
 

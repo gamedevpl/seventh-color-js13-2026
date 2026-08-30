@@ -1,5 +1,5 @@
 {
-  "name": "R11 it behaves on a phone",
-  "description": "the accelerometer is gone, a pinch no longer trips the shutter, the page declares a viewport and every control is 44px - 12,338 packed, 974 bytes free",
+  "name": "R12 pictures, not words",
+  "description": "the bench buttons are a pixel unicorn with one part lit, the result screen is a scrollable feed of eight captioned photographs, and a trackpad pinch zooms - 12,509 packed, 803 bytes free",
   "ceilingBytes": 13312
 }

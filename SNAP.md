@@ -1096,6 +1096,65 @@ is a tenth of its width. Three to a row, sized off the card rather than off
 a number, with the thumb badge on a dark chip so it reads against a bright
 photograph.
 
+## R12 — the second phone session
+
+Five more, from the same pair of hands.
+
+### Pinch did nothing on a Mac
+
+Because **macOS does not send a second pointer for it**. Chrome turns a
+trackpad pinch into a wheel event with `ctrlKey` set; Safari sends its own
+`gesturestart`/`gesturechange` with a scale. Neither ever reached the
+two-finger code, so the gesture that worked on a phone was dead on a laptop
+— and worse, R11's blanket `preventDefault` on the gesture events had made
+Safari's pinch do nothing at all rather than zoom the page. Both paths now
+drive the same `zoomBy`, and the wheel listener is `passive:false` so its
+`preventDefault` actually holds.
+
+### The bench was written for readers
+
+*"dzieci nie potrafią czytać"* — and the styling row said MANE, TAIL, COAT,
+HORN, HOOF. **One 10×10 unicorn does all five buttons**: every pixel is
+labelled with the zone it belongs to, and each button draws the whole animal
+but lights only its own part, in the colour that part is currently painted.
+So the icon says *which bit this changes* and *what you have already done to
+it*, and the row needs no words. The name survives as the `title`, which is
+the hover text and the accessible name both — that is what the probes click.
+
+Two sizing bugs fell out of testing it at 375 CSS pixels, which is an iPhone
+SE and the smallest screen anyone will bring: the icon row ran off the left
+edge, and the nine swatches wrapped onto two lines. Swatches are narrower
+now but never shorter — 34×44 — because the thumb rule is about the height
+you can hit, not the width.
+
+### The bench lens was composed on a monitor
+
+A phone is tall and a unicorn is long, so the same vertical field of view
+that frames it on a laptop cropped its nose and tail off a portrait screen.
+The idle lens widens with the aspect instead of being one number. The bench
+camera also tracks its subject about three times harder than the title does
+— an animal three metres from the lens crosses the frame quickly, and a
+styling screen must never be half a unicorn.
+
+### The gallery became a feed
+
+The R10d screen was one large photograph and a row of thumbnails you tapped
+to swap it, which meant seven of your eight pictures were postage stamps and
+the sentence you were reading belonged to whichever one was selected. A
+phone already has the right idiom: **a column you scroll, every photograph
+full width, every verdict under the photograph it is about**. Nothing to
+tap, nothing to select — and the selection code went with it. Each frame is
+capped at 42vh, contained rather than cropped, because the verdict talks
+about the composition.
+
+### A score you can play for
+
+The season total is on every result screen now, with the personal best
+beside it, rather than appearing three jobs later. And the roll is **eight
+frames rather than six** — asked for directly, and the feed is what makes it
+free: eight photographs scroll exactly as well as six, where eight
+thumbnails would only have been smaller thumbnails.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

@@ -44,15 +44,30 @@ if (out) await page.screenshot({ path: path.join(out, '1-style.png') });
 
 // Style it for the job before shooting, so the result screen has brief
 // lines on it as well as photo lines.
-await page.getByRole('button', { name: 'COAT' }).click();
+// The bench buttons are pictures now, not words - a player who cannot read
+// yet was being asked to pick between MANE and HORN - so they are found by
+// the title that names them rather than by their label.
+await page.locator('[title=COAT]').click();
 await page.locator('button[data-i="6"]').click();
-await page.getByRole('button', { name: /GLITTER/ }).click();
-await page.getByRole('button', { name: /GLITTER/ }).click();
+await page.locator('[title=GLITTER]').click();
+await page.locator('[title=GLITTER]').click();
 
 await page.getByRole('button', { name: 'START THE SHOOT' }).click();
 await page.waitForTimeout(400);
 const s1 = await probe();
-check('the shoot starts with a full roll', s1.phase === 1 && s1.film === 6, `film ${s1.film}`);
+check('the shoot starts with a full roll', s1.phase === 1 && s1.film === 8, `film ${s1.film}`);
+
+// A TRACKPAD PINCH, which is not a touch pinch: macOS sends no second
+// pointer for it. Chrome turns it into a wheel event with ctrlKey set and
+// Safari into its own gesture events, so neither ever reached the
+// two-finger code - reported as pinch simply not working on a Mac. Only the
+// Chrome half is reachable from here; the Safari half is the same handler.
+const fov0 = (await probe()).cam[2];
+await page.evaluate(() => {
+  for (let i = 0; i < 6; i++) dispatchEvent(new WheelEvent('wheel', { deltaY: -12, ctrlKey: true, cancelable: true }));
+});
+const fov1 = (await probe()).cam[2];
+check('a trackpad pinch zooms in', fov1 < fov0 - .03, `${fov0.toFixed(2)} -> ${fov1.toFixed(2)}`);
 
 // A frozen unicorn would make this meaningless - the whole point of the
 // shoot is that the pose changes under the shutter.
@@ -69,13 +84,13 @@ const sc = await shot();
 check('a frame scores something', sc.total > 0 && sc.parts.length > 0, `${sc.total} pts`);
 check('the score is itemised', sc.parts.every((p) => p[1] > 0), `${sc.parts.length} lines`);
 
-for (let i = 0; i < 6; i++) {
+for (let i = 0; i < 8; i++) {
   await page.keyboard.press('Space');
   await page.waitForTimeout(260);
 }
 await page.waitForTimeout(1100);
 const s2 = await probe();
-check('six frames end the job', s2.phase === 2 && s2.film === 0, `phase ${s2.phase}`);
+check('a spent roll ends the job', s2.phase === 2 && s2.film === 0, `phase ${s2.phase}`);
 check('the job scored', s2.seasonPts > 0, `${s2.seasonPts} pts`);
 
 // The photograph has to be a photograph. preserveDrawingBuffer keeps the
@@ -87,38 +102,23 @@ const img = await page.evaluate(() => {
 });
 check('it kept an actual photograph', img && img.len > 4000, img ? `${(img.len / 1024) | 0} KB` : 'none');
 
-// Every frame in the gallery is inspectable, not only the keeper: the job
-// scores the whole roll, so a player who can see one verdict cannot learn
-// why the other five were worth what they were. And the verdict has to be a
-// sentence about the photograph, not a column of numbers - that was the
-// whole point of replacing the ledger.
-const sayText = () => page.evaluate(() => {
-  const d = [...document.querySelectorAll('div')].map((e) => e.textContent)
-    .find((t) => /^[\u{1F44D}\u{1F44E}] ./u.test(t));
-  return d || '';
-});
-// Which thumbnail the big picture is showing, read off the highlight, by
-// its COLOUR rather than its width: the ring got thicker for a phone and a
-// probe keyed to "2px" duly went blind to a screen that was working.
-// Which thumbnail the big picture is showing - the
-// verdict line alone cannot answer it, since two frames of the same mistake
-// honestly say the same thing.
-const lit = () => page.evaluate(() => [...document.querySelectorAll('img')].slice(1)
-  .findIndex((i) => i.style.outline.includes('160, 90, 16')));
-const capBefore = await sayText();
-const litBefore = await lit();
-await page.locator('img').nth(litBefore === 0 ? 2 : 1).click();
-await page.waitForTimeout(250);
-const litAfter = await lit();
-const capAfter = await sayText();
-check('a frame gets a thumb and a reason', /^[\u{1F44D}\u{1F44E}] \S/u.test(capBefore), capBefore || 'none');
-// The badge, not its wrapper: both carry the same textContent, so count
-// only the leaf that actually holds the character.
-const badges = await page.evaluate(() => [...document.querySelectorAll('div')]
-  .filter((d) => !d.children.length && /^[\u{1F44D}\u{1F44E}]$/u.test(d.textContent)).length);
-check('every frame carries a thumb', badges === 6, `${badges} thumbs`);
-check('tapping a thumbnail opens that frame', litAfter === (litBefore === 0 ? 1 : 0),
-  `frame ${litBefore} -> ${litAfter}`);
+// Every frame is on the screen with its own verdict under it. The screen
+// this replaced showed one photograph large and the rest as thumbnails you
+// tapped to swap in, so seven eighths of a roll were postage stamps and the
+// sentence you were reading belonged to whichever one was selected.
+const feed = await page.evaluate(() => ({
+  shots: document.querySelectorAll('img').length,
+  // The caption, not the wrapper around it: both carry the same
+  // textContent, so count only the element that actually holds the words.
+  said: [...document.querySelectorAll('div')]
+    .filter((d) => !d.children.length && /^[\u{1F44D}\u{1F44E}] \S/u.test(d.textContent)).length,
+}));
+check('every frame is in the feed', feed.shots === 8, `${feed.shots} photographs`);
+check('and every one says why', feed.said === 8, `${feed.said} verdicts`);
+const season = await page.evaluate(() => [...document.querySelectorAll('div')]
+  .map((d) => d.textContent).find((t) => /^season \d/.test(t)));
+check('the running season total is on it', !!season, season || 'none');
+
 if (out) {
   await page.screenshot({ path: path.join(out, '2-result.png') });
   const data = await page.evaluate(() => document.querySelector('img').src);
@@ -131,7 +131,7 @@ for (let r = 0; r < 2; r++) {
   await page.waitForTimeout(300);
   await page.getByRole('button', { name: 'START THE SHOOT' }).click();
   await page.waitForTimeout(300);
-  for (let i = 0; i < 6; i++) { await page.keyboard.press('Space'); await page.waitForTimeout(180); }
+  for (let i = 0; i < 8; i++) { await page.keyboard.press('Space'); await page.waitForTimeout(180); }
   await page.waitForTimeout(1000);
 }
 const s3 = await probe();

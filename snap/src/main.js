@@ -20,7 +20,11 @@ import { makeBrief, briefText, briefStyle, warmMatch, GLIT_WORD, POSE_BONUS } fr
 import { wake, awake, music, shutter, sparkle, pleased } from './snd.js';
 
 const FOG = [.09, .07, .05];
-const FILM = 6, SEASON = 3;
+// EIGHT FRAMES, NOT SIX. Asked for directly, and the gallery is the reason
+// it costs nothing: a feed of eight scrolls exactly as well as a feed of
+// six, where a contact sheet of eight thumbnails would have been eight
+// smaller thumbnails.
+const FILM = 8, SEASON = 3;
 
 const c = document.getElementById('c');
 initGL(c);
@@ -71,8 +75,8 @@ const top = el('div', 'position:fixed;left:0;right:0;top:0;padding:11px 14px 16p
   + 'font:600 14px system-ui,sans-serif;color:#fff3d6;text-shadow:0 2px 8px #000a;'
   + 'background:linear-gradient(#00000070,#00000000)');
 const bar = el('div', 'position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 8px calc(14px + env(safe-area-inset-bottom));touch-action:none');
-const rowZ = el('div', 'display:flex;gap:7px;flex-wrap:wrap;justify-content:center', bar);
-const rowC = el('div', 'display:flex;gap:7px;flex-wrap:wrap;justify-content:center', bar);
+const rowZ = el('div', 'display:flex;gap:5px;flex-wrap:wrap;justify-content:center', bar);
+const rowC = el('div', 'display:flex;gap:5px;flex-wrap:wrap;justify-content:center', bar);
 const rowG = el('div', 'display:flex;gap:8px;align-items:center;justify-content:center', bar);
 // Behaviour you cannot see is depth nobody plays with. The bench states, in
 // the player's words, what this look will make the unicorn do - which is the
@@ -127,12 +131,46 @@ function briefChips(row) {
 const ZONES = ['mane', 'tail', 'coat', 'horn', 'hoof'];
 let zone = 0;
 
+// A PICTURE OF THE PART, NOT ITS NAME. The bench said MANE, TAIL, COAT,
+// HORN, HOOF - six English words on a game whose player cannot read yet,
+// which makes the whole styling screen a guessing game for exactly the
+// person it was built for.
+//
+// One 10x10 unicorn does all five buttons: each pixel is labelled with the
+// zone it belongs to, and a button draws the whole animal but lights only
+// its own zone - in the colour that zone is currently painted. So the icon
+// says which part you are about to change AND shows what you have already
+// done to it, and the row needs no words at all. The name survives as the
+// title attribute, which is the hover text and the accessible name both.
+const PIX = '0044000000' + '0043000000' + '0333110000' + '0333111000' + '0033311100'
+  + '0033333322' + '0033333332' + '0033333330' + '0030030300' + '0050050500';
+// The digits are zone+1 in bench order: mane, tail, coat, horn, hoof.
+const ZPIX = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 };
+const rgb = (c) => `rgb(${c.map((v) => (v * 255) | 0)})`;
+function drawIcon(cv, mine) {
+  const x = cv.getContext('2d');
+  x.clearRect(0, 0, 10, 10);
+  for (let i = 0; i < 100; i++) {
+    const z = ZPIX[PIX[i]];
+    if (z === undefined) continue;
+    // Everything but this button's own part is a faint grey ghost, so the
+    // eye lands on the bit the button edits.
+    x.fillStyle = z === mine ? rgb(swatch(deco[ZONES[z]])) : '#3a2a1230';
+    x.fillRect(i % 10, (i / 10) | 0, 1, 1);
+  }
+}
+const icons = [];
 const zBtns = ZONES.map((z, i) => {
-  const b = el('button', BTN, rowZ, z.toUpperCase());
+  const b = el('button', BTN + ';padding:4px 6px', rowZ);
+  b.title = z.toUpperCase();
+  const cv = el('canvas', 'width:32px;height:32px;display:block;image-rendering:pixelated', b);
+  cv.width = cv.height = 10;
+  icons.push(cv);
   b.onclick = () => { wake(); zone = i; sync(); };
   return b;
 });
-const glitBtn = el('button', BTN, rowZ, 'GLITTER');
+const glitBtn = el('button', BTN + ';font-size:19px;letter-spacing:.06em', rowZ, '\u2728');
+glitBtn.title = 'GLITTER';
 glitBtn.onclick = () => {
   wake();
   deco.glitter = (deco.glitter + 1) % (MAX_GLITTER + 1);
@@ -141,7 +179,8 @@ glitBtn.onclick = () => {
 };
 const cBtns = [RB, 0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
   const b = el('button', BTN, rowC, '');
-  b.style.width = b.style.height = '44px';
+  b.style.width = '34px';
+  b.style.height = '44px';
   b.style.padding = '0';
   b.dataset.i = i;
   b.onclick = () => { wake(); apply(i); sparkle(3); };
@@ -186,12 +225,14 @@ function sync() {
     b.style.opacity = i === RB && zone > 1 ? '.25' : '1';
     b.style.outline = deco[ZONES[zone]] === i ? '2px solid #3a2a12' : '0';
   });
-  glitBtn.textContent = 'GLITTER ' + '*'.repeat(deco.glitter);
+  glitBtn.textContent = '\u2728'.repeat(deco.glitter) || '\u2728';
+  glitBtn.style.opacity = deco.glitter ? '1' : '.45';
+  icons.forEach(drawIcon);
   const t = temper(deco);
   const does = [];
-  if (t.warm > .25) does.push('struts and rears');
-  if (t.cool > .25) does.push('settles, and watches you');
-  if (t.glit > .3) does.push('shakes the glitter out');
+  if (t.warm > .25) does.push('strut and rear');
+  if (t.cool > .25) does.push('settle and watch you');
+  if (t.glit > .3) does.push('shake the glitter out');
   tell.textContent = does.length
     ? 'this look makes it ' + does.join(' - ')
     : 'a plain look - it will mostly just stand about';
@@ -215,7 +256,8 @@ try { bestEver = +localStorage.usBest || 0; } catch (e) { /* no store, no proble
 // half of what you just painted - the tail above all, which is the part a
 // child paints first and then wants to see.
 let spin = 1;
-const benchCam = () => { spin = 1; if (!FROZEN) { cam.a = Math.PI; cam.p = -.10; cam.fov = .62; cam.ang = 0; } };
+const idleFov = () => (c.height > c.width ? .98 : .72);
+const benchCam = () => { spin = 1; if (!FROZEN) { cam.a = Math.PI; cam.p = -.10; cam.fov = idleFov(); cam.ang = 0; } };
 const wideCam = () => { if (!FROZEN) { cam.a = Math.PI; cam.p = -.02; cam.fov = 1.15; cam.ang = 0; } };
 
 function newRound() {
@@ -301,50 +343,36 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
       el('div', 'color:#a05a10;font-weight:800', card, 'A NEW PERSONAL BEST');
     } else el('div', '', card, `Best season ${bestEver}`);
   } else {
-    // A GALLERY, NOT A LEDGER. This screen used to list every term that
-    // contributed to every frame, and it read as an invoice - the numbers
-    // were all true and none of them told a player whether the picture was
-    // any good. Six photographs, a thumb on each, and one sentence about
-    // whichever one you are looking at.
-    el('div', 'font-size:15px;font-weight:700;opacity:.75', card,
-      best ? `${total} points${bs.pts ? ` - brief +${bs.pts}` : ''}` : 'No usable frames');
-    if (best) {
-      const im = el('img', 'width:100%;max-width:340px;border-radius:10px;display:block', card);
-      const say = el('div', 'font:700 17px system-ui,sans-serif;line-height:1.3', card, '');
-      // THUMBNAILS BIG ENOUGH TO READ. At 62 pixels these were six brown
-      // stamps on a phone - reported as barely visible, and fairly: the
-      // subject inside one is a tenth of its width. Three to a row, sized
-      // off the card rather than off a number, they are large enough to
-      // tell one photograph from another, which is the entire job of a
-      // contact sheet.
-      const cs = el('div', 'display:grid;grid-template-columns:repeat(3,1fr);gap:7px;width:100%;max-width:340px', card);
-      const thumbs = [];
-      const show = (f) => {
-        const [up, why] = verdict(f);
-        im.src = f.img;
-        say.textContent = (up ? '\u{1F44D} ' : '\u{1F44E} ') + why;
-        thumbs.forEach((t, i) => { t.style.outline = roll[i] === f ? '3px solid #a05a10' : '1px solid #0003'; });
-      };
-      roll.forEach((f) => {
-        const t = el('div', 'position:relative;cursor:pointer;touch-action:manipulation', cs);
-        const ti = el('img', 'width:100%;display:block;border-radius:6px;outline:1px solid #0003', t);
-        ti.src = f.img;
-        el('div', 'position:absolute;right:3px;bottom:3px;font-size:17px;line-height:1;'
-          + 'background:#000000a6;border-radius:6px;padding:2px 3px', t,
-          verdict(f)[0] ? '\u{1F44D}' : '\u{1F44E}');
-        t.onclick = () => { wake(); show(f); };
-        thumbs.push(ti);
-      });
-      // Open on the best KEEPER, not the best score. The highest-scoring
-      // frame of a bad roll is still a bad photograph, and a gallery that
-      // greets you with a thumbs-down on the frame it calls your best is
-      // just confusing.
-      let op = 0;
-      for (const f of roll) if (verdict(f)[0] && (!op || f.total > op.total)) op = f;
-      show(op || best);
+    // A FEED, NOT A CONTACT SHEET. The first cut of this screen was one big
+    // photograph and a row of thumbnails you tapped to swap it - which meant
+    // seven of your eight pictures were the size of a postage stamp, and the
+    // verdict you were reading belonged to whichever one you had selected.
+    // A phone already has the right idiom for "here is what you shot": a
+    // column you scroll, every photograph full width, every verdict under
+    // the photograph it is about. Nothing to tap, nothing to select.
+    el('div', 'font:800 19px system-ui,sans-serif', card,
+      best ? `${total} points` : 'No usable frames');
+    // The running total, on every result screen rather than only at the end
+    // of a season - a score you cannot see until three jobs later is not a
+    // score anyone is playing for.
+    el('div', 'font-size:14px;font-weight:700;opacity:.7', card,
+      `season ${seasonPts}` + (bs.pts ? ` - brief +${bs.pts}` : '') + (bestEver ? ` - best ${bestEver}` : ''));
+    for (const f of roll) {
+      const [up, why] = verdict(f);
+      const w = el('div', 'width:100%;position:relative', card);
+      // Capped at a screen-share rather than shown at full height: a phone
+      // photograph is as tall as the phone, and eight of them at full size
+      // is a feed nobody reaches the end of. Contained, not cropped - the
+      // verdict talks about the composition, so the composition has to be
+      // the thing on screen.
+      el('img', 'max-width:100%;max-height:42vh;border-radius:10px;display:block;margin:0 auto', w)
+        .src = f.img;
+      el('div', 'font:700 16px system-ui,sans-serif;padding:5px 2px 2px;text-align:left', w,
+        (up ? '\u{1F44D} ' : '\u{1F44E} ') + why);
     }
   }
-  const b = el('button', GO, card, phase === 3 ? 'SHOOT ANOTHER SEASON' : 'NEXT JOB');
+  const b = el('button', GO + ';position:sticky;bottom:0;box-shadow:0 0 0 12px #f5e6bd;margin-top:4px', card,
+    phase === 3 ? 'SHOOT ANOTHER SEASON' : 'NEXT JOB');
   b.onclick = () => {
     wake();
     if (phase === 3) { round = 0; seasonPts = 0; used = []; }
@@ -426,10 +454,7 @@ addEventListener('pointermove', (e) => {
   p.d += Math.abs(dx) + Math.abs(dy);
   if (pts.size === 2) {
     const d = spread();
-    if (pinch && d > 8) {
-      cam.fov = Math.max(.34, Math.min(1.15, cam.fov * (pinch / d)));
-      learnt.zoom = cam.fov < 1 ? 1 : learnt.zoom;
-    }
+    if (pinch && d > 8) zoomBy(pinch / d);
     pinch = d;
     return;
   }
@@ -440,15 +465,37 @@ addEventListener('pointermove', (e) => {
   cam.a -= dx * .0022 * cam.fov;
   cam.p = Math.max(-.5, Math.min(.6, cam.p - dy * .0022 * cam.fov));
 });
-// iOS pinch-zooms the PAGE unless the page says otherwise, and a zoomed
-// page is a game with its controls off the bottom of the screen. The
-// viewport meta stops the double-tap; these stop the pinch.
-for (const g of ['gesturestart', 'gesturechange', 'dblclick']) addEventListener(g, (e) => e.preventDefault());
-
-addEventListener('wheel', (e) => {
-  cam.fov = Math.max(.34, Math.min(1.15, cam.fov + e.deltaY * .0012));
+let gScale = 1;
+const zoomBy = (k) => {
+  cam.fov = Math.max(.34, Math.min(1.15, cam.fov * k));
   if (cam.fov < 1) learnt.zoom = 1;
+};
+// A TRACKPAD PINCH IS NOT A TOUCH PINCH. macOS does not send two pointers
+// for it: Chrome turns it into a wheel event with ctrlKey set, and Safari
+// sends its own gesture events with a scale. Neither reaches the two-finger
+// code, which is why pinching on a Mac did nothing at all while it worked
+// on a phone - and both, left alone, zoom the PAGE instead, which is the
+// other half of the same bug.
+addEventListener('gesturestart', (e) => { e.preventDefault(); gScale = 1; });
+addEventListener('gesturechange', (e) => {
+  e.preventDefault();
+  zoomBy(gScale / e.scale);
+  gScale = e.scale;
 });
+addEventListener('gestureend', (e) => e.preventDefault());
+addEventListener('dblclick', (e) => e.preventDefault());
+
+// passive:false, or the preventDefault is ignored and the browser zooms the
+// page out from under a game that just handled the same gesture.
+addEventListener('wheel', (e) => {
+  e.preventDefault();
+  // ctrlKey on a wheel event means a pinch, not a scroll - the convention
+  // every browser settled on for trackpads. It arrives in much smaller
+  // steps than a scroll wheel, so it gets its own gain.
+  if (e.ctrlKey) zoomBy(1 + e.deltaY * .01);
+  else cam.fov = Math.max(.34, Math.min(1.15, cam.fov + e.deltaY * .0012));
+  if (cam.fov < 1) learnt.zoom = 1;
+}, { passive: false });
 
 const q = new URLSearchParams(location.search);
 if (q.has('pose')) { anim.mode = +q.get('pose'); }
@@ -523,8 +570,16 @@ function frame(now) {
     cam.ang += dt * (phase < 0 ? .11 : .3);
     const ex = Math.sin(cam.ang) * R, ez = Math.cos(cam.ang) * R;
     const want = Math.atan2(P.x - ex, P.z - ez);
-    cam.a += ((want - cam.a + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 2.2);
-    cam.fov += (.62 - cam.fov) * Math.min(1, dt * 1.4);
+    // The bench tracks HARDER than the title does. A unicorn three metres
+    // from the lens crosses the frame quickly, and a lens that ambles after
+    // it at the title's rate leaves the animal half out of shot - which is
+    // exactly what a styling screen must never do.
+    cam.a += ((want - cam.a + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * (phase < 0 ? 2.2 : 6));
+    // A phone is TALL, and a unicorn is long: the same vertical field of
+    // view that frames it on a monitor crops its nose and tail off a
+    // portrait screen, which is what the bench was doing on an iPhone SE.
+    // The idle lens widens with the aspect instead of being one number.
+    cam.fov += (idleFov() - cam.fov) * Math.min(1, dt * 1.4);
     // The title aims BELOW the subject on purpose: a camera pointed at what
     // it photographs centres it by definition, and the centre of that frame
     // is the words - the first cut put the title across the unicorn's

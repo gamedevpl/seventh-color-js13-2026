@@ -778,7 +778,7 @@ function frame(now) {
       pose: anim.mode, hoof: lo, belly, contact: Math.min(lo, belly), t: anim.t,
       deco, name: POSE_NAME[anim.mode], glit: glitN / 10,
       phase, film, round, best: best && best.total, seasonPts, lastJob,
-      cam: [cam.a, cam.p, cam.fov, cam.ang], sub: [P.x, P.z],
+      cam: [cam.a, cam.p, cam.fov, cam.ang], sub: [P.x, P.z], yaw: P.yaw,
     };
     window.SNAPSHOT = () => scoreShot(P, vp, eye, anim, deco, roll);
     // The rig and the hair as the renderer sees them, so a probe can ask

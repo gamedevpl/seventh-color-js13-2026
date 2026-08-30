@@ -92,11 +92,27 @@ check('the camera takes the wheel while shooting', await page.evaluate(() =>
 // A frozen unicorn would make this meaningless - the whole point of the
 // shoot is that the pose changes under the shutter.
 const seen = new Set();
+// A STANDING UNICORN MAY NOT PIVOT. The heading used to be turned whatever
+// the animal was doing, so a grazing one swung slowly round with all four
+// hooves planted - reported as "spinning without moving its legs", which is
+// precisely what it was. Only the poses with footwork under them may change
+// heading, and this samples fast enough to catch a slow drift.
+const FOOT = [2, 3, 4, 9, 13];        // walk, trot, gallop, prance, spin
+let planted = 0, drift = 0;
+let prev = await probe();
 for (let i = 0; i < 60; i++) {
-  seen.add((await probe()).pose);
+  seen.add(prev.pose);
+  const now = await probe();
+  if (!FOOT.includes(prev.pose) && !FOOT.includes(now.pose)) {
+    const d = Math.abs(((now.yaw - prev.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+    planted++;
+    if (d > drift) drift = d;
+  }
+  prev = now;
   await page.waitForTimeout(120);
 }
 check('it works the set on its own', seen.size >= 3, `${seen.size} poses`);
+check('and never pivots on planted hooves', drift < .01, `${drift.toFixed(3)} rad over ${planted}`);
 
 // THE VERDICT BEFORE THE SHUTTER. The gallery tells a player at the end of
 // a job what they needed to know during it; the same sentence on the

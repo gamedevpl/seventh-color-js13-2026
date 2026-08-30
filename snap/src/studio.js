@@ -129,17 +129,21 @@ export function shadowMesh() {
 // puts down for the same reason - it marks the ground the subject works on,
 // and it gives the eye something to measure travel against.
 //
-// Dashed rather than solid, because a solid ring at this radius reads as a
-// plate the animal is standing on.
+// A SCUFF, NOT A STRIPE. The first cut was a dashed band 16 cm wide at 58%
+// of the paper's brightness, and it read as gaffer tape slapped across a
+// photograph - the eye went to it before it went to the unicorn. What a
+// worked studio floor actually has is a faint continuous ring where the
+// subject has been walked round for years: unbroken, a finger wide, barely
+// darker than the paper. It gives the eye its reference and stays out of
+// the picture.
 export function markMesh() {
-  const v = [], N = 54;
+  const v = [], N = 96;
   for (let k = 0; k < N; k++) {
-    if (k % 3 === 2) continue;
     const a = k / N * TAU, b = (k + 1) / N * TAU;
     const p = (r, ang) => [Math.sin(ang) * r, .006, Math.cos(ang) * r];
-    const q = [p(1.98, a), p(2.14, a), p(2.14, b), p(1.98, b)];
+    const q = [p(2.03, a), p(2.09, a), p(2.09, b), p(2.03, b)];
     for (const i of [0, 1, 2, 0, 2, 3]) {
-      const [x, y, z] = q[i], c = shade(x, y, z) * .58;
+      const [x, y, z] = q[i], c = shade(x, y, z) * .88;
       v.push(x, y, z, 0, 1, 0, PAPER[0] * c, PAPER[1] * c, PAPER[2] * c, 1);
     }
   }

@@ -1430,6 +1430,35 @@ numerically: the first cut had the sign inverted and swung both hind legs
 forward under the belly. Backward is positive, and a bone above the root
 inherits the root's pitch.
 
+## R17 — a statue on a turntable, and a floor mark that shouted
+
+Two from a play session, both about things being noticed that should not
+have been noticeable.
+
+### It span without moving its legs
+
+Exactly right, and exactly what the code said: `move()` applied the actor's
+yaw rate whatever the animal was doing, so a standing or grazing unicorn
+swung slowly round with all four hooves planted. Turning is footwork now -
+only the poses that have any (walk, trot, gallop, prance, spin) may change
+heading, and the roaming leash steers only when there are feet under it.
+
+`test-shoot` samples pose and heading together for seven seconds and fails
+on any drift at all while the hooves are planted. Measured: 0.000 rad over
+25 planted samples.
+
+### The floor mark read as gaffer tape
+
+The set needed an edge and got a dashed band 16 cm wide at 58% of the
+paper's brightness. It worked, in the sense that travel became legible, and
+it was the first thing the eye landed on - ahead of the unicorn, in a game
+about photographing the unicorn. *"Nie tak chamska przerywana linia."*
+
+What a worked studio floor actually has is a faint continuous ring where the
+subject has been walked round for years: unbroken, a finger wide, barely
+darker than the paper. Same reference for the eye, no longer in the
+photograph.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

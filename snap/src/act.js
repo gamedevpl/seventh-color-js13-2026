@@ -130,7 +130,13 @@ export const poke = (A) => { A.spark = 1; A.bored = Math.max(0, A.bored - .55); 
 // a skill. A subject that moves has to be followed.
 export function move(A, anim, P, dt) {
   const sp = SPEED[anim.mode] || 0;
-  P.yaw += A.turn * dt;
+  // IT TURNS ON ITS FEET, or it does not turn. The yaw used to be applied
+  // whatever the animal was doing, so a standing or grazing unicorn swung
+  // slowly round on the spot with all four hooves planted - reported as
+  // spinning without moving its legs, and it is exactly that: a statue on a
+  // turntable. Only the poses with footwork under them may change heading.
+  const foots = sp || anim.mode === SPIN;
+  if (foots) P.yaw += A.turn * dt;
   if (sp) {
     P.x += Math.sin(P.yaw) * sp * dt;
     P.z += Math.cos(P.yaw) * sp * dt;
@@ -138,7 +144,7 @@ export function move(A, anim, P, dt) {
   // A leash rather than a wall: past the roaming radius it steers back
   // toward the middle instead of stopping dead at an invisible edge.
   const r = Math.hypot(P.x, P.z);
-  if (r > ROAM) {
+  if (foots && r > ROAM) {
     const want = Math.atan2(-P.x, -P.z);
     let d = ((want - P.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
     P.yaw += d * Math.min(1, dt * 1.6);

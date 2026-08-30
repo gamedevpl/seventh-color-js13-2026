@@ -1,5 +1,5 @@
 {
-  "name": "R9b walking round it",
-  "description": "turning the phone walks the camera round the unicorn with the lens held on it, a finger still trims the aim, and a page with no sensor access says so instead of looking armed",
+  "name": "R9c motion confirmed",
+  "description": "walking round the unicorn by turning the phone works on real hardware; the temporary sensor readout is removed and only the NO SENSOR fallback remains",
   "ceilingBytes": 13312
 }

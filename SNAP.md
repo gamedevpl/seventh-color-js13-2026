@@ -136,8 +136,9 @@ budget rather than a hoped-for one.
 | R8, the viewfinder, pinch and a shutter | 11,266 | 647 |
 | R9, aiming with the phone | 11,603 | 337 |
 | R9b, walking round it, and the button that did nothing | 11,728 | 125 |
+| R9c, the diagnostic panel out again | 11,689 | −39 |
 
-**1,584 bytes still in hand.**
+**1,623 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -799,26 +800,20 @@ went.
   switching it off really stops it                    unmoved  ok
 ```
 
-### A temporary panel, because silence has two causes
+### The panel that settled it, and is gone again
 
-**Remove before submission.** Pressing WALK currently also shows a
-diagnostic readout.
+A page with no sensor access fails *silently and identically to broken code*:
+in a cross-origin iframe without an `allow="gyroscope"` permissions policy the
+events simply never arrive — no error, no refused permission, nothing to
+catch. This pass had already produced a real bug with exactly that symptom,
+so a temporary readout was added rather than guessing between the two:
+whether the page was framed, what `requestPermission` returned or threw, what
+`featurePolicy` said, and live counts of orientation and motion events.
 
-The reason it exists: a page with no sensor access fails *silently and
-identically to broken code*. In a cross-origin iframe without an
-`allow="gyroscope"` permissions policy the events simply never arrive — no
-error, no refused permission, nothing to catch. From the outside that is
-indistinguishable from a bug, and this pass had already produced a real bug
-with exactly the same symptom, so guessing between the two is not a way to
-spend another round.
-
-The panel prints what actually separates them: whether the page is framed,
-whether `DeviceOrientationEvent` and `requestPermission` exist, what the
-permission call returned (or threw), what `featurePolicy` says about
-`gyroscope` where that non-standard call exists, whether the context is
-secure, and live counts of orientation *and* motion events with the last raw
-reading. `requestPermission: false` with `orient ev: 0` is a policy problem;
-`granted` with `orient ev: 0` is a platform problem; anything else is ours.
+Confirmed working on a real phone, so it has been removed. The **NO SENSOR**
+fallback stays, because that one is not diagnostics: it is what a player sees
+when their browser blocks motion access, and a button that is pressed and
+then does nothing is the failure this whole section is about.
 
 ## Where it goes next
 

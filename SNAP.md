@@ -137,8 +137,9 @@ budget rather than a hoped-for one.
 | R9, aiming with the phone | 11,603 | 337 |
 | R9b, walking round it, and the button that did nothing | 11,728 | 125 |
 | R9c, the diagnostic panel out again | 11,689 | −39 |
+| R10, styling that changes behaviour | 12,153 | 464 |
 
-**1,623 bytes still in hand.**
+**1,159 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -815,6 +816,97 @@ fallback stays, because that one is not diagnostics: it is what a player sees
 when their browser blocks motion access, and a button that is pressed and
 then does nothing is the failure this whole section is about.
 
+## R10 — the styling became the strategy
+
+Visuals and sound were called finished, so this pass is about the game. It
+started with a measurement rather than an opinion — how often does the pose a
+brief asks for actually happen?
+
+```
+  per 30s of shooting
+  idle    3.25    prance  3.13    shake   1.88    walk  1.75
+  toss    1.25    rear    1.13    graze   0.88    bow   0.88    trot  0.63
+```
+
+The wanted pose turned up **0.9 to 3 times per thirty seconds and held for
+under two** — and nothing the player did could change that. Which named the
+real hole: **the player had one verb.** Point and press. Everything else
+happened beforehand, and had one right answer.
+
+### Styling is not paint
+
+What you put on the unicorn now changes what it *does*. Three rules, and the
+bench states them in the player's own words, because behaviour nobody can
+see is depth nobody plays with:
+
+- **warm and bold** — it struts and rears, because it is showing off
+- **cool and dark** — it bows, and it watches you for longer
+- **glitter** — it shakes, which is what throws the stuff into the air
+
+That last one is the strongest on purpose: glitter in the air is the best
+thing a photograph of this animal can contain, so the styling choice and the
+money shot are the same decision.
+
+### The flash is the provocation
+
+A photographer's only tool is the camera, so that is what provokes. The
+shutter makes the unicorn look at you, and for a second or two afterwards it
+is likelier to do something worth catching — which turns a frame into
+currency: spend one to buy a better next one.
+
+### Boredom is the clock the shoot never had
+
+Dawdle and the poses thin out; keep dawdling and it lies down, which is the
+plainest possible statement that the shoot has stalled. Every shutter resets
+it, so a player who is working never meets it.
+
+### Three findings that changed the design
+
+**One:** the first `test-temper` compared a warm-and-glittered look against a
+cool-and-plain one, and reported warmth as *weaker* than cool. Shares sum to
+one, so the glitter rule trebling one pose pushed every other share down. One
+variable at a time, or a rule cannot be attributed anything.
+
+**Two, and the one that mattered:** the balance probe gained a `dressed`
+policy — skilled, but styled for each brief — and it **lost**, 3,400 against
+4,423 for a policy that ignored every brief and wore one warm look all
+season. Cool was boosting *standing and grazing*, poses worth 30 and 40, so
+obeying a cool brief spoiled all six frames to collect one styling bonus.
+**A brief that is cheaper to disobey is not a brief.** Cool buys bows and eye
+contact now — fewer, better moments against warm's many showy ones.
+
+That fixed the sign and left a tie, which was its own answer: the styling
+bonus was a flat 380 against a job worth four thousand, too small to be a
+reason. It is a **share of the roll** now.
+
+**Three:** boosting the flash and the boredom clock together made *waiting*
+pointless — composition-only outscored composition-plus-timing, because
+spraying the shutter summoned showy poses more reliably than patience did.
+The flash helps; it must not decide. Boredom is for a player who has
+stopped, not one who is being patient.
+
+### Where it landed
+
+```
+  policy      mean job    worst    best   frame   vs idle
+  idle           1562      325    2672    0.31     1.00x
+  framed         4088     3044    4906    0.97     2.62x
+  timed          2140     1603    2687    0.40     1.37x
+  skilled        4380     3526    5383    0.97     2.80x
+  dressed        4117     3256    5248    0.92     2.64x
+```
+
+Skill is worth **2.80x**, up from 2.57x, and the ordering is right again:
+`skilled` beats `framed`, so timing earns its keep.
+
+**`dressed` is honestly unresolved.** It sits 6% below `skilled` with the
+spreads overlapping heavily at eight jobs a policy, and its framing measures
+0.92 against 0.97 — a cool-dressed unicorn bows, and a bow is a harder shape
+to frame than a strut. Whether that is the game being fair (harder shots for
+better poses) or the harness's zoom servo coping badly cannot be separated
+at this sample size. What *can* be said is that dressing to the brief no
+longer costs 23% of the score, which is what it did before this pass.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens
@@ -825,7 +917,8 @@ then does nothing is the failure this whole section is about.
   to a player who is styling it well and sulk at one who is not.
 - **Sound for the shutter's aftermath** — a frame that scores well should
   be audibly better than one that does not.
-- **More jobs than six.** The commission list is short enough that a second
-  season repeats it.
+- **Settling `dressed`.** More jobs a policy, or a harness that frames a bow
+  as competently as a strut, would say whether styling pays or merely stops
+  costing.
 - **The music.** A strutting catwalk vamp — the joke the idea was born with,
   written rather than borrowed.

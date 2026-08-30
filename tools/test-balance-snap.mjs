@@ -12,7 +12,13 @@
 //   idle     default camera, shutter on a timer - not playing at all
 //   framed   aims carefully, shutter on a timer - composition only
 //   timed    default camera, waits for a pose worth having - timing only
-//   skilled  both
+//   skilled  both, in a look chosen for nothing
+//   dressed  skilled, and styled for the brief
+//
+// `dressed` exists because styling stopped being paint: the look now changes
+// which poses the unicorn offers at all. A mechanic that changes the odds
+// has to be worth something measurable, or it is decoration with extra
+// steps - and nothing else in this probe would have noticed either way.
 //
 // If idle scores near skilled the game has no skill in it. If framed and
 // timed are both near idle, the terms they feed are not worth their weight.
@@ -62,7 +68,24 @@ async function requireDevBuild() {
 }
 await requireDevBuild();
 
+// The brief changes every job, so the look has to be chosen every job.
+async function dress(policy) {
+  if (!policy.styles) return;                    // whatever it came with
+  const b = (await probe()).brief;
+  const swatch = b.warm > 0 ? '6' : '2';         // coral, or sky
+  for (const zoneName of ['COAT', 'MANE']) {
+    await page.getByRole('button', { name: zoneName }).click();
+    await page.locator(`button[data-i="${swatch}"]`).click();
+  }
+  // GLITTER cycles 0..3, and it starts wherever the last job left it.
+  for (let i = 0; i < 4; i++) {
+    if ((await probe()).deco.glitter === b.glit) break;
+    await page.getByRole('button', { name: /GLITTER/ }).click();
+  }
+}
+
 async function runJob(policy) {
+  await dress(policy);
   await page.getByRole('button', { name: 'START THE SHOOT' }).click();
   await wait(250);
 
@@ -128,6 +151,7 @@ const POLICIES = [
   { name: 'framed', aims: 1, waits: 0 },
   { name: 'timed', aims: 0, waits: 1 },
   { name: 'skilled', aims: 1, waits: 1 },
+  { name: 'dressed', aims: 1, waits: 1, styles: 1 },
 ];
 
 const results = {};
@@ -138,12 +162,15 @@ for (const pol of POLICIES) {
   await wait(600);
   await page.getByRole('button', { name: 'OPEN THE STUDIO' }).click();
   await wait(300);
-  // Style it identically for every policy. Styling is a different skill and
-  // mixing it in here would blur the one thing being measured.
-  await page.getByRole('button', { name: 'COAT' }).click();
-  await page.locator('button[data-i="6"]').click();
-  await page.getByRole('button', { name: /GLITTER/ }).click();
-  await page.getByRole('button', { name: /GLITTER/ }).click();
+  // Every policy but `dressed` wears the same unconsidered look for the whole
+  // run - a warm coat and some glitter, chosen once and never revisited - so
+  // that what `dressed` earns is the choosing, not the wearing.
+  if (!pol.styles) {
+    await page.getByRole('button', { name: 'COAT' }).click();
+    await page.locator('button[data-i="6"]').click();
+    await page.getByRole('button', { name: /GLITTER/ }).click();
+    await page.getByRole('button', { name: /GLITTER/ }).click();
+  }
 
   const jobs = [];
   jobQ.length = 0;

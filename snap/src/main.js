@@ -14,7 +14,7 @@ import { studioMesh, shadowMesh, lightsMesh, shadowMat } from './studio.js';
 import { makeMane, updateMane, maneVerts, recolour, MANE_CORE, MANE_HALO } from './mane.js';
 import { makeAnim, applyPose, POSE_NAME, SHAKE, IDLE } from './pose.js';
 import { makeDeco, makeGlitter, glitterVerts, GLITTER_BUF, PALETTE, RB, MAX_GLITTER, swatch } from './deco.js';
-import { makeActor, act, move } from './act.js';
+import { makeActor, act, move, poke, temper } from './act.js';
 import { scoreShot, frameBox, frameQuality, eyeContact, POSE_WORTH } from './score.js';
 import { makeBrief, briefText, briefStyle, warmMatch, GLIT_WORD, POSE_BONUS } from './brief.js';
 import { wake, awake, music, shutter, sparkle, pleased } from './snd.js';
@@ -67,6 +67,10 @@ const bar = el('div', 'position:fixed;left:0;right:0;bottom:0;display:flex;flex-
 const rowZ = el('div', 'display:flex;gap:6px;flex-wrap:wrap;justify-content:center', bar);
 const rowC = el('div', 'display:flex;gap:6px;flex-wrap:wrap;justify-content:center', bar);
 const rowG = el('div', 'display:flex;gap:8px;align-items:center;justify-content:center', bar);
+// Behaviour you cannot see is depth nobody plays with. The bench states, in
+// the player's words, what this look will make the unicorn do - which is the
+// only reason choosing a colour is a decision rather than a preference.
+const tell = el('div', 'font:600 12px system-ui,sans-serif;color:#3a2a12;opacity:.75;text-align:center;max-width:32em', bar);
 const flash = el('div', 'position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none');
 // Taught in the order the controls are needed, one at a time, low on the
 // screen where a viewfinder overlay belongs.
@@ -176,11 +180,19 @@ function sync() {
     b.style.outline = deco[ZONES[zone]] === i ? '2px solid #3a2a12' : '0';
   });
   glitBtn.textContent = 'GLITTER ' + '*'.repeat(deco.glitter);
+  const t = temper(deco);
+  const does = [];
+  if (t.warm > .25) does.push('struts and rears');
+  if (t.cool > .25) does.push('settles, and watches you');
+  if (t.glit > .3) does.push('shakes the glitter out');
+  tell.textContent = does.length
+    ? 'this look makes it ' + does.join(' - ')
+    : 'a plain look - it will mostly just stand about';
 }
 
 // --- the game -------------------------------------------------------------
 let phase = 0;                 // 0 style, 1 shoot, 2 result, 3 season over
-let round = 0, film = FILM, seasonPts = 0, best = null, brief = null, lastJob = 0;
+let round = 0, film = FILM, seasonPts = 0, best = null, brief = null, lastJob = 0, used = [];
 let rollPts = 0, onBrief = 0, roll = [];
 let bestEver = 0;
 try { bestEver = +localStorage.usBest || 0; } catch (e) { /* no store, no problem */ }
@@ -195,7 +207,8 @@ const benchCam = () => { if (!FROZEN) { cam.a = Math.PI; cam.p = -.10; cam.fov =
 const wideCam = () => { if (!FROZEN) { cam.a = Math.PI; cam.p = -.02; cam.fov = 1.15; cam.ang = 0; } };
 
 function newRound() {
-  brief = makeBrief(round);
+  brief = makeBrief(round, used);
+  used.push(brief.title);
   best = null;
   rollPts = 0;
   onBrief = 0;
@@ -203,6 +216,8 @@ function newRound() {
   film = FILM;
   phase = 0;
   anim.mode = IDLE;
+  A.spark = 0;
+  A.bored = 0;
   P.x = P.z = P.yaw = 0;
   benchCam();
   layout();
@@ -222,7 +237,7 @@ function endRound() {
   // aimed at 0.73 of one who did, because six draws from the pose table
   // almost always contain one good one. Summing every frame means a wasted
   // frame is a wasted frame.
-  const b = briefStyle(brief, deco);
+  const b = briefStyle(brief, deco, rollPts);
   const total = rollPts + b.pts;
   lastJob = total;
   seasonPts += total;
@@ -295,7 +310,7 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
   const b = el('button', GO, card, phase === 3 ? 'SHOOT ANOTHER SEASON' : 'NEXT JOB');
   b.onclick = () => {
     wake();
-    if (phase === 3) { round = 0; seasonPts = 0; }
+    if (phase === 3) { round = 0; seasonPts = 0; used = []; }
     else round++;
     if (round >= SEASON) { phase = 3; showSheet(null, 0); layout(); return; }
     newRound();
@@ -525,7 +540,7 @@ function frame(now) {
   // The unicorn only performs while it is being photographed - or on the
   // title, which is an attract mode and wants exactly that. On the bench it
   // stands and waits, so the player can see what they are painting.
-  if ((phase === 1 || phase < 0) && !FROZEN) { act(A, anim, dt); move(A, anim, P, dt); }
+  if ((phase === 1 || phase < 0) && !FROZEN) { act(A, anim, dt, deco); move(A, anim, P, dt); }
 
   // The title's camera works the subject by itself: it drifts round the
   // cove and keeps the lens on the unicorn, which is the shot the player is
@@ -650,7 +665,7 @@ function frame(now) {
     window.SNAP = {
       pose: anim.mode, hoof: lo, belly, contact: Math.min(lo, belly), t: anim.t,
       deco, name: POSE_NAME[anim.mode], glit: glitN / 10,
-      phase, film, round, best: best && best.total, seasonPts, lastJob,
+      phase, film, round, best: best && best.total, seasonPts, lastJob, brief,
       cam: [cam.a, cam.p, cam.fov, cam.ang], sub: [P.x, P.z],
     };
     window.SNAPSHOT = () => scoreShot(P, vp, eye, anim, deco);
@@ -659,6 +674,10 @@ function frame(now) {
     // and routing it through keyboard timing would measure the harness.
     window.SNAPCAM = (a, p, f, ang) => { cam.a = a; cam.p = p; cam.fov = f; if (ang !== undefined) cam.ang = ang; };
     window.SNAPFIRE = () => { wantShot = 1; };
+    // Boredom and spark both move the same weights the look does, so a probe
+    // measuring what a LOOK is worth has to be able to hold the mood still -
+    // otherwise it measures the two together and can attribute neither.
+    window.SNAPMOOD = (bored, spark) => { A.bored = bored; A.spark = spark; };
     window.SNAPPIX = (x, y, w, h) => {
       const px = new Uint8Array(w * h * 4);
       gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
@@ -675,6 +694,9 @@ function takeShot() {
   if (phase !== 1 || film <= 0) return;
   film--;
   learnt.shot = 1;
+  // The flash is the provocation. It also resets the boredom clock, so a
+  // player who keeps working keeps a lively subject.
+  poke(A);
   shutter();
   flashT = 1;
   const s = scoreShot(P, vp, eye, anim, deco);

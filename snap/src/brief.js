@@ -4,8 +4,7 @@
 // specific, which makes every swatch a decision with an answer.
 
 import { warmth, PALETTE, RB } from './deco.js';
-import { POSE_NAME } from './pose.js';
-import { SHOWY } from './act.js';
+import { POSE_NAME, PRANCE, SHAKE, TOSS, BOW, REAR } from './pose.js';
 
 // [title, wanted warmth, wanted glitter]. Authored rather than generated:
 // five names a player can recognise beat a hundred they cannot.
@@ -16,13 +15,30 @@ const JOBS = [
   ['ICE QUEEN', -1, 0],
   ['WILDFLOWER', 1, 1],
   ['MIDNIGHT GALA', -1, 2],
+  ['CANDY FLOSS', 1, 2],
+  ['FROST FAIR', -1, 1],
+  ['CARNIVAL', 1, 3],
+  ['DEEP WATER', -1, 0],
+  ['HARVEST', 1, 1],
+  ['SILVER SCREEN', -1, 2],
 ];
+
+// The season gets harder by asking for RARER poses, not by taking film away.
+// Film is what the job is scored out of - every frame is summed - so shrinking
+// the roll would make a harder job worth fewer points, which is backwards.
+// Measured occurrences per thirty seconds of shooting: prance 3.1, shake 1.9,
+// toss 1.3, rear 1.1, bow 0.9. The pools walk down that list.
+const POSE_POOL = [[PRANCE, SHAKE], [SHAKE, TOSS, BOW], [TOSS, REAR, BOW]];
 
 export const GLIT_WORD = ['no glitter', 'a little glitter', 'glitter', 'lots of glitter'];
 
-export function makeBrief(seed) {
-  const j = JOBS[seed % JOBS.length];
-  return { title: j[0], warm: j[1], glit: j[2], pose: SHOWY[(Math.random() * SHOWY.length) | 0] };
+// `used` are the titles already commissioned this season, so a three-job run
+// does not ask for the same shoot twice.
+export function makeBrief(round, used = []) {
+  const pool = JOBS.filter((j) => !used.includes(j[0]));
+  const j = (pool.length ? pool : JOBS)[(Math.random() * (pool.length || JOBS.length)) | 0];
+  const p = POSE_POOL[Math.min(round, POSE_POOL.length - 1)];
+  return { title: j[0], warm: j[1], glit: j[2], pose: p[(Math.random() * p.length) | 0] };
 }
 
 export const briefText = (b) =>

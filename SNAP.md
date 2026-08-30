@@ -612,7 +612,18 @@ touched nothing a framing of **0.96**, and the whole game measured back at
 
 The bench keeps a good view, because the player is painting and needs to see
 what they are painting. **The shoot hands over a wide lens**, like every
-camera. Balance came back to 2.19x.
+camera. Measured again over eight jobs a policy, with the title in place:
+
+```
+  policy      mean job    worst    best   frame   vs idle
+  idle           1315      404    2004    0.32     1.00x
+  framed         2939     2332    3701    0.95     2.24x
+  timed          1917     1263    2577    0.35     1.46x
+  skilled        3484     2891    4214    0.99     2.65x
+```
+
+Composition on its own more than doubles a score, timing on its own adds
+half again, and together they come to **2.65x**.
 
 A second, quieter version of the same fault: the attract camera also
 overrode the fixed camera the styling probe asks for by URL, so that probe

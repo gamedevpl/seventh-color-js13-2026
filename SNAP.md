@@ -1517,6 +1517,22 @@ both because the halo had been quietly doing work nobody asked it to do:
   there was nothing left to tell one strand from the next. The shade is
   dealt out by strand index so neighbours always differ.
 
+### And a gate that had been quietly diluted
+
+The suite caught something the hair work had nothing to do with: a bored
+subject lying down **6.3%** of the time against a 15% threshold, and 12.8%
+on a re-run. It used to be 18 to 22%.
+
+Not a boundary flake. R16 put three new poses into the repertoire and gave
+the travelling gaits a third of its weight, and sleep is **gated on boredom
+rather than weighted against anything** — so every pose added anywhere else
+in the table pushed it down. A gate has to be sized against the table it
+competes with, not set once and left there while the table grows around it.
+
+Two guesses, both measured: 17 overshot to 31.8%, and 13 lands at **19.6%**,
+back inside the band the design had before. The number in the file is the
+one the probe agreed with.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

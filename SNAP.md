@@ -1491,6 +1491,32 @@ subject has been walked round for years: unbroken, a finger wide, barely
 darker than the paper. Same reference for the eye, no longer in the
 photograph.
 
+## R18 — the hair was tinsel
+
+*"Nie pasuje mi, że one są jakieś takie pół przezroczyste jak łańcuch
+choinkowy."* Correct, and the culprit was a leftover: the mane was drawn
+twice, as a solid core and as a wide additive halo around it.
+
+The halo came from Rainbow Surfer, where the mane glowed against a night
+sky. Against a lit studio sweep it never glowed — adding light to an
+already-bright surface changes almost nothing, which was known and written
+down two rounds into this game — and what it did instead was hang a
+translucent fringe twice the width of the strand around every piece of hair.
+Overlapping strands showed the body through each other. Tinsel.
+
+**Hair is opaque.** The halo is gone, which also removes half the mane's
+geometry and the second material it needed. Two adjustments came with it,
+both because the halo had been quietly doing work nobody asked it to do:
+
+- **The ribbons are wider** (0.064 half-width, up from 0.042). The halo used
+  to fill the gaps between strands, and without it the neck showed through
+  the mane. Still narrower than a segment is long, so a quad reads as a
+  strand rather than as a tile.
+- **Each strand is shaded a few percent differently from its neighbour.**
+  Flat opaque colour turned a pink mane into one moulded plastic piece;
+  there was nothing left to tell one strand from the next. The shade is
+  dealt out by strand index so neighbours always differ.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

@@ -125,8 +125,15 @@ export function makeMane() {
 export function recolour(M, deco, g, c) {
   for (const s of M.strands) {
     const pick = s.g === 2 ? deco.tail : deco.mane;
-    s.c = c && (s.g === 2 ? 2 : 1) === g ? c
+    const col = c && (s.g === 2 ? 2 : 1) === g ? c
       : pick === RB ? RAINBOW[s.i % 7] : PALETTE[pick];
+    // A LITTLE DARKER, STRAND BY STRAND. Opaque hair in one flat colour is
+    // a plastic shell: without the old halo there was nothing left to tell
+    // one strand from the next, and a pink mane read as a single moulded
+    // piece. A few percent of shade, dealt out so neighbours differ, is
+    // enough to see the hair as hair.
+    const k = .82 + .18 * ((s.i * 3) % 5) / 4;
+    s.c = [col[0] * k, col[1] * k, col[2] * k];
   }
 }
 
@@ -224,19 +231,21 @@ export function updateMane(M, W, t, dt) {
   }
 }
 
-// Billboarded quads along each strand, tapering to nothing at the tip.
+// Billboarded quads along each strand.
 //
-// TWO MATERIALS, and the reason is the backdrop. On Rainbow Surfer's night
-// sky the mane was purely additive and glowed beautifully; against a lit
-// studio sweep additive is nearly a no-op, because adding light to an
-// already-bright surface changes almost nothing - the rainbow washed out to
-// the colour of the paper. So the core is now SOLID, opaque, coloured
-// geometry that holds its hue against anything behind it, and the additive
-// pass is demoted to a thin rim that reads as sheen rather than as the hair
-// itself.
+// ONE MATERIAL. There were two: a solid core and a wide additive halo, the
+// halo left over from Rainbow Surfer, where the mane glowed against a night
+// sky. Against a lit studio sweep it never glowed - adding light to an
+// already-bright surface changes almost nothing - and what it did instead
+// was hang a translucent fringe twice the width of the strand around every
+// piece of hair, so overlapping strands showed the body through them and
+// the whole mane read as tinsel: *"pol przezroczyste jak lancuch
+// choinkowy"*, and exactly right.
+//
+// Hair is opaque. The core is all that is left, wider now that it is not
+// sitting inside a haze, and it costs half the geometry it used to.
 const CORE = new Float32Array(24 * L * 6 * 10);
-const HALO = new Float32Array(24 * L * 6 * 10);
-let ci = 0, hi = 0;
+let ci = 0;
 const V = (buf, i, x, y, z, c, a) => {
   buf[i++] = x; buf[i++] = y; buf[i++] = z;
   buf[i++] = 0; buf[i++] = 1; buf[i++] = 0;
@@ -250,12 +259,9 @@ const Q = (buf, i, a, b, c, d) => {
   return i;
 };
 
-// Fills BOTH buffers in one walk of the strands and returns their two vertex
-// counts. The core and the halo are the same ribbon at two widths, so the
-// cross product that orients it toward the lens is computed once and used
-// twice rather than the whole solve being run per material.
+// One walk of the strands, one buffer, and the vertex count back.
 export function maneVerts(M, eye) {
-  ci = 0; hi = 0;
+  ci = 0;
   for (const s of M.strands) {
     for (let i = 1; i < L; i++) {
       const a = s.p[i - 1], b = s.p[i];
@@ -267,21 +273,21 @@ export function maneVerts(M, eye) {
       let sx = dy * ez - dz * ey, sy = dz * ex - dx * ez, sz = dx * ey - dy * ex;
       const sl = Math.hypot(sx, sy, sz) || 1;
       sx /= sl; sy /= sl; sz /= sl;
+      // Tapering toward the tip, which is what hair does and what keeps a
+      // strand from ending in a blunt square.
       const t0 = 1 - (i - 1) / L * .55, t1 = 1 - i / L * .55;
-      const f0 = 1 - (i - 1) / L * .3, f1 = 1 - i / L * .3;
-      const rib = (w, a0, a1) => [
-        [a[0] - sx * w * t0, a[1] - sy * w * t0, a[2] - sz * w * t0, s.c, a0],
-        [a[0] + sx * w * t0, a[1] + sy * w * t0, a[2] + sz * w * t0, s.c, a0],
-        [b[0] + sx * w * t1, b[1] + sy * w * t1, b[2] + sz * w * t1, s.c, a1],
-        [b[0] - sx * w * t1, b[1] - sy * w * t1, b[2] - sz * w * t1, s.c, a1],
-      ];
-      // Narrower than the segment is long. At .055 a half-width the quads
-      // were wider than they were tall and the hair read as a row of tiles;
-      // hair is made of strands, and a strand is longer than it is wide.
-      ci = Q(CORE, ci, ...rib(.042, f0, f1));
-      hi = Q(HALO, hi, ...rib(.088, .16 * f0, .16 * f1));
+      // Wider than it was under the halo, because the halo used to fill
+      // the gaps between strands and its removal left the neck showing
+      // through the mane. Still under the segment length, so a quad is
+      // taller than it is wide and reads as hair rather than as tiling.
+      const w = .064;
+      ci = Q(CORE, ci,
+        [a[0] - sx * w * t0, a[1] - sy * w * t0, a[2] - sz * w * t0, s.c, 1],
+        [a[0] + sx * w * t0, a[1] + sy * w * t0, a[2] + sz * w * t0, s.c, 1],
+        [b[0] + sx * w * t1, b[1] + sy * w * t1, b[2] + sz * w * t1, s.c, 1],
+        [b[0] - sx * w * t1, b[1] - sy * w * t1, b[2] - sz * w * t1, s.c, 1]);
     }
   }
-  return [ci, hi];
+  return ci;
 }
-export { CORE as MANE_CORE, HALO as MANE_HALO };
+export { CORE as MANE_CORE };

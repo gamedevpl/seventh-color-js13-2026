@@ -11,7 +11,7 @@ import {
 } from './gl.js';
 import { buildUnicorn, paint, flushPaint, makePose, solve, BOXES, MESH_OF, COAT, HORN, HOOF } from './uni.js';
 import { studioMesh, shadowMesh, lightsMesh, markMesh, shadowMat } from './studio.js';
-import { makeMane, updateMane, maneVerts, recolour, MANE_CORE, MANE_HALO } from './mane.js';
+import { makeMane, updateMane, maneVerts, recolour, MANE_CORE } from './mane.js';
 import { makeAnim, applyPose, POSE_NAME, SHAKE, IDLE } from './pose.js';
 import { makeDeco, makeGlitter, glitterVerts, GLITTER_BUF, PALETTE, RB, MAX_GLITTER, swatch } from './deco.js';
 import { makeActor, act, move, poke, temper } from './act.js';
@@ -47,7 +47,6 @@ const M = makeMane();
 const deco = makeDeco();
 const G = makeGlitter();
 const maneCore = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
-const maneHalo = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
 const glitMesh = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
 recolour(M, deco);
 
@@ -679,9 +678,7 @@ function frame(now) {
   solve(P);
   updateMane(M, P.w, anim.t, dt);
 
-  const [nc, nh] = maneVerts(M, eye);
-  updateMesh(maneCore, MANE_CORE, nc);
-  updateMesh(maneHalo, MANE_HALO, nh);
+  updateMesh(maneCore, MANE_CORE, maneVerts(M, eye));
   const burst = anim.mode === SHAKE ? anim.hold : 0;
   glitN = glitterVerts(G, P.w, eye, deco.glitter, anim.t, burst);
   updateMesh(glitMesh, GLITTER_BUF, glitN);
@@ -711,7 +708,6 @@ function frame(now) {
   drawMesh(maneCore, IDENT);
   mode(1);
   drawMesh(lights, IDENT);
-  drawMesh(maneHalo, IDENT);
   drawMesh(glitMesh, IDENT);
 
   // The capture happens HERE, after the draw and before anything else can

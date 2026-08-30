@@ -1357,6 +1357,34 @@ getting bigger. There is a **taped circle on the floor** now, dashed, the
 way a real studio marks the ground a subject works on — and the roaming
 leash sits just inside it, so the mark and the behaviour say the same thing.
 
+### What removing the brief cost, measured
+
+```
+  policy      mean job    worst    best   frame   vs idle
+  idle           1320      623    2070    0.42     1.00x
+  timed          1523      820    2335    0.41     1.15x
+  samey          3207     2514    3773    0.97     2.43x
+  framed         4152     3617    4717    0.95     3.15x
+  dressed        4186     3316    4835    0.96     3.17x
+  skilled        4208     3659    5010    0.98     3.19x
+  roaming        4602     3624    5839    0.94     3.49x
+```
+
+Two things to read here honestly. Walking the set still wins (3.49x) and
+spamming one shot still takes 70% of what playing properly earns, so the
+variety rule survived the change. But **`dressed` and `skilled` are now the
+same number**: with the brief bonus gone, dressing to buy showy poses is
+worth nothing measurable on top of aiming and waiting, because a patient
+photographer gets the pose eventually anyway.
+
+That is a real cost and it is worth naming rather than hiding: in R10 the
+styling was the strategy layer, and it is now expression plus a mild change
+in what the subject does. The lever that would bring it back is lowering the
+base weights of the showy poses so a plain unicorn genuinely offers fewer of
+them - but that makes the game duller for a child who just wants to point
+the camera, which is exactly the player this round was for. Left as it is,
+deliberately.
+
 ### The probe that had stopped being a probe
 
 Fixing the jump meant looking at `?pose=`, and `?pose=` had been broken

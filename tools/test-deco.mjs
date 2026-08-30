@@ -48,7 +48,9 @@ const check = (name, ok, detail) => {
 const base = await coat();
 check('the coat starts pale', base[0] > 120 && Math.abs(base[0] - base[2]) < 70, rgb(base));
 
-await page.getByRole('button', { name: 'COAT' }).click();
+// By title, not by label: the bench buttons are pictures now, because the
+// player this game was made for cannot read yet.
+await page.locator('[title=COAT]').click();
 await page.locator('button[data-i="1"]').click();          // rose
 await page.waitForTimeout(300);
 const rose = await coat();
@@ -75,18 +77,18 @@ check('the rainbow swatch is inert on the coat', moved < 6, moved.toFixed(1));
 
 // Glitter is counted rather than looked at: it twinkles, so a screenshot
 // catches an arbitrary moment and a bright frame proves nothing.
-await page.getByRole('button', { name: /GLITTER/ }).click();
+await page.locator('[title=GLITTER]').click();
 await page.waitForTimeout(400);
 const g1 = await probe();
 check('one press puts glitter on the coat', g1.deco.glitter === 1 && g1.glit > 0, `${g1.glit} quads`);
 
-await page.getByRole('button', { name: /GLITTER/ }).click();
-await page.getByRole('button', { name: /GLITTER/ }).click();
+await page.locator('[title=GLITTER]').click();
+await page.locator('[title=GLITTER]').click();
 await page.waitForTimeout(400);
 const g3 = await probe();
 check('three presses put on more', g3.deco.glitter === 3 && g3.glit > g1.glit, `${g3.glit} quads`);
 
-await page.getByRole('button', { name: /GLITTER/ }).click();
+await page.locator('[title=GLITTER]').click();
 await page.waitForTimeout(300);
 const g0 = await probe();
 check('a fourth press brushes it all off', g0.deco.glitter === 0 && g0.glit === 0, `${g0.glit} quads`);

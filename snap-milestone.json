@@ -1,5 +1,5 @@
 {
-  "name": "R18 the hair is a surface",
-  "description": "the additive halo is gone, consecutive segments share their corners so the strands are continuous, and each ribbon edge carries a normal leaned outward and up so the hair is lit and shaded instead of reading as cut paper - 12,930 packed, 382 bytes free",
+  "name": "R18 the hair takes the light",
+  "description": "the halo is gone, strands are continuous and lit, and a sheen uniform gives the mane and tail a highlight - measured spread across the hair up from a flat 18 levels at every angle to 47 mean and 74 where it shines - 12,976 packed, 336 bytes free",
   "ceilingBytes": 13312
 }

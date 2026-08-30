@@ -1549,6 +1549,36 @@ With real shading in place the per-strand tint went from ±18% to ±10%: it
 only has to break neighbours apart now, not carry the whole impression of
 depth on its own.
 
+### Rubber tubes that do not shine
+
+Shaded hair was better and still wrong: *"trochę takie rurki teraz i nie
+błyszczą się"*. Right again — lambert alone gives a smooth gradient across a
+band, and a smooth gradient across a band is a tube. What says *hair* is the
+highlight running along it.
+
+So the shader learned one new trick, a **sheen**: Blinn-Phong off the
+half-vector, per vertex, behind a `spc` uniform that is zero for everything
+in the game except the mane and tail. Eight points a strand is coarse for a
+specular term, and it does not matter: a strand is thin, so what you see is
+a bright band sliding along it as the camera moves, which is what real hair
+does.
+
+And the whole argument stopped being about screenshots, because
+`tools/test-shine.mjs` now measures it. The camera goes round the mane from
+six angles, the raw pixels come back, the hair is picked out of them by
+colour, and the probe reports the **spread of brightness across the hair**:
+
+```
+                        spread, by angle
+  flat-lit (before)    18  18  18  18  18  18
+  shaded + sheen       33  29  35  59  74  52
+```
+
+Eighteen levels from all six angles, to the level — that is the numeric
+signature of paper. Every bit of that spread was the per-strand tint and not
+one level of it was the light. It reads 47 mean now, and 74 at the angle
+where the highlight lands.
+
 ### And a gate that had been quietly diluted
 
 The suite caught something the hair work had nothing to do with: a bored

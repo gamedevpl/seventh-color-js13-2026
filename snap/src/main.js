@@ -7,7 +7,7 @@
 
 import {
   gl, initGL, frameGL, mode, drawMesh, createMesh, updateMesh,
-  perspective, lookAt, mul, modelTR, mask, setDim, setSdw, IDENT,
+  perspective, lookAt, mul, modelTR, mask, setDim, setSdw, setSpc, IDENT,
 } from './gl.js';
 import { buildUnicorn, paint, flushPaint, makePose, solve, BOXES, MESH_OF, COAT, HORN, HOOF } from './uni.js';
 import { studioMesh, shadowMesh, lightsMesh, markMesh, shadowMat } from './studio.js';
@@ -705,7 +705,10 @@ function frame(now) {
 
   mode(0);
   for (let i = 0; i < U.parts.length; i++) drawMesh(U.parts[i], P.w[i]);
+  // The one shiny thing on the set.
+  setSpc(1.7);
   drawMesh(maneCore, IDENT);
+  setSpc(0);
   mode(1);
   drawMesh(lights, IDENT);
   drawMesh(glitMesh, IDENT);
@@ -793,6 +796,13 @@ function frame(now) {
     // measuring what a LOOK is worth has to be able to hold the mood still -
     // otherwise it measures the two together and can attribute neither.
     window.SNAPMOOD = (bored, spark) => { A.bored = bored; A.spark = spark; };
+    // Raw pixels, for the one question an average cannot answer: is there
+    // a GRADIENT across the hair, or is it flat-lit paper?
+    window.SNAPRAW = (x, y, w, h) => {
+      const px = new Uint8Array(w * h * 4);
+      gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      return Array.from(px);
+    };
     window.SNAPPIX = (x, y, w, h) => {
       const px = new Uint8Array(w * h * 4);
       gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);

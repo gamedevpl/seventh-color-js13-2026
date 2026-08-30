@@ -22,12 +22,21 @@ export let gl, canvas;
 // shadow the subject stands on top of and nobody can see.
 export const LIGHT = [.45, .85, .3];
 
+// `spc` is the SHEEN, and it is a uniform rather than a material because
+// exactly one thing in this game is shiny. Hair is not matte: a mane with
+// only a lambert term reads as a set of rubber tubes, and the one cue that
+// says "this is hair" is the highlight running along it. Blinn-Phong off
+// the half-vector, per vertex - eight points a strand is coarse, but a
+// strand is thin and what you see is a bright band sliding along it as the
+// camera moves, which is exactly what real hair does.
 const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
-uniform mediump float add,dim,gls,sdw;varying vec3 vc;varying float vf,va;
+uniform mediump float add,dim,gls,sdw,spc;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
-vec3 nn=(md*vec4(n,0.)).xyz+vec3(0.,1e-6,0.);
-float l=.55+.45*max(dot(normalize(nn),normalize(vec3(${LIGHT}))),0.);
-vc=mix(c*mix(l,1.,add),vec3(.16,.09,.02),sdw);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
+vec3 nn=normalize((md*vec4(n,0.)).xyz+vec3(0.,1e-6,0.));
+vec3 L=normalize(vec3(${LIGHT}));
+float l=.55+.45*max(dot(nn,L),0.);
+float sp=spc*pow(max(dot(nn,normalize(L+normalize(cam-w.xyz))),0.),7.);
+vc=mix(c*mix(l,1.,add)+sp,vec3(.16,.09,.02),sdw);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
 // Glass does NOT fog toward the fog colour - it fades its ALPHA instead.
 // It writes no depth, so a far piece of deck composites over a near one in
 // mesh order rather than depth order; fogged, that far sliver is close to
@@ -60,7 +69,7 @@ export function initGL(c) {
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls', 'sdw']) loc[u] = gl.getUniformLocation(prog, u);
+  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls', 'sdw', 'spc']) loc[u] = gl.getUniformLocation(prog, u);
   gl.uniform1f(loc.dim, 1);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
@@ -105,6 +114,7 @@ export const setDim = (v) => gl.uniform1f(loc.dim, v);
 // meshes: the mane is rebuilt every frame and duplicating it would double
 // the per-frame geometry work to save one line of shader.
 export const setSdw = (v) => gl.uniform1f(loc.sdw, v);
+export const setSpc = (v) => gl.uniform1f(loc.spc, v);
 
 // A planar reflection needs a MASK. A mirror image floating beside the
 // track - out over a gap, past the edge, in the empty air - is worse than

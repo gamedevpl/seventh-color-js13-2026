@@ -68,6 +68,12 @@ export function frameBox(P, vp) {
 
 const bell = (v, mid, wide) => Math.exp(-(((v - mid) / wide) ** 2));
 
+// THE FRAME IS A MULTIPLIER, not another line item - see scoreShot. It is
+// exported because the viewfinder shows it live while the player aims, and
+// a gauge computed from its own copy of this formula would drift away from
+// the score it claims to predict the moment either is touched.
+export const frameQuality = (b) => b.inFrac ** 2 * bell(b.h, 1.15, .48);
+
 // How squarely the unicorn is looking down the lens: its head's own forward
 // axis against the direction to the camera. This is the shot the whole game
 // is really about, so it is worth having its own line on the result.
@@ -101,7 +107,7 @@ export function scoreShot(P, vp, eye, anim, deco) {
   // Size is judged on HEIGHT rather than area, or the rule would quietly
   // prefer whichever poses happen to be wide - rewarding a shape when it
   // meant to reward a distance.
-  const q = b.inFrac ** 2 * bell(b.h, 1.15, .48);
+  const q = frameQuality(b);
 
   // Modest, because the frame is ALREADY paid on every other line through
   // the multiplier. A large flat framing award on top of that is composition

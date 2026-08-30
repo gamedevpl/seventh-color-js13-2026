@@ -15,8 +15,8 @@ import { makeMane, updateMane, maneVerts, recolour, MANE_CORE, MANE_HALO } from 
 import { makeAnim, applyPose, POSE_NAME, SHAKE, IDLE } from './pose.js';
 import { makeDeco, makeGlitter, glitterVerts, GLITTER_BUF, PALETTE, RB, MAX_GLITTER, swatch } from './deco.js';
 import { makeActor, act, move } from './act.js';
-import { scoreShot } from './score.js';
-import { makeBrief, briefText, briefStyle, POSE_BONUS } from './brief.js';
+import { scoreShot, frameBox, frameQuality, eyeContact, POSE_WORTH } from './score.js';
+import { makeBrief, briefText, briefStyle, warmMatch, GLIT_WORD, POSE_BONUS } from './brief.js';
 import { wake, awake, music, shutter, sparkle, pleased } from './snd.js';
 
 const FOG = [.09, .07, .05];
@@ -60,7 +60,9 @@ const BTN = 'font:600 13px system-ui,sans-serif;padding:7px 11px;border:0;border
 const GO = BTN + ';background:#3a2a12;color:#f2d98a;padding:10px 20px;font-size:15px';
 const TXT = 'font:600 14px system-ui,sans-serif;color:#3a2a12;text-align:center;line-height:1.5';
 
-const top = el('div', 'position:fixed;left:0;right:0;top:0;padding:12px 14px;pointer-events:none;' + TXT);
+const top = el('div', 'position:fixed;left:0;right:0;top:0;padding:11px 14px 16px;pointer-events:none;text-align:center;'
+  + 'font:600 14px system-ui,sans-serif;color:#fff3d6;text-shadow:0 2px 8px #000a;'
+  + 'background:linear-gradient(#00000070,#00000000)');
 const bar = el('div', 'position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:7px;padding:10px 8px 14px;touch-action:none');
 const rowZ = el('div', 'display:flex;gap:6px;flex-wrap:wrap;justify-content:center', bar);
 const rowC = el('div', 'display:flex;gap:6px;flex-wrap:wrap;justify-content:center', bar);
@@ -68,13 +70,48 @@ const rowG = el('div', 'display:flex;gap:8px;align-items:center;justify-content:
 const flash = el('div', 'position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none');
 // Taught in the order the controls are needed, one at a time, low on the
 // screen where a viewfinder overlay belongs.
-const hint = el('div', 'position:fixed;left:0;right:0;bottom:9vh;text-align:center;pointer-events:none;transition:opacity .3s;font:600 14px system-ui,sans-serif;color:#fff3d6;text-shadow:0 2px 10px #000a');
+const hint = el('div', 'position:fixed;left:0;right:0;bottom:142px;text-align:center;pointer-events:none;transition:opacity .3s;font:600 14px system-ui,sans-serif;color:#fff3d6;text-shadow:0 2px 10px #000a');
+
+// --- the viewfinder -------------------------------------------------------
+// The score used to arrive six frames late, on a card, after every decision
+// had been made. A photographer sees the picture BEFORE the shutter, so the
+// two things the score is actually made of are on screen while you aim.
+const vf = el('div', 'position:fixed;inset:0;display:none;pointer-events:none');
+// Thirds guides, drawn with gradients rather than four elements. They are
+// the cheapest possible tutorial for the one composition rule the score
+// rewards: you can see where the subject has to sit.
+el('div', 'position:absolute;inset:0;opacity:.22;background:'
+  + 'linear-gradient(90deg,#0000 33.2%,#fff 33.2%,#fff 33.5%,#0000 33.5%,#0000 66.4%,#fff 66.4%,#fff 66.7%,#0000 66.7%),'
+  + 'linear-gradient(#0000 33.2%,#fff 33.2%,#fff 33.5%,#0000 33.5%,#0000 66.4%,#fff 66.4%,#fff 66.7%,#0000 66.7%)', vf);
+const meters = el('div', 'position:fixed;left:50%;transform:translateX(-50%);bottom:104px;display:flex;gap:14px;pointer-events:none', vf);
+const METER = 'font:700 10px system-ui,sans-serif;letter-spacing:.09em;color:#fff3d6;text-shadow:0 2px 8px #000a;text-align:center';
+function gauge(label) {
+  const w = el('div', METER, meters, '');
+  el('div', '', w, label);
+  const track = el('div', 'width:96px;height:7px;border-radius:4px;background:#0006;margin-top:4px;overflow:hidden', w);
+  const fill = el('div', 'height:100%;width:0;border-radius:4px;background:#ffd977;transition:width .12s linear', track);
+  return fill;
+}
+const gFrame = gauge('FRAME');
+const gMoment = gauge('MOMENT');
+const onbrief = el('div', 'position:fixed;left:0;right:0;bottom:174px;text-align:center;pointer-events:none;opacity:0;transition:opacity .18s;font:800 15px system-ui,sans-serif;letter-spacing:.08em;color:#ffe9a8;text-shadow:0 2px 12px #000c', vf, 'THE POSE THEY ASKED FOR');
 const sheet = el('div', 'position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#00000055;backdrop-filter:blur(3px);padding:16px');
 // The title sits over a LIVE set rather than a still: the unicorn is already
 // working and the camera is already following it, so the first thing anyone
 // sees is the thing the game is about. A menu over a frozen frame would be
 // advertising a different game.
 const title = el('div', 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px;padding:0 16px 8vh;text-align:center;background:linear-gradient(#00000059,#00000000 34%,#00000012 50%,#000000a6)');
+
+const CHIP = 'font:600 12px system-ui,sans-serif;padding:3px 9px;border-radius:999px;background:#0000005e;color:#fff3d6';
+// Each requirement is its own chip and ticks when it is met, so the brief
+// is a checklist you can glance at rather than a sentence you re-read.
+let poseChip = null;
+function briefChips(row) {
+  const w = warmMatch(brief, deco);
+  el('div', CHIP, row, (brief.warm > 0 ? 'warm' : 'cool') + (w > .25 ? ' OK' : ''));
+  el('div', CHIP, row, GLIT_WORD[brief.glit] + (deco.glitter === brief.glit ? ' OK' : ''));
+  poseChip = el('div', CHIP, row, POSE_NAME[brief.pose]);
+}
 
 const ZONES = ['mane', 'tail', 'coat', 'horn', 'hoof'];
 let zone = 0;
@@ -104,6 +141,13 @@ el('div', 'font:600 15px system-ui,sans-serif;color:#ffeec4;text-shadow:0 2px 8p
 el('div', 'font:500 13px/1.7 system-ui,sans-serif;color:#f0dcae;text-shadow:0 2px 8px #0008;max-width:34em', title,
   'Style the unicorn for the job, then shoot it. Drag to aim - wheel or W/S to zoom - Q/E to walk round the set. Tap or SPACE takes the picture.');
 const startBtn = el('button', GO + ';margin-top:10px;font-size:17px', title, 'OPEN THE STUDIO');
+
+// A real button for the shutter. Tap-anywhere works on a phone, but on a
+// trackpad a tap is indistinguishable from the start of a drag until the
+// finger has already moved - so the one control the game is built around
+// was the one control a trackpad could not reliably use.
+const shutBtn = el('button', 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;width:72px;height:72px;border-radius:50%;border:4px solid #fff3d6cc;background:#ffffff26;cursor:pointer;display:none;font:800 11px system-ui,sans-serif;letter-spacing:.08em;color:#fff3d6;text-shadow:0 2px 8px #000a', null, 'SHOOT');
+shutBtn.onclick = () => { wake(); if (phase === 1) wantShot = 1; };
 startBtn.onclick = () => { wake(); phase = 0; benchCam(); layout(); };
 
 const goBtn = el('button', GO, rowG, 'START THE SHOOT');
@@ -191,10 +235,17 @@ function layout() {
   title.style.display = phase < 0 ? 'flex' : 'none';
   bar.style.display = phase === 0 ? 'flex' : 'none';
   sheet.style.display = phase >= 2 ? 'flex' : 'none';
-  top.textContent = phase === 0
-    ? `JOB ${round + 1}/${SEASON} - ${briefText(brief)}`
-    : phase === 1 ? `${briefText(brief)}      FILM ${film}` : '';
-  if (phase < 0) top.textContent = '';
+  // The job, always legible, never a sentence to re-read mid-shoot: the
+  // title, the three things it wants, and how much film is left.
+  top.textContent = '';
+  if (phase >= 0) {
+    const row = el('div', 'display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center', top);
+    el('div', 'font:800 14px system-ui,sans-serif;letter-spacing:.06em', row, brief.title);
+    briefChips(row);
+    if (phase === 1) el('div', CHIP + ';font-weight:800', row, `FILM ${film}`);
+  }
+  vf.style.display = phase === 1 ? 'block' : 'none';
+  shutBtn.style.display = phase === 1 ? 'block' : 'none';
   const c2 = phase === 1 ? coach() : '';
   hint.textContent = c2;
   hint.style.opacity = c2 ? '1' : '0';
@@ -274,27 +325,53 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => { keys[e.code] = 0; });
 
-let drag = null, dragDist = 0, wantShot = 0;
-c.addEventListener('pointerdown', (e) => { wake(); drag = [e.clientX, e.clientY]; dragDist = 0; });
-addEventListener('pointerup', () => {
-  // A tap is a shutter and a drag is an aim, told apart by how far the
-  // finger went. There is no second button to give the shutter on a phone,
-  // and asking a player to reach for one while the pose they want is
-  // happening is asking them to miss it.
-  if (drag && dragDist < 7 && phase === 1) wantShot = 1;
-  drag = null;
+// Every live pointer is tracked, because pinch rests on knowing whether two
+// fingers are down at once. One finger aims; two zoom by the change in the
+// distance between them, which is the gesture every camera app on a phone
+// already taught the player.
+const pts = new Map();
+let dragDist = 0, wantShot = 0, pinch = 0;
+const spread = () => {
+  const [a, b] = [...pts.values()];
+  return Math.hypot(a[0] - b[0], a[1] - b[1]);
+};
+c.addEventListener('pointerdown', (e) => {
+  wake();
+  pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pts.size === 1) dragDist = 0;
+  if (pts.size === 2) pinch = spread();
 });
+const drop = (e) => {
+  // A tap is a shutter and a drag is an aim, told apart by how far the
+  // finger went - and a pinch is neither, so releasing one of two fingers
+  // must never fire the shutter.
+  if (pts.size === 1 && dragDist < 7 && !pinch && phase === 1) wantShot = 1;
+  pts.delete(e.pointerId);
+  if (pts.size < 2) pinch = 0;
+};
+addEventListener('pointerup', drop);
+addEventListener('pointercancel', drop);
 addEventListener('pointermove', (e) => {
-  if (!drag) return;
-  const dx = e.clientX - drag[0], dy = e.clientY - drag[1];
+  if (!pts.has(e.pointerId)) return;
+  const prev = pts.get(e.pointerId);
+  const dx = e.clientX - prev[0], dy = e.clientY - prev[1];
+  pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pts.size === 2) {
+    const d = spread();
+    if (pinch && d > 8) {
+      cam.fov = Math.max(.34, Math.min(1.15, cam.fov * (pinch / d)));
+      learnt.zoom = cam.fov < 1 ? 1 : learnt.zoom;
+    }
+    pinch = d;
+    return;
+  }
   dragDist += Math.abs(dx) + Math.abs(dy);
+  if (dragDist > 24) learnt.aim = 1;
   // Scaled by the field of view, so a long lens aims slowly. Without this,
   // zooming in makes the camera unusably twitchy at exactly the moment
   // precision starts to matter.
-  if (dragDist > 24) learnt.aim = 1;
   cam.a -= dx * .0022 * cam.fov;
   cam.p = Math.max(-.5, Math.min(.6, cam.p - dy * .0022 * cam.fov));
-  drag = [e.clientX, e.clientY];
 });
 addEventListener('wheel', (e) => {
   cam.fov = Math.max(.34, Math.min(1.15, cam.fov + e.deltaY * .0012));
@@ -442,6 +519,23 @@ function frame(now) {
   if (phase === 1) {
     const h = coach();
     if (hint.textContent !== h) { hint.textContent = h; hint.style.opacity = h ? '1' : '0'; }
+    // The two gauges are the two skills, shown separately on purpose: a
+    // single "shot quality" number would tell a player they are doing badly
+    // without telling them which half to fix.
+    const q = frameQuality(frameBox(P, vp));
+    const e = eyeContact(P, eye);
+    const mom = Math.min(1, ((POSE_WORTH[anim.mode] || 40) / 320) + Math.max(0, e - .55) * .5);
+    gFrame.style.width = (q * 100).toFixed(0) + '%';
+    gMoment.style.width = (mom * 100).toFixed(0) + '%';
+    // Green only when BOTH are there, because that is the only combination
+    // the score actually pays for.
+    const good = q > .7 && mom > .55;
+    gFrame.style.background = q > .7 ? '#9fe08a' : '#ffd977';
+    gMoment.style.background = mom > .55 ? '#9fe08a' : '#ffd977';
+    const ob = anim.mode === brief.pose;
+    onbrief.style.opacity = ob ? '1' : '0';
+    if (poseChip) poseChip.style.background = ob ? '#c07a12' : '#0000005e';
+    shutBtn.style.borderColor = good ? '#9fe08add' : '#fff3d6cc';
   }
   if (flashT > 0) {
     flashT = Math.max(0, flashT - dt * 3.4);

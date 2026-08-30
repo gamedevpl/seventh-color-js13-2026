@@ -133,8 +133,9 @@ budget rather than a hoped-for one.
 | R5, the shoot, the brief and the season | 9,799 | 2,002 |
 | R6, the tripod, roaming and balance | 10,026 | 227 |
 | R7, title, contact sheet and coaching | 10,619 | 593 |
+| R8, the viewfinder, pinch and a shutter | 11,266 | 647 |
 
-**2,693 bytes still in hand.**
+**2,046 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -630,6 +631,57 @@ overrode the fixed camera the styling probe asks for by URL, so that probe
 started sampling the backdrop instead of the coat. Both are the same rule —
 *an attract mode must not be driving anything a caller has asked to hold
 still.*
+
+## R8 — the viewfinder
+
+The score arrived six frames late, on a card, after every decision had
+already been made. **A photographer sees the picture before the shutter**,
+so the two things the score is made of are now on screen while you aim.
+
+### Two gauges, not one
+
+`FRAME` and `MOMENT`, side by side, each going green on its own. A single
+"shot quality" number would tell a player they are doing badly without
+telling them *which half to fix* — and the balance probe had already
+established that these are two separable skills worth 2.24x and 1.46x on
+their own. The HUD says the same thing the scoring does.
+
+`frameQuality` is exported and shared rather than reimplemented for the
+gauge: a meter computed from its own copy of the formula drifts away from
+the score it claims to predict the moment either is touched.
+
+### Thirds guides
+
+Two CSS gradients, four lines, no elements. They are the cheapest possible
+tutorial for the one composition rule the score rewards — instead of being
+told about the rule of thirds, you can see where the subject has to sit.
+
+### The job became a checklist
+
+`GOLDEN HOUR · warm OK · lots of glitter OK · rearing · FILM 6` — each
+requirement its own chip, ticking as it is met, and the pose chip lighting
+up at the moment the unicorn actually does it. A brief written as a sentence
+is something you re-read mid-shoot; a row of chips is something you glance
+at.
+
+The HUD carries **its own scrim and its own light colour**. It has to be
+legible over the bright paper and over the dark upper cove, and text that
+borrows either one is unreadable against the other.
+
+### Pinch, and a shutter button
+
+Every live pointer is tracked, because pinch rests on knowing whether two
+fingers are down at once: one finger aims, two zoom by the change in the
+distance between them. Releasing one of two fingers must never fire the
+shutter, which is why the tap test also checks that no pinch was in
+progress.
+
+And there is a real **SHOOT** button now. Tap-anywhere is right on a phone,
+but on a trackpad a tap is indistinguishable from the beginning of a drag
+until the finger has already moved — so the one control the whole game is
+built around was the one control a trackpad could not reliably use. Its ring
+turns green when both gauges are, which makes the button itself the last
+piece of feedback before the shutter.
 
 ## Where it goes next
 

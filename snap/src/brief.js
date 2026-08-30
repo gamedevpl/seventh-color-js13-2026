@@ -18,7 +18,7 @@ const JOBS = [
   ['MIDNIGHT GALA', -1, 2],
 ];
 
-const GLITTER_WORD = ['no glitter', 'a little glitter', 'glitter', 'all the glitter'];
+export const GLIT_WORD = ['no glitter', 'a little glitter', 'glitter', 'lots of glitter'];
 
 export function makeBrief(seed) {
   const j = JOBS[seed % JOBS.length];
@@ -26,7 +26,7 @@ export function makeBrief(seed) {
 }
 
 export const briefText = (b) =>
-  `${b.title} - ${b.warm > 0 ? 'warm' : 'cool'} colours, ${GLITTER_WORD[b.glit]}, catch a ${POSE_NAME[b.pose]}`;
+  `${b.title} - ${b.warm > 0 ? 'warm' : 'cool'} colours, ${GLIT_WORD[b.glit]}, catch a ${POSE_NAME[b.pose]}`;
 
 // The coat and the mane are what a viewer reads as the look; the horn and
 // hooves are trim. Rainbow hair counts as neither warm nor cool, which is
@@ -40,6 +40,12 @@ const look = (deco) => {
 // What the styling earned. Paid ONCE per job, because the styling is fixed
 // for the whole job - awarding it per frame would just scale every score by
 // six and make the paint look far more important than the shooting.
+// How well the styling answers the brief's mood, on 0..1. Exported because
+// the job card ticks the requirement live while the player paints - a
+// checklist that only grades you afterwards teaches nothing while you can
+// still act on it.
+export const warmMatch = (b, deco) => Math.max(0, look(deco) * b.warm);
+
 export function briefStyle(b, deco) {
   const lines = [];
   const add = (n, p) => { if (p >= 1) lines.push([n, Math.round(p)]); };

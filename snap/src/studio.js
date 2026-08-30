@@ -10,7 +10,7 @@
 // is resolution-independent - the falloff is computed from world position,
 // so it never bands the way a texture would.
 
-import { createMesh, pushBox } from './gl.js';
+import { createMesh, pushBox, LIGHT } from './gl.js';
 
 // The paper. Warm and slightly dusty rather than pure - a saturated
 // backdrop takes over the photograph, and the unicorn is the subject.
@@ -26,15 +26,35 @@ const NX = 26, NA = 8, NB = 7, NC = 7;
 // toward the lens - a floor lit as evenly as the wall reads as a cardboard
 // box, and the near shading is what gives the sweep its depth.
 function shade(x, y, z) {
-  const dx = x / 17, dy = (y - 2.4) / 12, dz = (z + 8) / 30;
-  let f = 1 / (1 + (dx * dx + dy * dy + dz * dz) * 1.45);
-  f *= 1 - Math.max(0, (z - 1) / 9) * .28;
-  // Bottoming out at 0.55 rather than 0.34: the first cut fell so far that
+  // ONE distance from ONE point, weighted only mildly per axis, so the pool
+  // is a circle centred on the subject. The previous version divided each
+  // axis by a wildly different number (17, 12, 30) and added a separate
+  // fall-off along the floor, which made the bright region a broad
+  // horizontal band with a darker top - it read as a gradient laid over the
+  // picture rather than as a light aimed at the middle of it.
+  const dx = x, dy = (y - 2.1) * 1.15, dz = (z + 4.5) * .8;
+  const d = Math.hypot(dx, dy, dz) / 13;
+  const f = 1 / (1 + d * d * 2.2);
+  // Bottoming out at 0.5 rather than 0.34: the first cut fell so far that
   // the far corners went olive and the paper read as dirty rather than as
-  // lit. A studio sweep is meant to be an even field with a gentle pool in
-  // it, not a spotlight in a dark room.
-  return .55 + .45 * f;
+  // lit. A studio sweep is an even field with a gentle pool in it, not a
+  // spotlight in a dark room.
+  return .5 + .5 * f;
 }
+
+// Flatten the world onto the paper from the same direction the shader lights
+// it, so the shadow agrees with the shading instead of contradicting it.
+// For a directional light the projection is a pure shear: a point drops
+// straight down onto the plane, sliding by its own height times the light's
+// slope. `h` lifts the plane a hair off the floor - exactly coplanar, the
+// shadow z-fights with the paper across its whole area.
+const KX = LIGHT[0] / LIGHT[1], KZ = LIGHT[2] / LIGHT[1];
+export const shadowMat = (h) => [
+  1, 0, 0, 0,
+  -KX, 0, -KZ, 0,
+  0, 0, 1, 0,
+  KX * h, h, KZ * h, 1,
+];
 
 // The profile as [y, z, normalY, normalZ]. Floor and wall are the two ends
 // of the same arc - the floor is the curve at angle 0 and the wall is it at
@@ -68,10 +88,11 @@ export function studioMesh() {
   return createMesh(v);
 }
 
-// The contact shadow, as a unit fan drawn flat on the paper and scaled to
-// the subject. Without it the unicorn hangs in front of the backdrop
-// instead of standing on it - on a seamless sweep there is no horizon line
-// and no texture, so the shadow is the ONLY cue for where the floor is.
+// The ambient contact patch, as a unit fan drawn flat on the paper. The cast
+// shadow above is a hard-edged silhouette, which is what one key light
+// actually produces; this sits under it and darkens the few centimetres
+// where the hooves meet the floor, which no directional projection gives
+// you. Together they read as a key plus a fill - which is what a studio is.
 export function shadowMesh() {
   const v = [], N = 20, C = [.30, .18, .06];
   for (let i = 0; i < N; i++) {

@@ -122,7 +122,8 @@ reports.
 
 Worst-of-3 at `--O1`: **5,384** against 13,312 — **7,928 bytes in hand** for
 the game itself. Stated now so that later passes are spending a measured
-budget rather than a hoped-for one.
+budget rather than a hoped-for one. After the studio and its shadow:
+**5,725**, so the set and its lighting came to 341 bytes.
 
 ## R2 — the studio
 
@@ -145,10 +146,51 @@ Three things make it read as a studio rather than as a coloured box:
 - **The floor shades differently from the wall.** Lit as evenly as each
   other they read as the inside of a cardboard box; the fall-off along the
   floor toward the lens is what gives the sweep its depth.
-- **A contact shadow**, as a unit fan scaled to the subject. On a seamless
+- **A cast shadow, projected and stencilled** — see below. On a seamless
   sweep there is no horizon line and no texture, so the shadow is the *only*
-  cue for where the floor is — without it the unicorn hangs in front of the
+  cue for where the floor is; without one the unicorn hangs in front of the
   backdrop instead of standing on it.
+
+### The shadow
+
+Not a blob. The whole rig is drawn a second time through a **shear that
+flattens it onto the paper**, so the shadow is the unicorn's own silhouette:
+legs, horn, and the mane's every strand. In a game about photographing
+poses, the shadow states the pose.
+
+Three things make it work:
+
+- **The stencil paints each pixel once.** Flattening a solid onto a plane
+  piles its triangles on top of each other — four legs, a barrel and a head
+  all land in one footprint — and an alpha-blended shadow drawn that way
+  darkens once per overlapping triangle, so the silhouette comes out mottled
+  with the mesh's own internal structure. Passing only where the stencil is
+  still zero and incrementing as it draws fixes that exactly.
+- **A uniform tints it, not a second set of meshes.** The projected geometry
+  arrives carrying the unicorn's own colours, and without an override it
+  would paint a flattened *copy* of the unicorn on the floor rather than its
+  shadow. A shader uniform costs one line; dark twin meshes would double the
+  per-frame geometry work, and the mane is rebuilt every frame.
+- **The light has exactly one definition.** It is used twice — the shader
+  lights with it, the studio shears along it — and two hand-kept copies of
+  one vector is precisely how a shadow ends up disagreeing with the shading
+  that made it. `LIGHT` lives in `gl.js` and is interpolated into the shader
+  source; the projection derives its slope from the same array. It also sits
+  lower than a noon sun on purpose: the shear *is* the light's slope, so a
+  light overhead casts a shadow the subject stands on top of.
+
+The ambient fan survives underneath it at low alpha, darkening the few
+centimetres where the hooves meet the floor — which no directional
+projection gives you. A hard key plus a soft fill is what a studio is.
+
+### The gradient
+
+The first sweep divided each axis by a wildly different number (17, 12, 30)
+and added a separate fall-off along the floor. The result was a broad
+horizontal band with a darker top: it read as a gradient laid *over* the
+picture rather than as a light aimed at the middle of it. It is now one
+distance from one point, weighted only mildly per axis — a circle centred
+on the subject.
 
 ### What the backdrop cost the mane
 

@@ -14,11 +14,20 @@ export let gl, canvas;
 // `add` lives in both stages, so it carries an explicit precision: default
 // float precision is highp in the vertex shader and mediump in the fragment
 // one, and a uniform whose precision disagrees across stages is a link error.
+// THE light, and the only copy of it. It is used twice - the shader lights
+// with it, and the studio flattens the shadow along it - and two hand-kept
+// copies of one vector is exactly how a shadow ends up disagreeing with the
+// shading that produced it. Lower than a noon sun on purpose: the shear of
+// the cast shadow is the light's own slope, so a light overhead casts a
+// shadow the subject stands on top of and nobody can see.
+export const LIGHT = [.45, .85, .3];
+
 const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
-uniform mediump float add,dim,gls;varying vec3 vc;varying float vf,va;
+uniform mediump float add,dim,gls,sdw;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
-float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
-vc=c*mix(l,1.,add);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
+vec3 nn=(md*vec4(n,0.)).xyz+vec3(0.,1e-6,0.);
+float l=.55+.45*max(dot(normalize(nn),normalize(vec3(${LIGHT}))),0.);
+vc=mix(c*mix(l,1.,add),vec3(.16,.09,.02),sdw);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
 // Glass does NOT fog toward the fog colour - it fades its ALPHA instead.
 // It writes no depth, so a far piece of deck composites over a near one in
 // mesh order rather than depth order; fogged, that far sliver is close to
@@ -51,7 +60,7 @@ export function initGL(c) {
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls']) loc[u] = gl.getUniformLocation(prog, u);
+  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls', 'sdw']) loc[u] = gl.getUniformLocation(prog, u);
   gl.uniform1f(loc.dim, 1);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
@@ -88,16 +97,38 @@ export function mode(m) {
 // second time as a faint ghost of itself - which is all a reflection is.
 export const setDim = (v) => gl.uniform1f(loc.dim, v);
 
+// Force every vertex to the shadow tint. A projected shadow is the SAME
+// geometry drawn again through a squashing matrix, so it arrives carrying
+// the unicorn's own colours - white body, gold horn, rainbow mane - and
+// without this it would paint a flattened copy of the unicorn on the floor
+// rather than its shadow. A uniform rather than a second set of dark
+// meshes: the mane is rebuilt every frame and duplicating it would double
+// the per-frame geometry work to save one line of shader.
+export const setSdw = (v) => gl.uniform1f(loc.sdw, v);
+
 // A planar reflection needs a MASK. A mirror image floating beside the
 // track - out over a gap, past the edge, in the empty air - is worse than
 // no mirror at all. So the deck marks the stencil buffer as it draws, and
 // the reflected pass lands only where the deck itself appeared on screen.
 // The deck is drawn after the solids and tests depth, so a stretch of it
 // hidden behind the scenery marks nothing and reflects nothing.
-//   1 write the mask (the deck pass)   2 test it (the mirror pass)   0 off
+//   1 write the mask   2 test it   3 draw once   0 off
+//
+// Mode 3 is what makes a projected shadow usable. Flattening a solid onto a
+// plane piles its triangles on top of each other - four legs, a barrel and
+// a head all land in the same footprint - and an alpha-blended shadow drawn
+// that way darkens once per overlapping triangle, so the silhouette comes
+// out mottled with the mesh's own internal structure. Passing only where
+// the stencil is still zero, and incrementing as it draws, paints every
+// shadowed pixel exactly once however many triangles cover it.
 export function mask(m) {
   if (!m) { gl.disable(gl.STENCIL_TEST); return; }
   gl.enable(gl.STENCIL_TEST);
+  if (m === 3) {
+    gl.stencilFunc(gl.EQUAL, 0, 255);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
+    return;
+  }
   gl.stencilFunc(m === 1 ? gl.ALWAYS : gl.EQUAL, 1, 255);
   gl.stencilOp(gl.KEEP, gl.KEEP, m === 1 ? gl.REPLACE : gl.KEEP);
 }

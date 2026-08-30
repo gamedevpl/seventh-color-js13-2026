@@ -8,10 +8,10 @@
 
 import {
   initGL, frameGL, mode, drawMesh, createMesh, updateMesh,
-  perspective, lookAt, mul, modelTR, IDENT,
+  perspective, lookAt, mul, modelTR, mask, setDim, setSdw, IDENT,
 } from './gl.js';
 import { buildUnicorn, makePose, solve } from './uni.js';
-import { studioMesh, shadowMesh, lightsMesh } from './studio.js';
+import { studioMesh, shadowMesh, lightsMesh, shadowMat } from './studio.js';
 import { makeMane, updateMane, maneVerts, MANE_CORE, MANE_HALO } from './mane.js';
 import { makeAnim, applyPose, POSE_NAME } from './pose.js';
 
@@ -115,12 +115,33 @@ function frame(now) {
   frameGL(vp, eye, FOG);
   mode(0);
   drawMesh(studio, IDENT);
-  for (let i = 0; i < parts.length; i++) drawMesh(parts[i], P.w[i]);
-  drawMesh(maneCore, IDENT);
+
+  // --- the shadow, before the unicorn that casts it ----------------------
+  // Drawn first so the solid unicorn then covers whatever part of its own
+  // shadow lies behind it, for free and in the right order.
   mode(2);
   // Just clear of the paper: coplanar with it, this z-fights across the
   // whole disc and flickers as the camera moves.
-  drawMesh(shadow, modelTR(P.x, .012, P.z, 0, 1.15));
+  setDim(.4);
+  drawMesh(shadow, modelTR(P.x, .01, P.z, 0, 1.0));
+  // The real one: every bone flattened onto the floor through the light's
+  // shear, tinted by the shader and painted once per pixel by the stencil.
+  // The mane is in world space already, so it projects with the same matrix
+  // and its silhouette lands in the shadow with everything else - which is
+  // the whole point of doing this rather than drawing a blob.
+  const SM = shadowMat(.012);
+  mask(3);
+  setDim(.5);
+  setSdw(1);
+  for (let i = 0; i < parts.length; i++) drawMesh(parts[i], mul(SM, P.w[i]));
+  drawMesh(maneCore, SM);
+  setSdw(0);
+  setDim(1);
+  mask(0);
+
+  mode(0);
+  for (let i = 0; i < parts.length; i++) drawMesh(parts[i], P.w[i]);
+  drawMesh(maneCore, IDENT);
   mode(1);
   drawMesh(lights, IDENT);
   drawMesh(maneHalo, IDENT);

@@ -87,19 +87,35 @@ const img = await page.evaluate(() => {
 });
 check('it kept an actual photograph', img && img.len > 4000, img ? `${(img.len / 1024) | 0} KB` : 'none');
 
-// Every frame on the contact sheet is inspectable, not only the keeper: the
-// job scores the whole roll, so a player who can see one breakdown cannot
-// learn why the other five were worth what they were.
-const thumbs = page.locator('img').nth(1);
-const before = await page.evaluate(() => document.querySelector('img').src.length);
-const capBefore = await page.evaluate(() => document.querySelectorAll('div')[0] && [...document.querySelectorAll('div')].map((d) => d.textContent).find((t) => /^frame \d+ of/.test(t)));
-await thumbs.click();
+// Every frame in the gallery is inspectable, not only the keeper: the job
+// scores the whole roll, so a player who can see one verdict cannot learn
+// why the other five were worth what they were. And the verdict has to be a
+// sentence about the photograph, not a column of numbers - that was the
+// whole point of replacing the ledger.
+const sayText = () => page.evaluate(() => {
+  const d = [...document.querySelectorAll('div')].map((e) => e.textContent)
+    .find((t) => /^[\u{1F44D}\u{1F44E}] ./u.test(t));
+  return d || '';
+});
+// Which thumbnail the big picture is showing, read off the highlight - the
+// verdict line alone cannot answer it, since two frames of the same mistake
+// honestly say the same thing.
+const lit = () => page.evaluate(() => [...document.querySelectorAll('img')].slice(1)
+  .findIndex((i) => /\b2px\b/.test(i.style.outline)));
+const capBefore = await sayText();
+const litBefore = await lit();
+await page.locator('img').nth(litBefore === 0 ? 2 : 1).click();
 await page.waitForTimeout(250);
-const after = await page.evaluate(() => document.querySelector('img').src.length);
-const capAfter = await page.evaluate(() => [...document.querySelectorAll('div')].map((d) => d.textContent).find((t) => /^frame \d+ of/.test(t)));
-check('a frame names itself', /^frame \d+ of \d+/.test(capBefore || ''), capBefore || 'none');
-check('tapping a thumbnail opens that frame', after !== before || capAfter !== capBefore,
-  `${capBefore} -> ${capAfter}`);
+const litAfter = await lit();
+const capAfter = await sayText();
+check('a frame gets a thumb and a reason', /^[\u{1F44D}\u{1F44E}] \S/u.test(capBefore), capBefore || 'none');
+// The badge, not its wrapper: both carry the same textContent, so count
+// only the leaf that actually holds the character.
+const badges = await page.evaluate(() => [...document.querySelectorAll('div')]
+  .filter((d) => !d.children.length && /^[\u{1F44D}\u{1F44E}]$/u.test(d.textContent)).length);
+check('every frame carries a thumb', badges === 6, `${badges} thumbs`);
+check('tapping a thumbnail opens that frame', litAfter === (litBefore === 0 ? 1 : 0),
+  `frame ${litBefore} -> ${litAfter}`);
 if (out) {
   await page.screenshot({ path: path.join(out, '2-result.png') });
   const data = await page.evaluate(() => document.querySelector('img').src);

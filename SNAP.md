@@ -421,9 +421,10 @@ Two of the terms are worth defending:
 The rule of thirds is a **bonus, not a requirement**: dead centre is a real
 choice and should not score as a mistake, it just does not earn this.
 
-Every term is named, because the result screen has to say *why*. A number
-alone teaches nothing; `mane toss +200, eye contact +150` teaches a player
-what to point at next time.
+Every term is named. The result screen no longer prints the list — see
+*R10d* — but the names are what the one-sentence verdict reasons over, and
+what the balance probe reads when it needs to know which skill a policy is
+being paid for.
 
 ### The brief
 
@@ -990,12 +991,51 @@ session, each time because an `--O1` build had just been written to the same
 directory. `tools/lib/require-dev.mjs` now says so in one line, and every
 probe calls it before its first read.
 
+## R10d — the gallery replaced the ledger
+
+Reported, in the plainest possible terms: *the screen after a session is
+number-itis; it has to be simpler — a gallery of photographs with thumbs up
+or down.* Right, and the version it replaced was a fair description of what
+the game was doing and a poor description of what the player had done. Six
+photographs, each with its own itemised list — framing, size, pose, eye
+contact, thirds, brief — plus a roll total and a styling total. Every number
+true. None of them answering *was that a nice picture?*
+
+So the screen is now a large photograph, a row of six thumbnails, and one
+line: a 👍 or a 👎 and the single most useful thing that can be said about
+the frame you are looking at. Each thumbnail carries its own thumb, so the
+shape of a session is legible before you tap anything — five down and one up
+is a different session from four up and two down, and you can see which is
+which at a glance.
+
+`verdict()` reasons over the same terms the score does, and the **order is
+the whole design**. Faults are checked first and worst first: a photograph
+that is half out of frame is not also *a lovely rear* — the crop is the only
+thing worth saying about it. Only once a frame has no fault does it get told
+what it did right, and again most-specific-first: glitter in the air beats
+eye contact beats the name of the pose.
+
+Two smaller decisions:
+
+- **It opens on the best keeper, not the best score.** The highest-scoring
+  frame of a bad roll is still a bad photograph, and greeting a player with
+  a thumbs-down on the frame the game calls their best is just confusing.
+- **The total survives, small and grey**, with the brief bonus beside it on
+  the same line. Points are the season's currency and deleting them would
+  make the season screen arrive from nowhere; they are simply no longer the
+  first thing the screen says.
+
+The probe changed with the screen. `test-shoot` used to assert on the
+caption `frame N of M` and prove a tap worked by watching that caption
+change — which the gallery would have broken silently, and which would not
+work anyway now that two frames with the same fault honestly say the same
+sentence. It reads the highlight ring instead: click a thumbnail that is not
+the lit one, and the ring has to move to it.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens
   straight onto the bench.
-- **The contact sheet.** All six frames at the end of a job rather than only
-  the best one, so a player can see the near misses they took.
 - **A unicorn with moods.** It performs on a fixed table; it should play up
   to a player who is styling it well and sulk at one who is not.
 - **Sound for the shutter's aftermath** — a frame that scores well should

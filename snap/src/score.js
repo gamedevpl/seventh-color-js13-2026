@@ -7,9 +7,10 @@
 // large, which pose it was half way through, whether it was looking down
 // the lens, what it was wearing.
 //
-// Every term is also NAMED, because the result screen has to be able to say
-// why. A number alone teaches nothing; "mane toss +200, eye contact +150"
-// teaches a player what to point at next time.
+// Every term is also NAMED. The result screen no longer prints the list -
+// six itemised invoices taught less than one plain sentence did - but the
+// names are what verdict() reasons over, and what the balance probe reads
+// when it needs to know which skill a policy is actually being paid for.
 
 import { NB } from './uni.js';
 import { GRAZE, IDLE, WALK, TROT, GALLOP, REAR, TOSS, SHAKE, SLEEP, PRANCE, BOW, POSE_NAME } from './pose.js';
@@ -96,6 +97,30 @@ export function eyeContact(P, eye) {
 // glitter in the air. And the escape is the one the game already has a
 // control for - walk round the set and shoot it from somewhere else, and it
 // is a different photograph again.
+// ONE SENTENCE, NOT A LEDGER.
+//
+// The result screen listed every term that contributed - framing, size, the
+// pose, eye contact, the thirds, the brief - and read as an invoice. What a
+// player wants to know, and a nine-year-old especially, is whether the
+// picture was any good and what made it so. So each frame gets a thumb and
+// the single most useful thing that can be said about it: the fault when
+// there is one, the reason when there is not.
+//
+// Order matters here. The faults are checked first and worst-first, because
+// a photograph that is half out of frame is not also "a lovely rear" - the
+// crop is the only thing worth mentioning.
+export function verdict(s) {
+  const b = s.box;
+  if (b.inFrac < .9) return [0, 'half out of frame'];
+  if (b.h < .62) return [0, 'too far away'];
+  if (b.h > 1.95) return [0, 'too close in'];
+  if (s.fresh < .7) return [0, 'the same shot again'];
+  if ((POSE_WORTH[s.pose] || 40) < 80) return [0, 'nothing much happening'];
+  if (s.glitAir) return [1, 'glitter everywhere'];
+  if (s.eye > .82) return [1, 'looking right at you'];
+  return [1, POSE_NAME[s.pose] + '!'];
+}
+
 export function scoreShot(P, vp, eye, anim, deco, roll = []) {
   const b = frameBox(P, vp);
   const bearing = Math.atan2(eye[0] - P.x, eye[2] - P.z);
@@ -156,5 +181,5 @@ export function scoreShot(P, vp, eye, anim, deco, roll = []) {
   }
 
   const total = parts.reduce((a, p) => a + p[1], 0);
-  return { total, parts, box: b, pose: anim.mode, eye: e, q, fresh, bearing };
+  return { total, parts, box: b, pose: anim.mode, eye: e, q, fresh, bearing, glitAir: deco.glitter > 0 && anim.mode === SHAKE };
 }

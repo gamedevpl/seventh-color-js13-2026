@@ -15,7 +15,7 @@ import { makeMane, updateMane, maneVerts, recolour, MANE_CORE, MANE_HALO } from 
 import { makeAnim, applyPose, POSE_NAME, SHAKE, IDLE } from './pose.js';
 import { makeDeco, makeGlitter, glitterVerts, GLITTER_BUF, PALETTE, RB, MAX_GLITTER, swatch } from './deco.js';
 import { makeActor, act, move, poke, temper } from './act.js';
-import { scoreShot, frameBox, frameQuality, eyeContact, POSE_WORTH } from './score.js';
+import { scoreShot, verdict, frameBox, frameQuality, eyeContact, POSE_WORTH } from './score.js';
 import { makeBrief, briefText, briefStyle, warmMatch, GLIT_WORD, POSE_BONUS } from './brief.js';
 import { wake, awake, music, shutter, sparkle, pleased } from './snd.js';
 
@@ -283,26 +283,22 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
       el('div', 'color:#a05a10;font-weight:800', card, 'A NEW PERSONAL BEST');
     } else el('div', '', card, `Best season ${bestEver}`);
   } else {
-    el('div', 'font-size:20px;font-weight:800', card, best ? `${total} points` : 'No usable frames');
+    // A GALLERY, NOT A LEDGER. This screen used to list every term that
+    // contributed to every frame, and it read as an invoice - the numbers
+    // were all true and none of them told a player whether the picture was
+    // any good. Six photographs, a thumb on each, and one sentence about
+    // whichever one you are looking at.
+    el('div', 'font-size:15px;font-weight:700;opacity:.75', card,
+      best ? `${total} points${bs.pts ? ` - brief +${bs.pts}` : ''}` : 'No usable frames');
     if (best) {
-      // EVERY frame is inspectable, not only the keeper. The whole roll is
-      // what the job scores, so a player looking at one photograph and one
-      // breakdown cannot see why the other five were worth what they were -
-      // and a 24-point frame beside a 280-point one is the clearest lesson
-      // this game has to offer, if you can put them side by side.
-      const cap = el('div', 'font-weight:500;font-size:13px', card, '');
       const im = el('img', 'width:min(62vw,290px);border-radius:8px;display:block', card);
-      const list = el('div', 'font-weight:500;font-size:13px;line-height:1.6', card);
-      el('div', 'font-weight:700;font-size:13px', card, `whole roll ${rollPts} + styling ${bs.pts}`);
-      for (const [n, p] of bs.lines) el('div', 'font-weight:500;font-size:12px;opacity:.8', card, `${n} +${p}`);
-      const cs = el('div', 'display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:2px', card);
+      const say = el('div', 'font:700 16px system-ui,sans-serif;line-height:1.3', card, '');
+      const cs = el('div', 'display:flex;gap:5px;flex-wrap:wrap;justify-content:center', card);
       const thumbs = [];
       const show = (f) => {
+        const [up, why] = verdict(f);
         im.src = f.img;
-        cap.textContent = `frame ${roll.indexOf(f) + 1} of ${roll.length}`
-          + (f === best ? ' - your best' : '') + ` - ${f.total} points`;
-        list.textContent = '';
-        for (const [n, p] of f.parts) el('div', '', list, `${n} +${p}`);
+        say.textContent = (up ? '\u{1F44D} ' : '\u{1F44E} ') + why;
         thumbs.forEach((t, i) => {
           t.style.outline = roll[i] === f ? '2px solid #a05a10' : '1px solid #0002';
         });
@@ -311,11 +307,18 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
         const t = el('div', 'position:relative;width:62px;cursor:pointer', cs);
         const ti = el('img', 'width:62px;display:block;border-radius:4px;outline:1px solid #0002', t);
         ti.src = f.img;
-        el('div', 'font:600 11px system-ui,sans-serif;color:#6b5320', t, String(f.total));
+        el('div', 'position:absolute;right:1px;bottom:0;font-size:13px', t,
+          verdict(f)[0] ? '\u{1F44D}' : '\u{1F44E}');
         t.onclick = () => { wake(); show(f); };
         thumbs.push(ti);
       });
-      show(best);
+      // Open on the best KEEPER, not the best score. The highest-scoring
+      // frame of a bad roll is still a bad photograph, and a gallery that
+      // greets you with a thumbs-down on the frame it calls your best is
+      // just confusing.
+      let op = 0;
+      for (const f of roll) if (verdict(f)[0] && (!op || f.total > op.total)) op = f;
+      show(op || best);
     }
   }
   const b = el('button', GO, card, phase === 3 ? 'SHOOT ANOTHER SEASON' : 'NEXT JOB');

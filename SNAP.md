@@ -135,8 +135,9 @@ budget rather than a hoped-for one.
 | R7, title, contact sheet and coaching | 10,619 | 593 |
 | R8, the viewfinder, pinch and a shutter | 11,266 | 647 |
 | R9, aiming with the phone | 11,603 | 337 |
+| R9b, walking round it, and the button that did nothing | 11,728 | 125 |
 
-**1,709 bytes still in hand.**
+**1,584 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -698,7 +699,7 @@ Re-measured with the viewfinder in: **2.57x**, against 2.65x before it —
 unchanged within the run-to-run spread, which is what a HUD ought to do to
 a score.
 
-## R9 — aiming the camera by moving the phone
+## R9 — walking round the unicorn with the phone
 
 The ask was WebXR. **What shipped is not WebXR, and that was a deliberate
 call worth writing down**, because the request named an API and described an
@@ -710,8 +711,23 @@ no WebXR at all** — and the DOM heads-up display would additionally need the
 puts the unicorn in your living room, and the one thing this game is about
 standing in is a lit studio cove. A VR session on a phone wants a headset.
 
-`DeviceOrientation` delivers the part that was actually asked for — *turn
-the phone, turn the lens* — on both platforms, for 337 bytes.
+`DeviceOrientation` delivers the part a phone can actually do, on both
+platforms.
+
+### It cannot tell you where you walked
+
+The first cut mapped the phone's rotation to the **lens heading**, which is
+the honest reading of the sensor and the wrong reading of the request: what
+was wanted was *walking around* the unicorn, and a gyroscope has nothing to
+say about position. Integrating an accelerometer twice drifts metres within
+seconds — "how far have I moved" is not a question this hardware answers.
+
+So turning yourself is mapped to **stepping round the set**. The tripod
+already orbits the cove, so turning right walks you right around the subject
+with the lens held on it — and a finger drag still trims the aim from
+wherever you are standing, so composition stays the player's. It is a
+substitution, stated as one, and it is the one that makes a phone feel like
+a window onto the animal.
 
 ### Relative, and accumulated
 
@@ -731,9 +747,30 @@ north swung the lens 350 degrees.** Pitch stays absolute against its base,
 because `beta` does not wrap for a phone anyone is holding and accumulating
 it would drift against the clamp.
 
-The button also exists because iOS will not deliver a single event until
-`requestPermission()` is granted from inside a real gesture — so this could
-never have been something the game switches on by itself.
+### The button that did nothing
+
+Reported from a real phone: *"I press MOTION and nothing happens."* Exactly
+right, and the cause was a one-line mistake with a category worth naming.
+
+iOS will not deliver a single event until `requestPermission()` is granted
+from inside a real gesture — which is why this is a button at all. But the
+call had been written as
+
+```js
+const R = DeviceOrientationEvent.requestPermission;
+if (R) { try { if (await R() !== 'granted') return; } catch (e) { return; } }
+```
+
+Pulled off its constructor, the method loses its receiver and throws. And
+the `catch` — written to handle a refusal politely — **swallowed the throw
+and returned**, so the button was pressed, did nothing, and said nothing. A
+catch that hides the failure it was written for is worse than no catch.
+
+It is called on the constructor now. And because a page can also legitimately
+have no sensor access — an iframe without the gyroscope permission policy, a
+browser with motion access switched off — the button now reports it: if no
+reading arrives within a second and a half it says **NO SENSOR** instead of
+sitting there looking armed.
 
 ### What the probe can and cannot settle
 

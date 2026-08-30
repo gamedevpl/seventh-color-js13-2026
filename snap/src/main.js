@@ -139,7 +139,7 @@ const cBtns = [RB, 0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
 el('div', 'font:800 min(13vw,54px)/1 system-ui,sans-serif;color:#fff6dd;letter-spacing:.02em;text-shadow:0 3px 14px #0007', title, 'UNICORN SNAP');
 el('div', 'font:600 15px system-ui,sans-serif;color:#ffeec4;text-shadow:0 2px 8px #0008;margin-top:6px', title, 'It knows how good it looks. Prove it.');
 el('div', 'font:500 13px/1.7 system-ui,sans-serif;color:#f0dcae;text-shadow:0 2px 8px #0008;max-width:34em', title,
-  'Style the unicorn for the job, then shoot it. Drag or pinch to aim and zoom - wheel or W/S on a desktop, Q/E to walk round the set. Tap, SPACE or the shutter takes the picture. On a phone, MOTION aims by moving the phone itself.');
+  'Style the unicorn for the job, then shoot it. Drag or pinch to aim and zoom - wheel or W/S on a desktop, Q/E to walk round the set. Tap, SPACE or the shutter takes the picture. On a phone, WALK lets you turn on the spot to walk right round the unicorn.');
 const startBtn = el('button', GO + ';margin-top:10px;font-size:17px', title, 'OPEN THE STUDIO');
 
 // A real button for the shutter. Tap-anywhere works on a phone, but on a
@@ -302,26 +302,25 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
   };
 }
 
-// --- aiming with the phone itself -----------------------------------------
-// Not WebXR. immersive-ar needs ARCore, so it is Android-only - iOS Safari
-// has no WebXR at all - and the DOM HUD would need the dom-overlay feature,
-// which narrows it further. An AR session would also put the unicorn in your
-// living room, which is the opposite of the one thing this game is about
-// standing in: a lit studio cove.
+// --- walking round the unicorn with the phone -----------------------------
+// Not WebXR. immersive-ar needs ARCore, so it is Android-and-Chrome - iOS
+// Safari has no WebXR at all - and an AR session would put the unicorn in
+// your living room, which is the opposite of the lit cove this game is about
+// standing in.
 //
-// DeviceOrientation gives the part that was actually asked for - turn the
-// phone, turn the lens - on both platforms, for a few hundred bytes.
-//
-// Everything is RELATIVE to the pose it was switched on in, rather than to
-// absolute compass north. Absolute headings need a calibrated magnetometer,
-// drift indoors, and would point the player at a corner of the cove they
-// never chose; a relative frame means "wherever you are pointing now is
-// where you were pointing", and switching it off and on again is a recentre.
-let gyroBase = null, gyroPrev = 0;
+// What a phone CAN give without any of that is rotation. It cannot give
+// position: accelerometers drift metres within seconds once you integrate
+// them twice, so "how far have I walked" is not a question this hardware
+// answers. So turning yourself is mapped to WALKING ROUND THE SET - the
+// tripod already orbits the cove, and turning right steps you right around
+// the subject with the lens still on it. It is a substitution, and it is the
+// one that makes a phone feel like a window onto the animal.
+let gyroBase = null, gyroPrev = 0, gyroSeen = 0, aimOff = 0;
 const canGyro = typeof DeviceOrientationEvent !== 'undefined' && matchMedia('(pointer:coarse)').matches;
 
 function onOrient(e) {
   if (e.alpha == null || !gyroBtn.dataset.on) return;
+  gyroSeen = 1;
   const rot = (screen.orientation || {}).angle || 0;
   const a = e.alpha * Math.PI / 180;
   // Pitch rides a different axis depending on how the phone is held: beta is
@@ -336,30 +335,58 @@ function onOrient(e) {
   // degree swing for a 10 degree movement across north.
   const d = ((a - gyroPrev + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
   gyroPrev = a;
-  cam.a += d;
+  // Turn right, step right around the subject. Alpha counts anticlockwise,
+  // so a rightward turn lowers it, and the orbit angle has to go the other
+  // way to follow you.
+  cam.ang -= d;
+  // The lens stays pointed back at the middle of the set, with whatever the
+  // player has dragged in on top - so composition is still theirs, and the
+  // subject does not slide out of frame every time they turn.
+  cam.a = cam.ang + Math.PI + aimOff;
   // Pitch stays absolute against its base: beta does not wrap for a phone
   // anyone is holding, and accumulating it would drift against the clamp.
   cam.p = Math.max(-.5, Math.min(.6, gyroBase.cp + (p - gyroBase.p)));
   learnt.aim = 1;
 }
 
-const gyroBtn = el('button', 'position:fixed;right:14px;bottom:34px;padding:9px 13px;border:0;border-radius:10px;cursor:pointer;display:none;font:700 12px system-ui,sans-serif;letter-spacing:.06em;background:#0000005e;color:#fff3d6', null, 'MOTION');
+const gyroBtn = el('button', 'position:fixed;right:14px;bottom:34px;padding:9px 13px;border:0;border-radius:10px;cursor:pointer;display:none;font:700 12px system-ui,sans-serif;letter-spacing:.06em;background:#0000005e;color:#fff3d6', null, 'WALK');
 gyroBtn.onclick = async () => {
   wake();
   if (gyroBtn.dataset.on) {
     delete gyroBtn.dataset.on;
     gyroBase = null;
+    gyroBtn.textContent = 'WALK';
     gyroBtn.style.background = '#0000005e';
     return;
   }
-  // iOS 13 and later will not deliver a single event until this is granted,
-  // and it must be asked for from inside a real gesture - which is the whole
-  // reason this is a button rather than something the game turns on itself.
-  const R = DeviceOrientationEvent.requestPermission;
-  if (R) { try { if (await R() !== 'granted') return; } catch (err) { return; } }
+  // iOS 13 and later deliver nothing until this is granted, and it must be
+  // asked for from inside a real gesture - which is why this is a button
+  // rather than something the game switches on by itself.
+  //
+  // It has to be called ON the constructor. Pulled off into a variable and
+  // called bare it loses its receiver, throws, and - with the throw caught -
+  // the button silently does nothing at all, which is exactly how this
+  // shipped the first time.
+  if (DeviceOrientationEvent.requestPermission) {
+    try {
+      if (await DeviceOrientationEvent.requestPermission() !== 'granted') return;
+    } catch (err) { /* denied or unavailable; the check below says so */ }
+  }
   gyroBtn.dataset.on = '1';
   gyroBase = null;
+  gyroSeen = 0;
+  gyroBtn.textContent = 'WALKING';
   gyroBtn.style.background = '#c07a12';
+  // A button that was pressed and then did nothing is the worst outcome
+  // here, and a page without sensor permission - an iframe missing the
+  // gyroscope policy, a browser with motion access off - fails exactly that
+  // way. If nothing arrives, say so.
+  setTimeout(() => {
+    if (gyroBtn.dataset.on && !gyroSeen) {
+      gyroBtn.textContent = 'NO SENSOR';
+      gyroBtn.style.background = '#00000090';
+    }
+  }, 1500);
 };
 if (canGyro) addEventListener('deviceorientation', onOrient);
 
@@ -429,8 +456,10 @@ addEventListener('pointermove', (e) => {
   }
   dragDist += Math.abs(dx) + Math.abs(dy);
   if (dragDist > 24) learnt.aim = 1;
-  // While the phone is aiming, a drag would be two hands on one wheel.
-  if (gyroBtn.dataset.on) return;
+  // While the phone is walking, a drag trims the aim rather than fighting
+  // it: the phone says where you are standing, the finger says exactly where
+  // to point from there.
+  if (gyroBtn.dataset.on) { aimOff -= dx * .0022 * cam.fov; return; }
   // Scaled by the field of view, so a long lens aims slowly. Without this,
   // zooming in makes the camera unusably twitchy at exactly the moment
   // precision starts to matter.
@@ -469,9 +498,12 @@ let glitN = 0, vp = null, eye = null, flashT = 0;
 // each control has been used. A hint that stays up after you have obeyed it
 // is noise, and noise is how players learn to ignore the next hint.
 const learnt = { aim: 0, zoom: 0, shot: 0 };
-const coach = () => (!learnt.aim ? 'drag to aim the camera'
-  : !learnt.zoom ? 'wheel or W/S to zoom in - fill the frame'
-  : !learnt.shot ? 'tap or SPACE to take the picture'
+// Named for the hardware in the player's hands. Telling someone on a phone
+// to use a mouse wheel is worse than saying nothing: it teaches them the
+// hint is not about them.
+const coach = () => (!learnt.aim ? (canGyro ? 'drag to aim - or WALK to turn on the spot' : 'drag to aim the camera')
+  : !learnt.zoom ? (canGyro ? 'pinch to zoom - fill the frame' : 'wheel or W/S to zoom in - fill the frame')
+  : !learnt.shot ? (canGyro ? 'tap or the shutter takes the picture' : 'tap or SPACE to take the picture')
   : '');
 let last = performance.now();
 function frame(now) {

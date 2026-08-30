@@ -1147,6 +1147,22 @@ tap, nothing to select — and the selection code went with it. Each frame is
 capped at 42vh, contained rather than cropped, because the verdict talks
 about the composition.
 
+### Bigger again, and the other half of the trackpad
+
+Fed straight back from the next sitting: the icons and swatches were better
+but still not comfortable. Icons went to 42px inside 54px buttons and
+swatches to 52 square, five to a row — which on an iPhone SE means the
+controls take the lower half of the screen, so the portrait lens widens
+again *and aims lower*, because a lens pointed down lifts its subject up the
+frame and the clear space is at the top.
+
+And pinch worked but panning did not, which is the same lesson twice:
+**three different gestures arrive as one event on a Mac.** A pinch is a
+wheel with `ctrlKey`; a two-finger drag is small pixel deltas, usually on
+both axes; a mouse wheel is a big notch on one axis, or a line-mode delta.
+The handler now tells all three apart, and the probe fires all three and
+checks that each moves the thing it should and nothing it should not.
+
 ### A score you can play for
 
 The season total is on every result screen now, with the personal best

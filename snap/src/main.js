@@ -76,7 +76,7 @@ const top = el('div', 'position:fixed;left:0;right:0;top:0;padding:11px 14px 16p
   + 'background:linear-gradient(#00000070,#00000000)');
 const bar = el('div', 'position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 8px calc(14px + env(safe-area-inset-bottom));touch-action:none');
 const rowZ = el('div', 'display:flex;gap:5px;flex-wrap:wrap;justify-content:center', bar);
-const rowC = el('div', 'display:flex;gap:5px;flex-wrap:wrap;justify-content:center', bar);
+const rowC = el('div', 'display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:296px', bar);
 const rowG = el('div', 'display:flex;gap:8px;align-items:center;justify-content:center', bar);
 // Behaviour you cannot see is depth nobody plays with. The bench states, in
 // the player's words, what this look will make the unicorn do - which is the
@@ -161,15 +161,15 @@ function drawIcon(cv, mine) {
 }
 const icons = [];
 const zBtns = ZONES.map((z, i) => {
-  const b = el('button', BTN + ';padding:4px 6px', rowZ);
+  const b = el('button', BTN + ';padding:6px', rowZ);
   b.title = z.toUpperCase();
-  const cv = el('canvas', 'width:32px;height:32px;display:block;image-rendering:pixelated', b);
+  const cv = el('canvas', 'width:42px;height:42px;display:block;image-rendering:pixelated', b);
   cv.width = cv.height = 10;
   icons.push(cv);
   b.onclick = () => { wake(); zone = i; sync(); };
   return b;
 });
-const glitBtn = el('button', BTN + ';font-size:19px;letter-spacing:.06em', rowZ, '\u2728');
+const glitBtn = el('button', BTN + ';font-size:23px;letter-spacing:.04em;padding:6px 10px', rowZ, '\u2728');
 glitBtn.title = 'GLITTER';
 glitBtn.onclick = () => {
   wake();
@@ -179,8 +179,8 @@ glitBtn.onclick = () => {
 };
 const cBtns = [RB, 0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
   const b = el('button', BTN, rowC, '');
-  b.style.width = '34px';
-  b.style.height = '44px';
+  b.style.width = '52px';
+  b.style.height = '52px';
   b.style.padding = '0';
   b.dataset.i = i;
   b.onclick = () => { wake(); apply(i); sparkle(3); };
@@ -256,7 +256,11 @@ try { bestEver = +localStorage.usBest || 0; } catch (e) { /* no store, no proble
 // half of what you just painted - the tail above all, which is the part a
 // child paints first and then wants to see.
 let spin = 1;
-const idleFov = () => (c.height > c.width ? .98 : .72);
+// The bench controls now eat the bottom half of a small phone, so the
+// portrait lens both widens AND aims lower - a lens pointed down lifts its
+// subject up the frame, which is where the only clear space is.
+const tall = () => c.height > c.width;
+const idleFov = () => (tall() ? 1.06 : .72);
 const benchCam = () => { spin = 1; if (!FROZEN) { cam.a = Math.PI; cam.p = -.10; cam.fov = idleFov(); cam.ang = 0; } };
 const wideCam = () => { if (!FROZEN) { cam.a = Math.PI; cam.p = -.02; cam.fov = 1.15; cam.ang = 0; } };
 
@@ -485,16 +489,30 @@ addEventListener('gesturechange', (e) => {
 addEventListener('gestureend', (e) => e.preventDefault());
 addEventListener('dblclick', (e) => e.preventDefault());
 
-// passive:false, or the preventDefault is ignored and the browser zooms the
-// page out from under a game that just handled the same gesture.
+// passive:false, or the preventDefault is ignored and the browser zooms or
+// scrolls the page out from under a game that just handled the same gesture.
+//
+// THREE GESTURES ARRIVE AS ONE EVENT on a Mac. A trackpad pinch is a wheel
+// with ctrlKey set. A two-finger drag - which is how anyone on a laptop
+// expects to move a camera, and which did nothing here - is a wheel with
+// small pixel deltas, usually on both axes. A real mouse wheel is a big
+// notch on one axis, or a line-mode delta. They have to be told apart from
+// each other, because the same event means zoom, pan and zoom again.
 addEventListener('wheel', (e) => {
   e.preventDefault();
-  // ctrlKey on a wheel event means a pinch, not a scroll - the convention
-  // every browser settled on for trackpads. It arrives in much smaller
-  // steps than a scroll wheel, so it gets its own gain.
-  if (e.ctrlKey) zoomBy(1 + e.deltaY * .01);
-  else cam.fov = Math.max(.34, Math.min(1.15, cam.fov + e.deltaY * .0012));
-  if (cam.fov < 1) learnt.zoom = 1;
+  if (e.ctrlKey) return zoomBy(1 + e.deltaY * .01);
+  if (e.deltaMode || (!e.deltaX && Math.abs(e.deltaY) >= 50)) {
+    // A notch: zoom, which is what a wheel has always done here.
+    cam.fov = Math.max(.34, Math.min(1.15, cam.fov + e.deltaY * .0012));
+    if (cam.fov < 1) learnt.zoom = 1;
+    return;
+  }
+  // A two-finger drag. Scrolling right moves the world left, which is the
+  // same thing as dragging the canvas left, so the signs are the drag
+  // handler's inverted.
+  cam.a += e.deltaX * .0022 * cam.fov;
+  cam.p = Math.max(-.5, Math.min(.6, cam.p + e.deltaY * .0022 * cam.fov));
+  learnt.aim = 1;
 }, { passive: false });
 
 const q = new URLSearchParams(location.search);
@@ -584,7 +602,7 @@ function frame(now) {
     // it photographs centres it by definition, and the centre of that frame
     // is the words - the first cut put the title across the unicorn's
     // chest. The bench has no words in the middle, so it looks straight on.
-    cam.p += ((phase < 0 ? -.23 : -.12) - cam.p) * Math.min(1, dt * 1.4);
+    cam.p += ((phase < 0 ? -.23 : tall() ? -.30 : -.12) - cam.p) * Math.min(1, dt * 1.4);
   }
   if (awake()) music(phase === 1 ? .8 : .2, phase !== 1);
 

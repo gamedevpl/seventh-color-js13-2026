@@ -57,17 +57,32 @@ await page.waitForTimeout(400);
 const s1 = await probe();
 check('the shoot starts with a full roll', s1.phase === 1 && s1.film === 8, `film ${s1.film}`);
 
-// A TRACKPAD PINCH, which is not a touch pinch: macOS sends no second
-// pointer for it. Chrome turns it into a wheel event with ctrlKey set and
-// Safari into its own gesture events, so neither ever reached the
-// two-finger code - reported as pinch simply not working on a Mac. Only the
-// Chrome half is reachable from here; the Safari half is the same handler.
-const fov0 = (await probe()).cam[2];
-await page.evaluate(() => {
-  for (let i = 0; i < 6; i++) dispatchEvent(new WheelEvent('wheel', { deltaY: -12, ctrlKey: true, cancelable: true }));
-});
-const fov1 = (await probe()).cam[2];
-check('a trackpad pinch zooms in', fov1 < fov0 - .03, `${fov0.toFixed(2)} -> ${fov1.toFixed(2)}`);
+// THE THREE THINGS A WHEEL EVENT MEANS ON A MAC, told apart. A pinch is a
+// wheel with ctrlKey; a two-finger drag is small pixel deltas on both axes;
+// a mouse wheel is a big notch on one. All three reached the same handler
+// and only one of them worked - pinch did nothing at all on a laptop, and
+// two-finger panning did nothing after that was fixed.
+const wheel = (d) => page.evaluate((o) => dispatchEvent(new WheelEvent('wheel', { ...o, cancelable: true })), d);
+const cam = async () => (await probe()).cam;
+
+const c0 = await cam();
+await wheel({ deltaY: -12, ctrlKey: true });
+await wheel({ deltaY: -12, ctrlKey: true });
+await wheel({ deltaY: -12, ctrlKey: true });
+await wheel({ deltaY: -12, ctrlKey: true });
+await wheel({ deltaY: -12, ctrlKey: true });
+await wheel({ deltaY: -12, ctrlKey: true });
+const c1 = await cam();
+check('a trackpad pinch zooms in', c1[2] < c0[2] - .03, `${c0[2].toFixed(2)} -> ${c1[2].toFixed(2)}`);
+
+await wheel({ deltaX: 40, deltaY: 6 });
+const c2 = await cam();
+check('a two-finger drag turns the camera', Math.abs(c2[0] - c1[0]) > .01 && Math.abs(c2[2] - c1[2]) < 1e-9,
+  `${(c2[0] - c1[0]).toFixed(3)} rad, lens held`);
+
+await wheel({ deltaY: 120 });
+const c3 = await cam();
+check('and a mouse wheel still zooms out', c3[2] > c2[2] + .05, `${c2[2].toFixed(2)} -> ${c3[2].toFixed(2)}`);
 
 // A frozen unicorn would make this meaningless - the whole point of the
 // shoot is that the pose changes under the shutter.

@@ -483,11 +483,18 @@ addEventListener('pointermove', (e) => {
     return;
   }
   if (p.d > 24) learnt.aim = 1;
+  // THE UNICORN FOLLOWS THE FINGER. This was the other way round - drag
+  // right, camera pans right, subject slides left - which is how a
+  // viewfinder works and not how a touchscreen does. Everything a phone has
+  // taught anyone about dragging says the thing under your finger comes
+  // with it, and a nine-year-old reaching to nudge the unicorn back into
+  // frame pushed it further out.
+  //
   // Scaled by the field of view, so a long lens aims slowly. Without this,
   // zooming in makes the camera unusably twitchy at exactly the moment
   // precision starts to matter.
-  cam.a -= dx * .0022 * cam.fov;
-  cam.p = Math.max(-.5, Math.min(.6, cam.p - dy * .0022 * cam.fov));
+  cam.a += dx * .0022 * cam.fov;
+  cam.p = Math.max(-.5, Math.min(.6, cam.p + dy * .0022 * cam.fov));
 });
 let gScale = 1;
 const zoomBy = (k) => {
@@ -534,11 +541,11 @@ addEventListener('wheel', (e) => {
     if (cam.fov < 1) learnt.zoom = 1;
     return;
   }
-  // A two-finger drag. Scrolling right moves the world left, which is the
-  // same thing as dragging the canvas left, so the signs are the drag
-  // handler's inverted.
-  cam.a += e.deltaX * .0022 * cam.fov;
-  cam.p = Math.max(-.5, Math.min(.6, cam.p + e.deltaY * .0022 * cam.fov));
+  // A two-finger drag. Scrolling right moves the content left, which is the
+  // same gesture as dragging the canvas left, so the signs are the drag
+  // handler's inverted - and the subject still follows the fingers.
+  cam.a -= e.deltaX * .0022 * cam.fov;
+  cam.p = Math.max(-.5, Math.min(.6, cam.p - e.deltaY * .0022 * cam.fov));
   learnt.aim = 1;
 }, { passive: false });
 

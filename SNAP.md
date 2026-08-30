@@ -1207,6 +1207,20 @@ instants. A flash under a second long, checked at a moment the probe
 calculates for itself, tests the probe's arithmetic about its own clock as
 much as it tests the game.
 
+### The drag was a viewfinder, not a touchscreen
+
+Asked as a question — *shouldn't touch steering be inverted?* — and the
+answer, measured rather than argued, was yes. A 120-pixel drag to the right
+moved the subject **0.68 of a screen to the left**: the camera panned right,
+which is exactly what a tripod head does and the opposite of what every
+touchscreen anyone has ever held does. A child reaching to nudge the unicorn
+back into frame pushed it further out.
+
+The subject follows the finger now, on both axes, and the trackpad's
+two-finger drag keeps the inverted signs that make it the same gesture. The
+probe asserts the convention directly — drag right, `box.cx` goes up — so it
+cannot quietly flip back.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

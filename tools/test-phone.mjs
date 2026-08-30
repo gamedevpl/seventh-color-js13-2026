@@ -114,6 +114,19 @@ await gesture([
 await page.waitForTimeout(250);
 check('an aiming drag spends no film', await film() === f0, `${await film()} of ${f0}`);
 
+// THE SUBJECT FOLLOWS THE FINGER, which is the one thing every touchscreen
+// has taught everyone who has ever held one. It used to work like a
+// viewfinder - drag right, subject slides left - so a child reaching to
+// nudge the unicorn back into frame pushed it further out.
+const at = async () => (await page.evaluate(() => SNAPSHOT().box.cx));
+const x0 = await at();
+await gesture([
+  ['pointerdown', 1, 150, 400], ['pointermove', 1, 190, 400],
+  ['pointermove', 1, 230, 400], ['pointermove', 1, 270, 400], ['pointerup', 1, 270, 400],
+]);
+const x1 = await at();
+check('dragging right takes the subject right', x1 > x0 + .05, `${x0.toFixed(2)} -> ${x1.toFixed(2)}`);
+
 await gesture([['pointerdown', 1, 200, 400], ['pointerup', 1, 201, 401]]);
 await page.waitForTimeout(450);
 check('a tap takes the picture', await film() === f0 - 1, `${await film()} of ${f0}`);

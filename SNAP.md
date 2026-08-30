@@ -683,6 +683,20 @@ built around was the one control a trackpad could not reliably use. Its ring
 turns green when both gauges are, which makes the button itself the last
 piece of feedback before the shutter.
 
+### The harness got a guard
+
+The balance probe reads and drives the DEV hooks, which a shipping build
+compiles out entirely. Run against one, its first evaluate died with
+`SNAPSHOT is not a function` and said nothing about why — twice, in this
+pass alone, both times because a packed build had just been made in the same
+directory. It now checks for the hooks up front and names the fix, and
+`npm run snap:balance` builds the right thing first. A footgun that fires
+twice is a tooling defect, not a lapse.
+
+Re-measured with the viewfinder in: **2.57x**, against 2.65x before it —
+unchanged within the run-to-run spread, which is what a HUD ought to do to
+a score.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

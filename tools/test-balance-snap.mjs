@@ -40,9 +40,27 @@ const page = await browser.newPage({ viewport: { width: 900, height: 620 } });
 page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
 
 const probe = () => page.evaluate(() => window.SNAP);
+
+
 const fire = () => page.evaluate(() => window.SNAPFIRE());
 const setCam = (c) => page.evaluate((v) => window.SNAPCAM(...v), c);
 const wait = (ms) => page.waitForTimeout(ms);
+
+// This probe reads and drives the DEV hooks, which a shipping build compiles
+// out entirely. Run against one, the first evaluate dies with "SNAPSHOT is
+// not a function" and says nothing about why - which cost two runs before it
+// was worth a guard.
+async function requireDevBuild() {
+  await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
+  await wait(500);
+  if (await page.evaluate(() => typeof window.SNAPSHOT !== 'function')) {
+    console.error('\n  This needs a --cheats build; the packed one has no probes in it.');
+    console.error('  Run: npm run snap:dev\n');
+    await browser.close();
+    process.exit(2);
+  }
+}
+await requireDevBuild();
 
 async function runJob(policy) {
   await page.getByRole('button', { name: 'START THE SHOOT' }).click();

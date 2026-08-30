@@ -139,8 +139,9 @@ budget rather than a hoped-for one.
 | R9c, the diagnostic panel out again | 11,689 | −39 |
 | R10, styling that changes behaviour | 12,153 | 464 |
 | R10b, a contact sheet you can read | 12,203 | 50 |
+| R10c, the same shot twice is worth less | 12,297 | 94 |
 
-**1,109 bytes still in hand.**
+**1,015 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -935,6 +936,59 @@ sees far more of the cove's ceiling than a monitor does, and the light pool
 was centred for a landscape frame, so the upper third of every phone photo
 read as an unlit room rather than a lit backdrop. The pool sits higher now
 and falls off more gently upward than sideways.
+
+## R10c — the same shot six times
+
+Asked directly: *does taking the same shot several times score the same?*
+It did. `scoreShot` saw only the present moment, so six identical
+photographs were worth six times one — and a `samey` policy (aim once, then
+spam one pose from one spot) measured **3,707 against 4,324 for playing
+properly: 86% of the best score for no variety at all**, with the *highest*
+framing of any policy, because a parked camera is the easiest one to keep
+aimed.
+
+A duplicate still earns its **framing**, because you did frame it. What it
+stops earning is the **moment** — the pose, the eye contact, the glitter in
+the air — at 0.68 per repeat. And the escape is the control the game already
+had and barely used: **walk round the set**. Two rears from two sides are two
+photographs, so the check is pose *and* bearing, within half a radian.
+
+### Two rounds of overshoot, both caught by the probe
+
+At 0.55 per repeat, `timed` — waits for good poses, never aims — fell to
+**0.77x, below a policy that shoots at random**. Random shooting is more
+varied by construction, so the harsh rate taught *do not bother waiting*,
+which is the opposite of the lesson. Repetition should cost; patience should
+not.
+
+Softened to 0.68, `framed` still beat `skilled`: with only five showy poses,
+selectivity naturally repeats. That is when it became clear the table was
+missing the policy the rule was built for.
+
+```
+  policy      mean job    worst    best   frame   vs idle
+  idle           1109      771    1560    0.39     1.00x
+  timed          1263      579    1957    0.33     1.14x
+  samey          2950     2379    3478    0.97     2.66x
+  framed         3266     2491    3713    0.90     2.95x
+  skilled        3388     2903    3880    0.91     3.06x
+  dressed        3970     2936    4918    0.95     3.58x
+  roaming        4185     3195    4942    0.93     3.78x
+```
+
+**`roaming` — aim, wait, and walk between frames — comes top at 3.78x**,
+which is the answer the rule wanted: it rewards variety rather than punishing
+selectivity. Dressing to the brief pays. And spamming one shot now takes 70%
+of what playing properly earns, rather than 86%.
+
+### The footgun got a shared guard
+
+Every probe here reads the DEV hooks a shipping build compiles out, and
+pointing one at a packed build kills it several frames in with a stack that
+blames the assertion. That cost three separate debugging detours in this
+session, each time because an `--O1` build had just been written to the same
+directory. `tools/lib/require-dev.mjs` now says so in one line, and every
+probe calls it before its first read.
 
 ## Where it goes next
 

@@ -10,6 +10,7 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright-core';
+import { requireDevBuild } from './lib/require-dev.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const file = path.join(root, 'build', 'snap', 'index.html');
@@ -27,6 +28,8 @@ const BOX = [420, 285, 60, 40];
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
 page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
+
+await requireDevBuild(page, browser, file, pathToFileURL);
 await page.goto(`${pathToFileURL(file).href}?pose=1&cam=0,-0.115,0.5`, { waitUntil: 'load' });
 await page.waitForTimeout(800);
 await page.getByRole('button', { name: 'OPEN THE STUDIO' }).click();

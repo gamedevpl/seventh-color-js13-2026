@@ -11,6 +11,7 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright-core';
+import { requireDevBuild } from './lib/require-dev.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const file = path.join(root, 'build', 'snap', 'index.html');
@@ -33,6 +34,8 @@ const browser = await chromium.launch({
 async function tally(deco, bored) {
   const page = await browser.newPage({ viewport: { width: 900, height: 620 } });
   page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
+
+await requireDevBuild(page, browser, file, pathToFileURL);
   await page.goto(`${pathToFileURL(file).href}?deco=${deco}`, { waitUntil: 'load' });
   await page.waitForTimeout(500);
   await page.getByRole('button', { name: 'OPEN THE STUDIO' }).click();

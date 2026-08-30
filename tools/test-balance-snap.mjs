@@ -14,6 +14,13 @@
 //   timed    default camera, waits for a pose worth having - timing only
 //   skilled  both, in a look chosen for nothing
 //   dressed  skilled, and styled for the brief
+//   samey    aims once, then takes the SAME shot six times
+//   roaming  skilled, and walks the tripod between frames
+//
+// `roaming` is the policy the repetition rule is built for: two rears from
+// two sides are two photographs, and the game already has a control for
+// walking round the set. If it does not come top, the rule is punishing
+// selectivity rather than rewarding variety.
 //
 // `dressed` exists because styling stopped being paint: the look now changes
 // which poses the unicorn offers at all. A mechanic that changes the odds
@@ -25,6 +32,7 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright-core';
+import { requireDevBuild } from './lib/require-dev.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const file = path.join(root, 'build', 'snap', 'index.html');
@@ -52,21 +60,7 @@ const fire = () => page.evaluate(() => window.SNAPFIRE());
 const setCam = (c) => page.evaluate((v) => window.SNAPCAM(...v), c);
 const wait = (ms) => page.waitForTimeout(ms);
 
-// This probe reads and drives the DEV hooks, which a shipping build compiles
-// out entirely. Run against one, the first evaluate dies with "SNAPSHOT is
-// not a function" and says nothing about why - which cost two runs before it
-// was worth a guard.
-async function requireDevBuild() {
-  await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
-  await wait(500);
-  if (await page.evaluate(() => typeof window.SNAPSHOT !== 'function')) {
-    console.error('\n  This needs a --cheats build; the packed one has no probes in it.');
-    console.error('  Run: npm run snap:dev\n');
-    await browser.close();
-    process.exit(2);
-  }
-}
-await requireDevBuild();
+await requireDevBuild(page, browser, file, pathToFileURL);
 
 // The brief changes every job, so the look has to be chosen every job.
 async function dress(policy) {
@@ -112,7 +106,7 @@ async function runJob(policy) {
       const pp = Math.atan2(.95 - EYE_Y, dist);
       const h = s.sh.box.h;
       const f = Math.max(.34, Math.min(1.15, f0 + (f0 * (h > .05 ? 1.15 / h : 2) - f0) * -.3 + 0));
-      await setCam([a, pp, Math.max(.34, Math.min(1.15, f0 * (h > .05 ? h / 1.15 : .6) * .35 + f0 * .65))]);
+      await setCam([a, pp, Math.max(.34, Math.min(1.15, f0 * (h > .05 ? h / 1.15 : .6) * .35 + f0 * .65)), ang]);
     }
 
     // An aiming policy must be ALLOWED to aim. The first cut fired on every
@@ -120,7 +114,11 @@ async function runJob(policy) {
     // never converged - it measured a player who intends to compose and
     // then shoots before finishing, which is nobody.
     let take = !policy.aims || settle >= 9;
-    if (policy.waits) {
+    if (policy.only !== undefined) {
+      // One pose, one camera position, six times: the laziest strategy the
+      // scoring permits. If this wins, the game is asking to be farmed.
+      take = take && (s.p.pose === policy.only || waited > 90);
+    } else if (policy.waits) {
       // Hold out for a pose worth having - but not forever: a real player
       // with two frames left and a bored unicorn takes the shot. Without
       // this the policy stalls and measures patience rather than skill.
@@ -129,6 +127,12 @@ async function runJob(policy) {
     if (take) {
       qs.push(s.sh.q);
       await fire(); shots++; waited = 0; settle = 0; await wait(200);
+      if (policy.roams) {
+        // Step round the cove, then re-aim from the new spot.
+        const c = (await probe()).cam;
+        await setCam([c[0], c[1], c[2], c[3] + .8]);
+        settle = 0;
+      }
     } else { waited++; await wait(75); }
   }
   await wait(1400);
@@ -152,6 +156,8 @@ const POLICIES = [
   { name: 'timed', aims: 0, waits: 1 },
   { name: 'skilled', aims: 1, waits: 1 },
   { name: 'dressed', aims: 1, waits: 1, styles: 1 },
+  { name: 'samey', aims: 1, only: 9 },        // 9 is prancing
+  { name: 'roaming', aims: 1, waits: 1, roams: 1 },
 ];
 
 const results = {};

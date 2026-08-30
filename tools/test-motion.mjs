@@ -16,6 +16,7 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright-core';
+import { requireDevBuild } from './lib/require-dev.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const file = path.join(root, 'build', 'snap', 'index.html');
@@ -26,6 +27,8 @@ const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] })
 const ctx = await browser.newContext({ viewport: { width: 420, height: 780 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
+
+await requireDevBuild(page, browser, file, pathToFileURL);
 
 let bad = 0;
 const check = (name, ok, detail) => {

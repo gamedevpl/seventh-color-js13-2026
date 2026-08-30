@@ -85,8 +85,32 @@ export function eyeContact(P, eye) {
   return fx * dx / l + fy * dy / l + fz * dz / l;
 }
 
-export function scoreShot(P, vp, eye, anim, deco) {
+// `roll` is the frames already taken this job. Without it the scoring knew
+// only the present moment, and six identical photographs were worth six
+// times one - measured at 3,707 against 4,324 for playing properly, or 86%
+// of the best score for parking the camera and spamming one pose. No editor
+// buys the same frame twice.
+//
+// What a duplicate still earns is the FRAMING, because you did frame it.
+// What it stops earning is the moment: the pose, the eye contact, the
+// glitter in the air. And the escape is the one the game already has a
+// control for - walk round the set and shoot it from somewhere else, and it
+// is a different photograph again.
+export function scoreShot(P, vp, eye, anim, deco, roll = []) {
   const b = frameBox(P, vp);
+  const bearing = Math.atan2(eye[0] - P.x, eye[2] - P.z);
+  let seen = 0;
+  for (const f of roll) {
+    if (f.pose !== anim.mode) continue;
+    const d = ((f.bearing - bearing + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    if (Math.abs(d) < .5) seen++;
+  }
+  // 0.68, not 0.55. At the steeper rate a policy that waits for good poses
+  // from one spot fell BELOW one that shot at random - random shooting is
+  // more varied by construction, so the harsher penalty taught "do not
+  // bother waiting", which is the opposite of the lesson. Repetition should
+  // cost; patience should not.
+  const fresh = .68 ** seen;
   const parts = [];
   const add = (name, pts) => { if (pts >= 1) parts.push([name, Math.round(pts)]); };
 
@@ -113,7 +137,8 @@ export function scoreShot(P, vp, eye, anim, deco) {
   // the multiplier. A large flat framing award on top of that is composition
   // counted twice, and it was drowning out the timing.
   add('framing', 170 * q);
-  add(POSE_NAME[anim.mode], (POSE_WORTH[anim.mode] || 40) * (.35 + .65 * q));
+  add(POSE_NAME[anim.mode] + (seen ? ` again (x${seen + 1})` : ''),
+    (POSE_WORTH[anim.mode] || 40) * (.35 + .65 * q) * fresh);
 
   // The rule of thirds, as a bonus rather than a requirement - dead centre
   // is a real choice and should not be scored as a mistake, it just does
@@ -121,15 +146,15 @@ export function scoreShot(P, vp, eye, anim, deco) {
   if (Math.abs(Math.abs(b.cx) - 1 / 3) < .13 && b.inFrac > .95) add('rule of thirds', 120 * q);
 
   const e = eyeContact(P, eye);
-  if (e > .55) add('eye contact', 200 * bell(e, 1, .55) * q);
+  if (e > .55) add('eye contact', 200 * bell(e, 1, .55) * q * fresh);
 
   // Glitter only counts when it is IN THE AIR. Sitting on the coat it is
   // styling; thrown off mid-shake it is the thing that makes the frame.
   if (deco.glitter) {
     const flying = anim.mode === SHAKE ? 1 : .25;
-    add(flying > .5 ? 'glitter in the air' : 'sparkle', 120 * (deco.glitter / 3) * flying * q);
+    add(flying > .5 ? 'glitter in the air' : 'sparkle', 120 * (deco.glitter / 3) * flying * q * fresh);
   }
 
   const total = parts.reduce((a, p) => a + p[1], 0);
-  return { total, parts, box: b, pose: anim.mode, eye: e, q };
+  return { total, parts, box: b, pose: anim.mode, eye: e, q, fresh, bearing };
 }

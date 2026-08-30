@@ -684,7 +684,7 @@ function frame(now) {
       phase, film, round, best: best && best.total, seasonPts, lastJob, brief,
       cam: [cam.a, cam.p, cam.fov, cam.ang], sub: [P.x, P.z],
     };
-    window.SNAPSHOT = () => scoreShot(P, vp, eye, anim, deco);
+    window.SNAPSHOT = () => scoreShot(P, vp, eye, anim, deco, roll);
     // The balance policies drive the game through these rather than through
     // synthetic input events: what is being measured is a way of PLAYING,
     // and routing it through keyboard timing would measure the harness.
@@ -715,12 +715,12 @@ function takeShot() {
   poke(A);
   shutter();
   flashT = 1;
-  const s = scoreShot(P, vp, eye, anim, deco);
+  const s = scoreShot(P, vp, eye, anim, deco, roll);
   // Scaled by the frame like everything else: a badly composed photograph of
   // the pose they asked for is still a badly composed photograph, and paying
   // it in full would let a player ignore the lens and just wait.
   if (s.pose === brief.pose) {
-    const bp = Math.round(POSE_BONUS * s.q);
+    const bp = Math.round(POSE_BONUS * s.q * s.fresh);
     s.parts.push(['the pose they asked for', bp]);
     s.total += bp;
     onBrief++;

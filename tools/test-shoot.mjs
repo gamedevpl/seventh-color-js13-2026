@@ -10,6 +10,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright-core';
+import { requireDevBuild } from './lib/require-dev.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const file = path.join(root, 'build', 'snap', 'index.html');
@@ -19,6 +20,8 @@ if (out) mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 900, height: 620 } });
 page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
+
+await requireDevBuild(page, browser, file, pathToFileURL);
 await page.goto(pathToFileURL(file).href, { waitUntil: 'load' });
 await page.waitForTimeout(700);
 if (out) await page.screenshot({ path: path.join(out, '0-title.png') });

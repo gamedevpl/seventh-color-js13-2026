@@ -1286,6 +1286,9 @@ The first measurement, every pose:
 ```
 
 **A seventh of the hair was inside the animal, the worst of it 20 cm in.**
+(That first table, and the zero it eventually reached, were both measured
+through a broken `?pose=` — see *R16* — so they are eleven readings of a
+*standing* unicorn. The moving poses were still wrong, and nobody knew.)
 The collider was two spheres — one skull, one neck — and the barrel had
 none at all, so the crest fell through the withers and the tail hung inside
 the rump.
@@ -1384,6 +1387,29 @@ base weights of the showy poses so a plain unicorn genuinely offers fewer of
 them - but that makes the game duller for a child who just wants to point
 the camera, which is exactly the player this round was for. Left as it is,
 deliberately.
+
+### The correction: that zero was eleven readings of the same pose
+
+Fixing `?pose=` immediately falsified the claim made one round earlier.
+R15's hair probe reported zero points inside the unicorn in all eleven
+poses; with the query working, the same probe on the same code found the
+hair inside the animal in **five of them** — every pose that moves. The
+earlier zero was true and useless: it was the idle pose, measured eleven
+times.
+
+Two guesses were tried against the new numbers and both were wrong. A
+second solver pass, on the theory that pushing a point out of the body and
+then constraining the next one was a convergence problem: **no change**. Leg
+colliders, on the theory that the tail was catching a hind leg: **no
+change**. Then the probe was asked *which box* the strays were in, which
+took a minute and answered it completely — every stray point, in every pose,
+was in the **muzzle**. The forelock falls forward off the poll and straight
+through the nose.
+
+One more collider, and it is zero across all fourteen poses. The leg hulls
+came back out for changing nothing; the second pass stayed, having earned
+its keep on exactly one case — the 21 Hz shimmy of a shake, where it was the
+difference between one strand through the shoulder and none.
 
 ### The probe that had stopped being a probe
 

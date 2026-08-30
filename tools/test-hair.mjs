@@ -14,7 +14,7 @@ import { requireDevBuild } from './lib/require-dev.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const file = path.join(root, 'build', 'snap', 'index.html');
-const NAMES = ['graze', 'idle', 'walk', 'trot', 'gallop', 'rear', 'toss', 'shake', 'sleep', 'prance', 'bow'];
+const NAMES = ['graze', 'idle', 'walk', 'trot', 'gallop', 'rear', 'toss', 'shake', 'sleep', 'prance', 'bow', 'jump', 'buck', 'spin'];
 // Hair may grow out of the skin, so a point is only INSIDE if it is this
 // far past the surface on every axis at once. Below that it is a strand
 // lying against the animal, which is what hair does.

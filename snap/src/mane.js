@@ -66,8 +66,14 @@ const HULL = [
   [1, 0, .12, .02, .12, .17, .14],      // neck, lower
   [1, 0, .34, .12, .105, .15, .125],    // neck, upper
   [2, 0, .02, .14, .14, .13, .20],      // skull
+  // The MUZZLE, which is where every remaining penetration turned out to
+  // be: the forelock falls forward off the poll and straight through the
+  // nose. Found by asking the probe which box the points were in rather
+  // than by guessing at more of them - the guesses before this one, the
+  // legs included, changed nothing at all.
+  [2, 0, -.07, .38, .095, .085, .11],   // muzzle
+  [3, 0, -.06, -.10, .06, .07, .11],    // the dock the tail grows out of
 ];
-
 const xf = (m, p) => [
   m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
   m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
@@ -159,7 +165,18 @@ export function updateMane(M, W, t, dt) {
       s.q[i] = [p[0], p[1], p[2]];
       s.p[i] = [nx, ny, nz];
     }
-    // follow-the-leader: one pass, exact lengths, no stretch
+    // Follow-the-leader - exact lengths, no stretch - with each point
+    // pushed out of the animal immediately after its own length is set.
+    //
+    // TWICE. A second pass and a set of leg colliders were both tried when
+    // the moving poses were still failing, on the theory that this was a
+    // convergence problem. It was not: asking the probe WHICH box the
+    // strays were in answered it in a minute - every one of them, in every
+    // pose, was in the muzzle. The leg colliders went back out again for
+    // changing nothing; the second pass earned its keep on exactly one
+    // case, the 21 Hz shimmy of a shake, and one visible strand through the
+    // shoulder is one too many.
+    for (let pass = 0; pass < 2; pass++)
     for (let i = 1; i < L; i++) {
       const a = s.p[i - 1], b = s.p[i];
       let dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];

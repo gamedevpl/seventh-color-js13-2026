@@ -115,7 +115,19 @@ export function verdict(s) {
   if (b.h < .62) return [0, 'too far away'];
   if (b.h > 1.95) return [0, 'too close in'];
   if (s.fresh < .7) return [0, 'the same shot again'];
-  if ((POSE_WORTH[s.pose] || 40) < 80) return [0, 'nothing much happening'];
+  // NAME THE THING IT IS DOING. "Nothing much happening" was fair as
+  // arithmetic and useless as feedback: it was said over a close, well
+  // framed photograph of a unicorn that had lain down and gone to sleep,
+  // and it read as the game not looking at the picture. Sleep gets its own
+  // line because it is the game telling you it is bored, and the fix is a
+  // control the player already has - the flash wakes it up.
+  if ((POSE_WORTH[s.pose] || 40) < 80) {
+    // By the time we are here the crop and the distance have already
+    // passed, so the player got the hard half right and should be told so -
+    // a bare thumbs-down on a well composed picture reads as the game not
+    // having looked at it.
+    return [0, s.pose === SLEEP ? 'fast asleep - flash it awake' : 'nice frame - only ' + POSE_NAME[s.pose]];
+  }
   if (s.glitAir) return [1, 'glitter everywhere'];
   if (s.eye > .82) return [1, 'looking right at you'];
   return [1, POSE_NAME[s.pose] + '!'];

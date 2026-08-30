@@ -1247,6 +1247,23 @@ it reads as counting up rather than jumping, and the `+N` sits high enough
 to miss both the coaching line and the subject — it landed on both in the
 first cut.
 
+### "How is nothing much happening?"
+
+Asked over a close, well composed photograph of a unicorn that had lain
+down and gone to sleep. The arithmetic was right — sleep is worth 25 — and
+the sentence was useless: it read as the game not having looked at the
+picture at all.
+
+Two fixes, both about what the words are for. **The pose gets named**, so a
+thumbs-down says *only standing* or *only grazing* rather than a shrug. And
+because the faults are checked worst-first, anything reaching that line has
+already passed the crop and the distance — the player got the hard half
+right, so the line says so: *nice frame — only standing*.
+
+Sleep keeps its own line, because it is not a dull pose like the others: it
+is the game saying it is bored, and the fix is a control the player already
+has. *Fast asleep — flash it awake.*
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

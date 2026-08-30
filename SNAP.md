@@ -1579,6 +1579,27 @@ signature of paper. Every bit of that spread was the per-strand tint and not
 one level of it was the light. It reads 47 mean now, and 74 at the angle
 where the highlight lands.
 
+### Still tubes: the fault was the width, not the shading
+
+*"Ciągle wygląda jak dmuchańce/rurki."* And the honest reading of that is
+that the last two rounds of work made it worse in one specific way: a
+ribbon 13 cm across, smoothly shaded edge to edge with a highlight down the
+middle, is the exact recipe for a rounded plastic tube. Every improvement to
+the shading made the tube more convincing.
+
+**Hair does not read as volume. It reads as count.** Many thin pieces with
+hard edges between them, not few fat ones with a gradient.
+
+So each solved chain now carries **three thin ribbons** instead of one wide
+one — 3 cm across, spaced 4 cm apart, each a shade off its siblings so the
+seam between them is visible. Splitting at the drawing stage rather than
+adding roots keeps the solver's work identical (one chain still swings,
+three ribbons ride it) and costs geometry rather than bytes, which is the
+resource this game has left.
+
+The shine probe holds through the change: 44 mean, 64 at the best angle,
+against the flat 18.
+
 ### And a gate that had been quietly diluted
 
 The suite caught something the hair work had nothing to do with: a bored

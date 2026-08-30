@@ -1430,7 +1430,7 @@ numerically: the first cut had the sign inverted and swung both hind legs
 forward under the belly. Backward is positive, and a bone above the root
 inherits the root's pitch.
 
-## R17 — a statue on a turntable, and a floor mark that shouted
+## R17 — a statue on a turntable, a loud floor mark, and an argument between two boxes
 
 Two from a play session, both about things being noticed that should not
 have been noticeable.
@@ -1446,6 +1446,27 @@ heading, and the roaming leash steers only when there are feet under it.
 `test-shoot` samples pose and heading together for seven seconds and fails
 on any drift at all while the hooves are planted. Measured: 0.000 rad over
 25 planted samples.
+
+### And the hair was back inside, for a third reason
+
+The suite caught a shake with one strand 4.1 cm inside the animal, so the
+probe was asked again which box - and this time the answer was *the chest,
+and the barrel, and the legs, and the base of the horn*, across a fifth of
+the frames of that pose.
+
+The body being **three** hulls was the problem. A point pushed out through
+the chest's nearest face lands inside the barrel; the next pass pushes it
+back into the chest; a 21 Hz shimmy catches it mid-argument. Their union is
+barely bigger than the barrel alone - a barrel is most of a horse - so the
+body is one box now and the oscillation has nowhere to happen.
+
+The legs went back in at the same time. They were guessed in once, measured
+out again when the only strays left were in the muzzle, and measured back in
+when the shake - which swings the whole body over its feet - turned out to
+bury the tail in a hind leg. Guessing put them in and out; the probe decided
+it.
+
+Zero points inside, all fourteen poses, three runs.
 
 ### The floor mark read as gaffer tape
 

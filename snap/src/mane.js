@@ -60,20 +60,30 @@ const GROUPS = [
 // against, which is why the probe can be trusted to notice if these numbers
 // ever drift away from uni.js.
 const HULL = [
-  [0, 0, 0, .30, .23, .20, .45],        // barrel
-  [0, 0, .02, -.10, .22, .19, .15],     // rump
-  [0, 0, -.03, .74, .21, .18, .14],     // chest
+  // ONE BOX FOR THE BODY, not three. Barrel, rump and chest as separate
+  // hulls oscillated: a point pushed out through the chest's nearest face
+  // landed inside the barrel, the next pass pushed it back into the chest,
+  // and the shake - a 21 Hz shimmy - caught it mid-argument often enough
+  // for the probe to see hair inside the animal in a fifth of its frames.
+  // Their union is barely larger than the barrel alone, because the barrel
+  // is most of a horse.
+  [0, 0, 0, .315, .23, .21, .565],      // barrel, rump and chest together
   [1, 0, .12, .02, .12, .17, .14],      // neck, lower
   [1, 0, .34, .12, .105, .15, .125],    // neck, upper
   [2, 0, .02, .14, .14, .13, .20],      // skull
-  // The MUZZLE, which is where every remaining penetration turned out to
-  // be: the forelock falls forward off the poll and straight through the
-  // nose. Found by asking the probe which box the points were in rather
-  // than by guessing at more of them - the guesses before this one, the
-  // legs included, changed nothing at all.
   [2, 0, -.07, .38, .095, .085, .11],   // muzzle
+  [2, 0, .18, .18, .045, .08, .045],    // the base of the horn
   [3, 0, -.06, -.10, .06, .07, .11],    // the dock the tail grows out of
 ];
+// The legs. Left out of the first cut, then measured out again when the
+// only strays left were in the muzzle - and measured back IN when the
+// shake, which swings the whole body over its feet, turned out to bury the
+// tail in a hind leg. Guessing put them in twice; the probe decided it.
+const LEGS = [];
+for (const b of [4, 6, 8, 10]) {
+  LEGS.push([b, 0, -.12, 0, .07, .13, .075], [b + 1, 0, -.10, 0, .05, .11, .055]);
+}
+
 const xf = (m, p) => [
   m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
   m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
@@ -122,7 +132,7 @@ export function recolour(M, deco, g, c) {
 
 export function updateMane(M, W, t, dt) {
   M.wind = Math.sin(t * .9) * .5 + Math.sin(t * 2.3) * .25;
-  const hulls = HULL.map(([b, ...h]) => [W[b], h]);
+  const hulls = [...HULL, ...LEGS].map(([b, ...h]) => [W[b], h]);
 
   for (const s of M.strands) {
     const g = GROUPS[s.g], m = W[g.bone];

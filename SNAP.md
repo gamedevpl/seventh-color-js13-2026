@@ -130,8 +130,9 @@ budget rather than a hoped-for one.
 | R2, the studio and its shadow | 5,725 | 341 |
 | R3, the track and the bow | 6,498 | 773 |
 | R4, styling and glitter | 7,797 | 1,299 |
+| R5, the shoot, the brief and the season | 9,799 | 2,002 |
 
-**5,515 bytes still in hand** for the shoot, the brief and the end game.
+**3,513 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -371,18 +372,125 @@ The thresholds are **relative** throughout — rose must lead blue by more
 than the bare coat did — because an absolute one would be a test of the
 studio lighting rather than of the paint.
 
+## R5 — the game
+
+Three phases in a loop. Take a commission and **style** the unicorn for it,
+**shoot** it while it works the set, then look at what you got. Six frames a
+job, three jobs a season.
+
+### The unicorn works the set
+
+A weighted table, not a state graph. A graph would let poses lead into each
+other, which sounds better and plays worse: what a photographer needs is
+that a big pose can arrive *at any moment*, not that it is reachable only
+from standing. The showy four are rare **and** brief — the same lever pulled
+twice, so a rearing unicorn is worth catching because it is worth points and
+because you might miss it. Eye contact comes and goes on its own clock,
+because a unicorn that stared down the lens forever would make the best shot
+in the game free.
+
+It only performs during the shoot. On the bench it stands still, so the
+player can see what they are painting.
+
+### Nothing here reads a pixel
+
+The score grades the **state of the world at the moment of the shutter**,
+projected onto the screen — which is what Pokémon Snap did, and it is why
+this is tractable at all. Every term already exists in the simulation.
+
+Two of the terms are worth defending:
+
+- **Cropping is punished on the square** of what made the frame, so losing a
+  quarter of the animal costs far more than a quarter of the marks. A
+  photograph missing its subject's head is not three-quarters of a
+  photograph.
+- **Size is judged on height, not area.** A rearing unicorn is tall and
+  narrow, a grazing one is long and low, and an area rule would quietly
+  prefer whichever poses happen to be wide — rewarding a shape when it meant
+  to reward a distance.
+
+The rule of thirds is a **bonus, not a requirement**: dead centre is a real
+choice and should not score as a mistake, it just does not earn this.
+
+Every term is named, because the result screen has to say *why*. A number
+alone teaches nothing; `mane toss +200, eye contact +150` teaches a player
+what to point at next time.
+
+### The brief
+
+Without one, the score would have to judge taste — and it cannot, so it
+would end up judging nothing and the styling would be a dress-up screen
+bolted to the side of a photo game. A commission asks for warm or cool
+colours, a glitter level and a pose to catch, which makes every swatch a
+decision with an answer.
+
+Matching is **graded, not pass/fail**: a warm-ish coat under a warm brief is
+worth something, or the palette collapses to one right answer per job and
+there is nothing left to choose. Warmth is read off the colours themselves,
+so the brief cannot be broken by editing the palette.
+
+### The photograph is a photograph
+
+The shutter captures the canvas to a JPEG data URL and the result screen
+shows it. It costs almost nothing and it is most of what makes this feel
+like a camera rather than a scoreboard.
+
+The capture has to happen **after the draw, inside the same frame**:
+`preserveDrawingBuffer` keeps the frame only until the next clear, so a
+capture taken from the input handler grabs a stale buffer. The shutter sets
+a flag; the frame loop takes the picture.
+
+A tap is a shutter and a drag is a camera move, told apart by how far the
+finger travelled. There is no second button to give the shutter on a phone,
+and asking a player to reach for one while the pose they want is happening
+is asking them to miss it.
+
+### The instrument
+
+`tools/test-shoot.mjs` plays a whole season. Almost every failure in this
+layer is **silent** — a phase that never advances, a shutter that fires with
+no film, a photograph that captures an already-cleared buffer and comes back
+black. None of them throw, and all of them look approximately like a working
+game until you read the numbers.
+
+```
+  starts on the styling bench                         phase 0  ok
+  the shoot starts with a full roll                    film 6  ok
+  it works the set on its own                         3 poses  ok
+  a frame scores something                            502 pts  ok
+  the score is itemised                               5 lines  ok
+  six frames end the job                              phase 2  ok
+  the job scored                                      748 pts  ok
+  it kept an actual photograph                          17 KB  ok
+  three jobs make a season                    phase 2 round 2  ok
+```
+
+It earned itself immediately: `endRound` set the phase and built the result
+card but never called `layout()`, so the sheet stayed `display:none`. The
+card existed in the DOM — a query found the photograph inside it — and
+nothing on screen had changed.
+
+The audio probe was rewritten in the same pass, because the music now
+follows the **phase** rather than the pose: the bench plays the bare
+bassline, and the shoot brings in the kit and the hook. Its old assertion
+had quietly stopped describing the game.
+
+| | oscillators | noise |
+| --- | ---: | ---: |
+| the bench | 4.0/s | **0.0/s** |
+| the shoot | **9.0/s** | 4.5/s |
+
 ## Where it goes next
 
-- **The photograph.** Aim, shutter, and a score computed from world state at
-  the moment it fires: framing against the thirds, how much of the frame the
-  unicorn fills, which pose it was caught mid-way through, and eye contact.
-- **The brief.** A commission each round — a palette, a mood, a pose to
-  catch — scored against what the player actually styled and shot. This is
-  what makes the paint a mechanic rather than a dress-up screen: without
-  something asking for a specific look, a score would have to judge taste,
-  which it cannot do honestly.
-- **A unicorn with opinions.** It works the set on its own schedule, and the
-  poses worth having are rare and brief, so the shutter finger has to wait.
-- **The end game.** A season of briefs, then a spread of the best frames.
+- **A title screen**, which the game does not have at all yet — it opens
+  straight onto the bench.
+- **The contact sheet.** All six frames at the end of a job rather than only
+  the best one, so a player can see the near misses they took.
+- **A unicorn with moods.** It performs on a fixed table; it should play up
+  to a player who is styling it well and sulk at one who is not.
+- **Tuning against measurement.** The balance question here is the one
+  Rainbow Surfer asked with `--idle`: can a player who never aims score
+  nearly as well as one who does? Until a probe answers that, the numbers in
+  `score.js` are guesses that happen to look reasonable.
 - **The music.** A strutting catwalk vamp — the joke the idea was born with,
   written rather than borrowed.

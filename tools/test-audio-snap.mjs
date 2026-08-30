@@ -53,24 +53,22 @@ check('silent before any gesture', before.osc === 0 && before.buf === 0,
   `${before.osc} osc, ${before.buf} noise`);
 check('no context before any gesture', !before.state, String(before.state));
 
-await page.keyboard.press('Digit1');
+// The styling bench runs the bare version - the bassline and nothing else -
+// so that the full track ARRIVES when the shoot starts. That arrival is a
+// musical event, and an event that is only a volume change is not one.
+await page.getByRole('button', { name: 'MANE' }).click();
 await page.waitForTimeout(500);
 const [o1, b1, s1] = await rate(2000);
 check('context running after a press', s1 === 'running', String(s1));
-// The bassline is every other sixteenth at 116 bpm - 3.87 a second - and the
-// hats and claps are noise, so the two streams are counted apart. A drop in
-// either is a piece of the track that has quietly stopped.
-check('bass and hook are sounding', o1 > 3, `${o1.toFixed(1)}/s`);
-check('drums are sounding', b1 > 3, `${b1.toFixed(1)}/s`);
+// The bassline is every other sixteenth at 116 bpm: 3.87 a second.
+check('the bench plays the bassline', o1 > 3, `${o1.toFixed(1)}/s`);
+check('the bench has no drums', b1 < .5, `${b1.toFixed(1)}/s`);
 
-// The hook is gated on intensity, so a pose worth photographing has to be
-// audibly bigger than one that is not. Measured rather than asserted from
-// the source, because the gate is a number in a call site and call sites
-// drift.
-await page.keyboard.press('Digit9');
-await page.waitForTimeout(400);
-const [o9] = await rate(2000);
-check('the hook comes in on a big pose', o9 > o1 * 1.15, `${o1.toFixed(1)} -> ${o9.toFixed(1)}/s`);
+await page.getByRole('button', { name: 'START THE SHOOT' }).click();
+await page.waitForTimeout(500);
+const [o2, b2] = await rate(2000);
+check('the shoot brings the kit in', b2 > 3, `${b1.toFixed(1)} -> ${b2.toFixed(1)}/s`);
+check('the shoot brings the hook in', o2 > o1 * 1.3, `${o1.toFixed(1)} -> ${o2.toFixed(1)}/s`);
 
 await browser.close();
 console.log('');

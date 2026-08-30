@@ -10,7 +10,7 @@
 // at all. A boxy unicorn loses nothing by having rigid limbs, and skinning
 // would cost both bytes and a per-frame rebuild of every vertex.
 
-import { pushBox, createMesh, mul } from './gl.js';
+import { pushBox, createMesh, updateMesh, mul } from './gl.js';
 
 export const RAINBOW = [
   [.79, .32, .31], [.85, .54, .29], [.85, .76, .31], [.49, .71, .42],
@@ -19,7 +19,7 @@ export const RAINBOW = [
 
 const W = [.93, .91, .88];        // moonlit white
 const D = [.82, .80, .78];        // shaded white, for limbs
-const HOOF = [.34, .30, .40];
+const HOOFC = [.34, .30, .40];
 const GOLD = [.91, .77, .41];
 
 // --- the rig -------------------------------------------------------------
@@ -49,67 +49,82 @@ export const BONES = [
 
 export const NB = BONES.length;
 
-// --- meshes, one per bone ------------------------------------------------
-function bodyMesh() {
-  const v = [];
-  pushBox(v, 0, 0, .30, .46, .40, .90, ...W);        // barrel
-  pushBox(v, 0, .02, -.10, .44, .38, .30, ...W);     // rump
-  pushBox(v, 0, -.03, .74, .42, .36, .28, ...W);     // chest
-  return createMesh(v);
-}
+// --- meshes ---------------------------------------------------------------
+// SIX meshes, not twelve: the four legs are the same two boxes drawn through
+// four different matrices, so they share their geometry - and, usefully,
+// their paint. A player who dyes the hooves dyes all four at once, which is
+// what they meant.
+const MESH_OF = [0, 1, 2, 3, 4, 5, 4, 5, 4, 5, 4, 5];
 
-function neckMesh() {
-  const v = [];
-  // Rising and leaning forward: a vertical neck reads as a fencepost.
-  pushBox(v, 0, .12, .02, .24, .34, .28, ...W);
-  pushBox(v, 0, .34, .12, .21, .30, .25, ...W);
-  return createMesh(v);
-}
+// Zones are recorded as vertex RANGES while the meshes are built, so paint
+// is a rewrite of a slice of an existing buffer rather than a rebuild. The
+// alternative - regenerating meshes on every colour change - allocates a
+// fresh GL buffer per stroke and leaks the old one unless it is tracked
+// anyway, which is the same bookkeeping for more work.
+export const COAT = 0, HORN = 1, HOOF = 2;
 
-function headMesh() {
-  const v = [];
-  pushBox(v, 0, .02, .14, .28, .26, .40, ...W);      // skull
-  pushBox(v, 0, -.07, .38, .19, .17, .22, ...W);     // muzzle
-  pushBox(v, 0, -.14, .46, .17, .06, .12, .74, .62, .66); // nose
-  // The horn tapers over three shrinking segments - one box reads as a
-  // spike, and the spiral is what makes it a unicorn rather than a horse.
-  pushBox(v, 0, .18, .18, .09, .16, .09, ...GOLD);
-  pushBox(v, 0, .30, .22, .06, .13, .06, ...GOLD);
-  pushBox(v, 0, .39, .25, .035, .10, .035, .97, .88, .60);
-  pushBox(v, -.10, .19, -.02, .07, .17, .06, ...W);  // ears
-  pushBox(v, .10, .19, -.02, .07, .17, .06, ...W);
-  pushBox(v, -.145, .05, .22, .04, .07, .07, .14, .11, .18); // eyes
-  pushBox(v, .145, .05, .22, .04, .07, .07, .14, .11, .18);
-  return createMesh(v);
-}
-
-function tailMesh() {
-  const v = [];
-  // The dock only; the hair itself is strands (mane.js), like the crest.
-  pushBox(v, 0, -.06, -.10, .12, .14, .22, ...W);
-  return createMesh(v);
-}
-
-function upperLegMesh() {
-  const v = [];
-  pushBox(v, 0, -.12, 0, .14, .26, .15, ...D);
-  return createMesh(v);
-}
-
-function lowerLegMesh() {
-  const v = [];
-  pushBox(v, 0, -.10, 0, .10, .22, .11, ...D);
-  pushBox(v, 0, -.22, .01, .12, .07, .14, ...HOOF);
-  return createMesh(v);
-}
-
-// Built once per round. Legs share two meshes between all four limbs -
-// they are the same box, only their matrices differ.
 export function buildUnicorn() {
-  const up = upperLegMesh(), lo = lowerLegMesh();
-  const m = [bodyMesh(), neckMesh(), headMesh(), tailMesh()];
-  for (let i = 0; i < 4; i++) m.push(up, lo);
-  return m;
+  const arrs = [], zones = [[], [], []];
+  let cur = null, ci = -1;
+  const open = () => { cur = []; ci = arrs.length; arrs.push(cur); };
+  const box = (zone, ...a) => {
+    const s = cur.length;
+    pushBox(cur, ...a);
+    if (zone >= 0) zones[zone].push([ci, s, cur.length]);
+  };
+
+  open();                                            // 0 body
+  box(COAT, 0, 0, .30, .46, .40, .90, ...W);         // barrel
+  box(COAT, 0, .02, -.10, .44, .38, .30, ...W);      // rump
+  box(COAT, 0, -.03, .74, .42, .36, .28, ...W);      // chest
+
+  open();                                            // 1 neck
+  box(COAT, 0, .12, .02, .24, .34, .28, ...W);
+  box(COAT, 0, .34, .12, .21, .30, .25, ...W);
+
+  open();                                            // 2 head
+  box(COAT, 0, .02, .14, .28, .26, .40, ...W);       // skull
+  box(COAT, 0, -.07, .38, .19, .17, .22, ...W);      // muzzle
+  box(-1, 0, -.14, .46, .17, .06, .12, .74, .62, .66); // nose stays a nose
+  // The horn tapers over three shrinking segments - one box reads as a
+  // spike, and the taper is what makes it a unicorn rather than a horse.
+  box(HORN, 0, .18, .18, .09, .16, .09, ...GOLD);
+  box(HORN, 0, .30, .22, .06, .13, .06, ...GOLD);
+  box(HORN, 0, .39, .25, .035, .10, .035, ...GOLD);
+  box(COAT, -.10, .19, -.02, .07, .17, .06, ...W);   // ears
+  box(COAT, .10, .19, -.02, .07, .17, .06, ...W);
+  box(-1, -.145, .05, .22, .04, .07, .07, .14, .11, .18); // eyes
+  box(-1, .145, .05, .22, .04, .07, .07, .14, .11, .18);
+
+  open();                                            // 3 tail dock
+  box(COAT, 0, -.06, -.10, .12, .14, .22, ...W);
+
+  open();                                            // 4 upper leg
+  box(COAT, 0, -.12, 0, .14, .26, .15, ...D);
+
+  open();                                            // 5 lower leg
+  box(COAT, 0, -.10, 0, .10, .22, .11, ...D);
+  box(HOOF, 0, -.22, .01, .12, .07, .14, ...HOOFC);
+
+  const meshes = arrs.map((v) => createMesh(v, true));
+  return { arrs, zones, meshes, parts: MESH_OF.map((i) => meshes[i]), dirty: [] };
+}
+
+// Recolour a zone. Only the three colour floats of each vertex in the zone's
+// ranges are touched; position and normal are left exactly as built.
+export function paint(U, zone, rgb) {
+  for (const [mi, a, b] of U.zones[zone]) {
+    const v = U.arrs[mi];
+    for (let i = a; i < b; i += 10) { v[i + 6] = rgb[0]; v[i + 7] = rgb[1]; v[i + 8] = rgb[2]; }
+    U.dirty[mi] = 1;
+  }
+}
+
+// Re-upload only what changed, once, after any number of strokes.
+export function flushPaint(U) {
+  for (let i = 0; i < U.arrs.length; i++) {
+    if (U.dirty[i]) { updateMesh(U.meshes[i], U.arrs[i]); U.dirty[i] = 0; }
+  }
 }
 
 // --- posing --------------------------------------------------------------

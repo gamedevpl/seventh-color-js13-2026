@@ -129,8 +129,9 @@ budget rather than a hoped-for one.
 | R1, the rig | 5,384 | — |
 | R2, the studio and its shadow | 5,725 | 341 |
 | R3, the track and the bow | 6,498 | 773 |
+| R4, styling and glitter | 7,797 | 1,299 |
 
-**6,814 bytes still in hand.**
+**5,515 bytes still in hand** for the shoot, the brief and the end game.
 
 ## R2 — the studio
 
@@ -295,14 +296,93 @@ a trick. Two details it needed:
   4 mm crack running across the floor — faint, dotted, and unmistakable
   once seen.
 
+## R4 — the styling bench
+
+The daughter's other idea, and the one that turns a photo toy into a game:
+**you dress the unicorn before you shoot it.** Paint on five zones — mane,
+tail, coat, horn, hooves — plus glitter.
+
+### Paint is a rewrite, not a rebuild
+
+Zones are recorded as vertex **ranges** while the meshes are built, so a
+stroke rewrites three floats per vertex in a slice of an existing buffer.
+Regenerating meshes per colour change would allocate a fresh GL buffer per
+stroke and leak the old one unless tracked — the same bookkeeping, for more
+work.
+
+It also fell out that the rig only needs **six** meshes, not twelve: the four
+legs are the same two boxes drawn through four matrices, so they share their
+geometry and, usefully, their paint. Dyeing the hooves dyes all four, which
+is what the player meant.
+
+### A palette, not a colour wheel
+
+A wheel is more expressive and much worse here. The brief has to ask for
+something specific and the score has to say whether it got it, and both are
+far easier to make honest against eight swatches than against a continuum
+nobody can hit twice. Warmth is derived from the colour itself rather than
+from a swatch number, so changing the palette cannot silently break a brief.
+
+The rainbow swatch belongs to hair only — a rainbow coat is a different game
+and a rainbow hoof is a mess.
+
+### The UI is DOM
+
+Buttons arrive with hit-testing, text layout, wrapping and touch handling
+already written. In a 13 KB budget those are precisely the things not worth
+writing twice.
+
+### Glitter
+
+Motes live in **bone-local space**, so they ride the pose for free: a rearing
+unicorn's glitter rears with it and nothing is re-scattered when it moves.
+Scattered once from a fixed seed, so the same unicorn always sparkles in the
+same places and a photograph is reproducible.
+
+The shake-off is closed form rather than integrated — each mote travels
+along its own direction by an amount that rises and falls, with a droop
+under it. No per-mote state to keep, nothing that can drift out of step with
+the pose, and at the speed a shake happens the eye cannot tell.
+
+Two goes at the look. The first made them squares of white stuck to the
+coat: a sparkle is a **point that blows out**, and the blow-out has to come
+from brightness rather than from area. Halving the quads and raising the
+twinkle's exponent from 9 to 14 fixed it.
+
+### The instrument
+
+`tools/test-deco.mjs` reads the framebuffer back over the barrel and asks
+what colour is actually there. Every cheaper way of asking tests the new
+code against itself — the state says rose, the array says rose, the uploader
+says it uploaded, and none of that is evidence that anything is rose on the
+player's screen.
+
+```
+  the coat starts pale                            171,167,162  ok
+  painting the coat rose warms it                 176,101,128  ok
+  painting the coat sky cools it                   77,128,174  ok
+  the rainbow swatch is inert on the coat                 0.0  ok
+  one press puts glitter on the coat                114 quads  ok
+  three presses put on more                         468 quads  ok
+  a fourth press brushes it all off                   0 quads  ok
+```
+
+The thresholds are **relative** throughout — rose must lead blue by more
+than the bare coat did — because an absolute one would be a test of the
+studio lighting rather than of the paint.
+
 ## Where it goes next
 
 - **The photograph.** Aim, shutter, and a score computed from world state at
   the moment it fires: framing against the thirds, how much of the frame the
   unicorn fills, which pose it was caught mid-way through, and eye contact.
-- **A unicorn with opinions.** It should work the set on its own schedule —
-  striking poses, getting bored, playing up to the lens when it feels like
-  it. What replaces the meadow's shyness as the source of tension is an open
-  question the next pass has to answer.
+- **The brief.** A commission each round — a palette, a mood, a pose to
+  catch — scored against what the player actually styled and shot. This is
+  what makes the paint a mechanic rather than a dress-up screen: without
+  something asking for a specific look, a score would have to judge taste,
+  which it cannot do honestly.
+- **A unicorn with opinions.** It works the set on its own schedule, and the
+  poses worth having are rare and brief, so the shutter finger has to wait.
+- **The end game.** A season of briefs, then a spread of the best frames.
 - **The music.** A strutting catwalk vamp — the joke the idea was born with,
   written rather than borrowed.

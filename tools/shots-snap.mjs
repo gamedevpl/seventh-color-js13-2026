@@ -16,6 +16,10 @@ const only = process.argv.find((a) => /^--pose=/.test(a))?.split('=')[1];
 // stated moment, so each shot names the time it was taken at.
 const AT = Number(process.argv.find((a) => /^--at=/.test(a))?.split('=')[1] || 1.6);
 const CAM = process.argv.find((a) => /^--cam=/.test(a))?.split('=')[1] || '0.9,0.12,4.6';
+// A whole look as mane,tail,coat,horn,hoof,glitter, so a contact sheet can
+// be taken of a STYLED unicorn rather than only of the default one.
+const DECO = process.argv.find((a) => /^--deco=/.test(a))?.split('=')[1];
+const HIDE = process.argv.includes('--nogui');
 
 mkdirSync(out, { recursive: true });
 const file = path.join(root, 'build', 'snap', 'index.html');
@@ -27,7 +31,8 @@ page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.e
 
 const list = only === undefined ? NAMES.map((_, i) => i) : [Number(only)];
 for (const i of list) {
-  const url = `${pathToFileURL(file).href}?pose=${i}&cam=${CAM}`;
+  const url = `${pathToFileURL(file).href}?pose=${i}&cam=${CAM}`
+    + (DECO ? `&deco=${DECO}` : '') + (HIDE ? '&ui=0' : '');
   await page.goto(url, { waitUntil: 'load' });
   await page.waitForTimeout(AT * 1000);
   await page.screenshot({ path: path.join(out, `${String(i)}-${NAMES[i]}.png`) });

@@ -10,6 +10,7 @@
 // that lag IS the animation.
 
 import { RAINBOW } from './uni.js';
+import { RB, PALETTE } from './deco.js';
 
 const L = 8;                 // points per strand, root included
 const SEG = .095;            // rest length between them
@@ -64,6 +65,7 @@ export function makeMane() {
         g: gi, r,
         // rainbow across the whole head of hair, not per group, so the
         // crest reads as one spectrum rather than three short ones
+        i: strands.length,
         c: RAINBOW[strands.length % 7],
         p: Array.from({ length: L }, () => [0, 0, 0]),
         q: Array.from({ length: L }, () => [0, 0, 0]),
@@ -72,6 +74,16 @@ export function makeMane() {
     });
   });
   return { strands, wind: 0 };
+}
+
+// Mane and forelock take one choice, the tail another - they are the two
+// things a player thinks of as separate, and groups 0 and 1 are both hair
+// on the head. A slot of RB means leave it the unicorn's own spectrum.
+export function recolour(M, deco) {
+  for (const s of M.strands) {
+    const pick = s.g === 2 ? deco.tail : deco.mane;
+    s.c = pick === RB ? RAINBOW[s.i % 7] : PALETTE[pick];
+  }
 }
 
 export function updateMane(M, W, t, dt) {

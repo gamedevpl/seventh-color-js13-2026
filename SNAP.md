@@ -799,6 +799,27 @@ went.
   switching it off really stops it                    unmoved  ok
 ```
 
+### A temporary panel, because silence has two causes
+
+**Remove before submission.** Pressing WALK currently also shows a
+diagnostic readout.
+
+The reason it exists: a page with no sensor access fails *silently and
+identically to broken code*. In a cross-origin iframe without an
+`allow="gyroscope"` permissions policy the events simply never arrive — no
+error, no refused permission, nothing to catch. From the outside that is
+indistinguishable from a bug, and this pass had already produced a real bug
+with exactly the same symptom, so guessing between the two is not a way to
+spend another round.
+
+The panel prints what actually separates them: whether the page is framed,
+whether `DeviceOrientationEvent` and `requestPermission` exist, what the
+permission call returned (or threw), what `featurePolicy` says about
+`gyroscope` where that non-standard call exists, whether the context is
+secure, and live counts of orientation *and* motion events with the last raw
+reading. `requestPermission: false` with `orient ev: 0` is a policy problem;
+`granted` with `orient ev: 0` is a platform problem; anything else is ours.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

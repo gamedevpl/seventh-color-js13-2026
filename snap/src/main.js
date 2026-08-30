@@ -247,6 +247,7 @@ function layout() {
   vf.style.display = phase === 1 ? 'block' : 'none';
   shutBtn.style.display = phase === 1 ? 'block' : 'none';
   gyroBtn.style.display = phase === 1 && canGyro ? 'block' : 'none';
+  if (phase !== 1) dbg.style.display = 'none';
   const c2 = phase === 1 ? coach() : '';
   hint.textContent = c2;
   hint.style.opacity = c2 ? '1' : '0';
@@ -318,7 +319,39 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
 let gyroBase = null, gyroPrev = 0, gyroSeen = 0, aimOff = 0;
 const canGyro = typeof DeviceOrientationEvent !== 'undefined' && matchMedia('(pointer:coarse)').matches;
 
+// TEMPORARY. Remove before submission - see the note in SNAP.md.
+//
+// A page with no sensor access fails silently and identically to broken
+// code: in a cross-origin iframe without an allow="gyroscope" policy the
+// events simply never arrive, with no error and no refused permission. From
+// the outside that is indistinguishable from a bug, so this panel prints
+// what can actually be told apart.
+let dbgPerm = '-', dbgOri = 0, dbgMot = 0, dbgLast = '-';
+const dbg = el('div', 'position:fixed;right:8px;bottom:80px;pointer-events:none;display:none;'
+  + 'font:600 10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#fff3d6;'
+  + 'background:#000000a8;padding:7px 9px;border-radius:8px;white-space:pre;text-align:left');
+function dbgShow() {
+  let policy = '?';
+  // featurePolicy is non-standard and long deprecated, but where it exists
+  // it answers this exact question directly, and nothing standard does.
+  try { policy = document.featurePolicy ? String(document.featurePolicy.allowsFeature('gyroscope')) : '?'; } catch (e) { policy = '?'; }
+  dbg.textContent = [
+    'in iframe  ' + (self !== top),
+    'DevOrient  ' + (typeof DeviceOrientationEvent !== 'undefined'),
+    'reqPerm    ' + (typeof DeviceOrientationEvent !== 'undefined' && !!DeviceOrientationEvent.requestPermission),
+    'permission ' + dbgPerm,
+    'gyro-allow ' + policy,
+    'secure     ' + isSecureContext,
+    'orient ev  ' + dbgOri,
+    'motion ev  ' + dbgMot,
+    'last       ' + dbgLast,
+  ].join('\n');
+}
+addEventListener('devicemotion', () => { dbgMot++; });
+
 function onOrient(e) {
+  dbgOri++;
+  dbgLast = `a${e.alpha == null ? 'null' : e.alpha.toFixed(0)} b${e.beta == null ? 'null' : e.beta.toFixed(0)} g${e.gamma == null ? 'null' : e.gamma.toFixed(0)}`;
   if (e.alpha == null || !gyroBtn.dataset.on) return;
   gyroSeen = 1;
   const rot = (screen.orientation || {}).angle || 0;
@@ -355,6 +388,7 @@ gyroBtn.onclick = async () => {
   if (gyroBtn.dataset.on) {
     delete gyroBtn.dataset.on;
     gyroBase = null;
+    dbg.style.display = 'none';
     gyroBtn.textContent = 'WALK';
     gyroBtn.style.background = '#0000005e';
     return;
@@ -369,12 +403,16 @@ gyroBtn.onclick = async () => {
   // shipped the first time.
   if (DeviceOrientationEvent.requestPermission) {
     try {
-      if (await DeviceOrientationEvent.requestPermission() !== 'granted') return;
-    } catch (err) { /* denied or unavailable; the check below says so */ }
-  }
+      dbgPerm = await DeviceOrientationEvent.requestPermission();
+      dbgShow();
+      if (dbgPerm !== 'granted') return;
+    } catch (err) { dbgPerm = 'ERR ' + err.message.slice(0, 40); dbgShow(); }
+  } else dbgPerm = 'n/a';
   gyroBtn.dataset.on = '1';
   gyroBase = null;
   gyroSeen = 0;
+  dbg.style.display = 'block';
+  dbgShow();
   gyroBtn.textContent = 'WALKING';
   gyroBtn.style.background = '#c07a12';
   // A button that was pressed and then did nothing is the worst outcome
@@ -632,6 +670,7 @@ function frame(now) {
     onbrief.style.opacity = ob ? '1' : '0';
     if (poseChip) poseChip.style.background = ob ? '#c07a12' : '#0000005e';
     shutBtn.style.borderColor = good ? '#9fe08add' : '#fff3d6cc';
+    if (dbg.style.display === 'block') dbgShow();
   }
   if (flashT > 0) {
     flashT = Math.max(0, flashT - dt * 3.4);

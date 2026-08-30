@@ -15,7 +15,7 @@ const only = process.argv.find((a) => /^--pose=/.test(a))?.split('=')[1];
 // Poses are cyclic; a still of a gait is a lie unless it is taken at a
 // stated moment, so each shot names the time it was taken at.
 const AT = Number(process.argv.find((a) => /^--at=/.test(a))?.split('=')[1] || 1.6);
-const CAM = process.argv.find((a) => /^--cam=/.test(a))?.split('=')[1] || '0.9,0.12,4.6';
+const CAM = process.argv.find((a) => /^--cam=/.test(a))?.split('=')[1] || '0,-0.06,0.8';   // heading, pitch, field of view
 // A whole look as mane,tail,coat,horn,hoof,glitter, so a contact sheet can
 // be taken of a STYLED unicorn rather than only of the default one.
 const DECO = process.argv.find((a) => /^--deco=/.test(a))?.split('=')[1];

@@ -131,8 +131,9 @@ budget rather than a hoped-for one.
 | R3, the track and the bow | 6,498 | 773 |
 | R4, styling and glitter | 7,797 | 1,299 |
 | R5, the shoot, the brief and the season | 9,799 | 2,002 |
+| R6, the tripod, roaming and balance | 10,026 | 227 |
 
-**3,513 bytes still in hand.**
+**3,286 bytes still in hand.**
 
 ## R2 — the studio
 
@@ -480,6 +481,91 @@ had quietly stopped describing the game.
 | the bench | 4.0/s | **0.0/s** |
 | the shoot | **9.0/s** | 4.5/s |
 
+## R6 — making skill worth something
+
+The question was the one Rainbow Surfer asked with `--idle`: **can a player
+who never aims score nearly as well as one who does?** `tools/test-balance-snap.mjs`
+answers it by playing whole jobs under four policies — *idle* (default
+camera, shutter on a timer), *framed* (aims, shoots on a timer), *timed*
+(default camera, waits for a pose worth having) and *skilled* (both) — with
+identical styling, so the one thing being measured is the one thing that
+varies.
+
+The first answer was **1.37x**, and everything below came out of chasing it.
+
+### The camera could not be aimed
+
+The rig was an orbit that always looked at the centre of the set, so
+swinging it barely moved the subject in frame: composition priced at
+**1.12x**, which is what "you cannot actually aim" looks like as a number.
+
+It is a **tripod** now. The lens has its own heading and field of view, the
+tripod walks round the cove, and aim speed scales with the field of view so
+a long lens is not twitchy at exactly the moment precision starts to matter.
+Drag aims, wheel zooms — a photographer's controls, and the whole of the
+skill: hold the subject, fill the frame, wait for the moment.
+
+### The unicorn stayed where it was put
+
+It played its gaits on the spot, so one aim held forever. It walks the set
+now, on a leash rather than against a wall — past its roaming radius it
+steers back toward the middle instead of stopping at an invisible edge.
+
+### Best-of-six was a lottery
+
+A job kept its best frame, so six draws from the pose table almost always
+contained a good one and the shutter was free. **The job is the whole roll
+now**: every frame is summed, so a wasted frame is a wasted frame.
+
+### The frame became a multiplier
+
+Framing was another line item — 200 points for having the subject on screen
+at all, with the pose and the eye contact added on top. So a rear paid the
+same whether it filled the frame or sat in the far distance. It is a
+multiplier on everything now: **a distant, badly composed photograph of a
+rearing unicorn is not a good photograph of a rearing unicorn.**
+
+The flat framing award was cut to 170 in the same pass, because with the
+multiplier in place a large one is composition counted twice — and it was
+drowning out the timing.
+
+### The camera started already composed
+
+Even then, idle framed at **0.69** of a perfect shot without touching
+anything. A camera handed to you already composed is a camera you need not
+use, so it starts at its widest now and you zoom to compose.
+
+### Timing earned nothing
+
+With everything multiplied by the frame, *timed* sat at 1.01x: a player who
+had learned to wait but not to zoom saw no reward at all, which is exactly
+the wrong lesson to give a learner. The pose term keeps a floor —
+`0.35 + 0.65q` — so catching the moment pays something even when the framing
+is poor, and pays properly when it is not.
+
+### Where it landed
+
+```
+  policy      mean job    worst    best   frame   vs idle
+  idle           1348      272    2597    0.29     1.00x
+  framed         2642     1871    3680    0.88     1.96x
+  timed          1800      878    2698    0.36     1.34x
+  skilled        3993     3049    5247    0.97     2.96x
+```
+
+Both skills pay on their own — composition nearly doubles a score, timing
+adds a third — and together they nearly triple it. The gate fails the build
+below **1.6x**, because under that a player who never aims is within a bad
+roll of one who does and the shutter stops being a decision.
+
+`frame` is the composition multiplier at the moment each shutter fired, and
+it is in the report because without it a low score is indistinguishable from
+a broken servo in the harness. It earned that immediately: the first run of
+the aiming policies fired on every iteration, so the servo got about six
+steps across a whole job and never converged — the harness was measuring a
+player who intends to compose and then shoots before finishing, which is
+nobody.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens
@@ -488,9 +574,7 @@ had quietly stopped describing the game.
   the best one, so a player can see the near misses they took.
 - **A unicorn with moods.** It performs on a fixed table; it should play up
   to a player who is styling it well and sulk at one who is not.
-- **Tuning against measurement.** The balance question here is the one
-  Rainbow Surfer asked with `--idle`: can a player who never aims score
-  nearly as well as one who does? Until a probe answers that, the numbers in
-  `score.js` are guesses that happen to look reasonable.
+- **A tutorial that is not a wall of text.** The controls are a
+  photographer's, but nothing on screen says so yet.
 - **The music.** A strutting catwalk vamp — the joke the idea was born with,
   written rather than borrowed.

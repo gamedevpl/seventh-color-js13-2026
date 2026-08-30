@@ -37,7 +37,10 @@ const look = (deco) => {
   return c * .6 + m * .4;
 };
 
-export function briefScore(b, deco, shot) {
+// What the styling earned. Paid ONCE per job, because the styling is fixed
+// for the whole job - awarding it per frame would just scale every score by
+// six and make the paint look far more important than the shooting.
+export function briefStyle(b, deco) {
   const lines = [];
   const add = (n, p) => { if (p >= 1) lines.push([n, Math.round(p)]); };
 
@@ -46,10 +49,11 @@ export function briefScore(b, deco, shot) {
   // per job and there is nothing to choose.
   const w = look(deco) * b.warm;
   add(b.warm > 0 ? 'warm brief' : 'cool brief', 220 * Math.max(0, w));
-
   add('glitter as asked', 160 * Math.max(0, 1 - Math.abs(deco.glitter - b.glit) / 3));
-
-  if (shot.pose === b.pose) add(`the ${POSE_NAME[b.pose]} they wanted`, 300);
 
   return { pts: lines.reduce((a, l) => a + l[1], 0), lines };
 }
+
+// Paid PER FRAME, because catching the pose they asked for is the thing the
+// job is actually about, and catching it twice is twice the work.
+export const POSE_BONUS = 260;

@@ -16,9 +16,14 @@ import { GRAZE, IDLE, WALK, TROT, GALLOP, REAR, TOSS, SHAKE, SLEEP, PRANCE, BOW,
 
 // What each pose is worth to a photographer. The showy ones are worth more
 // AND are rarer - the same lever pulled twice, deliberately.
+// The spread was widened once the probe could see what each skill was
+// worth. Composition alone was paying 1.98x and timing 1.01x - waiting for
+// the moment earned nothing, so the game was "zoom in properly" with a
+// unicorn moving about in it. A photographer's two skills should both be
+// worth having.
 export const POSE_WORTH = {
-  [SLEEP]: 30, [IDLE]: 40, [GRAZE]: 55, [WALK]: 60, [TROT]: 85, [GALLOP]: 120,
-  [PRANCE]: 170, [SHAKE]: 180, [BOW]: 190, [TOSS]: 200, [REAR]: 250,
+  [SLEEP]: 25, [IDLE]: 30, [GRAZE]: 40, [WALK]: 45, [TROT]: 70, [GALLOP]: 110,
+  [PRANCE]: 200, [SHAKE]: 220, [BOW]: 230, [TOSS]: 250, [REAR]: 320,
 };
 
 // Bone origins cover the animal; the horn tip and the four hooves are added
@@ -79,34 +84,46 @@ export function scoreShot(P, vp, eye, anim, deco) {
   const parts = [];
   const add = (name, pts) => { if (pts >= 1) parts.push([name, Math.round(pts)]); };
 
-  // Cropping is punished on the SQUARE of what made it in, so losing a
-  // quarter of the animal costs far more than a quarter of the marks. A
-  // photograph missing its subject's head is not three-quarters of a
-  // photograph.
-  add('in frame', 200 * b.inFrac ** 2);
+  // THE FRAME IS A MULTIPLIER, not another line item.
+  //
+  // It used to be additive - 200 for having the subject on screen at all,
+  // then the pose and the eye contact on top - and the balance probe took
+  // that apart: a player who never aimed scored 0.69 of one who did, because
+  // pointing roughly at the set collected the whole framing term and a rear
+  // paid the same whether it filled the frame or sat in the far distance.
+  //
+  // A distant, badly composed photograph OF a rearing unicorn is not a good
+  // photograph of a rearing unicorn. So everything the subject does is worth
+  // what the framing is worth, and aiming stops being optional.
+  //
+  // Cropping counts on the SQUARE of what made the frame: a photograph
+  // missing its subject's head is not three-quarters of a photograph.
+  // Size is judged on HEIGHT rather than area, or the rule would quietly
+  // prefer whichever poses happen to be wide - rewarding a shape when it
+  // meant to reward a distance.
+  const q = b.inFrac ** 2 * bell(b.h, 1.15, .48);
 
-  // Height rather than area: a rearing unicorn is tall and narrow and a
-  // grazing one is long and low, and judging by area would quietly prefer
-  // the poses that happen to be wide.
-  add('size', 190 * bell(b.h, 1.15, .55));
+  // Modest, because the frame is ALREADY paid on every other line through
+  // the multiplier. A large flat framing award on top of that is composition
+  // counted twice, and it was drowning out the timing.
+  add('framing', 170 * q);
+  add(POSE_NAME[anim.mode], (POSE_WORTH[anim.mode] || 40) * (.35 + .65 * q));
 
   // The rule of thirds, as a bonus rather than a requirement - dead centre
   // is a real choice and should not be scored as a mistake, it just does
   // not earn this.
-  if (Math.abs(Math.abs(b.cx) - 1 / 3) < .13 && b.inFrac > .95) add('rule of thirds', 120);
-
-  add(POSE_NAME[anim.mode], POSE_WORTH[anim.mode] || 40);
+  if (Math.abs(Math.abs(b.cx) - 1 / 3) < .13 && b.inFrac > .95) add('rule of thirds', 120 * q);
 
   const e = eyeContact(P, eye);
-  if (e > .55) add('eye contact', 150 * bell(e, 1, .55));
+  if (e > .55) add('eye contact', 200 * bell(e, 1, .55) * q);
 
   // Glitter only counts when it is IN THE AIR. Sitting on the coat it is
   // styling; thrown off mid-shake it is the thing that makes the frame.
   if (deco.glitter) {
     const flying = anim.mode === SHAKE ? 1 : .25;
-    add(flying > .5 ? 'glitter in the air' : 'sparkle', 110 * (deco.glitter / 3) * flying);
+    add(flying > .5 ? 'glitter in the air' : 'sparkle', 120 * (deco.glitter / 3) * flying * q);
   }
 
   const total = parts.reduce((a, p) => a + p[1], 0);
-  return { total, parts, box: b, pose: anim.mode, eye: e };
+  return { total, parts, box: b, pose: anim.mode, eye: e, q };
 }

@@ -31,8 +31,35 @@ const TOTAL = REPERTOIRE.reduce((a, r) => a + r[1], 0);
 // the other.
 export const SHOWY = [PRANCE, TOSS, SHAKE, BOW, REAR];
 
+// How fast each gait actually travels. Roughly stride length times stride
+// rate, so the hooves do not skate - and, more to the point, so that a
+// walking unicorn LEAVES where it was standing.
+const SPEED = { [WALK]: .58, [TROT]: 1.06, [PRANCE]: .34 };
+const ROAM = 1.35;             // how far from the middle of the set it strays
+
 export function makeActor() {
-  return { hold: 0, next: 1.5, gaze: 0, gazeNext: 2 };
+  return { hold: 0, next: 1.5, gaze: 0, gazeNext: 2, turn: 0 };
+}
+
+// The unicorn WALKS THE SET. Until it did, the camera could be aimed once
+// and left, and framing cost nothing after the first second - the balance
+// probe put composition at 1.12x, which is another way of saying it was not
+// a skill. A subject that moves has to be followed.
+export function move(A, anim, P, dt) {
+  const sp = SPEED[anim.mode] || 0;
+  P.yaw += A.turn * dt;
+  if (sp) {
+    P.x += Math.sin(P.yaw) * sp * dt;
+    P.z += Math.cos(P.yaw) * sp * dt;
+  }
+  // A leash rather than a wall: past the roaming radius it steers back
+  // toward the middle instead of stopping dead at an invisible edge.
+  const r = Math.hypot(P.x, P.z);
+  if (r > ROAM) {
+    const want = Math.atan2(-P.x, -P.z);
+    let d = ((want - P.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    P.yaw += d * Math.min(1, dt * 1.6);
+  }
 }
 
 export function act(A, anim, dt) {
@@ -57,4 +84,5 @@ export function act(A, anim, dt) {
   anim.hold = 0;
   A.hold = 0;
   A.next = pick[2];
+  A.turn = (Math.random() * 2 - 1) * .7;
 }

@@ -17,12 +17,17 @@ const W = 900, H = 620;
 // A box well inside the barrel at this fixed camera. Deliberately small and
 // central: clipping the outline would average the paper in and every
 // reading would drift toward yellow.
-const BOX = [400, H - 350, 55, 38];
+//
+// `cam` is the tripod now - heading, pitch, field of view - so the pitch is
+// set to put the barrel on the optical axis and the lens is at a medium
+// zoom. It used to be an orbit's yaw/pitch/distance, and left unchanged it
+// asked for a 3.6 radian field of view and sampled the paper.
+const BOX = [420, 285, 60, 40];
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
 page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
-await page.goto(`${pathToFileURL(file).href}?pose=1&cam=0.3,0.1,3.6`, { waitUntil: 'load' });
+await page.goto(`${pathToFileURL(file).href}?pose=1&cam=0,-0.115,0.5`, { waitUntil: 'load' });
 await page.waitForTimeout(800);
 
 const coat = () => page.evaluate((b) => window.SNAPPIX(...b), BOX);

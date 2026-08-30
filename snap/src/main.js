@@ -14,9 +14,9 @@ import { studioMesh, shadowMesh, lightsMesh, shadowMat } from './studio.js';
 import { makeMane, updateMane, maneVerts, recolour, MANE_CORE, MANE_HALO } from './mane.js';
 import { makeAnim, applyPose, POSE_NAME, SHAKE, IDLE } from './pose.js';
 import { makeDeco, makeGlitter, glitterVerts, GLITTER_BUF, PALETTE, RB, MAX_GLITTER, swatch } from './deco.js';
-import { makeActor, act } from './act.js';
+import { makeActor, act, move } from './act.js';
 import { scoreShot } from './score.js';
-import { makeBrief, briefText, briefScore } from './brief.js';
+import { makeBrief, briefText, briefStyle, POSE_BONUS } from './brief.js';
 import { wake, awake, music, shutter, sparkle, pleased } from './snd.js';
 
 const FOG = [.09, .07, .05];
@@ -121,16 +121,20 @@ function sync() {
 
 // --- the game -------------------------------------------------------------
 let phase = 0;                 // 0 style, 1 shoot, 2 result, 3 season over
-let round = 0, film = FILM, seasonPts = 0, best = null, brief = null;
+let round = 0, film = FILM, seasonPts = 0, best = null, brief = null, lastJob = 0;
+let rollPts = 0, onBrief = 0;
 let bestEver = 0;
 try { bestEver = +localStorage.usBest || 0; } catch (e) { /* no store, no problem */ }
 
 function newRound() {
   brief = makeBrief(round);
   best = null;
+  rollPts = 0;
+  onBrief = 0;
   film = FILM;
   phase = 0;
   anim.mode = IDLE;
+  P.x = P.z = P.yaw = 0;
   layout();
 }
 
@@ -142,8 +146,14 @@ function startShoot() {
 
 function endRound() {
   phase = 2;
-  const b = best ? briefScore(brief, deco, best) : { pts: 0, lines: [] };
-  const total = (best ? best.total : 0) + b.pts;
+  // The job is the WHOLE ROLL, not its best frame. Keeping only the best of
+  // six made the shutter free: the balance probe put a player who never
+  // aimed at 0.73 of one who did, because six draws from the pose table
+  // almost always contain one good one. Summing every frame means a wasted
+  // frame is a wasted frame.
+  const b = briefStyle(brief, deco);
+  const total = rollPts + b.pts;
+  lastJob = total;
   seasonPts += total;
   if (best) pleased();
   layout();                    // the sheet is display:none until this runs
@@ -172,12 +182,15 @@ function showSheet(bs, total) {
   } else {
     el('div', 'font-size:20px;font-weight:800', card, best ? `${total} points` : 'No usable frames');
     if (best) {
+      el('div', 'font-weight:500;font-size:13px', card,
+        `your best of ${FILM}` + (onBrief ? ` - ${onBrief} on brief` : ''));
       const im = el('img', 'width:min(78vw,380px);border-radius:8px;display:block', card);
       im.src = best.img;
       const list = el('div', 'font-weight:500;font-size:13px;line-height:1.6', card);
       for (const [n, p] of best.parts.concat(bs.lines)) {
         el('div', '', list, `${n} +${p}`);
       }
+      el('div', 'font-weight:700;font-size:13px', card, `whole roll ${rollPts} + styling ${bs.pts}`);
     }
   }
   const b = el('button', GO, card, phase === 3 ? 'SHOOT ANOTHER SEASON' : 'NEXT JOB');
@@ -190,9 +203,22 @@ function showSheet(bs, total) {
   };
 }
 
-// --- camera ---------------------------------------------------------------
-const YAW = 1.25;
-const cam = { yaw: .35, pitch: .12, dist: 4.4 };
+// --- the camera -----------------------------------------------------------
+// A TRIPOD, not an orbit. The orbit rig this started with always looked at
+// the centre of the set, so swinging it barely moved the subject in frame -
+// the balance probe priced composition at 1.12x, which is what "you cannot
+// actually aim" looks like as a number. Now the lens has its own heading
+// and the body has to be tracked across the set.
+//
+// Drag aims, the wheel zooms, and Q/E walk the tripod round the cove. Those
+// are a photographer's three controls and they are the whole of the skill:
+// hold the subject, fill the frame, wait for the moment.
+const R = 4.6;
+// It starts at its WIDEST. The probe found the old default already framing
+// at 0.69 of a perfect shot, which left aiming almost nothing to earn - a
+// camera handed to you already composed is a camera you need not use. A
+// real one starts wide and you zoom to compose, and now so does this.
+const cam = { a: Math.PI, p: -.02, fov: 1.15, ang: 0 };
 const keys = {};
 addEventListener('keydown', (e) => {
   wake();
@@ -204,10 +230,10 @@ addEventListener('keyup', (e) => { keys[e.code] = 0; });
 let drag = null, dragDist = 0, wantShot = 0;
 c.addEventListener('pointerdown', (e) => { wake(); drag = [e.clientX, e.clientY]; dragDist = 0; });
 addEventListener('pointerup', () => {
-  // A tap is a shutter and a drag is a camera move, told apart by how far
-  // the finger went. On a phone there is no second button to give the
-  // shutter, and asking a player to reach for one while the pose they want
-  // is happening is asking them to miss it.
+  // A tap is a shutter and a drag is an aim, told apart by how far the
+  // finger went. There is no second button to give the shutter on a phone,
+  // and asking a player to reach for one while the pose they want is
+  // happening is asking them to miss it.
   if (drag && dragDist < 7 && phase === 1) wantShot = 1;
   drag = null;
 });
@@ -215,17 +241,20 @@ addEventListener('pointermove', (e) => {
   if (!drag) return;
   const dx = e.clientX - drag[0], dy = e.clientY - drag[1];
   dragDist += Math.abs(dx) + Math.abs(dy);
-  cam.yaw = Math.max(-YAW, Math.min(YAW, cam.yaw - dx * .006));
-  cam.pitch = Math.max(-.12, Math.min(.9, cam.pitch + dy * .004));
+  // Scaled by the field of view, so a long lens aims slowly. Without this,
+  // zooming in makes the camera unusably twitchy at exactly the moment
+  // precision starts to matter.
+  cam.a -= dx * .0022 * cam.fov;
+  cam.p = Math.max(-.5, Math.min(.6, cam.p - dy * .0022 * cam.fov));
   drag = [e.clientX, e.clientY];
 });
 addEventListener('wheel', (e) => {
-  cam.dist = Math.max(2, Math.min(12, cam.dist + e.deltaY * .003));
+  cam.fov = Math.max(.34, Math.min(1.15, cam.fov + e.deltaY * .0012));
 });
 
 const q = new URLSearchParams(location.search);
 if (q.has('pose')) { anim.mode = +q.get('pose'); }
-if (q.has('cam')) { const p = q.get('cam').split(','); cam.yaw = +p[0]; cam.pitch = +p[1]; cam.dist = +p[2]; }
+if (q.has('cam')) { const p = q.get('cam').split(','); cam.ang = +p[0]; cam.p = +p[1]; cam.fov = +p[2]; }
 if (q.has('deco')) {
   const d = q.get('deco').split(',').map(Number);
   ZONES.forEach((k, i) => { zone = i; apply(d[i]); });
@@ -248,31 +277,43 @@ function frame(now) {
   anim.t += dt;
   anim.hold += dt;
 
-  if (keys.ArrowLeft) cam.yaw = Math.min(YAW, cam.yaw + dt * 1.4);
-  if (keys.ArrowRight) cam.yaw = Math.max(-YAW, cam.yaw - dt * 1.4);
-  if (keys.ArrowUp) cam.pitch = Math.min(.9, cam.pitch + dt);
-  if (keys.ArrowDown) cam.pitch = Math.max(-.12, cam.pitch - dt);
+  if (keys.ArrowLeft) cam.a += dt * cam.fov;
+  if (keys.ArrowRight) cam.a -= dt * cam.fov;
+  if (keys.ArrowUp) cam.p = Math.min(.6, cam.p + dt * cam.fov);
+  if (keys.ArrowDown) cam.p = Math.max(-.5, cam.p - dt * cam.fov);
+  if (keys.KeyQ) cam.ang += dt * .8;
+  if (keys.KeyE) cam.ang -= dt * .8;
+  if (keys.KeyW) cam.fov = Math.max(.34, cam.fov - dt * .6);
+  if (keys.KeyS) cam.fov = Math.min(1.15, cam.fov + dt * .6);
 
   // The unicorn only performs while it is being photographed. On the bench
   // it stands and waits, so the player can actually see what they are
   // painting.
-  if (phase === 1 && !FROZEN) act(A, anim, dt);
+  if (phase === 1 && !FROZEN) { act(A, anim, dt); move(A, anim, P, dt); }
   if (awake()) music(phase === 1 ? .8 : .2, phase !== 1);
 
-  anim.lookYaw = Math.atan2(Math.sin(cam.yaw - P.yaw), Math.cos(cam.yaw - P.yaw));
-  anim.lookPitch = cam.pitch;
+  // The lens is placed BEFORE anything reads it. It depends only on the
+  // camera, never on the pose, and the gaze below needs it in the same
+  // frame - computing it after the rig left the unicorn looking at a null.
+  eye = [Math.sin(cam.ang) * R, 1.15, Math.cos(cam.ang) * R];
+  const cp = Math.cos(cam.p);
+  const at = [
+    eye[0] + Math.sin(cam.a) * cp,
+    eye[1] + Math.sin(cam.p),
+    eye[2] + Math.cos(cam.a) * cp,
+  ];
+
+  // Where the lens actually IS, rather than where an orbit angle says it is
+  // - the unicorn has to find a camera that can now stand anywhere.
+  const toCam = Math.atan2(eye[0] - P.x, eye[2] - P.z);
+  anim.lookYaw = Math.atan2(Math.sin(toCam - P.yaw), Math.cos(toCam - P.yaw));
+  anim.lookPitch = Math.atan2(eye[1] - 1.3, Math.hypot(eye[0] - P.x, eye[2] - P.z));
   if (phase !== 1) anim.gaze += (1 - anim.gaze) * (1 - Math.exp(-dt / .4));
 
   applyPose(P, anim, dt);
   solve(P);
   updateMane(M, P.w, anim.t, dt);
 
-  const aim = [0, .8, 0];
-  eye = [
-    aim[0] + Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist,
-    aim[1] + Math.sin(cam.pitch) * cam.dist,
-    aim[2] + Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist,
-  ];
   const [nc, nh] = maneVerts(M, eye);
   updateMesh(maneCore, MANE_CORE, nc);
   updateMesh(maneHalo, MANE_HALO, nh);
@@ -280,7 +321,7 @@ function frame(now) {
   glitN = glitterVerts(G, P.w, eye, deco.glitter, anim.t, burst);
   updateMesh(glitMesh, GLITTER_BUF, glitN);
 
-  vp = mul(perspective(1.15, c.width / c.height, .1, 400), lookAt(eye, aim));
+  vp = mul(perspective(cam.fov, c.width / c.height, .1, 400), lookAt(eye, at));
 
   frameGL(vp, eye, FOG);
   mode(0);
@@ -331,9 +372,15 @@ function frame(now) {
     window.SNAP = {
       pose: anim.mode, hoof: lo, belly, contact: Math.min(lo, belly), t: anim.t,
       deco, name: POSE_NAME[anim.mode], glit: glitN / 10,
-      phase, film, round, best: best && best.total, seasonPts,
+      phase, film, round, best: best && best.total, seasonPts, lastJob,
+      cam: [cam.a, cam.p, cam.fov, cam.ang], sub: [P.x, P.z],
     };
     window.SNAPSHOT = () => scoreShot(P, vp, eye, anim, deco);
+    // The balance policies drive the game through these rather than through
+    // synthetic input events: what is being measured is a way of PLAYING,
+    // and routing it through keyboard timing would measure the harness.
+    window.SNAPCAM = (a, p, f, ang) => { cam.a = a; cam.p = p; cam.fov = f; if (ang !== undefined) cam.ang = ang; };
+    window.SNAPFIRE = () => { wantShot = 1; };
     window.SNAPPIX = (x, y, w, h) => {
       const px = new Uint8Array(w * h * 4);
       gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
@@ -352,6 +399,16 @@ function takeShot() {
   shutter();
   flashT = 1;
   const s = scoreShot(P, vp, eye, anim, deco);
+  // Scaled by the frame like everything else: a badly composed photograph of
+  // the pose they asked for is still a badly composed photograph, and paying
+  // it in full would let a player ignore the lens and just wait.
+  if (s.pose === brief.pose) {
+    const bp = Math.round(POSE_BONUS * s.q);
+    s.parts.push(['the pose they asked for', bp]);
+    s.total += bp;
+    onBrief++;
+  }
+  rollPts += s.total;
   // JPEG, not PNG: these are photographs, six of them are held in memory at
   // once, and a full-window PNG data URL is megabytes of string.
   s.img = c.toDataURL('image/jpeg', .82);

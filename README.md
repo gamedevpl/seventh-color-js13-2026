@@ -1,21 +1,30 @@
-# js13kGames 2026 — two entries
+# js13kGames 2026 — three entries
 
-This repo holds two finished js13kGames 2026 entries. They share a build,
-measurement and verification toolchain and **nothing else**: separate source
-trees, separate game code, separate budgets, separate size gates. Both are
+This repo holds three js13kGames 2026 entries. They share a build, measurement
+and verification toolchain and **nothing else**: separate source trees,
+separate game code, separate budgets, separate size gates. All three are
 written to the 2026 theme, *rainbows and unicorns*.
 
 | entry | source | zipped | limit | write-up |
 | --- | --- | ---: | ---: | --- |
 | **The Seventh Color** — a twelve-beat story game with four playable mechanics | `native/src` (9 files) | **12,160** | 13,312 | [`NATIVE.md`](./NATIVE.md) |
 | **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,247** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
+| **Unicorn Snap** — photograph a unicorn that knows how good it looks | `snap/src` (10 files) | **12,936** | 13,312 | [`SNAP.md`](./SNAP.md) |
 
 Rainbow Surfer: <https://js13kgames.com/2026/games/rainbow-surfer>
 
-Neither game depends on anything at runtime — no libraries, no assets, no
-network. The Seventh Color is raw canvas 2D with a hand-rolled tracker; Rainbow
-Surfer is raw WebGL with one shader program and a course generated fresh every
-run.
+No game depends on anything at runtime — no libraries, no assets, no network.
+The Seventh Color is raw canvas 2D with a hand-rolled tracker; Rainbow Surfer
+is raw WebGL with one shader program and a course generated fresh every run;
+Unicorn Snap shares that renderer's discipline and points it at a single
+posed subject — a rig of rigid boxes, hair solved as Verlet chains, and a
+scoring model that reads the state of the world at the shutter rather than
+the pixels it produced.
+
+Unicorn Snap was built with its player in the room: a nine-year-old asked for
+a game about photographing a unicorn, and most of what is in it arrived as a
+reaction to a play session rather than as a plan. [`SNAP.md`](./SNAP.md) keeps
+those rounds in order, including the ones that were wrong.
 
 ## Building
 
@@ -28,6 +37,11 @@ Each game builds through the same tools, selected with `--game`:
 | `npm run strands` | build Rainbow Surfer |
 | `npm run strands:gate` | its release gate: course invariants, motion smoothness, worst-of-5 pack, verify |
 | `npm run strands:ship` | the submission build — roadroller at `-O2`, which is worth ~32 bytes over `-O1` and far too slow to iterate on |
+| `npm run snap` | build Unicorn Snap |
+| `npm run snap:dev` | the same, unpacked and with the DEV probes compiled in |
+| `npm run snap:test` | its probe suite: poses, hair, light, paint, the shoot loop, the phone, behaviour |
+| `npm run snap:gate` | the suite plus the balance sweep and a worst-of-5 pack |
+| `npm run snap:poses` | a contact sheet of every pose, for looking at a change rather than measuring it |
 
 Add `--cheats` to any build for the DEV probes the live measurement tools read;
 they compile out of a shipping build entirely.
@@ -48,6 +62,19 @@ telemetry back out of it:
 | `tools/test-fps.mjs` | what an effect costs in frames |
 | `tools/shots.mjs` | promo frames, rendered at twice the game's own resolution |
 
+Unicorn Snap's are the same idea aimed at a subject rather than a track:
+
+| tool | the question it answers |
+| --- | --- |
+| `tools/test-pose.mjs` | does the unicorn stand on the ground in all fourteen poses — and does the jump leave it *and come back*? |
+| `tools/test-hair.mjs` | is the mane outside the animal, measured against the boxes the renderer actually draws? |
+| `tools/test-shine.mjs` | is the hair lit, or flat? (flat-lit paper reads the same 18 levels from every angle) |
+| `tools/test-shoot.mjs` | does a session run end to end, and do all three trackpad gestures do their own job? |
+| `tools/test-phone.mjs` | does it behave on an iPhone: viewport, thumb-sized controls, no film spent by a pinch |
+| `tools/test-deco.mjs` | does the paint reach the screen, and does the part you pick wink? |
+| `tools/test-temper.mjs` | does the styling change what the subject does, and does a bored one lie down? |
+| `tools/test-balance-snap.mjs` | is skill worth anything — and how much does spamming one shot get you? |
+
 ## The shared toolchain
 
 esbuild → terser (whole-program property mangling) → roadroller (self-extracting
@@ -56,8 +83,9 @@ fields, zeroed timestamps, three zlib strategies plus zopfli, smallest kept —
 so the same input always produces the same archive.
 
 Every build is measured against a per-game milestone ceiling
-(`native-milestone.json`, `strands-milestone.json`) as **worst of N rolls**, not
-best, because a number you cannot reproduce is not a number you can ship.
+(`native-milestone.json`, `strands-milestone.json`, `snap-milestone.json`) as
+**worst of N rolls**, not best, because a number you cannot reproduce is not a
+number you can ship.
 
 ## The first approach, and why it was abandoned
 
@@ -77,8 +105,9 @@ at 12,160. [`NATIVE.md`](./NATIVE.md) tells that story properly;
 that led to the decision.
 
 The packer is still wired up as `npm run size` and its per-transform notes are
-kept below, because the engineering in them is sound and reusable — but neither
-entry ships through it, and it has not been exercised since the rewrite.
+kept below, because the engineering in them is sound and reusable — but none of
+the three entries ships through it, and it has not been exercised since the
+rewrite.
 
 ### The transforms
 

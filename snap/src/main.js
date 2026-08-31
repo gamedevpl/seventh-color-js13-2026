@@ -7,7 +7,7 @@
 
 import {
   gl, initGL, frameGL, mode, drawMesh, createMesh, updateMesh,
-  perspective, lookAt, mul, modelTR, mask, setDim, setSdw, setSpc, IDENT,
+  perspective, lookAt, mul, modelTR, mask, setDim, setSdw, setSpc, setHair, IDENT,
 } from './gl.js';
 import { buildUnicorn, paint, flushPaint, makePose, solve, BOXES, MESH_OF, COAT, HORN, HOOF } from './uni.js';
 import { studioMesh, shadowMesh, lightsMesh, markMesh, shadowMat } from './studio.js';
@@ -553,6 +553,7 @@ addEventListener('wheel', (e) => {
 }, { passive: false });
 
 const q = new URLSearchParams(location.search);
+const HAIRN = +q.get('hair') || 5;
 if (q.has('cam')) { const p = q.get('cam').split(','); cam.ang = +p[0]; cam.p = +p[1]; cam.fov = +p[2]; }
 if (q.has('deco')) {
   const d = q.get('deco').split(',').map(Number);
@@ -705,9 +706,13 @@ function frame(now) {
 
   mode(0);
   for (let i = 0; i < U.parts.length; i++) drawMesh(U.parts[i], P.w[i]);
-  // The one shiny thing on the set.
+  // The one shiny thing on the set, and the only thing cut into hairs.
+  // HAIRN is how many hairs the fragment shader carves out of each card;
+  // a query parameter while this is being tuned by eye.
   setSpc(1.7);
+  setHair(HAIRN);
   drawMesh(maneCore, IDENT);
+  setHair(0);
   setSpc(0);
   mode(1);
   drawMesh(lights, IDENT);

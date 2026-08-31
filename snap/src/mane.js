@@ -250,10 +250,13 @@ export function updateMane(M, W, t, dt) {
 const SUB = 3;                 // thin strands per solved chain
 const CORE = new Float32Array(24 * L * 6 * 10 * SUB);
 let ci = 0;
-const V = (buf, i, x, y, z, n, c) => {
+// The last slot is the ALPHA attribute, which solid geometry never reads -
+// so hair borrows it for the coordinate across the card, which is what the
+// fragment shader cuts the bundle up with.
+const V = (buf, i, x, y, z, n, c, u) => {
   buf[i++] = x; buf[i++] = y; buf[i++] = z;
   buf[i++] = n[0]; buf[i++] = n[1]; buf[i++] = n[2];
-  buf[i++] = c[0]; buf[i++] = c[1]; buf[i++] = c[2]; buf[i++] = 1;
+  buf[i++] = c[0]; buf[i++] = c[1]; buf[i++] = c[2]; buf[i++] = u;
   return i;
 };
 const Q = (buf, i, a, b, c, d) => {
@@ -333,6 +336,9 @@ export function maneVerts(M, eye) {
       // between them is visible and the mane reads as separate hair rather
       // than as one moulded piece.
       const c = s.c.map((v) => v * (.86 + .14 * (k % 2)));
+      // Each sibling's hairs start at a different phase, or the three cards
+      // line their strands up and the bundle reads as one combed sheet.
+      const ph = k * .37 + (s.i % 3) * .21;
       for (let i = 1; i < L; i++) {
         const a = P[i - 1], b = P[i], s0 = SIDE[i - 1], s1 = SIDE[i];
         // Tapering toward the tip, which is what hair does and what keeps a
@@ -340,10 +346,10 @@ export function maneVerts(M, eye) {
         const w0 = .031 * (1 - (i - 1) / L * .55), w1 = .031 * (1 - i / L * .55);
         const o0 = off, o1 = off;
         ci = Q(CORE, ci,
-          [a[0] + s0[0] * (o0 - w0), a[1] + s0[1] * (o0 - w0), a[2] + s0[2] * (o0 - w0), NRM[i - 1][0], c],
-          [a[0] + s0[0] * (o0 + w0), a[1] + s0[1] * (o0 + w0), a[2] + s0[2] * (o0 + w0), NRM[i - 1][1], c],
-          [b[0] + s1[0] * (o1 + w1), b[1] + s1[1] * (o1 + w1), b[2] + s1[2] * (o1 + w1), NRM[i][1], c],
-          [b[0] + s1[0] * (o1 - w1), b[1] + s1[1] * (o1 - w1), b[2] + s1[2] * (o1 - w1), NRM[i][0], c]);
+          [a[0] + s0[0] * (o0 - w0), a[1] + s0[1] * (o0 - w0), a[2] + s0[2] * (o0 - w0), NRM[i - 1][0], c, ph],
+          [a[0] + s0[0] * (o0 + w0), a[1] + s0[1] * (o0 + w0), a[2] + s0[2] * (o0 + w0), NRM[i - 1][1], c, ph + 1],
+          [b[0] + s1[0] * (o1 + w1), b[1] + s1[1] * (o1 + w1), b[2] + s1[2] * (o1 + w1), NRM[i][1], c, ph + 1],
+          [b[0] + s1[0] * (o1 - w1), b[1] + s1[1] * (o1 - w1), b[2] + s1[2] * (o1 - w1), NRM[i][0], c, ph]);
       }
     }
   }

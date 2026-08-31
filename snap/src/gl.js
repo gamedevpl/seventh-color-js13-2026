@@ -30,13 +30,13 @@ export const LIGHT = [.45, .85, .3];
 // strand is thin and what you see is a bright band sliding along it as the
 // camera moves, which is exactly what real hair does.
 const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
-uniform mediump float add,dim,gls,sdw,spc;varying vec3 vc;varying float vf,va;
+uniform mediump float add,dim,gls,sdw,spc;varying vec3 vc;varying float vf,va,vh;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
 vec3 nn=normalize((md*vec4(n,0.)).xyz+vec3(0.,1e-6,0.));
 vec3 L=normalize(vec3(${LIGHT}));
 float l=.55+.45*max(dot(nn,L),0.);
 float sp=spc*pow(max(dot(nn,normalize(L+normalize(cam-w.xyz))),0.),7.);
-vc=mix(c*mix(l,1.,add)+sp,vec3(.16,.09,.02),sdw);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
+vc=mix(c*mix(l,1.,add)+sp,vec3(.16,.09,.02),sdw);va=a*dim;vh=clamp((7.-length(w.xyz-cam))/4.,0.,1.);vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
 // Glass does NOT fog toward the fog colour - it fades its ALPHA instead.
 // It writes no depth, so a far piece of deck composites over a near one in
 // mesh order rather than depth order; fogged, that far sliver is close to
@@ -44,9 +44,28 @@ vc=mix(c*mix(l,1.,add)+sp,vec3(.16,.09,.02),sdw);va=a*dim;vf=clamp((length(w.xyz
 // it paints a thin black curve across it. Keeping its colour means the
 // overlap is deck-over-deck - the same hue, so the seam disappears - while
 // the alpha fade still lets it die away with distance.
-const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
-uniform vec3 fog;uniform float add,gls;
-void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
+// HAIR CARDS. `hair` turns the alpha attribute into an ACROSS-THE-CARD
+// coordinate and cuts each ribbon into a bundle of separate hairs in the
+// fragment shader: a repeating profile gives every hair its own rounded
+// shading, and the gaps between them are discarded outright, so what the
+// eye gets is a mass of thin hairs with the background showing between
+// them rather than one smooth band. This is the standard hair-card trick
+// and it is the only thing that has ever fixed "it looks like tubes",
+// because the tube was real - one quad, one gradient.
+const FS = `precision mediump float;varying vec3 vc;varying float vf,va,vh;
+uniform vec3 fog;uniform float add,gls,hair;
+void main(){
+if(hair>.5){
+float f=fract(va*hair);
+float d=abs(f-.5)*2.;
+// The gaps CLOSE WITH DISTANCE. A hair narrower than a pixel cannot be
+// drawn, only sampled, and sampling one gives a speckled mess - so far
+// away the bundle goes back to being a solid band and the eye never sees
+// the transition.
+if(d>mix(1.,.82,vh))discard;
+gl_FragColor=vec4(mix(vc*mix(1.,mix(1.18,.66,d*d),vh),fog,vf),1.);
+return;}
+if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
 else if(gls>.5)gl_FragColor=vec4(vc,va*(1.-vf));
 else gl_FragColor=vec4(mix(vc,fog,vf),va);}`;
 
@@ -69,7 +88,7 @@ export function initGL(c) {
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls', 'sdw', 'spc']) loc[u] = gl.getUniformLocation(prog, u);
+  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls', 'sdw', 'spc', 'hair']) loc[u] = gl.getUniformLocation(prog, u);
   gl.uniform1f(loc.dim, 1);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
@@ -115,6 +134,8 @@ export const setDim = (v) => gl.uniform1f(loc.dim, v);
 // the per-frame geometry work to save one line of shader.
 export const setSdw = (v) => gl.uniform1f(loc.sdw, v);
 export const setSpc = (v) => gl.uniform1f(loc.spc, v);
+// How many hairs across one card. 0 turns the whole trick off.
+export const setHair = (v) => gl.uniform1f(loc.hair, v);
 
 // A planar reflection needs a MASK. A mirror image floating beside the
 // track - out over a gap, past the edge, in the empty air - is worse than

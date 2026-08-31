@@ -193,11 +193,19 @@ const cBtns = [RB, 0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
 });
 el('div', 'font:800 min(13vw,54px)/1 system-ui,sans-serif;color:#fff6dd;letter-spacing:.02em;text-shadow:0 3px 14px #0007', title, 'UNICORN SNAP');
 el('div', 'font:600 15px system-ui,sans-serif;color:#ffeec4;text-shadow:0 2px 8px #0008;margin-top:6px', title, 'It knows how good it looks. Prove it.');
-el('div', 'font:500 13px/1.7 system-ui,sans-serif;color:#f0dcae;text-shadow:0 2px 8px #0008;max-width:34em', title,
+// ONE LINE WHERE THERE IS ROOM FOR ONE. The line was capped at 34em, which
+// is narrower than the sentence, so even a wide screen broke it - and broke
+// it badly, leaving "picture." alone on the second row. The cap is wide
+// enough for the whole sentence now, and `text-wrap:balance` handles the
+// narrow case: a phone cannot fit this much text on one line at a readable
+// size, so what it gets instead is two lines of roughly equal length rather
+// than a full line and an orphan.
+el('div', 'font:500 13px/1.7 system-ui,sans-serif;color:#f0dcae;text-shadow:0 2px 8px #0008;'
+  + 'max-width:min(92vw,46em);text-wrap:balance', title,
   // Short, because the coaching line teaches the same three controls one
   // at a time while you are holding them, which is where it sticks. This
   // paid for the gauges coming back.
-  'Dress it up, then shoot it. Drag to aim, pinch to zoom, tap to take the picture.');
+  'Dress it up, then shoot it. Drag to aim, pinch to zoom, tap to shoot.');
 const startBtn = el('button', GO + ';margin-top:10px;font-size:18px', title, 'OPEN THE STUDIO');
 // The same credit the other two entries carry, and cheaper here than in
 // either of them: both of those paint it into a canvas and hit-test the

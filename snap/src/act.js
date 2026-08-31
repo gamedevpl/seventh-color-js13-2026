@@ -209,7 +209,14 @@ export function act(A, anim, dt, deco, calm) {
   for (let i = 0; i < rep.length; i++) { r -= ws[i]; if (r <= 0) { pick = rep[i]; break; } }
   // Never twice in a row: repeating a pose reads as the animal being stuck,
   // and it also lets a patient player farm one rare pose by waiting.
-  if (pick[0] === anim.mode) pick = rep[0];
+  //
+  // The fallback has to be the NEXT entry, not the first one. rep[0] is
+  // IDLE in both tables, so a draw that landed on IDLE while already idle
+  // was "corrected" to idle - the one case the rule exists to prevent. On
+  // the bench, where the calm table is three entries and IDLE carries four
+  // of its nine weight, that made standing still self-perpetuating: the
+  // phone probe caught a twelve-second window with a single pose in it.
+  if (pick[0] === anim.mode) pick = rep[(rep.indexOf(pick) + 1) % rep.length];
   anim.mode = pick[0];
   anim.hold = 0;
   A.hold = 0;

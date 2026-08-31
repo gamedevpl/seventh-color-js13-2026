@@ -490,7 +490,15 @@ addEventListener('pointermove', (e) => {
   // Scaled by the field of view, so a long lens aims slowly. Without this,
   // zooming in makes the camera unusably twitchy at exactly the moment
   // precision starts to matter.
-  cam.a += dx * .0022 * cam.fov;
+  // X TURNS THE CAMERA, Y CARRIES THE SUBJECT, and the mixed convention is
+  // deliberate rather than an oversight. Both axes used to follow the
+  // finger - drag right, unicorn goes right - and the vertical half of that
+  // reads correctly while the horizontal half was reported as simply
+  // annoying. That is not a contradiction: turning left and right is
+  // AIMING, and every camera anyone has held turns the way you push it,
+  // while up and down is FRAMING, where the subject sliding with the thumb
+  // is what a touchscreen has taught everybody. So the signs differ.
+  cam.a -= dx * .0022 * cam.fov;
   cam.p = Math.max(-.5, Math.min(.6, cam.p + dy * .0022 * cam.fov));
 });
 let gScale = 1;
@@ -538,10 +546,10 @@ addEventListener('wheel', (e) => {
     if (cam.fov < 1) learnt.zoom = 1;
     return;
   }
-  // A two-finger drag. Scrolling right moves the content left, which is the
-  // same gesture as dragging the canvas left, so the signs are the drag
-  // handler's inverted - and the subject still follows the fingers.
-  cam.a -= e.deltaX * .0022 * cam.fov;
+  // A two-finger drag, with the same split as the one-finger one and its
+  // signs inverted, because scrolling right is the gesture of dragging the
+  // surface left.
+  cam.a += e.deltaX * .0022 * cam.fov;
   cam.p = Math.max(-.5, Math.min(.6, cam.p - e.deltaY * .0022 * cam.fov));
   learnt.aim = 1;
 }, { passive: false });

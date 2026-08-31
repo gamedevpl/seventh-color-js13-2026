@@ -127,7 +127,20 @@ await gesture([
   ['pointermove', 1, 230, 400], ['pointermove', 1, 270, 400], ['pointerup', 1, 270, 400],
 ]);
 const x1 = await at();
-check('dragging right turns the camera right', x1 < x0 - .05, `${x0.toFixed(2)} -> ${x1.toFixed(2)}`);
+check('by default the subject follows the finger', x1 > x0 + .05, `${x0.toFixed(2)} -> ${x1.toFixed(2)}`);
+
+// ...and the switch really switches it. Two conventions exist, this game
+// ships one and offers the other, and the probe holds both ends so neither
+// can quietly become the other.
+await page.getByRole('button', { name: /CAMERA|SUBJECT/ }).click();
+const x2 = await at();
+await gesture([
+  ['pointerdown', 1, 150, 400], ['pointermove', 1, 190, 400],
+  ['pointermove', 1, 230, 400], ['pointermove', 1, 270, 400], ['pointerup', 1, 270, 400],
+]);
+const x3 = await at();
+check('and the switch turns the camera instead', x3 < x2 - .05, `${x2.toFixed(2)} -> ${x3.toFixed(2)}`);
+await page.getByRole('button', { name: /CAMERA|SUBJECT/ }).click();
 
 await gesture([['pointerdown', 1, 200, 400], ['pointerup', 1, 201, 401]]);
 await page.waitForTimeout(450);

@@ -249,9 +249,6 @@ export function updateMane(M, W, t, dt) {
 // sitting inside a haze, and it costs half the geometry it used to.
 const CORE = new Float32Array(24 * L * 6 * 10);
 let ci = 0;
-// The last slot is the ALPHA attribute, which solid geometry never reads -
-// so hair borrows it for the coordinate across the card, which is what the
-// fragment shader cuts the bundle up with.
 const V = (buf, i, x, y, z, n, c, u) => {
   buf[i++] = x; buf[i++] = y; buf[i++] = z;
   buf[i++] = n[0]; buf[i++] = n[1]; buf[i++] = n[2];
@@ -319,12 +316,12 @@ export function maneVerts(M, eye) {
         [nx * .42 + sx * .66, ny * .42 + sy * .66 + .62, nz * .42 + sz * .66],
       ];
     }
-    // ONE WIDE CARD PER CHAIN. This was three thin ribbons for a round, and
-    // three thin ribbons cut into five hairs each is thirty noodles per
-    // chain - reported, accurately, as spaghetti. The lesson from the far
-    // side of that: hair reads as a MASS with a broken edge, not as a count
-    // of separate pieces. The card is wide and solid again; the fragment
-    // shader does the breaking up, and only at the silhouette.
+    // ONE WIDE CARD PER CHAIN, lit and shiny, and no longer cut into hairs
+    // by the fragment shader. That trick worked - the mane stopped reading
+    // as tubes - and it was not worth what it cost: it was paid for with
+    // the FRAME and MOMENT gauges, and the game plays badly without those.
+    // A cosmetic gain does not outrank a control the player aims with, and
+    // the person who has to aim said so.
     for (let i = 1; i < L; i++) {
       const a = P[i - 1], b = P[i], s0 = SIDE[i - 1], s1 = SIDE[i];
       // Tapering toward the tip, which is what hair does and what keeps a

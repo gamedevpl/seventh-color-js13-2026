@@ -1675,6 +1675,48 @@ The lesson is in `act.js` in full, including the nine readings, because the
 next person to touch that constant should start from the spread rather than
 from another guess.
 
+## R20 — the trade goes back the other way
+
+*"Ostatnio majstrowałeś przy włosach, a efekt za bardzo się nie polepszył, a
+w zamian straciliśmy wskaźniki kadru i momentu, bez których beznadziejnie
+się w to gra."*
+
+Right on both halves, and the bad call was mine. R19 deleted the FRAME and
+MOMENT gauges to pay for hair cards, with an argument that read well and was
+wrong: that the live verdict says the same thing in words. It does not. The
+verdict says what is wrong with the frame you are **on** — after the fact of
+having pointed somewhere. The bars say how close you are getting **while you
+move**, continuously, and that is what aiming is made of. A cosmetic gain
+never outranks a control the player aims with.
+
+So the gauges are back, and the same hair work paid for them:
+
+| given up | bought back |
+|---|---|
+| hair cards (the fragment-shader strand cut) | FRAME and MOMENT |
+| the specular sheen | |
+| the floating `+N` after each shot | |
+| the title screen's long control blurb | |
+
+The mane keeps its per-point normals and per-strand shading — the half that
+stopped it reading as cut paper — and goes back to being the version that
+was called tubes. Worse to look at, better to play, and **376 bytes free**,
+which is more than the hair cards cost. If they come back, something else
+pays, and it will not be a control.
+
+### The probe caught a black screen
+
+Cutting the sheen removed the `vh` varying from the vertex shader while the
+fragment shader still declared and used it — a leftover from the hair-card
+removal, whose text edit had silently missed. The program stopped linking
+and the entire 3D scene went black behind the menu, which on a screenshot
+looks exactly like "the game does not start".
+
+I did not spot it. `test-shine` returned `NaN` instead of a number, because
+a probe that reads real pixels cannot miss an empty buffer, and that is the
+whole reason it reads pixels rather than asking the code what it thinks it
+drew.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

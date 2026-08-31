@@ -22,21 +22,13 @@ export let gl, canvas;
 // shadow the subject stands on top of and nobody can see.
 export const LIGHT = [.45, .85, .3];
 
-// `spc` is the SHEEN, and it is a uniform rather than a material because
-// exactly one thing in this game is shiny. Hair is not matte: a mane with
-// only a lambert term reads as a set of rubber tubes, and the one cue that
-// says "this is hair" is the highlight running along it. Blinn-Phong off
-// the half-vector, per vertex - eight points a strand is coarse, but a
-// strand is thin and what you see is a bright band sliding along it as the
-// camera moves, which is exactly what real hair does.
 const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
-uniform mediump float add,dim,gls,sdw,spc;varying vec3 vc;varying float vf,va,vh;
+uniform mediump float add,dim,gls,sdw;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
 vec3 nn=normalize((md*vec4(n,0.)).xyz+vec3(0.,1e-6,0.));
 vec3 L=normalize(vec3(${LIGHT}));
 float l=.55+.45*max(dot(nn,L),0.);
-float sp=spc*pow(max(dot(nn,normalize(L+normalize(cam-w.xyz))),0.),7.);
-vc=mix(c*mix(l,1.,add)+sp,vec3(.16,.09,.02),sdw);va=a*dim;vh=clamp((7.-length(w.xyz-cam))/4.,0.,1.);vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
+vc=mix(c*mix(l,1.,add),vec3(.16,.09,.02),sdw);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
 // Glass does NOT fog toward the fog colour - it fades its ALPHA instead.
 // It writes no depth, so a far piece of deck composites over a near one in
 // mesh order rather than depth order; fogged, that far sliver is close to
@@ -44,30 +36,9 @@ vc=mix(c*mix(l,1.,add)+sp,vec3(.16,.09,.02),sdw);va=a*dim;vh=clamp((7.-length(w.
 // it paints a thin black curve across it. Keeping its colour means the
 // overlap is deck-over-deck - the same hue, so the seam disappears - while
 // the alpha fade still lets it die away with distance.
-// HAIR CARDS. `hair` turns the alpha attribute into an ACROSS-THE-CARD
-// coordinate and cuts each ribbon into a bundle of separate hairs in the
-// fragment shader: a repeating profile gives every hair its own rounded
-// shading, and the gaps between them are discarded outright, so what the
-// eye gets is a mass of thin hairs with the background showing between
-// them rather than one smooth band. This is the standard hair-card trick
-// and it is the only thing that has ever fixed "it looks like tubes",
-// because the tube was real - one quad, one gradient.
-const FS = `precision mediump float;varying vec3 vc;varying float vf,va,vh;
-uniform vec3 fog;uniform float add,gls,hair;
-void main(){
-if(hair>.5){
-// The card is SOLID DOWN THE MIDDLE and ragged at its edges. Cutting gaps
-// all the way across turned every ribbon into a bundle of noodles - the
-// spaghetti this replaced - because a gap in the middle of a mass of hair
-// is a hole, while a gap at its edge is the silhouette hair actually has.
-float d=abs(fract(va*hair)-.5)*2.;
-if(abs(fract(va)-.5)>.31&&d>1.-vh*.65)discard;
-// Inside, the same stripe only shades: light down the centre of each hair,
-// dark in the parting between them, which is the detail that says the mass
-// is made of strands without punching holes in it.
-gl_FragColor=vec4(mix(vc*(1.-vh*d*d*.32),fog,vf),1.);
-return;}
-if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
+const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
+uniform vec3 fog;uniform float add,gls;
+void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
 else if(gls>.5)gl_FragColor=vec4(vc,va*(1.-vf));
 else gl_FragColor=vec4(mix(vc,fog,vf),va);}`;
 
@@ -90,7 +61,7 @@ export function initGL(c) {
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls', 'sdw', 'spc', 'hair']) loc[u] = gl.getUniformLocation(prog, u);
+  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls', 'sdw']) loc[u] = gl.getUniformLocation(prog, u);
   gl.uniform1f(loc.dim, 1);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
@@ -135,9 +106,6 @@ export const setDim = (v) => gl.uniform1f(loc.dim, v);
 // meshes: the mane is rebuilt every frame and duplicating it would double
 // the per-frame geometry work to save one line of shader.
 export const setSdw = (v) => gl.uniform1f(loc.sdw, v);
-export const setSpc = (v) => gl.uniform1f(loc.spc, v);
-// How many hairs across one card. 0 turns the whole trick off.
-export const setHair = (v) => gl.uniform1f(loc.hair, v);
 
 // A planar reflection needs a MASK. A mirror image floating beside the
 // track - out over a gap, past the edge, in the empty air - is worse than

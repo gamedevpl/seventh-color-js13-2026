@@ -1,5 +1,5 @@
 {
-  "name": "R19 hair cards, and a probe worth believing",
-  "description": "the fragment shader cuts each ribbon into a bundle of hairs, solid down the middle and ragged at the silhouette; the FRAME/MOMENT gauges were traded to pay for it; and test-temper now measures 223 pose changes instead of 23, which retired five rounds of tuning against noise - 13,178 packed, 134 bytes free",
+  "name": "R20 the gauges come back",
+  "description": "FRAME and MOMENT are back on the viewfinder - the hair cards, the sheen and the +N floater paid for them, because a continuous read while you aim beats a sentence after you have aimed - 12,936 packed, 376 bytes free",
   "ceilingBytes": 13312
 }

@@ -25,8 +25,9 @@ export const LIGHT = [.45, .85, .3];
 const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
 uniform mediump float add,dim,gls,sdw;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
-vec3 nn=(md*vec4(n,0.)).xyz+vec3(0.,1e-6,0.);
-float l=.55+.45*max(dot(normalize(nn),normalize(vec3(${LIGHT}))),0.);
+vec3 nn=normalize((md*vec4(n,0.)).xyz+vec3(0.,1e-6,0.));
+vec3 L=normalize(vec3(${LIGHT}));
+float l=.55+.45*max(dot(nn,L),0.);
 vc=mix(c*mix(l,1.,add),vec3(.16,.09,.02),sdw);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
 // Glass does NOT fog toward the fog colour - it fades its ALPHA instead.
 // It writes no depth, so a far piece of deck composites over a near one in

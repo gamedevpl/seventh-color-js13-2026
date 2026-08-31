@@ -1491,6 +1491,232 @@ subject has been walked round for years: unbroken, a finger wide, barely
 darker than the paper. Same reference for the eye, no longer in the
 photograph.
 
+## R18 — the hair was tinsel
+
+*"Nie pasuje mi, że one są jakieś takie pół przezroczyste jak łańcuch
+choinkowy."* Correct, and the culprit was a leftover: the mane was drawn
+twice, as a solid core and as a wide additive halo around it.
+
+The halo came from Rainbow Surfer, where the mane glowed against a night
+sky. Against a lit studio sweep it never glowed — adding light to an
+already-bright surface changes almost nothing, which was known and written
+down two rounds into this game — and what it did instead was hang a
+translucent fringe twice the width of the strand around every piece of hair.
+Overlapping strands showed the body through each other. Tinsel.
+
+**Hair is opaque.** The halo is gone, which also removes half the mane's
+geometry and the second material it needed. Two adjustments came with it,
+both because the halo had been quietly doing work nobody asked it to do:
+
+- **The ribbons are wider** (0.064 half-width, up from 0.042). The halo used
+  to fill the gaps between strands, and without it the neck showed through
+  the mane. Still narrower than a segment is long, so a quad reads as a
+  strand rather than as a tile.
+- **Each strand is shaded a few percent differently from its neighbour.**
+  Flat opaque colour turned a pink mane into one moulded plastic piece;
+  there was nothing left to tell one strand from the next. The shade is
+  dealt out by strand index so neighbours always differ.
+
+### Three faults, one shortcut
+
+Then, on the same hair: *it looks like cut tissue paper, there are little
+gaps between the segments, and it does not react to the light at all.* All
+three were the same shortcut — a quad is not a surface.
+
+**The gaps.** The sideways vector was computed per segment, from that
+segment's own direction, so where a strand bends the two quads meeting at a
+point were rotated slightly differently and their corners did not touch. It
+is computed per **point** now, off the average of the segments either side,
+so consecutive quads share their corners exactly and a strand is one
+continuous band.
+
+**The light.** Every hair vertex carried a hard-coded normal of straight up,
+which made the one lambert term in the shader a constant. The hair could not
+be lit, shaded, or turned away from the light — it read as cut paper because
+that is precisely what it was. Each edge of the ribbon now gets a normal
+tilted **outward** from the strand's plane, as if the band were the front of
+a round tuft: the middle faces the lens, the edges lean away, and the
+gradient across every strand is what says *hair* rather than *sticker*.
+
+One correction fell out of that immediately. A billboard's own normal points
+at the lens, which is at right angles to a light coming from above, so
+shading it honestly made every strand dark — the mane went murky the moment
+it stopped being flat-lit. The normals carry a standing up-component too, so
+the hair catches the key light the way the body does and the side lean
+supplies the gradient.
+
+With real shading in place the per-strand tint went from ±18% to ±10%: it
+only has to break neighbours apart now, not carry the whole impression of
+depth on its own.
+
+### Rubber tubes that do not shine
+
+Shaded hair was better and still wrong: *"trochę takie rurki teraz i nie
+błyszczą się"*. Right again — lambert alone gives a smooth gradient across a
+band, and a smooth gradient across a band is a tube. What says *hair* is the
+highlight running along it.
+
+So the shader learned one new trick, a **sheen**: Blinn-Phong off the
+half-vector, per vertex, behind a `spc` uniform that is zero for everything
+in the game except the mane and tail. Eight points a strand is coarse for a
+specular term, and it does not matter: a strand is thin, so what you see is
+a bright band sliding along it as the camera moves, which is what real hair
+does.
+
+And the whole argument stopped being about screenshots, because
+`tools/test-shine.mjs` now measures it. The camera goes round the mane from
+six angles, the raw pixels come back, the hair is picked out of them by
+colour, and the probe reports the **spread of brightness across the hair**:
+
+```
+                        spread, by angle
+  flat-lit (before)    18  18  18  18  18  18
+  shaded + sheen       33  29  35  59  74  52
+```
+
+Eighteen levels from all six angles, to the level — that is the numeric
+signature of paper. Every bit of that spread was the per-strand tint and not
+one level of it was the light. It reads 47 mean now, and 74 at the angle
+where the highlight lands.
+
+### Still tubes: the fault was the width, not the shading
+
+*"Ciągle wygląda jak dmuchańce/rurki."* And the honest reading of that is
+that the last two rounds of work made it worse in one specific way: a
+ribbon 13 cm across, smoothly shaded edge to edge with a highlight down the
+middle, is the exact recipe for a rounded plastic tube. Every improvement to
+the shading made the tube more convincing.
+
+**Hair does not read as volume. It reads as count.** Many thin pieces with
+hard edges between them, not few fat ones with a gradient.
+
+So each solved chain now carries **three thin ribbons** instead of one wide
+one — 3 cm across, spaced 4 cm apart, each a shade off its siblings so the
+seam between them is visible. Splitting at the drawing stage rather than
+adding roots keeps the solver's work identical (one chain still swings,
+three ribbons ride it) and costs geometry rather than bytes, which is the
+resource this game has left.
+
+The shine probe holds through the change: 44 mean, 64 at the best angle,
+against the flat 18.
+
+### And a gate that had been quietly diluted
+
+The suite caught something the hair work had nothing to do with: a bored
+subject lying down **6.3%** of the time against a 15% threshold, and 12.8%
+on a re-run. It used to be 18 to 22%.
+
+Not a boundary flake. R16 put three new poses into the repertoire and gave
+the travelling gaits a third of its weight, and sleep is **gated on boredom
+rather than weighted against anything** — so every pose added anywhere else
+in the table pushed it down. A gate has to be sized against the table it
+competes with, not set once and left there while the table grows around it.
+
+Two guesses, both measured: 17 overshot to 31.8%, and 13 lands at **19.6%**,
+back inside the band the design had before. The number in the file is the
+one the probe agreed with.
+
+## R19 — hair cards, and the probe that had been lying about noise
+
+*"Nie dasz miliona pasm - to ciągle jest jak rurki. Zignoruj na chwilę
+limit i spróbuj drugiego passa albo pixel shadera."*
+
+### What actually fixed it
+
+Not a second pass. A post-process bloom needs a framebuffer, a blur and a
+second program, which is several hundred bytes this game does not have —
+and it would have bloomed a tube. The fault was never the lighting, it was
+that **one quad with one gradient across it is a tube**, and every round of
+shading work made the tube more convincing.
+
+The fix is the standard **hair card**: the alpha attribute, which solid
+geometry never reads, carries the coordinate ACROSS the ribbon, and the
+fragment shader cuts the card into a bundle of hairs with `discard`.
+
+Two attempts, and the first was a lesson:
+
+1. **Cut all the way across, three thin cards per chain.** Thirty noodles
+   per chain. Reported back in one word: *spaghetti*. Right.
+2. **One wide card, solid down the middle, ragged only at its edges.** A gap
+   in the middle of a mass of hair is a hole; a gap at its edge is the
+   silhouette hair actually has. The same stripe that cuts the edge only
+   *shades* the interior — light along each hair, dark in the parting.
+
+The gaps also close with distance: a hair narrower than a pixel cannot be
+drawn, only sampled, and sampling one gives speckle.
+
+### The trade that paid for it
+
+13,353 against a 13,312 ceiling — 41 over. Shader golf recovered 8. The
+rest came from deleting the **FRAME and MOMENT gauges**: two bars saying in
+numbers what the live verdict says in words, and a sentence a child can read
+beats a bar a child has to interpret. The shutter ring still greens when
+both halves are there. 13,178 packed, and the interface is simpler than it
+was.
+
+### The probe had been lying to me for five rounds
+
+While that landed, `test-temper` failed its sleep check again, and this time
+I looked at the spread instead of the constant. The same gate had measured
+**6.3, 10.5, 12.8, 14.9, 18.4, 19.6, 25.4, 25.5 and 31.8 percent** — and the
+variation *within* one constant was as wide as the gap between constants. I
+had tuned that gate four times against a number that moves five points on
+its own. Every regression and every fix in that sequence was noise.
+
+The probe counts pose CHANGES, and it was starving its own sample: six
+WebGL pages at once under a software renderer, each window managing
+**twenty-three** of them. Three pooled windows and — the real fix —
+**320×240 viewports**, because nothing in this probe reads a pixel and fill
+rate was the whole cost. It now measures **223 events**, and the sleep gate
+reads 22.4% with about 2.8 points of spread, four standard deviations clear
+of its floor.
+
+The lesson is in `act.js` in full, including the nine readings, because the
+next person to touch that constant should start from the spread rather than
+from another guess.
+
+## R20 — the trade goes back the other way
+
+*"Ostatnio majstrowałeś przy włosach, a efekt za bardzo się nie polepszył, a
+w zamian straciliśmy wskaźniki kadru i momentu, bez których beznadziejnie
+się w to gra."*
+
+Right on both halves, and the bad call was mine. R19 deleted the FRAME and
+MOMENT gauges to pay for hair cards, with an argument that read well and was
+wrong: that the live verdict says the same thing in words. It does not. The
+verdict says what is wrong with the frame you are **on** — after the fact of
+having pointed somewhere. The bars say how close you are getting **while you
+move**, continuously, and that is what aiming is made of. A cosmetic gain
+never outranks a control the player aims with.
+
+So the gauges are back, and the same hair work paid for them:
+
+| given up | bought back |
+|---|---|
+| hair cards (the fragment-shader strand cut) | FRAME and MOMENT |
+| the specular sheen | |
+| the floating `+N` after each shot | |
+| the title screen's long control blurb | |
+
+The mane keeps its per-point normals and per-strand shading — the half that
+stopped it reading as cut paper — and goes back to being the version that
+was called tubes. Worse to look at, better to play, and **376 bytes free**,
+which is more than the hair cards cost. If they come back, something else
+pays, and it will not be a control.
+
+### The probe caught a black screen
+
+Cutting the sheen removed the `vh` varying from the vertex shader while the
+fragment shader still declared and used it — a leftover from the hair-card
+removal, whose text edit had silently missed. The program stopped linking
+and the entire 3D scene went black behind the menu, which on a screenshot
+looks exactly like "the game does not start".
+
+I did not spot it. `test-shine` returned `NaN` instead of a number, because
+a probe that reads real pixels cannot miss an empty buffer, and that is the
+whole reason it reads pixels rather than asking the code what it thinks it
+drew.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

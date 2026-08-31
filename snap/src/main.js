@@ -11,7 +11,7 @@ import {
 } from './gl.js';
 import { buildUnicorn, paint, flushPaint, makePose, solve, BOXES, MESH_OF, COAT, HORN, HOOF } from './uni.js';
 import { studioMesh, shadowMesh, lightsMesh, markMesh, shadowMat } from './studio.js';
-import { makeMane, updateMane, maneVerts, recolour, MANE_CORE, MANE_HALO } from './mane.js';
+import { makeMane, updateMane, maneVerts, recolour, MANE_CORE } from './mane.js';
 import { makeAnim, applyPose, POSE_NAME, SHAKE, IDLE } from './pose.js';
 import { makeDeco, makeGlitter, glitterVerts, GLITTER_BUF, PALETTE, RB, MAX_GLITTER, swatch } from './deco.js';
 import { makeActor, act, move, poke, temper } from './act.js';
@@ -47,7 +47,6 @@ const M = makeMane();
 const deco = makeDeco();
 const G = makeGlitter();
 const maneCore = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
-const maneHalo = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
 const glitMesh = createMesh([0, 0, 0, 0, 1, 0, 1, 1, 1, 1], true);
 recolour(M, deco);
 
@@ -97,14 +96,19 @@ const vf = el('div', 'position:fixed;inset:0;display:none;pointer-events:none');
 el('div', 'position:absolute;inset:0;opacity:.22;background:'
   + 'linear-gradient(90deg,#0000 33.2%,#fff 33.2%,#fff 33.5%,#0000 33.5%,#0000 66.4%,#fff 66.4%,#fff 66.7%,#0000 66.7%),'
   + 'linear-gradient(#0000 33.2%,#fff 33.2%,#fff 33.5%,#0000 33.5%,#0000 66.4%,#fff 66.4%,#fff 66.7%,#0000 66.7%)', vf);
+// THE TWO GAUGES ARE THE TWO SKILLS, and they were deleted once to pay for
+// a hair shader. That was a bad trade and it was mine: the verdict says
+// what is wrong with the frame you are ON, in words, after the fact of
+// pointing somewhere - the bars say how close you are getting WHILE you
+// move, continuously, which is what aiming needs. A sentence cannot do
+// that, and the game was reported as miserable to play without them.
 const meters = el('div', 'position:fixed;left:50%;transform:translateX(-50%);bottom:120px;display:flex;gap:14px;pointer-events:none', vf);
 const METER = 'font:700 10px system-ui,sans-serif;letter-spacing:.09em;color:#fff3d6;text-shadow:0 2px 8px #000a;text-align:center';
 function gauge(label) {
   const w = el('div', METER, meters, '');
   el('div', '', w, label);
   const track = el('div', 'width:96px;height:7px;border-radius:4px;background:#0006;margin-top:4px;overflow:hidden', w);
-  const fill = el('div', 'height:100%;width:0;border-radius:4px;background:#ffd977;transition:width .12s linear', track);
-  return fill;
+  return el('div', 'height:100%;width:0;border-radius:4px;background:#ffd977;transition:width .12s linear', track);
 }
 const gFrame = gauge('FRAME');
 const gMoment = gauge('MOMENT');
@@ -116,13 +120,9 @@ const gMoment = gauge('MOMENT');
 // something to do about it.
 const live = el('div', 'position:fixed;left:0;right:0;bottom:158px;text-align:center;pointer-events:none;'
   + 'font:800 17px system-ui,sans-serif;text-shadow:0 2px 12px #000c', vf, '');
-// Points that climb as you shoot. The score used to be a number you met
-// after the fact; a total that ticks up when a good frame lands is the same
-// information arriving at the moment it means something.
-// It rises toward the running total rather than sitting in the middle of
-// the viewfinder, where it landed on the coaching line and on the subject.
-const pop = el('div', 'position:fixed;left:0;right:0;top:106px;text-align:center;pointer-events:none;opacity:0;'
-  + 'font:800 27px system-ui,sans-serif;color:#ffe9a8;text-shadow:0 2px 14px #000c', vf, '');
+// The running total climbs in the top row as the roll fills; the floating
+// "+N" that used to rise toward it was the cheapest thing on this screen to
+// give up when the gauges came back, and it said nothing the total did not.
 const sheet = el('div', 'position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#00000055;backdrop-filter:blur(3px);padding:16px');
 // The title sits over a LIVE set rather than a still: the unicorn is already
 // working and the camera is already following it, so the first thing anyone
@@ -131,7 +131,7 @@ const sheet = el('div', 'position:fixed;inset:0;display:none;flex-direction:colu
 const title = el('div', 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px;padding:0 16px 8vh;text-align:center;background:linear-gradient(#00000059,#00000000 34%,#00000012 50%,#000000a6)');
 
 const CHIP = 'font:600 13px system-ui,sans-serif;padding:5px 11px;border-radius:999px;background:#0000005e;color:#fff3d6';
-let ptsChip = null, shown = 0, popT = 0;
+let ptsChip = null, shown = 0;
 
 const ZONES = ['mane', 'tail', 'coat', 'horn', 'hoof'];
 let zone = 0;
@@ -194,7 +194,10 @@ const cBtns = [RB, 0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
 el('div', 'font:800 min(13vw,54px)/1 system-ui,sans-serif;color:#fff6dd;letter-spacing:.02em;text-shadow:0 3px 14px #0007', title, 'UNICORN SNAP');
 el('div', 'font:600 15px system-ui,sans-serif;color:#ffeec4;text-shadow:0 2px 8px #0008;margin-top:6px', title, 'It knows how good it looks. Prove it.');
 el('div', 'font:500 13px/1.7 system-ui,sans-serif;color:#f0dcae;text-shadow:0 2px 8px #0008;max-width:34em', title,
-  'Style the unicorn for the job, then shoot it. Drag or pinch to aim and zoom - wheel or W/S on a desktop, Q/E to walk round the set. Tap, SPACE or the shutter takes the picture.');
+  // Short, because the coaching line teaches the same three controls one
+  // at a time while you are holding them, which is where it sticks. This
+  // paid for the gauges coming back.
+  'Dress it up, then shoot it. Drag to aim, pinch to zoom, tap to take the picture.');
 const startBtn = el('button', GO + ';margin-top:10px;font-size:18px', title, 'OPEN THE STUDIO');
 
 // A real button for the shutter. Tap-anywhere works on a phone, but on a
@@ -203,6 +206,33 @@ const startBtn = el('button', GO + ';margin-top:10px;font-size:18px', title, 'OP
 // was the one control a trackpad could not reliably use.
 const shutBtn = el('button', 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(22px + env(safe-area-inset-bottom));width:84px;height:84px;border-radius:50%;touch-action:manipulation;border:4px solid #fff3d6cc;background:#ffffff26;cursor:pointer;display:none;font:800 11px system-ui,sans-serif;letter-spacing:.08em;color:#fff3d6;text-shadow:0 2px 8px #000a', null, 'SHOOT');
 shutBtn.onclick = () => { wake(); if (phase === 1) wantShot = 1; };
+
+// WHICH WAY SIDEWAYS GOES, as a switch rather than as an argument.
+//
+// There are two coherent conventions and no third. Drag the world - Street
+// View, Maps, Sketchfab, every 360 player - moves the subject with your
+// finger on BOTH axes. Mouse-look - an FPS with a captured pointer - turns
+// the camera into the drag on BOTH axes. What this game shipped for a while
+// was one of each, because two reports arrived about different halves and I
+// implemented both literally; a mixed pair is the one option nobody ships.
+//
+// The default is drag-the-world, which is the convention this kind of view
+// belongs to. The switch exists because which one FEELS right is a question
+// about hands, not about documentation, and the person it has to feel right
+// for is nine.
+let invX = 0;
+try { invX = +localStorage.usInvX || 0; } catch (e) { /* no store, no problem */ }
+const axBtn = el('button', 'position:fixed;right:14px;bottom:calc(34px + env(safe-area-inset-bottom));'
+  + 'min-height:44px;padding:8px 12px;border:0;border-radius:10px;touch-action:manipulation;cursor:pointer;'
+  + 'display:none;font:700 13px system-ui,sans-serif;background:#0000005e;color:#fff3d6', null, '');
+const axSay = () => { axBtn.textContent = invX ? '\u2194 CAMERA' : '\u2194 SUBJECT'; };
+axSay();
+axBtn.onclick = () => {
+  wake();
+  invX = invX ? 0 : 1;
+  try { localStorage.usInvX = invX; } catch (e) { /* no store, no problem */ }
+  axSay();
+};
 startBtn.onclick = () => { wake(); phase = 0; benchCam(); layout(); };
 
 const goBtn = el('button', GO, rowG, 'START THE SHOOT');
@@ -349,7 +379,7 @@ function layout() {
     }
   }
   vf.style.display = phase === 1 ? 'block' : 'none';
-  shutBtn.style.display = phase === 1 ? 'block' : 'none';
+  shutBtn.style.display = axBtn.style.display = phase === 1 ? 'block' : 'none';
   const c2 = phase === 1 ? coach() : '';
   hint.textContent = c2;
   hint.style.opacity = c2 ? '1' : '0';
@@ -497,7 +527,9 @@ addEventListener('pointermove', (e) => {
   // Scaled by the field of view, so a long lens aims slowly. Without this,
   // zooming in makes the camera unusably twitchy at exactly the moment
   // precision starts to matter.
-  cam.a += dx * .0022 * cam.fov;
+  // Sideways follows the switch; up and down always carries the subject
+  // with the finger, which is the half nobody has argued with.
+  cam.a += (invX ? -dx : dx) * .0022 * cam.fov;
   cam.p = Math.max(-.5, Math.min(.6, cam.p + dy * .0022 * cam.fov));
 });
 let gScale = 1;
@@ -545,10 +577,12 @@ addEventListener('wheel', (e) => {
     if (cam.fov < 1) learnt.zoom = 1;
     return;
   }
-  // A two-finger drag. Scrolling right moves the content left, which is the
-  // same gesture as dragging the canvas left, so the signs are the drag
-  // handler's inverted - and the subject still follows the fingers.
-  cam.a -= e.deltaX * .0022 * cam.fov;
+  // A two-finger drag, with the same switch and its signs inverted, because
+  // scrolling right is the gesture of dragging the surface left - and the
+  // sign the browser reports already carries the reader's own natural-
+  // scrolling setting, which is the one convention worth inheriting rather
+  // than guessing at.
+  cam.a -= (invX ? -e.deltaX : e.deltaX) * .0022 * cam.fov;
   cam.p = Math.max(-.5, Math.min(.6, cam.p - e.deltaY * .0022 * cam.fov));
   learnt.aim = 1;
 }, { passive: false });
@@ -595,7 +629,7 @@ const coach = () => (!learnt.aim ? 'drag to aim the camera'
   // the stop puts the subject 94% outside the frame and the score at zero.
   // The gauge already knows where the sweet spot is; the hint's job is to
   // send the player there rather than to imply that more is always better.
-  : !learnt.zoom ? (TOUCH ? 'pinch to zoom until FRAME turns green' : 'wheel or W/S to zoom until FRAME turns green')
+  : !learnt.zoom ? (TOUCH ? 'pinch to zoom in on it' : 'wheel or W/S to zoom in on it')
   : !learnt.shot ? (TOUCH ? 'tap or the shutter takes the picture' : 'tap or SPACE to take the picture')
   : '');
 let last = performance.now();
@@ -679,9 +713,7 @@ function frame(now) {
   solve(P);
   updateMane(M, P.w, anim.t, dt);
 
-  const [nc, nh] = maneVerts(M, eye);
-  updateMesh(maneCore, MANE_CORE, nc);
-  updateMesh(maneHalo, MANE_HALO, nh);
+  updateMesh(maneCore, MANE_CORE, maneVerts(M, eye));
   const burst = anim.mode === SHAKE ? anim.hold : 0;
   glitN = glitterVerts(G, P.w, eye, deco.glitter, anim.t, burst);
   updateMesh(glitMesh, GLITTER_BUF, glitN);
@@ -708,10 +740,15 @@ function frame(now) {
 
   mode(0);
   for (let i = 0; i < U.parts.length; i++) drawMesh(U.parts[i], P.w[i]);
+  // No sheen on it any more. The specular went the same way as the hair
+  // cards and for the same reason: it belonged to a run of work on how the
+  // mane LOOKS, which was judged not to have earned what it cost, and the
+  // nine bytes of headroom left after the gauges came back are not a
+  // margin, they are luck. The hair keeps its shading, which is what
+  // stopped it reading as cut paper.
   drawMesh(maneCore, IDENT);
   mode(1);
   drawMesh(lights, IDENT);
-  drawMesh(maneHalo, IDENT);
   drawMesh(glitMesh, IDENT);
 
   // The capture happens HERE, after the draw and before anything else can
@@ -725,20 +762,20 @@ function frame(now) {
   if (phase === 1) {
     const h = coach();
     if (hint.textContent !== h) { hint.textContent = h; hint.style.opacity = h ? '1' : '0'; }
-    // The two gauges are the two skills, shown separately on purpose: a
-    // single "shot quality" number would tell a player they are doing badly
-    // without telling them which half to fix.
     const b2 = frameBox(P, vp);
     const q = frameQuality(b2);
     const e = eyeContact(P, eye);
+    // The moment half of the pair: how much is worth photographing right
+    // now, which is the pose's own worth plus whatever eye contact adds.
     const mom = Math.min(1, ((POSE_WORTH[anim.mode] || 40) / 320) + Math.max(0, e - .55) * .5);
     gFrame.style.width = (q * 100).toFixed(0) + '%';
     gMoment.style.width = (mom * 100).toFixed(0) + '%';
     // Green only when BOTH are there, because that is the only combination
-    // the score actually pays for.
-    const good = q > .7 && mom > .55;
+    // the score actually pays for - and the shutter ring says the same
+    // thing in one colour for a player who is looking at the unicorn.
     gFrame.style.background = q > .7 ? '#9fe08a' : '#ffd977';
     gMoment.style.background = mom > .55 ? '#9fe08a' : '#ffd977';
+    const good = q > .7 && mom > .55;
     // The same call the gallery makes, on the frame you are aiming at.
     const [up, why] = verdict({
       box: b2, pose: anim.mode, eye: e, glitAir: deco.glitter > 0 && anim.mode === SHAKE,
@@ -755,11 +792,6 @@ function frame(now) {
     const n = `${Math.round(shown)}`;
     if (ptsChip && ptsChip.textContent !== n) ptsChip.textContent = n;
     shutBtn.style.borderColor = good ? '#9fe08add' : '#fff3d6cc';
-  }
-  if (popT > 0) {
-    popT = Math.max(0, popT - dt * 1.1);
-    pop.style.opacity = popT;
-    pop.style.transform = `translateY(${(1 - popT) * -22}px)`;
   }
   if (flashT > 0) {
     flashT = Math.max(0, flashT - dt * 3.4);
@@ -797,6 +829,13 @@ function frame(now) {
     // measuring what a LOOK is worth has to be able to hold the mood still -
     // otherwise it measures the two together and can attribute neither.
     window.SNAPMOOD = (bored, spark) => { A.bored = bored; A.spark = spark; };
+    // Raw pixels, for the one question an average cannot answer: is there
+    // a GRADIENT across the hair, or is it flat-lit paper?
+    window.SNAPRAW = (x, y, w, h) => {
+      const px = new Uint8Array(w * h * 4);
+      gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      return Array.from(px);
+    };
     window.SNAPPIX = (x, y, w, h) => {
       const px = new Uint8Array(w * h * 4);
       gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
@@ -820,8 +859,6 @@ function takeShot() {
   flashT = 1;
   const s = scoreShot(P, vp, eye, anim, deco, roll);
   rollPts += s.total;
-  pop.textContent = `+${s.total}`;
-  popT = 1;
   // JPEG, not PNG: these are photographs, six of them are held in memory at
   // once, and a full-window PNG data URL is megabytes of string.
   s.img = c.toDataURL('image/jpeg', .82);

@@ -1743,6 +1743,28 @@ holds about two and a half seconds, so twelve seconds is five picks, and
 same small-sample trap that had the sleep gate tuned against noise for five
 rounds.
 
+## R22 — a line that broke itself
+
+The title's instruction line wrapped on a 1000-pixel screen and left
+`picture.` alone on the second row. The cause was in the style, not the
+prose: it carried `max-width: 34em`, **narrower than the sentence it holds**,
+so no screen was ever wide enough to fit it.
+
+The cap is wider than the text now, and the sentence is a few characters
+shorter at the end. Measured by counting the line boxes rather than by
+looking:
+
+```
+1200 px   1 line
+ 900 px   1 line
+ 430 px   2 lines
+ 375 px   2 lines
+```
+
+A phone cannot fit that much text on one line at a readable size, so the
+narrow case gets `text-wrap: balance` — two lines of roughly equal length
+rather than a full line and an orphan.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

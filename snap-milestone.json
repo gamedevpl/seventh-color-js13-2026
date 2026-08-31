@@ -1,5 +1,5 @@
 {
-  "name": "R21 the credit, and a rule that undid itself",
-  "description": "the title carries the same @gtanczyk | gamedev.pl | 2026 credit the other two entries do, as real anchors rather than painted text; and never-twice-in-a-row fell back to rep[0], which is IDLE, so standing still perpetuated itself - 13,067 packed, 245 bytes free",
+  "name": "R22 the title fits on one line",
+  "description": "the instruction line was capped narrower than its own sentence, so even a wide screen broke it and left an orphan word; the cap is wider than the text now and text-wrap:balance splits the phone case evenly - 13,072 packed, 240 bytes free",
   "ceilingBytes": 13312
 }

@@ -39,7 +39,11 @@ const browser = await chromium.launch({
 
 // mane,tail,coat,horn,hoof,glitter
 async function tally(deco, bored) {
-  const page = await browser.newPage({ viewport: { width: 900, height: 620 } });
+  // SMALL WINDOWS. Nothing here reads a pixel - it counts pose changes -
+  // and these run six at a time under a software GL, where fill rate is the
+  // whole cost. At 900x620 each page was managing about twenty-three pose
+  // changes in a window; the parallelism was starving its own sample.
+  const page = await browser.newPage({ viewport: { width: 320, height: 240 } });
   page.on('pageerror', (e) => { console.error('PAGE ERROR:', e.message); process.exitCode = 1; });
 
 await requireDevBuild(page, browser, file, pathToFileURL);
@@ -82,12 +86,28 @@ const check = (name, ok, detail) => {
 // one, so a pose that trebles pushes every other share down, and warmth read
 // as WEAKER than cool despite working. Three looks, differing in one thing
 // each, is the only way to attribute a change to a rule.
-const [warm, cool, glit, bored] = await Promise.all([
+// THE BORED WINDOW IS RUN THREE TIMES AND POOLED. Every tally here counts
+// pose CHANGES, so a share is a count of events: one window holds about
+// eighty picks and a one-in-five share is sixteen of them, which is why
+// this check has read 10.5%, 14.9%, 18.4%, 25.4% and 31.8% off constants
+// that differed by nothing at all. Three windows in parallel cost no extra
+// wall clock - they were always going to run alongside the other three -
+// and cut the spread on the one statistic that kept crying wolf.
+const [warm, cool, glit, b1, b2, b3] = await Promise.all([
   tally('4,4,6,4,4,0', 0),      // coral coat, gold mane
   tally('2,2,2,2,2,0', 0),      // sky throughout
   tally('4,4,6,4,4,3', 0),      // warm again, plus glitter
   tally('4,4,6,4,4,0', 1),      // warm, but the player has stopped working
+  tally('4,4,6,4,4,0', 1),
+  tally('4,4,6,4,4,0', 1),
 ]);
+// Pooled by COUNT, not by averaging three percentages: a window that got
+// fewer picks should carry less weight, and under six parallel WebGL pages
+// they do not all get the same number.
+const bored = { share: {}, n: b1.n + b2.n + b3.n };
+for (const k of new Set([...Object.keys(b1.share), ...Object.keys(b2.share), ...Object.keys(b3.share)])) {
+  bored.share[k] = ((b1.share[k] || 0) * b1.n + (b2.share[k] || 0) * b2.n + (b3.share[k] || 0) * b3.n) / bored.n;
+}
 
 console.log('\n  pose          warm     cool     warm+glitter');
 for (const i of [PRANCE, REAR, TOSS, SHAKE, BOW, 1, 0]) {
@@ -120,7 +140,7 @@ check('and does not just stand about', dead < .5, pct(dead));
 // 15.3%). Widening the bucket to what is actually being claimed makes the
 // same test read the same effect with a fraction of the variance.
 const showy = (r) => SHOWY.reduce((a, p) => a + (r.share[p] || 0), 0);
-console.log(`\n  bored:  sleep ${pct(bored.share[SLEEP])}   showy ${pct(showy(bored))}   rear ${pct(bored.share[REAR])}\n`);
+console.log(`\n  bored:  sleep ${pct(bored.share[SLEEP])}   showy ${pct(showy(bored))}   over ${bored.n} pose changes (${b1.n}+${b2.n}+${b3.n})\n`);
 // A FLOOR, NOT A TARGET. The design point is around a fifth of the time,
 // and the run-to-run spread on a sample this size is several points either
 // way, so the check asserts the thing that has to be true - a bored subject

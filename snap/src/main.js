@@ -96,17 +96,11 @@ const vf = el('div', 'position:fixed;inset:0;display:none;pointer-events:none');
 el('div', 'position:absolute;inset:0;opacity:.22;background:'
   + 'linear-gradient(90deg,#0000 33.2%,#fff 33.2%,#fff 33.5%,#0000 33.5%,#0000 66.4%,#fff 66.4%,#fff 66.7%,#0000 66.7%),'
   + 'linear-gradient(#0000 33.2%,#fff 33.2%,#fff 33.5%,#0000 33.5%,#0000 66.4%,#fff 66.4%,#fff 66.7%,#0000 66.7%)', vf);
-const meters = el('div', 'position:fixed;left:50%;transform:translateX(-50%);bottom:120px;display:flex;gap:14px;pointer-events:none', vf);
-const METER = 'font:700 10px system-ui,sans-serif;letter-spacing:.09em;color:#fff3d6;text-shadow:0 2px 8px #000a;text-align:center';
-function gauge(label) {
-  const w = el('div', METER, meters, '');
-  el('div', '', w, label);
-  const track = el('div', 'width:96px;height:7px;border-radius:4px;background:#0006;margin-top:4px;overflow:hidden', w);
-  const fill = el('div', 'height:100%;width:0;border-radius:4px;background:#ffd977;transition:width .12s linear', track);
-  return fill;
-}
-const gFrame = gauge('FRAME');
-const gMoment = gauge('MOMENT');
+// THE GAUGES ARE GONE, and this is the trade that paid for hair worth
+// looking at. FRAME and MOMENT were two bars saying, in numbers, what the
+// live verdict now says in words - "too far away", "nice frame - only
+// standing" - and a sentence a child can read beats a bar a child has to
+// interpret. The bytes went into the mane.
 // THE VERDICT ARRIVES BEFORE THE SHUTTER. The gallery says what each
 // photograph was worth once the roll is spent, which teaches a player at
 // the end of a job what they should have known during it. The same sentence
@@ -595,7 +589,7 @@ const coach = () => (!learnt.aim ? 'drag to aim the camera'
   // the stop puts the subject 94% outside the frame and the score at zero.
   // The gauge already knows where the sweet spot is; the hint's job is to
   // send the player there rather than to imply that more is always better.
-  : !learnt.zoom ? (TOUCH ? 'pinch to zoom until FRAME turns green' : 'wheel or W/S to zoom until FRAME turns green')
+  : !learnt.zoom ? (TOUCH ? 'pinch to zoom in on it' : 'wheel or W/S to zoom in on it')
   : !learnt.shot ? (TOUCH ? 'tap or the shutter takes the picture' : 'tap or SPACE to take the picture')
   : '');
 let last = performance.now();
@@ -729,20 +723,13 @@ function frame(now) {
   if (phase === 1) {
     const h = coach();
     if (hint.textContent !== h) { hint.textContent = h; hint.style.opacity = h ? '1' : '0'; }
-    // The two gauges are the two skills, shown separately on purpose: a
-    // single "shot quality" number would tell a player they are doing badly
-    // without telling them which half to fix.
     const b2 = frameBox(P, vp);
     const q = frameQuality(b2);
     const e = eyeContact(P, eye);
-    const mom = Math.min(1, ((POSE_WORTH[anim.mode] || 40) / 320) + Math.max(0, e - .55) * .5);
-    gFrame.style.width = (q * 100).toFixed(0) + '%';
-    gMoment.style.width = (mom * 100).toFixed(0) + '%';
-    // Green only when BOTH are there, because that is the only combination
-    // the score actually pays for.
-    const good = q > .7 && mom > .55;
-    gFrame.style.background = q > .7 ? '#9fe08a' : '#ffd977';
-    gMoment.style.background = mom > .55 ? '#9fe08a' : '#ffd977';
+    // The shutter's ring still says when both halves are there, because
+    // that is the only combination the score pays for - and it says it
+    // where the thumb already is.
+    const good = q > .7 && (POSE_WORTH[anim.mode] || 40) > 150;
     // The same call the gallery makes, on the frame you are aiming at.
     const [up, why] = verdict({
       box: b2, pose: anim.mode, eye: e, glitAir: deco.glitter > 0 && anim.mode === SHAKE,

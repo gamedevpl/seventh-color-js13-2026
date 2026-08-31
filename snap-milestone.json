@@ -1,5 +1,5 @@
 {
-  "name": "R19 hair cards",
-  "description": "the fragment shader cuts every ribbon into a bundle of separate hairs and discards the gaps between them, with the gaps closing at distance so far-off hair stops speckling - 13,252 packed, 60 bytes free, the tightest this game has ever been",
+  "name": "R19 hair cards, and a probe worth believing",
+  "description": "the fragment shader cuts each ribbon into a bundle of hairs, solid down the middle and ragged at the silhouette; the FRAME/MOMENT gauges were traded to pay for it; and test-temper now measures 223 pose changes instead of 23, which retired five rounds of tuning against noise - 13,178 packed, 134 bytes free",
   "ceilingBytes": 13312
 }

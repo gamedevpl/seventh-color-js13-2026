@@ -247,8 +247,7 @@ export function updateMane(M, W, t, dt) {
 //
 // Hair is opaque. The core is all that is left, wider now that it is not
 // sitting inside a haze, and it costs half the geometry it used to.
-const SUB = 3;                 // thin strands per solved chain
-const CORE = new Float32Array(24 * L * 6 * 10 * SUB);
+const CORE = new Float32Array(24 * L * 6 * 10);
 let ci = 0;
 // The last slot is the ALPHA attribute, which solid geometry never reads -
 // so hair borrows it for the coordinate across the card, which is what the
@@ -320,37 +319,25 @@ export function maneVerts(M, eye) {
         [nx * .42 + sx * .66, ny * .42 + sy * .66 + .62, nz * .42 + sz * .66],
       ];
     }
-    // THREE THIN STRANDS WHERE THERE WAS ONE FAT ONE. A single ribbon 13 cm
-    // across, smoothly shaded from edge to edge and with a highlight down
-    // the middle, is the exact recipe for a rounded plastic tube - which is
-    // what it was reported as, twice, and the shading work only made the
-    // tube more convincing. Hair does not read as volume, it reads as
-    // COUNT: many thin pieces with hard edges between them.
-    //
-    // Splitting here rather than adding roots keeps the solver's work
-    // identical - one chain still swings, three ribbons ride it - and costs
-    // geometry rather than bytes, which is the resource this game has left.
-    for (let k = 0; k < SUB; k++) {
-      const off = (k - (SUB - 1) / 2) * .040;
-      // Each sub-strand a shade apart from its siblings, so the seam
-      // between them is visible and the mane reads as separate hair rather
-      // than as one moulded piece.
-      const c = s.c.map((v) => v * (.86 + .14 * (k % 2)));
-      // Each sibling's hairs start at a different phase, or the three cards
-      // line their strands up and the bundle reads as one combed sheet.
-      const ph = k * .37 + (s.i % 3) * .21;
-      for (let i = 1; i < L; i++) {
-        const a = P[i - 1], b = P[i], s0 = SIDE[i - 1], s1 = SIDE[i];
-        // Tapering toward the tip, which is what hair does and what keeps a
-        // strand from ending in a blunt square.
-        const w0 = .031 * (1 - (i - 1) / L * .55), w1 = .031 * (1 - i / L * .55);
-        const o0 = off, o1 = off;
-        ci = Q(CORE, ci,
-          [a[0] + s0[0] * (o0 - w0), a[1] + s0[1] * (o0 - w0), a[2] + s0[2] * (o0 - w0), NRM[i - 1][0], c, ph],
-          [a[0] + s0[0] * (o0 + w0), a[1] + s0[1] * (o0 + w0), a[2] + s0[2] * (o0 + w0), NRM[i - 1][1], c, ph + 1],
-          [b[0] + s1[0] * (o1 + w1), b[1] + s1[1] * (o1 + w1), b[2] + s1[2] * (o1 + w1), NRM[i][1], c, ph + 1],
-          [b[0] + s1[0] * (o1 - w1), b[1] + s1[1] * (o1 - w1), b[2] + s1[2] * (o1 - w1), NRM[i][0], c, ph]);
-      }
+    // ONE WIDE CARD PER CHAIN. This was three thin ribbons for a round, and
+    // three thin ribbons cut into five hairs each is thirty noodles per
+    // chain - reported, accurately, as spaghetti. The lesson from the far
+    // side of that: hair reads as a MASS with a broken edge, not as a count
+    // of separate pieces. The card is wide and solid again; the fragment
+    // shader does the breaking up, and only at the silhouette.
+    for (let i = 1; i < L; i++) {
+      const a = P[i - 1], b = P[i], s0 = SIDE[i - 1], s1 = SIDE[i];
+      // Tapering toward the tip, which is what hair does and what keeps a
+      // strand from ending in a blunt square.
+      const w0 = .066 * (1 - (i - 1) / L * .55), w1 = .066 * (1 - i / L * .55);
+      // Where this card's hairs start, so neighbouring chains do not comb
+      // their strands into one continuous sheet.
+      const ph = (s.i % 4) * .27;
+      ci = Q(CORE, ci,
+        [a[0] - s0[0] * w0, a[1] - s0[1] * w0, a[2] - s0[2] * w0, NRM[i - 1][0], s.c, ph],
+        [a[0] + s0[0] * w0, a[1] + s0[1] * w0, a[2] + s0[2] * w0, NRM[i - 1][1], s.c, ph + 1],
+        [b[0] + s1[0] * w1, b[1] + s1[1] * w1, b[2] + s1[2] * w1, NRM[i][1], s.c, ph + 1],
+        [b[0] - s1[0] * w1, b[1] - s1[1] * w1, b[2] - s1[2] * w1, NRM[i][0], s.c, ph]);
     }
   }
   return ci;

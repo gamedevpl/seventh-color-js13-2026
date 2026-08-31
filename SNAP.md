@@ -1616,6 +1616,65 @@ Two guesses, both measured: 17 overshot to 31.8%, and 13 lands at **19.6%**,
 back inside the band the design had before. The number in the file is the
 one the probe agreed with.
 
+## R19 — hair cards, and the probe that had been lying about noise
+
+*"Nie dasz miliona pasm - to ciągle jest jak rurki. Zignoruj na chwilę
+limit i spróbuj drugiego passa albo pixel shadera."*
+
+### What actually fixed it
+
+Not a second pass. A post-process bloom needs a framebuffer, a blur and a
+second program, which is several hundred bytes this game does not have —
+and it would have bloomed a tube. The fault was never the lighting, it was
+that **one quad with one gradient across it is a tube**, and every round of
+shading work made the tube more convincing.
+
+The fix is the standard **hair card**: the alpha attribute, which solid
+geometry never reads, carries the coordinate ACROSS the ribbon, and the
+fragment shader cuts the card into a bundle of hairs with `discard`.
+
+Two attempts, and the first was a lesson:
+
+1. **Cut all the way across, three thin cards per chain.** Thirty noodles
+   per chain. Reported back in one word: *spaghetti*. Right.
+2. **One wide card, solid down the middle, ragged only at its edges.** A gap
+   in the middle of a mass of hair is a hole; a gap at its edge is the
+   silhouette hair actually has. The same stripe that cuts the edge only
+   *shades* the interior — light along each hair, dark in the parting.
+
+The gaps also close with distance: a hair narrower than a pixel cannot be
+drawn, only sampled, and sampling one gives speckle.
+
+### The trade that paid for it
+
+13,353 against a 13,312 ceiling — 41 over. Shader golf recovered 8. The
+rest came from deleting the **FRAME and MOMENT gauges**: two bars saying in
+numbers what the live verdict says in words, and a sentence a child can read
+beats a bar a child has to interpret. The shutter ring still greens when
+both halves are there. 13,178 packed, and the interface is simpler than it
+was.
+
+### The probe had been lying to me for five rounds
+
+While that landed, `test-temper` failed its sleep check again, and this time
+I looked at the spread instead of the constant. The same gate had measured
+**6.3, 10.5, 12.8, 14.9, 18.4, 19.6, 25.4, 25.5 and 31.8 percent** — and the
+variation *within* one constant was as wide as the gap between constants. I
+had tuned that gate four times against a number that moves five points on
+its own. Every regression and every fix in that sequence was noise.
+
+The probe counts pose CHANGES, and it was starving its own sample: six
+WebGL pages at once under a software renderer, each window managing
+**twenty-three** of them. Three pooled windows and — the real fix —
+**320×240 viewports**, because nothing in this probe reads a pixel and fill
+rate was the whole cost. It now measures **223 events**, and the sleep gate
+reads 22.4% with about 2.8 points of spread, four standard deviations clear
+of its floor.
+
+The lesson is in `act.js` in full, including the nine readings, because the
+next person to touch that constant should start from the spread rather than
+from another guess.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

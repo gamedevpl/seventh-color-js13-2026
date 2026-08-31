@@ -56,14 +56,16 @@ const FS = `precision mediump float;varying vec3 vc;varying float vf,va,vh;
 uniform vec3 fog;uniform float add,gls,hair;
 void main(){
 if(hair>.5){
-float f=fract(va*hair);
-float d=abs(f-.5)*2.;
-// The gaps CLOSE WITH DISTANCE. A hair narrower than a pixel cannot be
-// drawn, only sampled, and sampling one gives a speckled mess - so far
-// away the bundle goes back to being a solid band and the eye never sees
-// the transition.
-if(d>mix(1.,.82,vh))discard;
-gl_FragColor=vec4(mix(vc*mix(1.,mix(1.18,.66,d*d),vh),fog,vf),1.);
+// The card is SOLID DOWN THE MIDDLE and ragged at its edges. Cutting gaps
+// all the way across turned every ribbon into a bundle of noodles - the
+// spaghetti this replaced - because a gap in the middle of a mass of hair
+// is a hole, while a gap at its edge is the silhouette hair actually has.
+float d=abs(fract(va*hair)-.5)*2.;
+if(abs(fract(va)-.5)>.31&&d>1.-vh*.65)discard;
+// Inside, the same stripe only shades: light down the centre of each hair,
+// dark in the parting between them, which is the detail that says the mass
+// is made of strands without punching holes in it.
+gl_FragColor=vec4(mix(vc*(1.-vh*d*d*.32),fog,vf),1.);
 return;}
 if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
 else if(gls>.5)gl_FragColor=vec4(vc,va*(1.-vf));

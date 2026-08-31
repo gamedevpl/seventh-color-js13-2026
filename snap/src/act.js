@@ -108,14 +108,24 @@ function weightOf(e, t, spark, bored) {
   // the main event once the player has stopped. At the first weighting it
   // reached only 8% of pose changes at full boredom - a consequence nobody
   // would ever see, which is the same as no consequence.
-  // 13, not 9. R16 put three new poses into the table and gave the
-  // travelling gaits a third of its weight, and sleep - which is gated on
-  // boredom rather than weighted against anything - was quietly diluted by
-  // all of it: the probe measured a bored subject lying down 6% and 13% of
-  // the time, against the 18-22% it used to. A gate has to be sized against
-  // the table it competes with, not set once and left while the table grows
-  // around it. 17 was the first try and overshot to 32%.
-  if (pose === SLEEP) return base * bored * bored * 13;
+  // 17, and the number went 9 -> 17 -> 13 -> 17 before the measurement it
+  // was being tuned against was worth anything. Worth writing down in full.
+  //
+  // 9 was diluted by R16, which added three poses and heavier gaits: sleep
+  // is gated on boredom rather than weighted against the table, so every
+  // pose added anywhere else pushed it down. The probe then read 6.3%,
+  // 10.5%, 12.8%, 14.9%, 18.4%, 19.6%, 25.4%, 25.5% and 31.8% across
+  // constants of 9, 13 and 17 - and the spread WITHIN one constant was as
+  // wide as the gap between them. Every "regression" and every "fix" in
+  // that run was noise, mine included.
+  //
+  // The probe was starving its own sample: it counts pose CHANGES, ran six
+  // WebGL pages at once under a software renderer, and each window managed
+  // twenty-three of them. Small viewports and three pooled windows later it
+  // reads 223, and this gate measures 22.4% - inside the band the design
+  // always wanted, which 13 also hit on its lucky runs and missed on its
+  // unlucky ones.
+  if (pose === SLEEP) return base * bored * bored * 17;
   // The flash helps; it must not decide. At four times the odds, spraying
   // the shutter summoned showy poses reliably enough that waiting for one
   // was strictly worse than not waiting - which turns the provocation into a

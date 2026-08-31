@@ -54,7 +54,11 @@ await page.waitForTimeout(500);
 const SHOWY = [5, 6, 7, 9, 10];
 const a = await page.evaluate(() => [SNAP.cam[3], SNAP.sub[0], SNAP.sub[1]]);
 const seen = new Set();
-for (let i = 0; i < 60; i++) {
+// Ninety samples, not sixty: a pose holds for about two and a half
+// seconds, so a twelve-second window is five picks and "how many different
+// poses" is a question about a handful of dice rolls. The same
+// small-sample trap that had test-temper tuning a constant against noise.
+for (let i = 0; i < 90; i++) {
   seen.add(await page.evaluate(() => SNAP.pose));
   await page.waitForTimeout(200);
 }

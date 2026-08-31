@@ -199,6 +199,21 @@ el('div', 'font:500 13px/1.7 system-ui,sans-serif;color:#f0dcae;text-shadow:0 2p
   // paid for the gauges coming back.
   'Dress it up, then shoot it. Drag to aim, pinch to zoom, tap to take the picture.');
 const startBtn = el('button', GO + ';margin-top:10px;font-size:18px', title, 'OPEN THE STUDIO');
+// The same credit the other two entries carry, and cheaper here than in
+// either of them: both of those paint it into a canvas and hit-test the
+// links by hand against a rectangle, because their titles are canvas. This
+// title is already DOM, so an anchor is an anchor.
+const cred = el('div', 'font:600 12px system-ui,sans-serif;color:#e8d3a6;opacity:.72;margin-top:16px', title);
+const credit = (t, href) => {
+  const a = el('a', 'color:#f2d98a;text-decoration:none;border-bottom:1px solid #f2d98a66', cred, t);
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener';
+};
+credit('@gtanczyk', 'https://x.com/gtanczyk');
+el('span', '', cred, ' | ');
+credit('gamedev.pl', 'https://www.gamedev.pl');
+el('span', '', cred, ' | 2026');
 
 // A real button for the shutter. Tap-anywhere works on a phone, but on a
 // trackpad a tap is indistinguishable from the start of a drag until the

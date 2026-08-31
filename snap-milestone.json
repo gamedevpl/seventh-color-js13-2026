@@ -1,5 +1,5 @@
 {
-  "name": "R18 hair that reads as hair",
-  "description": "the halo is gone, strands are continuous, lit and shiny, and each chain carries three thin ribbons rather than one fat one because hair reads as count not volume - 13,022 packed, 290 bytes free",
+  "name": "R19 hair cards",
+  "description": "the fragment shader cuts every ribbon into a bundle of separate hairs and discards the gaps between them, with the gaps closing at distance so far-off hair stops speckling - 13,252 packed, 60 bytes free, the tightest this game has ever been",
   "ceilingBytes": 13312
 }

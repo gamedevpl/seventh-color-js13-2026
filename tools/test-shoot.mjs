@@ -97,7 +97,12 @@ const seen = new Set();
 // hooves planted - reported as "spinning without moving its legs", which is
 // precisely what it was. Only the poses with footwork under them may change
 // heading, and this samples fast enough to catch a slow drift.
-const FOOT = [2, 3, 4, 9, 13];        // walk, trot, gallop, prance, spin
+// The poses that MOVE: walk, trot, gallop, prance, spin - and the jump,
+// which travels furthest of any of them and was missing from this list, so
+// the probe counted an airborne unicorn as a planted one and failed a rule
+// it agrees with. Turning is allowed when there is footwork or flight
+// under it; the fault this catches is a statue on a turntable.
+const FOOT = [2, 3, 4, 9, 11, 13];
 let planted = 0, drift = 0;
 let prev = await probe();
 for (let i = 0; i < 60; i++) {

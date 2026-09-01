@@ -28,6 +28,11 @@
     "snap:test": "npm run snap:dev && node tools/test-pose.mjs && node tools/test-hair.mjs && node tools/test-shine.mjs && node tools/test-audio-snap.mjs && node tools/test-deco.mjs && node tools/test-shoot.mjs && node tools/test-phone.mjs && node tools/test-temper.mjs",
     "snap:balance": "npm run snap:dev && node tools/test-balance-snap.mjs --jobs=8",
     "snap:gate": "npm run snap:test && npm run snap:balance && node tools/native.mjs --game=snap --O1 --rolls=5",
+    "trailer": "npm run snap:dev && npm run trailer:frames && npm run trailer:endcard && npm run trailer:audio && npm run trailer:assemble",
+    "trailer:frames": "node tools/trailer/record-frames.mjs",
+    "trailer:endcard": "node tools/trailer/record-endcard.mjs",
+    "trailer:audio": "python3 tools/trailer/audio/render.py",
+    "trailer:assemble": "node tools/trailer/assemble.mjs",
     "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak"
   },
   "devDependencies": {

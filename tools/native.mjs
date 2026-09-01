@@ -26,7 +26,7 @@ const cheats = args.includes('--cheats');
 // builds; each has its own source dir, milestone file and title, and both
 // go through the same squeeze chain so their numbers stay comparable.
 const game = args.find((a) => /^--game=/.test(a))?.split('=')[1] || 'native';
-const TITLES = { native: 'The Seventh Color', strands: 'Rainbow Surfer', snap: 'Unicorn Snap' };
+const TITLES = { native: 'The Seventh Color', strands: 'Rainbow Surfer', snap: 'Unicorn Snap', fireball: 'Unicorn Fireball' };
 
 const num = (n) => n.toLocaleString('en-US');
 
@@ -66,9 +66,9 @@ const markup = '<canvas id=c></canvas>';
 const MOBILE = '<meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">';
 const TOUCHCSS = 'html,body{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;'
   + '-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}';
-const head = game === 'snap' ? MOBILE : '';
+const head = game === 'snap' || game === 'fireball' ? MOBILE : '';
 const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center}'
-  + (game === 'snap' ? TOUCHCSS : '');
+  + (game === 'snap' || game === 'fireball' ? TOUCHCSS : '');
 
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {

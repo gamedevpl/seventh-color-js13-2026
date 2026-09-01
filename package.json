@@ -27,7 +27,13 @@
     "snap:test": "npm run snap:dev && node tools/test-pose.mjs && node tools/test-hair.mjs && node tools/test-shine.mjs && node tools/test-audio-snap.mjs && node tools/test-deco.mjs && node tools/test-shoot.mjs && node tools/test-phone.mjs && node tools/test-temper.mjs",
     "snap:balance": "npm run snap:dev && node tools/test-balance-snap.mjs --jobs=8",
     "snap:gate": "npm run snap:test && npm run snap:balance && node tools/native.mjs --game=snap --O1 --rolls=5",
-    "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak"
+    "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak",
+    "fireball": "node tools/native.mjs --game=fireball",
+    "fireball:dev": "node tools/native.mjs --game=fireball --no-roadroller --cheats",
+    "fireball:verify": "node tools/verify-native.mjs 3 --game=fireball --keys=space,space,up:3000,left:600,space:2500,up:3000",
+    "fireball:test": "npm run fireball:dev && node tools/test-herd.mjs",
+    "fireball:gate": "npm run fireball:test && node tools/native.mjs --game=fireball --O1 --rolls=5 && npm run fireball:verify",
+    "fireball:ship": "node tools/native.mjs --game=fireball --O2 && npm run fireball:verify"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",

@@ -1,8 +1,8 @@
-# js13kGames 2026 — three entries
+# js13kGames 2026 — four entries
 
-This repo holds three js13kGames 2026 entries. They share a build, measurement
+This repo holds four js13kGames 2026 entries. They share a build, measurement
 and verification toolchain and **nothing else**: separate source trees,
-separate game code, separate budgets, separate size gates. All three are
+separate game code, separate budgets, separate size gates. All four are
 written to the 2026 theme, *rainbows and unicorns*.
 
 | entry | source | zipped | limit | write-up |
@@ -10,6 +10,7 @@ written to the 2026 theme, *rainbows and unicorns*.
 | **The Seventh Color** — a twelve-beat story game with four playable mechanics | `native/src` (9 files) | **12,160** | 13,312 | [`NATIVE.md`](./NATIVE.md) |
 | **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,247** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
 | **Unicorn Snap** — photograph a unicorn that knows how good it looks | `snap/src` (10 files) | **12,936** | 13,312 | [`SNAP.md`](./SNAP.md) |
+| **Unicorn Fireball** — gather your colour into a herd, and the herd into a fireball | `fireball/src` (5 files) | **9,808** | 13,312 | [`FIREBALL.md`](./FIREBALL.md) |
 
 Rainbow Surfer: <https://js13kgames.com/2026/games/rainbow-surfer>
 
@@ -42,6 +43,9 @@ Each game builds through the same tools, selected with `--game`:
 | `npm run snap:test` | its probe suite: poses, hair, light, paint, the shoot loop, the phone, behaviour |
 | `npm run snap:gate` | the suite plus the balance sweep and a worst-of-5 pack |
 | `npm run snap:poses` | a contact sheet of every pose, for looking at a change rather than measuring it |
+| `npm run fireball` | build Unicorn Fireball |
+| `npm run fireball:test` | its probe: boot, gather, charge, fire, land, and thirty autopilot matches for balance |
+| `npm run fireball:gate` | the probe, a worst-of-5 pack, and the zip driven in a browser |
 
 Add `--cheats` to any build for the DEV probes the live measurement tools read;
 they compile out of a shipping build entirely.
@@ -106,7 +110,7 @@ that led to the decision.
 
 The packer is still wired up as `npm run size` and its per-transform notes are
 kept below, because the engineering in them is sound and reusable — but none of
-the three entries ships through it, and it has not been exercised since the
+the four entries ships through it, and it has not been exercised since the
 rewrite.
 
 ### The transforms

@@ -155,18 +155,103 @@ And the build tool stopped knowing games by name: each entry carries an
 `entry.json` (title, phone viewport) beside its `src/`, so the fourth entry
 did not have to edit `native.mjs` the way the third did.
 
+## F3 — horns, the charge, and the rainbow
+
+The first playtest came back with four notes, and three of them were the
+same note: *the fireball is nonsense.* A ball that swallowed the herd,
+flew as a projectile and put the herd down somewhere else was a teleport
+with a hitbox, and it made the herd — the thing the game is about — vanish
+at the moment that mattered. What was asked for instead:
+
+- **melee first** — two herds should fight horn to horn;
+- **the button is a CHARGE** — a run that gathers speed slowly;
+- a long charge should **crackle** between the unicorns, tension building
+  the way it does in Dragon Ball, until the band **becomes a sliding
+  rainbow the size of itself** — Rainbow Surfer's rainbow with the herd
+  where the rider was — and only *that* does harm or meets another.
+- and left turned right.
+
+So the fireball is gone. `herd.js` was rewritten around three ideas:
+
+**Momentum decides a blow.** When two herds touch, each contact is settled
+by `.6 + speed/12 + 2 × charge` — a unicorn running hard knocks one that
+is not, and a charging wedge ploughs a grazing line. Leaders only bounce,
+unless the horn came in at over half charge, or the leader has no herd
+left to stand behind: then it is a heart. A lone leader is prey; it must
+run and gather. The last rule came from the probe — matches stalled for
+minutes with a forty-strong herd dancing at four units from a herdless
+leader it could not finish, because a charge needs a run-up and the
+target kept stepping out of it.
+
+**The charge is a run.** Holding the button no longer stops you; it makes
+the herd tighten into a wedge, shoulder to shoulder, and gather speed —
+from 11 to 33 over a few seconds, the turn heavier as it goes. From the
+first tenth the band crackles: bolts jump between unicorns, thin and rare
+at first, a storm at the top, and past two thirds they reach *up*, to a
+point hanging over the herd. The ground lights from within. At full charge
+(2.4 s + 0.08 s a head) it **ignites**: every unicorn is a lamp of its own
+colour, a haze hangs over the band, and the band drags a **tunnel** —
+seven arches the width of the herd, red outermost, extruded back along
+where it ran and dissolving behind it. You run inside your own rainbow,
+and it is faded where it passes the lens so it does not blind you. The
+rainbow burns for 2.5 s + 0.12 s a head, or until you let go.
+
+**Only the rainbow does real harm.** Everything under it is thrown; a
+leader under it loses a heart with its whole herd; a grazing unicorn of
+your colour under it is swept up. Two rainbows that meet explode and the
+bigger herd wins outright: the loser's herd is thrown, the winner's
+rainbow goes out — a clash costs the momentum too. Two lit herds do not
+trade horns; the rainbows settle it.
+
+### The brains had to learn to hold a note
+
+The first rewrite of the rivals produced *zero* clashes in twelve matches
+and eleven of them ran to the seven-minute cap. Three findings from the
+probe, in order:
+
+1. A brain that re-aimed every quarter second dropped every charge at the
+   target's first swerve. Now a charge, once running, is held while the
+   target is anywhere ahead.
+2. The attacker always arrived before the defender lit, so the clash
+   existed on paper only. An **answer** — a charge begun under an incoming
+   rainbow — builds twice as fast, and inside forty units a herd over half
+   the attacker's size turns and meets it rather than take the certain
+   trampling.
+3. Rivals could not close on a fleeing leader at equal speed. They sprint
+   now, as the player can, when hunting, fleeing or dodging.
+
+```
+  30 autopilot matches: 30 ended, player won 5, avg 182s,
+  14.4 rainbows (4.7 answers, 4.7s of two lit) and 0.5 clashes/match
+```
+
+Every match ends, in three minutes on average, with a rainbow lit
+fourteen times a match; about one in two matches has a clash. Two lit
+herds share the plain for almost five seconds a match without meeting,
+which says the clash is still rarer than the spectacle deserves — the
+next thing to tune.
+
+### And left turned right
+
+Yaw grows toward +z, and +z is the *right* of a camera looking along +x.
+The first build had LEFT raising the yaw, and the touch probe happily
+asserted it, because it only checked that a left thumb *moved* the yaw,
+not which way. Both fixed; the probe now says `yaw falls` and `yaw rises`.
+
 ## The wall
 
-F2: **9,965 bytes** packed worst-of-5 at O1, limit 13,312. Three and a
-third kilobytes in hand, which is where the next rounds go.
+F3: **10,396 bytes** packed worst-of-5 at O1, limit 13,312. The tunnel,
+the arcs and the new brains cost about four hundred bytes over F2, with
+the fireball's own code gone.
 
 ## Where it goes next
 
 - **Hearts, seen.** A rival at one heart should look it - a dimmer horn, a
   limp - not only read it in the list.
 - **A sky.** The plain has stars, a moon and fog; it wants a horizon.
-- **The feint as a tell.** A cancelled charge is free; it should cost a
-  beat of stun, or the rivals should learn to call it.
+- **More clashes.** Two lit herds share the plain for seconds without
+  meeting; the answering brain should steer for the collision, not the
+  attacker's current position.
 - **A skilled policy for the probe.** The autopilot player is the rival
   brain; a policy that hunts wild colours after a kill would say whether the
   snowball is too steep.
@@ -185,5 +270,6 @@ place the rebuild diverges from the 13k original and why.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F3 horns, charge, rainbow | 13,312 | 10,396 (O1 worst-of-5) | fireball removed; momentum melee, the charge as a run, arcs, ignition into a rainbow tunnel, answering brains, steering sign fixed |
 | F2 thumbs and ears | 13,312 | 9,965 (O1 worst-of-5) | touch zones and audio driven by the probe, rival hearts, per-entry build config |
 | F1 first playable | 13,312 | 9,808 (O0) | seven herds on a plain, gathering, the charge, the fireball as transport and weapon, the clash, wild colours, rival brains, the probe |

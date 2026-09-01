@@ -1,14 +1,16 @@
 // UNICORN FIREBALL. Run the plain as a unicorn of one colour, gather every
-// unicorn that shares it into a herd, and when the herd is big enough hold
-// the button: the herd spirals into you and becomes a rainbow fireball
-// that you ride across the plain into the next herd. Two fireballs that
-// meet explode in a rainbow, and the bigger fist wins; everyone the loser
-// gathered is thrown across the map, and the gathering starts again.
+// unicorn that shares it into a herd, and fight the other herds horn to
+// horn. Hold the button and the herd CHARGES: it tightens into a wedge and
+// gathers speed, arcs crackle between the unicorns, and if you hold it
+// long enough the whole band ignites into a sliding rainbow the size of
+// itself. Only the rainbow does real harm, and two rainbows that meet
+// explode - the bigger herd wins, and the loser's herd is thrown across
+// the plain, where the gathering starts again.
 
-import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox } from './gl.js';
+import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox, setDim } from './gl.js';
 import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
-import { units, leaders, balls, events, meadows, newWorld, step, charge, focus, won, lost, alive, radius, ARENA, WILD, now } from './herd.js';
-import { wake, awake, music, join as sJoin, clang, thud, rise, riseOff, whoosh, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
+import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, footprint, ARENA, WILD, now } from './herd.js';
+import { wake, awake, music, join as sJoin, clang, thud, rise, riseOff, whoosh, ignite as sIgnite, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
 
 const VW = 640, VH = 360;
 const FOG = [.07, .05, .13];
@@ -73,7 +75,11 @@ hud.addEventListener('pointermove', (e) => { if (pts.has(e.pointerId)) { pts.set
 const drop = (e) => { pts.delete(e.pointerId); scan(); };
 hud.addEventListener('pointerup', drop);
 hud.addEventListener('pointercancel', drop);
-const turnDir = () => (held.ArrowLeft || held.a || (tL && !tR) ? 1 : 0) - (held.ArrowRight || held.d || (tR && !tL) ? 1 : 0);
+// Yaw grows toward +z, and +z is the RIGHT of a camera looking along +x -
+// so LEFT lowers the yaw. The first build had this backwards, and the probe
+// happily asserted the backwards version, because it only checked that a
+// left thumb moved the yaw, not which way.
+const turnDir = () => (held.ArrowRight || held.d || (tR && !tL) ? 1 : 0) - (held.ArrowLeft || held.a || (tL && !tR) ? 1 : 0);
 const button = () => held[' '] || tT;
 
 // --- the plain ------------------------------------------------------------
@@ -182,6 +188,122 @@ function particleVerts(dt) {
   return n;
 }
 
+// --- the charge, the arcs, and the rainbow's wake -------------------------
+// A charging herd crackles: bolts jump between its unicorns, more of them
+// and brighter as the charge fills, and the ground under the band lights
+// up. When it ignites, every unicorn carries a disc of its own colour, a
+// haze hangs over the centre of the band, and the band drags a WAKE - seven
+// stripes across its width, the width of the herd, rising off the ground -
+// which is the rainbow you see coming from the other side of the plain.
+const ARCMAX = 60, ABUF = new Float32Array(ARCMAX * 6 * 6 * 10);
+const TBUF = new Float32Array(200000);
+let arcM, trailM;
+function drawCharge(L, T, dt) {
+  const k = L.charge, wave = L.wave > 0;
+  if (k < .04 && !wave) return;
+  // The ground, lit from within the band.
+  setDim(k * .8 + (wave ? .4 : 0));
+  disc(WILD, L.cx, .05, L.cz, L.r * 1.4);
+  setDim(1);
+  const herd = [];
+  for (const u of units) if (u.st === 0 && (u === L || u.lead === L.lead)) herd.push(u);
+  // Arcs. Rare and thin at first, a storm at the top of the charge.
+  if (herd.length > 1 && k > .12 && Math.random() < dt * (k * k * 60 + (wave ? 30 : 0)) && ARCS.length < ARCMAX) {
+    const a = herd[(Math.random() * herd.length) | 0];
+    let b = null, bd = 9;
+    for (let i = 0; i < 4; i++) {
+      const c = herd[(Math.random() * herd.length) | 0], d = Math.hypot(c.x - a.x, c.z - a.z);
+      if (c !== a && d < bd) { b = c; bd = d; }
+    }
+    const col = RAINBOW[(Math.random() * 7) | 0];
+    // Past two thirds the bolts also reach UP, to a point hanging over the
+    // band - the energy gathering above the herd before it lights.
+    if (b && (k < .66 || Math.random() < .5)) ARCS.push({ a: [a.x, .9, a.z], b: [b.x, .9, b.z], col, t: .15, w: .14 + .3 * k });
+    else ARCS.push({ a: [a.x, .9, a.z], b: [L.cx, 1.2 + L.r * .8, L.cz], col, t: .15, w: .1 + .24 * k });
+    spawnP([a.x, 1, a.z], [0, 2, 0], col, .3);
+  }
+  if (!wave) return;
+  // Lit: each unicorn a lamp of its own colour, the band under a haze.
+  setDim(.25);
+  herd.forEach((u, i) => disc(i % 7, u.x, .9, u.z, 1.7));
+  setDim(.16);
+  for (let i = 0; i < 3; i++) disc(((T * 3 + i * 2) | 0) % 7, L.cx, 1 + i * .6 + L.r * .15, L.cz, L.r * (1.15 - i * .28));
+  setDim(1);
+  // Motes lifting off the band.
+  if (Math.random() < .6) { const u = herd[(Math.random() * herd.length) | 0]; spawnP([u.x, 1, u.z], [0, 2.5, 0], RAINBOW[(Math.random() * 7) | 0], .6); }
+  // Sample the wake.
+  let tr = TRAIL.get(L);
+  if (!tr) TRAIL.set(L, tr = { s: [], since: 1 });
+  tr.since += dt;
+  if (tr.since > .09) { tr.since = 0; tr.s.push({ x: L.cx, z: L.cz, yaw: L.yaw, r: L.r * 1.1, t: 0 }); }
+}
+// The wake: the rainbow itself, as an ARCH the width of the herd, standing
+// over the band and extruded back along where it ran - a tunnel of seven
+// bands the herd runs inside, red outermost, that dissolves behind it. It
+// is Rainbow Surfer's braid with the herd where the rider was.
+const ARCH = 9;                                   // segments per half-circle
+function trailVerts(T, dt, eye) {
+  let n = 0;
+  const put = (x, y, z, c, a) => {
+    TBUF[n] = x; TBUF[n + 1] = y; TBUF[n + 2] = z; TBUF[n + 3] = 0; TBUF[n + 4] = 1; TBUF[n + 5] = 0;
+    TBUF[n + 6] = c[0] * 1.4; TBUF[n + 7] = c[1] * 1.4; TBUF[n + 8] = c[2] * 1.4; TBUF[n + 9] = a; n += 10;
+  };
+  const quad = (p0, p1, p2, p3, c, a) => { put(...p0, c, a); put(...p1, c, a); put(...p2, c, a); put(...p0, c, a); put(...p2, c, a); put(...p3, c, a); };
+  // A point on the arch of sample s: colour band c, angle index i, at the
+  // band's inner (e=0) or outer (e=1) edge.
+  const pt = (s, c, i, e, T) => {
+    const th = i / ARCH * Math.PI, R = s.r * (1.05 - c * .075 + e * .07) * (1 + Math.sin(T * 5 + i) * .03);
+    const sx = -Math.sin(s.yaw), sz = Math.cos(s.yaw);
+    return [s.x + sx * Math.cos(th) * R, .15 + Math.sin(th) * R * .85, s.z + sz * Math.cos(th) * R];
+  };
+  for (const [L, tr] of TRAIL) {
+    for (const s of tr.s) s.t += dt;
+    while (tr.s.length && tr.s[0].t > .9) tr.s.shift();
+    if (!tr.s.length) { TRAIL.delete(L); continue; }
+    for (let i = 0; i + 1 < tr.s.length && n < TBUF.length - 8000; i++) {
+      const s0 = tr.s[i], s1 = tr.s[i + 1];
+      // Fade with age, and fade out again where the tunnel runs past the
+      // camera - being inside your own rainbow is the point, being blinded
+      // by it is not.
+      const near = Math.min(1, Math.max(0, (Math.hypot(s1.x - eye[0], s1.z - eye[2]) - 5) / 9));
+      const f = (2 - s0.t / .9 - s1.t / .9) / 2 * near;
+      if (f <= 0) continue;
+      for (let c = 0; c < 7; c++) {
+        for (let k = 0; k < ARCH; k++) {
+          quad(pt(s0, c, k, 0, T), pt(s0, c, k + 1, 0, T), pt(s1, c, k + 1, 0, T), pt(s1, c, k, 0, T), RAINBOW[c], .26 * f);
+        }
+      }
+    }
+  }
+  return n;
+}
+// The arcs: jagged bolts, each a ribbon facing the camera, alive for a
+// few frames and gone.
+function arcVerts(dt) {
+  let n = 0;
+  const put = (x, y, z, c, a) => {
+    ABUF[n] = x; ABUF[n + 1] = y; ABUF[n + 2] = z; ABUF[n + 3] = 0; ABUF[n + 4] = 1; ABUF[n + 5] = 0;
+    ABUF[n + 6] = c[0] * 1.2 + .7; ABUF[n + 7] = c[1] * 1.2 + .7; ABUF[n + 8] = c[2] * 1.2 + .7; ABUF[n + 9] = a; n += 10;
+  };
+  for (let i = ARCS.length - 1; i >= 0; i--) {
+    const A = ARCS[i];
+    A.t -= dt;
+    if (A.t <= 0) { ARCS.splice(i, 1); continue; }
+    const a = A.t / .15, S = 6;
+    let px = A.a[0], py = A.a[1], pz = A.a[2];
+    for (let s = 1; s <= S; s++) {
+      const f = s / S, j = s < S ? (1 - Math.abs(2 * f - 1)) * .45 : 0;
+      const x = A.a[0] + (A.b[0] - A.a[0]) * f + (Math.random() - .5) * j, y = A.a[1] + (Math.random() - .3) * j * 1.6, z = A.a[2] + (A.b[2] - A.a[2]) * f + (Math.random() - .5) * j;
+      const w = A.w, ux = camU[0] * w, uy = camU[1] * w, uz = camU[2] * w;
+      put(px - ux, py - uy, pz - uz, A.col, a); put(px + ux, py + uy, pz + uz, A.col, a); put(x + ux, y + uy, z + uz, A.col, a);
+      put(px - ux, py - uy, pz - uz, A.col, a); put(x + ux, y + uy, z + uz, A.col, a); put(x - ux, y - uy, z - uz, A.col, a);
+      px = x; py = y; pz = z;
+    }
+  }
+  return n;
+}
+const WILDC = COL[WILD];
+
 // --- state ----------------------------------------------------------------
 let mode = 'title', timer = 0, msg = '', msgT = 0, shake = 0, flash = 0, endT = 0;
 // A private window throws on the FIRST TOUCH of localStorage - the read as
@@ -189,7 +311,7 @@ let mode = 'title', timer = 0, msg = '', msgT = 0, shake = 0, flash = 0, endT = 
 // game to fail to boot. Both ends are guarded.
 let best = 0, isBest = false;
 try { best = +localStorage.fbBest || 0; } catch {}
-const BOOMS = [];
+const BOOMS = [], TRAIL = new Map(), ARCS = [];
 let eye = null, look = null, camYaw = 0;
 const say = (t, d = 2) => { msg = t; msgT = d; };
 
@@ -199,15 +321,15 @@ function newRun(attract) {
   // the words, and the colour you are picking plays too.
   if (attract) leaders[0].ai = { t: 0, goal: null };
   buildPlain();
-  particleM = partM();
-  PART.length = 0; pcur = 0; BOOMS.length = 0;
+  particleM = partM(); arcM = partM(); trailM = partM();
+  PART.length = 0; pcur = 0; BOOMS.length = 0; TRAIL.clear(); ARCS.length = 0;
   timer = 0; msgT = 0; shake = 0; flash = 0; endT = 0; isBest = false;
   eye = null; camYaw = leaders[0].yaw;
 }
 newRun(1);
 
 // --- the frame ------------------------------------------------------------
-let last = 0, lastPick = 0, chgOn = false;
+let last = 0, lastPick = 0;
 function frame(now_) {
   const dt = Math.min(.05, (now_ - last) / 1000 || 0);
   last = now_;
@@ -226,9 +348,8 @@ function frame(now_) {
   } else if (mode === 'run') {
     const heat = Math.min(1, P.n / 12);
     music(heat, 0);
-    const btn = button();
-    if (btn !== chgOn) { chgOn = btn; charge(P, btn); }
-    if (P.chg) rise(P.charge); else riseOff();
+    charge(P, button());
+    if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
     step(dt, { turn: turnDir(), fwd: held.ArrowUp || held.w || (tL && tR), back: held.ArrowDown || held.s });
     if (won() || lost()) {
       mode = 'end'; endT = 0; riseOff();
@@ -249,35 +370,41 @@ function frame(now_) {
     if (e.k === 'join') { if (e.L === P) sJoin(P.n); burst([e.u.x, .8, e.u.z], 6, 2, COL[e.u.col]); }
     else if (e.k === 'knock') { thud(); burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
     else if (e.k === 'horn') { clang(); burst([e.x, 1, e.z], 5, 3, [1, .9, .6]); }
-    else if (e.k === 'fire') { whoosh(); if (e.L === P) say('FIREBALL!', 1.2); }
-    else if (e.k === 'eat') burst([e.b.x, 1, e.b.z], 4, 3);
-    else if (e.k === 'blast') { burst([e.x, .8, e.z], 10, 6, COL[e.col]); shake = Math.max(shake, .3); }
+    else if (e.k === 'chg') { if (e.L === P) say('CHARGE!', 1); }
+    else if (e.k === 'ignite') {
+      // The band lights: a flash, a fan of sparks the size of the herd, and
+      // the riser resolving into a chord.
+      whoosh(); sIgnite();
+      burst([e.L.cx, 1.2, e.L.cz], 40 + e.L.n * 6, 5 + e.L.r);
+      if (e.L === P) { say('RAINBOW!', 1.5); flash = Math.max(flash, .35); }
+    }
+    else if (e.k === 'fizzle') { if (e.L === P) say(P.cool ? 'SPENT' : '', 1); }
+    else if (e.k === 'blast') { burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
     else if (e.k === 'boom') { sBoom(e.pw); BOOMS.push({ x: e.x, z: e.z, t: 0, pw: e.pw }); burst([e.x, 1.5, e.z], 120, 9 + e.pw * .4); shake = 1; flash = .4; }
     else if (e.k === 'hurt') { if (e.L === P) { ouch(); say(P.hearts ? 'HEART LOST' : 'THE HERD IS GONE', 2); } }
     else if (e.k === 'dead') { if (e.L !== P) say(alive().length > 1 ? 'A RIVAL FALLS' : 'THE PLAIN IS YOURS', 2.5); }
-    else if (e.k === 'land' && e.L === P && mode === 'run') say(P.n ? 'RIDE ON' : 'GATHER AGAIN', 1.5);
   }
   events.length = 0;
   for (const b of BOOMS) b.t += dt;
   while (BOOMS.length && BOOMS[0].t > 1.6) BOOMS.shift();
 
   // --- camera -------------------------------------------------------------
-  const f = focus(), fb = P.ball;
   let ex, ey, ez, lx, ly, lz;
   if (mode === 'title') {
     // A trackside camera circling the herd of the colour you are picking,
     // which plays itself under the words: the plain is live, not a still.
-    const a = timer * .25, F = P.ball || P;
-    ex = F.x + Math.cos(a) * 15; ey = 5.5; ez = F.z + Math.sin(a) * 15;
-    lx = F.x; ly = 1; lz = F.z;
+    const a = timer * .25;
+    ex = P.x + Math.cos(a) * 15; ey = 5.5; ez = P.z + Math.sin(a) * 15;
+    lx = P.x; ly = 1; lz = P.z;
   } else {
-    // Behind the herd, pulling back as it grows, and further again to fit
-    // the fireball; the yaw eases so a spin does not whip the world round.
-    const yaw = fb ? Math.atan2(fb.vz, fb.vx) : P.yaw;
-    camYaw += wrapA(yaw - camYaw) * Math.min(1, dt * (fb ? 3 : 2.2));
-    const back = 9 + Math.sqrt(P.n) * 1.6 + (fb ? fb.r * 2.5 : 0), up = 3.6 + Math.sqrt(P.n) * .6 + (fb ? fb.r : 0);
-    ex = f.x - Math.cos(camYaw) * back; ey = up; ez = f.z - Math.sin(camYaw) * back;
-    lx = f.x + Math.cos(camYaw) * 6; ly = 1 + (fb ? fb.r : 0); lz = f.z + Math.sin(camYaw) * 6;
+    // Behind the herd, pulling back as it grows and further as it runs -
+    // a charge should feel like the ground coming at you. The yaw eases
+    // so a spin does not whip the world round.
+    camYaw += wrapA(P.yaw - camYaw) * Math.min(1, dt * 2.2);
+    const sp = Math.min(1, P.spd / 33);
+    const back = 9 + Math.sqrt(P.n) * 1.6 + sp * 5, up = 3.6 + Math.sqrt(P.n) * .6 + sp * 1.2;
+    ex = P.x - Math.cos(camYaw) * back; ey = up; ez = P.z - Math.sin(camYaw) * back;
+    lx = P.x + Math.cos(camYaw) * (6 + sp * 8); ly = 1; lz = P.z + Math.sin(camYaw) * (6 + sp * 8);
     if (P.st === 3) { ex = P.x + 10; ey = 8; ez = P.z + 10; lx = P.x; lz = P.z; ly = 1; }
   }
   if (!eye) eye = [ex, ey, ez], look = [lx, ly, lz];
@@ -295,18 +422,8 @@ function frame(now_) {
   drawMesh(groundM, IDENT);
   const T = now();
   for (const u of units) {
-    if (u.st === 2 && !(u.lead >= 0 && leaders[u.lead].ball)) continue;
-    const L = u.lead >= 0 ? leaders[u.lead] : null, set = U[u.st === 3 ? WILD : u.col];
-    let x = u.x, y = u.y, z = u.z, s = u.hearts ? 1.25 : 1, yaw = u.yaw;
-    // Folding into the fireball: the slot on the sphere, and a tumble.
-    const m = u.st === 2 ? 1 : u.morph * u.morph * (3 - 2 * u.morph);
-    if (m > 0 && L) {
-      const b = L.ball, cx = b ? b.x : L.x, cz = b ? b.z : L.z, r = (b ? b.r : radius(L.n)) * .75;
-      const th = u.seed * 7 + T * (2 + 4 * m) * (u.seed > 3.5 ? 1 : -1), ph = Math.sin(u.seed * 3 + T) * 1.2;
-      x = lerp(x, cx + Math.cos(th) * Math.cos(ph) * r, m); z = lerp(z, cz + Math.sin(th) * Math.cos(ph) * r, m);
-      y = lerp(y, (b ? b.r : 1.2) + Math.sin(ph) * r, m);
-      yaw += m * T * 6; s *= 1 - .5 * m;
-    }
+    const set = U[u.st === 3 ? WILD : u.col];
+    const x = u.x, y = u.y, z = u.z, s = u.hearts ? 1.25 : 1, yaw = u.yaw;
     const bob = u.st ? 0 : Math.sin(u.ph * 2) * .05 * Math.min(1, u.sp / 5);
     const M = modelTR(x, y + bob, z, -yaw + Math.PI / 2, s);
     // Thrown: tumbling end over end.
@@ -322,28 +439,11 @@ function frame(now_) {
       drawMesh(set.leg, mul(M, [1, 0, 0, 0, 0, cs, sn, 0, 0, -sn, cs, 0, hx, .43, hz, 1]));
     });
   }
-  // Glow, all of it additive: tufts, stars, the edge, the fireballs, the
-  // halos of a folding herd, the rings of an explosion, and the sparks.
+  // Glow, all of it additive: tufts, stars, the edge, the charge and its
+  // arcs, the rainbow and its wake, the rings of an explosion, the sparks.
   glMode(1);
   drawMesh(tuftM, IDENT); drawMesh(postM, IDENT); drawMesh(starM, IDENT);
-  for (const b of balls) {
-    // Seven layers, one per colour, each wobbling on its own orbit - the
-    // ball is a rainbow churning, not a white light. A faint white core and
-    // a pool of light on the ground under it.
-    for (let i = 0; i < 3; i++) {
-      const c = (i * 2 + (T * 3 | 0)) % 7, w = b.r * .3;
-      disc(c, b.x + Math.cos(T * 5 + i * 2.1) * w, b.r + Math.sin(T * 6 + i * 2) * w, b.z + Math.sin(T * 5 + i * 2.1) * w, b.r * (1.4 - i * .15));
-    }
-    for (let i = 0; i < 4; i++) ring((i * 3 + (T * 2 | 0)) % 7, bill(b.x, b.r, b.z, b.r * (1.1 + i * .22 + Math.sin(T * 8 + i) * .08)));
-    disc(WILD, b.x, .05, b.z, b.r * 1.6);
-    spawnP([b.x, b.r * .8, b.z], [(Math.random() - .5) * 6 - b.vx * .1, 3, (Math.random() - .5) * 6 - b.vz * .1], RAINBOW[(Math.random() * 7) | 0], .7);
-  }
-  for (const L of leaders) if (L.chg) {
-    // The charge halo: rainbow layers pulsing faster as the charge fills.
-    const r = radius(L.n) * (.3 + L.charge * .9), p = .85 + .15 * Math.sin(T * (10 + L.charge * 30));
-    for (let i = 0; i < 4; i++) disc(((T * 4 + i * 2) | 0) % 7, L.x, 1.2, L.z, r * (1.3 - i * .25) * p);
-    disc(WILD, L.x, .05, L.z, r * 1.8);
-  }
+  for (const L of leaders) if (L.st !== 3) drawCharge(L, T, dt);
   for (const b of BOOMS) {
     // The rainbow: seven shockwaves racing outward on the ground, red on
     // the outside, and a slower dome of the same rising off it.
@@ -354,6 +454,12 @@ function frame(now_) {
     }
     disc(WILD, b.x, 1.5, b.z, R * .5 * (1 - k));
   }
+  const tn = trailVerts(T, dt, e2);
+  updateMesh(trailM, TBUF, tn);
+  if (tn) drawMesh(trailM, IDENT);
+  const an = arcVerts(dt);
+  updateMesh(arcM, ABUF, an);
+  if (an) drawMesh(arcM, IDENT);
   const pn = particleVerts(dt);
   updateMesh(particleM, PBUF, pn);
   if (pn) drawMesh(particleM, IDENT);
@@ -375,9 +481,9 @@ function frame(now_) {
     ctx.fillStyle = '#f3ead6'; ctx.fillText('UNICORN FIREBALL', VW / 2, 70);
     ctx.font = '15px system-ui';
     ctx.fillStyle = '#d8d0ea';
-    ctx.fillText('gather every unicorn of your colour into a herd', VW / 2, 120);
-    ctx.fillText('hold SPACE: the herd becomes a fireball  -  release to fire it', VW / 2, 142);
-    ctx.fillText('a bigger fireball wins the clash; a smaller herd loses its horns', VW / 2, 164);
+    ctx.fillText('gather every unicorn of your colour into a herd, and fight horn to horn', VW / 2, 120);
+    ctx.fillText('hold SPACE to charge: the herd gathers speed, and lights up as it runs', VW / 2, 142);
+    ctx.fillText('hold long enough and the herd BECOMES the rainbow - the bigger one wins', VW / 2, 164);
     ctx.font = 'bold 15px system-ui';
     ctx.fillStyle = pc;
     ctx.fillStyle = css(pc);
@@ -388,7 +494,7 @@ function frame(now_) {
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
     ctx.fillText(awake() ? 'press SPACE to run' : 'press SPACE', VW / 2, VH - 42);
     ctx.font = '12px system-ui'; ctx.fillStyle = '#9a90b8';
-    ctx.fillText('arrows steer  -  up sprints  -  touch: sides steer, top strip fires', VW / 2, VH - 18);
+    ctx.fillText('arrows steer  -  up sprints  -  touch: sides steer, top strip charges', VW / 2, VH - 18);
     ctx.fillText('@gtanczyk | gamedev.pl | 2026', VW / 2, VH - 4);
   } else {
     // Your herd: a dot in your colour, the count, the hearts.
@@ -403,7 +509,7 @@ function frame(now_) {
       const y = 22 + i * 20, dead = L.st === 3;
       ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); ctx.beginPath(); ctx.arc(VW - 100, y, 6, 0, TAU); ctx.fill();
       ctx.fillStyle = dead ? '#666' : '#e8e0f4';
-      ctx.fillText(dead ? '-' : L.n + (L.chg ? ' !' : L.ball ? ' >' : ''), VW - 112, y);
+      ctx.fillText(dead ? '-' : L.n + (L.wave ? ' ~' : L.chg ? ' !' : ''), VW - 112, y);
       // Its hearts, but only once it has lost one. Three hearts beside
       // every rival is a wall of pink that says nothing; the row you want
       // to find is the one that is DOWN to one, and it only reads as an
@@ -411,7 +517,7 @@ function frame(now_) {
       if (!dead && L.hearts < 3) { ctx.fillStyle = '#ff6b8a'; ctx.font = '10px system-ui'; ctx.fillText('♥'.repeat(L.hearts), VW - 150, y); ctx.font = 'bold 14px system-ui'; }
     });
     // The radar: the whole plain in a square, leaders as dots sized by
-    // herd, fireballs as rings. It is how you see a fireball coming.
+    // herd, a rainbow as a ring. It is how you see one coming from behind.
     const RX = VW - 78, RY = 10, RS = 68;
     ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(RX, RY, RS, RS);
     const rp = (x, z) => [RX + (x / ARENA + 1) * RS / 2, RY + (z / ARENA + 1) * RS / 2];
@@ -423,18 +529,19 @@ function frame(now_) {
       if (u.hearts) { ctx.beginPath(); ctx.arc(x, y, 1.5 + Math.sqrt(u.n) * .8, 0, TAU); ctx.fill(); }
     }
     ctx.strokeStyle = '#fff';
-    for (const b of balls) { const [x, y] = rp(b.x, b.z); ctx.beginPath(); ctx.arc(x, y, 3 + b.r, 0, TAU); ctx.stroke(); }
+    for (const L of leaders) if (L.wave) { const [x, y] = rp(L.cx, L.cz); ctx.beginPath(); ctx.arc(x, y, 2 + L.r * .4, 0, TAU); ctx.stroke(); }
     ctx.strokeStyle = css(pc); ctx.strokeRect(RX + .5, RY + .5, RS - 1, RS - 1);
     ctx.textAlign = 'center';
-    // The charge bar, or the fireball's remaining flight.
-    if (P.chg || P.ball) {
-      const k = P.ball ? P.ball.life / (1.5 + P.ball.pw * .11) : P.charge;
+    // The charge bar: how far the charge is from igniting, then how much
+    // rainbow is left to burn.
+    if (P.chg || P.wave) {
+      const k = P.wave ? P.burn / (2.5 + .12 * P.n) : P.charge;
       ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(VW / 2 - 80, VH - 30, 160, 10);
       const g = ctx.createLinearGradient(VW / 2 - 80, 0, VW / 2 + 80, 0);
       RAINBOW.forEach((c, i) => g.addColorStop(i / 6, css(c)));
       ctx.fillStyle = g; ctx.fillRect(VW / 2 - 80, VH - 30, 160 * k, 10);
       ctx.font = 'bold 12px system-ui'; ctx.fillStyle = '#fff';
-      ctx.fillText(P.ball ? 'POWER ' + Math.round(P.ball.pw) : k >= 1 ? 'RELEASE!' : 'CHARGING ' + Math.round((1 + P.n * P.charge)), VW / 2, VH - 42);
+      ctx.fillText(P.wave ? 'RAINBOW ' + Math.round(P.wave) : 'CHARGE ' + Math.round(P.charge * 100) + '%', VW / 2, VH - 42);
     } else if (P.st === 0 && P.n >= 2 && timer < 40 && !P.cool) {
       ctx.font = '12px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.5)';
       ctx.fillText('hold SPACE to charge', VW / 2, VH - 26);
@@ -460,4 +567,4 @@ function frame(now_) {
 }
 requestAnimationFrame(frame);
 
-if (DEV) window.FB = { units, leaders, balls, events, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); } };
+if (DEV) window.FB = { units, leaders, events, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); } };

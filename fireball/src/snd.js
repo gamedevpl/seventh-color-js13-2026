@@ -125,6 +125,15 @@ export function boom(pw) {
   hit(t + .05, 1.2, .25 * g, 150, .6);
   [0, 2, 4, 5, 7, 9, 11].forEach((n, i) => tone(NOTE(24 + n), .5, 'triangle', .07, t + .12 + i * .06));
 }
+// Ignition: the riser resolves. A bright chord fanning up through the
+// seven colours, quicker than the explosion's and with no sub under it -
+// this is a light coming on, not a blast.
+export function ignite() {
+  if (!ac) return;
+  const t = t0();
+  hit(t, .4, .2, 1800, .8);
+  [0, 4, 7, 11, 14, 16, 19].forEach((n, i) => tone(NOTE(12 + n), .6, 'triangle', .06, t + i * .04));
+}
 // A heart lost: a low, sour two-note.
 export function ouch() {
   if (!ac) return;

@@ -1,18 +1,25 @@
 // THE HERD. Everything that is true about the world lives here, and nothing
-// in here draws or makes a sound: main.js reads `units`, `leaders`, `balls`
-// and drains `events`. Every unicorn is a `unit`; seven of them are also
+// in here draws or makes a sound: main.js reads `units` and `leaders` and
+// drains `events`. Every unicorn is a `unit`; seven of them are also
 // `leaders` (the player is leaders[0]) and the rest either follow a leader
-// or graze as neutrals of their colour. A leader may CHARGE: the herd
-// spirals in and melts into a rainbow fireball that carries the whole herd
-// across the plain, absorbs its own colour, blasts everyone else apart, and
-// meets another fireball as a clash the bigger one wins.
+// or graze as neutrals of their colour.
+//
+// The fight is horns first. Two herds that touch trade blows one unicorn
+// at a time, and momentum decides each one: a unicorn running hard knocks
+// one that is not. Holding the button is a CHARGE - the herd tightens into
+// a wedge and gathers speed, slowly, and the longer it runs the more it
+// crackles: arcs jump between the unicorns, the ground lights up under
+// them, until the charge IGNITES and the whole band becomes a sliding
+// rainbow the size of itself. Only the rainbow does real harm: everything
+// it runs over is thrown, a leader it runs over loses a heart, and two
+// rainbows that meet explode - the bigger herd wins.
 
 import { COL } from './uni.js';
 
 export const ARENA = 105;                 // half-size of the plain
 export const PER = 10;                    // grazing unicorns per colour
 export const WILD = 7;                    // the eighth colour: anyone's
-export const units = [], leaders = [], balls = [], events = [];
+export const units = [], leaders = [], events = [];
 export const meadows = [];                // [x, z] home of each colour
 let time = 0;
 export const now = () => time;
@@ -24,15 +31,14 @@ const lerp = (a, b, k) => a + (b - a) * k;
 function unit(x, z, col) {
   return {
     x, z, vx: 0, vz: 0, y: 0, vy: 0, yaw: rnd(7), col, lead: -1,
-    // st: 0 on the ground, 1 thrown through the air, 2 inside a fireball,
-    // 3 a statue - what is left of a leader with no hearts.
-    st: 0, ph: rnd(7), seed: rnd(7), daze: 0, hit: 0, morph: 0, sp: 0, wan: 0,
+    // st: 0 on the ground, 1 thrown through the air, 3 a statue - what is
+    // left of a leader with no hearts.
+    st: 0, ph: rnd(7), seed: rnd(7), daze: 0, hit: 0, sp: 0, wan: 0,
   };
 }
 
-// Player colour is chosen on the title; the six rivals take the rest.
 export function newWorld(playerCol) {
-  units.length = leaders.length = balls.length = events.length = meadows.length = 0;
+  units.length = leaders.length = events.length = meadows.length = 0;
   time = 0;
   // Seven meadows on a ring. The player's is always due south of the
   // centre - the opening shot looks the same way every time, and the
@@ -44,7 +50,11 @@ export function newWorld(playerCol) {
     const L = unit(mx, mz, c);
     L.yaw = a + Math.PI;                  // facing the centre
     L.lead = i; L.hearts = 3; L.chg = 0; L.charge = 0; L.cool = 0; L.stun = 0;
-    L.ball = null; L.n = 0; L.ai = i ? { t: rnd(.3), goal: null, mode: 0 } : null;
+    // spd is the run speed the charge builds; wave is the rainbow, 0 or
+    // its power; burn is how long it has left; cx/cz/r is the herd's
+    // footprint, kept because the rainbow is the size of the band.
+    L.spd = 11; L.wave = 0; L.burn = 0; L.n = 0; L.cx = mx; L.cz = mz; L.r = 2; L.threat = null;
+    L.ai = i ? { t: rnd(.3), goal: null } : null;
     leaders.push(L); units.push(L);
     for (let k = 0; k < PER; k++) {
       const b = rnd(7), d = 3 + rnd(13);
@@ -53,27 +63,38 @@ export function newWorld(playerCol) {
   }
 }
 
-export const herdOf = (L) => units.filter((u) => u !== L && u.lead === L.lead && u.st !== 3);
 export const alive = () => leaders.filter((L) => L.st !== 3);
-
-// How long a charge takes: a bigger herd takes longer to fold in, which is
-// the window a rival gets to answer.
-const chargeTime = (L) => 1.2 + .09 * L.n;
+// How long a charge takes to ignite: a bigger herd takes longer to light,
+// which is the window a rival gets to answer or get out of the way.
+// ...unless a rainbow is already coming at you: an ANSWER builds twice as
+// fast. Without that the attacker always arrives before the defender has
+// lit, and two rainbows never meet - the clash exists on paper only.
+const chargeTime = (L) => (2.4 + .08 * L.n) * (L.threat ? .5 : 1);
+// Is a rainbow, or a charge about to be one, bearing down on L?
+function threatened(L) {
+  for (const R of leaders) {
+    if (R === L || R.st === 3 || !(R.wave || R.charge > .4)) continue;
+    const dx = L.x - R.x, dz = L.z - R.z, d = Math.hypot(dx, dz);
+    if (d < 60 && (dx * Math.cos(R.yaw) + dz * Math.sin(R.yaw)) / (d || 1) > .75) return R;
+  }
+  return null;
+}
+export const footprint = (n) => 2.2 + 1.5 * Math.sqrt(n);
 
 function scatter(u, fx, fz, s) {
-  u.st = 1; u.lead = -1; u.morph = 0;
+  u.st = 1; u.lead = -1;
   const d = Math.hypot(fx, fz) || 1;
   u.vx = fx / d * s + rnd(4) - 2; u.vz = fz / d * s + rnd(4) - 2;
   u.vy = 6 + rnd(5); u.y = Math.max(u.y, .1);
 }
 
 function hurt(L, fx, fz) {
-  L.hearts--; L.stun = 2.6; L.chg = 0; L.charge = 0;
+  L.hearts--; L.stun = 2.4; L.chg = 0; L.charge = 0; L.wave = 0; L.spd = 0;
   events.push({ k: 'hurt', L });
   if (L.hearts <= 0) {
     // A leader with no hearts turns to stone where it stands, and its
     // colour is nobody's: every unicorn that wore it goes wild.
-    L.st = 3; L.ball = null;
+    L.st = 3;
     for (const u of units) if (u !== L && u.col === L.col) { u.col = WILD; if (u.lead === L.lead) u.lead = -1; }
     events.push({ k: 'dead', L });
   } else {
@@ -82,168 +103,149 @@ function hurt(L, fx, fz) {
   }
 }
 
-// Every follower is flung, and if it had a leader in there the leader pays
-// a heart. `s` is how far: a clash throws further than a blast.
+// Every follower is flung, and the leader pays a heart. `s` is how far.
 function breakHerd(L, cx, cz, s) {
   for (const u of units) if (u !== L && u.lead === L.lead && u.st !== 3) {
     scatter(u, u.x - cx + rnd(2) - 1, u.z - cz + rnd(2) - 1, s + rnd(4));
   }
-  L.ball = null;
   hurt(L, (L.x - cx) * 3, (L.z - cz) * 3);
 }
 
-// The charge: hold to fold the herd in, release to fire. Releasing before a
-// quarter charge is a feint - the herd simply unfolds again.
+// The button. Held, the herd charges; let go, it eases off. Nothing fires
+// on release any more - the rainbow is a state you run in, not a shot.
 export function charge(L, on) {
-  if (L.st !== 0 || L.stun > 0 || L.ball) return;
-  if (on) {
-    if (!L.chg && L.cool <= 0) { L.chg = 1; L.charge = 0; events.push({ k: 'chg', L }); }
-  } else if (L.chg) {
-    L.chg = 0;
-    if (L.charge < .25) { L.charge = 0; return; }
-    fire(L);
-  }
+  if (L.st !== 0 || L.stun > 0) { L.chg = 0; return; }
+  if (on && !L.chg && L.cool <= 0) events.push({ k: 'chg', L });
+  L.chg = on && L.cool <= 0 ? 1 : 0;
 }
 
-function fire(L) {
-  const herd = herdOf(L), pw = 1 + herd.length * L.charge;
-  const b = {
-    x: L.x, z: L.z, vx: Math.cos(L.yaw) * 26, vz: Math.sin(L.yaw) * 26,
-    pw, own: L.lead, life: 1.5 + pw * .11, age: 0, r: 0,
-  };
-  b.r0 = radius(pw);
-  for (const u of herd) { u.st = 2; u.morph = 1; }
-  L.st = 2; L.ball = b; L.charge = 0; L.cool = 3;
-  balls.push(b);
-  events.push({ k: 'fire', L, b });
-}
-
-export const radius = (pw) => 1.4 + .55 * Math.sqrt(pw);
-
-// The fireball opens back up into a herd where it stopped. Followers land in
-// a ring, still following - the fireball is a way to travel as much as a
-// way to fight.
-function unfold(b, keep) {
-  const L = leaders[b.own];
-  balls.splice(balls.indexOf(b), 1);
-  if (L.st !== 2) return;                 // already dealt with by a clash
-  L.st = 0; L.ball = null; L.x = b.x; L.z = b.z; L.y = 0; L.morph = 1;
-  let k = 0;
-  for (const u of units) if (u !== L && u.lead === L.lead && u.st === 2) {
-    const a = u.seed + k * 2.4, d = 1.5 + Math.sqrt(k) * 1.1;
-    u.x = b.x + Math.cos(a) * d; u.z = b.z + Math.sin(a) * d; u.y = 0;
-    if (keep !== undefined && k >= keep) scatter(u, u.x - b.x, u.z - b.z, 12);
-    else { u.st = 0; u.vx = u.vz = 0; }
-    k++;
-  }
-  events.push({ k: 'land', L, b });
-}
-
-// Two fireballs meet. The bigger one wins outright: the loser's whole herd
-// is thrown across the plain and its leader pays a heart; the winner keeps
-// only what it had over the loser, and the rest is thrown too. The margin
-// is the price of the fight.
-function clash(a, b) {
-  const A = leaders[a.own], B = leaders[b.own];
-  const [w, l, W, Lo] = a.pw >= b.pw ? [a, b, A, B] : [b, a, B, A];
-  const cx = (a.x + b.x) / 2, cz = (a.z + b.z) / 2;
-  events.push({ k: 'boom', x: cx, z: cz, pw: w.pw + l.pw });
-  w.x = l.x = cx; w.z = l.z = cz;
-  // The loser first: unfold puts its unicorns on the ground so breakHerd
-  // can throw them from the clash point.
-  unfold(l); breakHerd(Lo, cx, cz, 16);
-  if (w.pw === l.pw) { unfold(w); breakHerd(W, cx, cz, 16); return; }
-  unfold(w, Math.max(0, Math.round(w.pw - l.pw - 1)));
+// Two rainbows meet. The bigger herd wins outright: the loser's whole herd
+// is thrown across the plain and its leader pays a heart. The winner keeps
+// its herd but the rainbow goes out - a clash costs the momentum too.
+function clash(A, B) {
+  const [W, Lo] = A.wave >= B.wave ? [A, B] : [B, A];
+  const cx = (A.cx + B.cx) / 2, cz = (A.cz + B.cz) / 2;
+  events.push({ k: 'boom', x: cx, z: cz, pw: A.wave + B.wave });
+  breakHerd(Lo, cx, cz, 16);
+  if (A.wave === B.wave) { breakHerd(W, cx, cz, 16); return; }
+  W.wave = 0; W.charge = 0; W.chg = 0; W.cool = 3; W.burn = 0;
 }
 
 // --- the rival brains -----------------------------------------------------
 // Four moods. GATHER walks to the nearest unicorn it may take. HUNT closes
-// on a weaker herd and fires when lined up. FLEE runs from a stronger one.
-// ANSWER is the counter to an incoming fireball: fold in and meet it if
-// we would win, otherwise sidestep. Everyone gets bolder as the match wears
-// on, so a match cannot stall into seven grazing herds.
+// on a weaker herd - horns first, and a long straight run at it is worth a
+// charge. FLEE runs from a stronger one. ANSWER is the reply to a rainbow
+// coming this way: charge to meet it if we would win, otherwise sidestep.
+// Everyone gets bolder as the match wears on, so a match cannot stall into
+// seven grazing herds.
 function think(L, dt) {
   const ai = L.ai;
   ai.t -= dt;
   if (ai.t > 0) return;
   ai.t = .25;
-  // Boldness: at the start a rival only picks on a herd two thirds its
-  // size; after a minute and a half it will take on anyone its own size,
-  // because seven herds of ten grazing forever is not a match.
   const bold = Math.min(1, time / 90);
-  let want = null, fold = false;
-  // A fireball coming our way?
-  for (const b of balls) {
-    if (b.own === L.lead) continue;
-    const dx = L.x - b.x, dz = L.z - b.z, d = Math.hypot(dx, dz);
-    const along = (dx * b.vx + dz * b.vz) / (26 * d);
-    if (d < 40 && along > .8) {
-      if (L.n + 1 > b.pw * 1.15 && L.n >= 2) { fold = true; want = [b.x, b.z]; }
-      else want = [L.x - dz * 2, L.z + dx * 2];            // step aside
-    }
+  let want = null, run = false;
+  // A rainbow, or a charge about to become one, heading our way? Near
+  // enough in size, it is met - a clash is a coin worth flipping, and a
+  // herd that only ever sidesteps never wins the plain.
+  // Dodging is only better if it works, and inside forty units it mostly
+  // does not - so close in, anyone with a herd worth the name turns and
+  // meets it, and takes the coin flip over the certain trampling.
+  const R = L.threat;
+  let sprint = false;
+  if (R) {
+    const d = Math.hypot(R.x - L.x, R.z - L.z), size = (L.n + 1) / (R.n + 1);
+    if (L.n >= 2 && (size >= .9 || (d < 40 && size >= .55))) { run = true; want = [R.x, R.z]; }
+    else { want = [L.x - (L.z - R.z) * 2, L.z + (L.x - R.x) * 2]; sprint = true; }   // step aside, fast
   }
   if (!want) {
-    let hunt = null, hd = 1e9, run = null, rd = 1e9;
+    let hunt = null, hd = 1e9, flee = null, fd = 1e9;
     for (const R of leaders) {
       if (R === L || R.st === 3) continue;
       const d = Math.hypot(R.x - L.x, R.z - L.z);
-      if (time > 15 && R.n + 1 <= (L.n + 1) * (.65 + .4 * bold) && d < 30 + 60 * bold && d < hd && L.n >= 3) { hunt = R; hd = d; }
-      if (R.n > (L.n + 1) * 1.5 && d < 22 && d < rd) { run = R; rd = d; }
+      if (time > 15 && R.n + 1 <= (L.n + 1) * (.7 + .4 * bold) && d < 30 + 60 * bold && d < hd && L.n >= 3) { hunt = R; hd = d; }
+      if (R.n > (L.n + 1) * 1.5 && d < 22 && d < fd) { flee = R; fd = d; }
     }
-    if (run && !hunt) want = [L.x + (L.x - run.x), L.z + (L.z - run.z)];
+    if (flee && !hunt) { want = [L.x + (L.x - flee.x), L.z + (L.z - flee.z)]; sprint = true; }
     else if (hunt) {
-      // Lead the shot a little, and fire once we are lined up and close.
-      want = [hunt.x + hunt.vx * .6, hunt.z + hunt.vz * .6];
+      // Lead the target a little. Close in, and charge once lined up with
+      // room to build speed - a charge that ignites on top of them is the
+      // whole point; one that ignites past them is a waste of a cooldown.
+      want = [hunt.x + hunt.vx * .8, hunt.z + hunt.vz * .8];
       const err = Math.abs(wrapA(Math.atan2(want[1] - L.z, want[0] - L.x) - L.yaw));
-      if (hd < 30 * bold && err < .2 && L.cool <= 0) fold = true;
+      // Start the run lined up and inside forty-five units; once it is
+      // running, hold it as long as the target is anywhere ahead. A brain
+      // that re-aimed every tick dropped every charge at the first swerve.
+      const lit = L.charge > 0 || L.wave;
+      run = L.cool <= 0 && hd < 70 && (lit ? err < 1.5 : err < .35 && hd < 45);
+      sprint = true;
     } else {
       let best = null, bd = 1e9;
       for (const u of units) {
         if (u.lead >= 0 || u.st !== 0 || (u.col !== L.col && u.col !== WILD)) continue;
-        // Prefer a cluster: a unicorn with neighbours is worth walking to.
         const d = Math.hypot(u.x - L.x, u.z - L.z) - (u.col === WILD ? 6 : 0);
         if (d < bd) { bd = d; best = u; }
       }
       want = best ? [best.x, best.z] : [meadows[L.col][0] * .5, meadows[L.col][1] * .5];
     }
   }
-  ai.goal = want;
-  // A charge that has begun is held to completion unless the reason went
-  // away; a brain that toggles the button every tick would never fire.
-  if (fold && !L.chg) charge(L, 1);
-  if (L.chg && (L.charge >= 1 || (!fold && L.charge > .5))) charge(L, 0);
+  ai.goal = want; ai.sprint = sprint;
+  // Hold the charge to the end once lit; a brain that lets go every tick
+  // would never get past the crackle.
+  charge(L, run || (L.wave > 0));
 }
 
 // --- the step -------------------------------------------------------------
 // `input` is the player's: turn (-1..1), fwd (0/1 sprint), back (0/1).
 export function step(dt, input) {
   time += dt;
-  for (const L of leaders) L.n = 0;
-  for (const u of units) if (u.lead >= 0 && u !== leaders[u.lead] && u.st !== 3) leaders[u.lead].n++;
+  for (const L of leaders) { L.n = 0; L.cx = L.x; L.cz = L.z; }
+  for (const u of units) if (u.lead >= 0 && u !== leaders[u.lead] && u.st !== 3) {
+    const L = leaders[u.lead];
+    L.n++; L.cx += u.x; L.cz += u.z;
+  }
+  for (const L of leaders) { L.cx /= L.n + 1; L.cz /= L.n + 1; L.r = footprint(L.n); }
 
   // Leaders steer; everyone else reacts.
   for (const L of leaders) {
     if (L.st === 3) continue;
     L.cool = Math.max(0, L.cool - dt);
+    L.threat = threatened(L);
     if (L.ai) think(L, dt);
-    if (L.st !== 0) continue;
+    if (L.st !== 0) { L.spd = 0; continue; }
     L.stun = Math.max(0, L.stun - dt);
-    let turn = 0, spd = 11;
+    let turn = 0, want = 11;
     if (L.ai) {
       const g = L.ai.goal;
       if (g) turn = Math.max(-1, Math.min(1, wrapA(Math.atan2(g[1] - L.z, g[0] - L.x) - L.yaw) * 3));
-    } else { turn = input.turn; spd = input.fwd ? 15 : input.back ? 5 : 11; }
-    if (L.stun > 0) { spd = 0; turn = 0; }
-    if (L.chg) {
-      spd *= .3;
-      L.charge = Math.min(1, L.charge + dt / chargeTime(L));
+      // A rival hunting, fleeing or dodging sprints, as the player can.
+      if (L.ai.sprint) want = 15;
+    } else { turn = input.turn; want = input.fwd ? 15 : input.back ? 5 : 11; }
+    if (L.stun > 0) { want = 0; turn = 0; }
+    if (L.chg && L.stun <= 0) {
+      // The charge builds, and the speed with it - slowly, so the run-up
+      // is a thing you can see coming and a thing you can misjudge.
+      if (!L.wave) L.charge = Math.min(1, L.charge + dt / chargeTime(L));
+      want = 11 + 22 * L.charge;
+      if (L.charge >= 1 && !L.wave) {
+        // IGNITION. The band is the rainbow now, for as long as the herd
+        // can hold it - bigger herds burn longer.
+        L.wave = 1 + L.n; L.burn = 2.5 + .12 * L.n;
+        events.push({ k: 'ignite', L });
+      }
+    } else {
+      L.charge = Math.max(0, L.charge - dt * 1.5);
+      if (L.wave) { L.wave = 0; L.cool = 3; events.push({ k: 'fizzle', L }); }
     }
-    L.yaw += turn * dt * 2.6;
-    const tx = Math.cos(L.yaw) * spd, tz = Math.sin(L.yaw) * spd;
+    if (L.wave) {
+      L.burn -= dt;
+      if (L.burn <= 0) { L.wave = 0; L.chg = 0; L.charge = 0; L.cool = 3; events.push({ k: 'fizzle', L }); }
+    }
+    // Heavy at speed: a charging herd turns like a herd, not a bicycle.
+    L.yaw += turn * dt * 2.6 * (1 - .6 * L.charge);
+    L.spd = lerp(L.spd, want, dt * (want > L.spd ? 1.1 : 4));
+    const tx = Math.cos(L.yaw) * L.spd, tz = Math.sin(L.yaw) * L.spd;
     L.vx = lerp(L.vx, tx, dt * 6); L.vz = lerp(L.vz, tz, dt * 6);
-    // Morph is the herd's, but the leader carries it for drawing: it sinks
-    // into the ball last.
-    L.morph = L.chg ? L.charge : Math.max(0, L.morph - dt * 2.5);
   }
 
   for (const u of units) {
@@ -256,19 +258,18 @@ export function step(dt, input) {
     }
     if (u.st !== 0 || u.hearts) continue;
     const L = u.lead >= 0 ? leaders[u.lead] : null;
-    let tx = 0, tz = 0, spd = 2;
+    let tx = 0, tz = 0;
     if (L) {
       // A slot in the herd's wake, in the leader's own frame. sqrt(n) wide
-      // so a big herd is a broad wedge, not a queue.
-      const n = Math.sqrt(L.n + 1), w = Math.sin(u.seed * 3) * n * 1.4, back = 1.6 + (Math.cos(u.seed * 5) * .5 + .5) * n * 1.6;
+      // so a big herd is a broad wedge, not a queue - and a charging herd
+      // pulls that wedge tight, shoulder to shoulder.
+      const n = Math.sqrt(L.n + 1), tight = 1 - .45 * L.charge;
+      const w = Math.sin(u.seed * 3) * n * 1.4 * tight, back = 1.4 + (Math.cos(u.seed * 5) * .5 + .5) * n * 1.6 * tight;
       const c = Math.cos(L.yaw), s = Math.sin(L.yaw);
-      let gx = L.x - c * back - s * w, gz = L.z - s * back + c * w;
-      // Charging: the slot is on the sphere, and pulled in hard.
-      if (L.chg) { const r = radius(L.n) * .7; gx = L.x + Math.cos(u.seed * 7) * r; gz = L.z + Math.sin(u.seed * 7) * r; }
+      const gx = L.x - c * back - s * w, gz = L.z - s * back + c * w;
       const dx = gx - u.x, dz = gz - u.z, d = Math.hypot(dx, dz) || 1;
-      spd = Math.min(L.chg ? 30 : 19, d * 3.2);
+      const spd = Math.min(L.spd + 9, d * 3.2);
       tx = dx / d * spd; tz = dz / d * spd;
-      u.morph = L.chg ? L.charge : Math.max(0, u.morph - dt * 2.5);
     } else {
       // Grazing: drift, keep near home, and shy away from any leader that
       // is not your colour.
@@ -295,6 +296,10 @@ export function step(dt, input) {
   }
 
   // Separation, and the horn fight. One pass over the pairs does both.
+  // Momentum decides a blow: a unicorn's own speed, and its herd's charge
+  // - so a charging wedge ploughs through a grazing line, and two herds
+  // ambling into each other trade unicorns evenly until one runs.
+  const mom = (u) => .6 + u.sp / 12 + (u.lead >= 0 ? leaders[u.lead].charge * 2 : 0);
   for (let i = 0; i < units.length; i++) {
     const a = units[i];
     if (a.st !== 0) continue;
@@ -305,15 +310,26 @@ export function step(dt, input) {
       if (Math.abs(dx) > 1.3 || Math.abs(dz) > 1.3) continue;
       const d = Math.hypot(dx, dz) || .01, push = (1.3 - d) / d * 14 * dt;
       a.vx -= dx * push; a.vz -= dz * push; b.vx += dx * push; b.vz += dz * push;
-      // Two herds touching: the smaller one loses the unicorn in the
-      // contact. Leaders only bounce - a heart is only ever lost to a fireball.
       if (a.lead < 0 || b.lead < 0 || a.lead === b.lead || a.hit || b.hit) continue;
-      const A = leaders[a.lead], B = leaders[b.lead];
-      const [big, small, su] = A.n === B.n ? (rnd() < .5 ? [A, B, b] : [B, A, a]) : A.n > B.n ? [A, B, b] : [B, A, a];
+      const ma = mom(a), mb = mom(b);
+      const [win, lose] = ma === mb ? (rnd() < .5 ? [a, b] : [b, a]) : ma > mb ? [a, b] : [b, a];
       a.hit = b.hit = .4;
-      if (su.hearts) { events.push({ k: 'horn', x: a.x, z: a.z }); continue; }
-      scatter(su, su.x - big.x, su.z - big.z, 7);
-      events.push({ k: 'knock', x: su.x, z: su.z, col: su.col });
+      // Two lit herds do not trade horns; their rainbows settle it below.
+      const A = leaders[a.lead], B = leaders[b.lead];
+      if (A.wave && B.wave) continue;
+      if (lose.hearts) {
+        // A leader takes a horn: knocked back, and if the horn came in on
+        // a real charge - or the leader has no herd left to stand behind -
+        // that is a heart. A lone leader is prey; it must run and gather,
+        // and a hunter on top of it does not need a run-up to finish it.
+        const W = leaders[win.lead];
+        events.push({ k: 'horn', x: a.x, z: a.z });
+        if ((W.charge > .5 || lose.n === 0) && lose.stun <= 0) hurt(lose, lose.x - win.x, lose.z - win.z);
+        else { lose.vx += (lose.x - win.x) * 6; lose.vz += (lose.z - win.z) * 6; }
+        continue;
+      }
+      scatter(lose, lose.x - win.x, lose.z - win.z, 7 + mom(win) * 2);
+      events.push({ k: 'knock', x: lose.x, z: lose.z, col: lose.col });
     }
   }
 
@@ -329,48 +345,27 @@ export function step(dt, input) {
     if (sp > .5 && !u.hearts) u.yaw = lerp(u.yaw, u.yaw + wrapA(Math.atan2(u.vz, u.vx) - u.yaw), dt * 8);
   }
 
-  // The fireballs.
-  for (const b of [...balls]) {
-    if (!balls.includes(b)) continue;
-    b.age += dt; b.life -= dt;
-    b.r = radius(b.pw);
-    b.x += b.vx * dt; b.z += b.vz * dt;
-    const L = leaders[b.own];
-    L.x = b.x; L.z = b.z;
-    for (const u of units) if (u.lead === b.own && u.st === 2) { u.x = b.x; u.z = b.z; }
-    if (Math.abs(b.x) > ARENA + 4 || Math.abs(b.z) > ARENA + 4) b.life = 0;
-    // Another fireball?
-    for (const o of balls) if (o !== b && Math.hypot(o.x - b.x, o.z - b.z) < o.r + b.r) { clash(b, o); break; }
-    if (!balls.includes(b)) continue;
-    // Everyone on the ground within reach.
+  // The rainbows. Everything under one is thrown; two that meet explode.
+  for (const L of leaders) {
+    if (!L.wave || L.st !== 0) continue;
+    for (const R of leaders) {
+      if (R !== L && R.wave && R.st === 0 && Math.hypot(R.cx - L.cx, R.cz - L.cz) < R.r + L.r) { clash(L, R); break; }
+    }
+    if (!L.wave) continue;
     for (const u of units) {
-      if (u.st !== 0 || Math.hypot(u.x - b.x, u.z - b.z) > b.r + .9) continue;
-      const mine = u.lead === b.own, kin = u.col === L.col || u.col === WILD;
-      if (mine) continue;
+      if (u.st !== 0 || u.lead === L.lead || Math.hypot(u.x - L.cx, u.z - L.cz) > L.r) continue;
+      const kin = u.col === L.col || u.col === WILD;
       if (u.lead < 0 && kin) {
-        // Absorbed: our colour, or a wild one, rolled up on the way.
-        u.lead = b.own; u.st = 2; u.morph = 1; b.pw += 1; b.life += .1;
-        events.push({ k: 'eat', b });
+        // Swept up: our colour, or a wild one, caught in the light.
+        u.lead = L.lead; events.push({ k: 'join', u, L });
         continue;
       }
-      if (u.hearts) {
-        // A leader caught in the open: hurt, and everyone following it
-        // is thrown. A herd that was mid-charge is caught the same way.
-        breakHerd(u, b.x, b.z, 11);
-        b.pw -= 2;
-      } else {
-        scatter(u, u.x - b.x, u.z - b.z, 10 + b.pw * .3);
-        b.pw -= 1;
-      }
-      events.push({ k: 'blast', x: u.x, z: u.z, col: u.col });
+      if (u.hearts) breakHerd(u, L.cx, L.cz, 12);
+      else scatter(u, u.x - L.cx, u.z - L.cz, 12 + L.n * .3);
+      events.push({ k: 'blast', x: u.x, z: u.z, col: u.col, L });
     }
-    if (b.pw <= 0) { events.push({ k: 'boom', x: b.x, z: b.z, pw: 2 }); b.life = 0; }
-    if (b.life <= 0) unfold(b);
   }
 }
 
-// The player's position for the camera: the leader, or the fireball it
-// is riding in.
-export const focus = () => leaders[0].ball || leaders[0];
 export const won = () => leaders[0].st !== 3 && alive().length === 1;
 export const lost = () => leaders[0].st === 3;

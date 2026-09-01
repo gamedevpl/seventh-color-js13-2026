@@ -50,8 +50,8 @@ export function open(room) {
   try { ws = new WebSocket(room || ROOM); } catch { net.said = 'NO PLAIN FOUND'; return; }
   ws.binaryType = 'arraybuffer';
   ws.onopen = () => { net.on = 1; t = 0; tHeard = -99; joined = 0; };
-  ws.onclose = () => { net.on = net.host = 0; net.me = 0; ws = null; net.said = 'THE PLAIN IS GONE'; };
-  ws.onerror = () => { net.said = 'NO PLAIN FOUND'; };
+  ws.onclose = () => { net.on = net.host = 0; net.me = 0; ws = null; if (!net.said) net.said = 'THE PLAIN IS GONE'; };
+  ws.onerror = () => { net.said = 'NO PLAIN HERE - PLAYING ALONE'; net.on = 0; };
   ws.onmessage = (e) => hear(e.data);
 }
 export function close() { if (ws) { const w = ws; ws = null; net.on = net.host = 0; net.me = 0; w.close(); } }

@@ -734,9 +734,9 @@ function frame(now_) {
     }
     ctx.font = '13px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.6)';
     ctx.fillText(Math.floor(timer / 60) + ':' + String(Math.floor(timer % 60)).padStart(2, '0'), VW / 2, 16);
-    if (net.on) {
+    if (net.on || net.said) {
       ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#8fe3c8';
-      ctx.fillText(net.seats + (net.seats > 1 ? ' riders' : ' rider') + ' - ESC to leave', VW / 2, 34);
+      if (net.on) ctx.fillText(net.seats + (net.seats > 1 ? ' riders' : ' rider') + ' - ESC to leave', VW / 2, 34);
       if (net.said) { ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#f3ead6'; ctx.fillText(net.said, VW / 2, VH * .38); }
       if (net.me < 0) { ctx.font = 'bold 15px system-ui'; ctx.fillStyle = '#ffb0b8'; ctx.fillText('THE PLAIN IS FULL - WATCHING', VW / 2, VH * .3); }
       else if (P.st === 3) { ctx.font = 'bold 15px system-ui'; ctx.fillStyle = '#ffb0b8'; ctx.fillText('OUT - THE NEXT PLAIN IS COMING', VW / 2, VH * .3); }

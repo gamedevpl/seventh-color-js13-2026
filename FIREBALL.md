@@ -545,6 +545,28 @@ fireballs, bloom, an aurora, and the catalog gate (trace, capture,
 acceptance, agent-play, playtest) green. Its `VISUAL.md` records every
 place the rebuild diverges from the 13k original and why.
 
+Its multiplayer is **not** this one, and deliberately so. The competition
+relay is a room on the internet; the platform already has party mode - one
+screen, phones as controllers - and a game that reimplemented a WebSocket
+protocol there would be a second way of doing something the platform does
+already. So the director's cut shares a screen instead: four of the seven
+herds can be driven by people, by phone through the lobby or by a second
+and third pair of hands on the same keyboard, and the brains keep the
+rest. The drop-in rule is the same one as here, and it arrives at it from
+the other direction - a herd is the brains' until somebody touches its
+controls.
+
+The one thing that could not be shared is the shot. A chase camera behind
+one herd hides everybody else, which in a game about herds meeting is the
+whole show, so two or more drivers lift the camera into an overview that
+holds all of them. The heading stays fixed; only the distance answers to
+how far they have drifted apart.
+
+The kit gained `party.held(dt, { idleSeconds })` on the way: the claim
+rule - a slot is a person once a phone lands on it or its keys are
+touched, and a keyboard seat left alone goes back to the bots - was being
+written again in every party game.
+
 ## Milestone log
 
 | gate | ceiling | packed | notes |

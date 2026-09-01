@@ -395,11 +395,130 @@ lens, at a third of a second and again at seven tenths - the simulation's
 own clashes land in whatever frame the search stopped on, which is never
 the one worth looking at.
 
+## F5 — the plain, shared
+
+js13kGames 2026 has an **Online** category: a WebSocket relay hosted on
+Cloudflare, free to build on, and a rule that the game must still work on
+its own. The whole of it is one address per room, and it does four things:
+
+- it hands each socket a name of its own the moment it connects;
+- it repeats whatever you send to every OTHER socket in the room, and
+  never back to you;
+- it says a line when somebody arrives (`+name`) or leaves (`-name`);
+- and `@name|...` reaches that one socket instead of the room.
+
+Nothing else. No state, no rooms that outlive their last member, no
+authority. Everything below is built out of that.
+
+### What multiplayer is here
+
+Not a new game: the same plain, the same seven meadows, the same seven
+herds. **Every person on the plain drives one of them, and the brains keep
+the rest.** That single decision pays for itself three times over.
+
+- **It is offline-first for free.** One person in a room is exactly the
+  game you play with no socket at all - six rivals, same brains.
+- **Nobody waits in a lobby.** An arrival takes a herd off the brains
+  mid-match; a departure hands it back. There is no "waiting for players"
+  and no round to sit out.
+- **It fixes the thing the brains cannot do.** Two lit herds share the
+  plain for about a second a match and hardly ever meet, because a rainbow
+  cannot turn hard enough to close on one that swerves (see *Where it goes
+  next*). Two people can. Rainbow against rainbow was always the end-game;
+  online is where it actually happens.
+
+### Who runs the plain
+
+One client is the **host**: it alone runs `step`, and twelve times a second
+it writes the entire plain into a packet. Everyone else animates what they
+are told and sends three bytes of input back.
+
+The alternative was lockstep - everyone runs the same simulation on the
+same inputs - and it was rejected on sight. `herd.js` is thick with `sin`,
+`cos`, `atan2` and `hypot`, and those disagree in the last place between
+one engine and the next. A minute of that is a plain that has quietly
+become two plains, and the checksum-and-resync needed to notice costs more
+than sending the state does.
+
+Who hosts is **not negotiated**. Everyone announces their name once a
+second, so everyone holds the same set of names, and:
+
+- if nobody has sent a packet for 1.2 seconds, the smallest name starts;
+- whoever is running the plain **keeps** running it while they are there;
+- two hosts can only happen in the first second of an empty room, and the
+  packet carries a random tag so the larger one stands down mid-packet.
+
+The first build gave the plain to the smallest name outright. That is
+wrong, and the probe said so: every arrival with a small name took the
+plain off whoever had it, so **joining froze the game for a second and a
+half for everybody already playing**. Stability beats order. An arrival
+should be invisible to the people already there.
+
+When a host leaves, the plain does not restart. Everyone left has been
+drawing it all along, so whoever takes over simply carries on from the
+state they were already holding.
+
+### The packet
+
+Seven bytes a unicorn - two each for x and z, one for the heading, one
+holding state, herd and colour together, one for height - and four a
+leader on top. Seventy-seven unicorns, so **564 bytes, twelve times a
+second**: 6.5 KB/s up from the host, and about 45 KB/s out of the relay
+with seven people on the plain. Measured on the real relay before a line
+of game code was written: 12 Hz to six peers, not one frame dropped, 30 ms
+at the median and 44 at the 99th.
+
+What is NOT in the packet is the interesting half. Leg phase, tumbles,
+the horn's lunge and recoil, the herd's footprint, the arcs, the particles
+and every sound are worked out on each client from what it can see. They
+are the parts nobody can tell apart from the real thing, and they are most
+of the bytes. The client eases toward the positions it is given rather
+than snapping to them, so a packet every 83 ms still draws at 60.
+
+A client is told states, not events, so the noises are read back out of
+what changed: a herd that lit is an ignition, a heart that went at the same
+moment a rainbow went out is a clash, and one that went on its own is a
+horn.
+
+### The probe
+
+`tools/test-online.mjs` runs two and then three headless browsers against
+a relay of our own - `tools/lib/relay.mjs`, a hundred lines with exactly
+the four behaviours above - and asks:
+
+- do two people agree on which of them runs the plain, without a word
+  about it?
+- do they end up on different herds, and does the second one's herd obey
+  the second one's thumbs and nobody else's?
+- does the plain the guest draws match the plain the host is running?
+- does an arrival mid-match leave the plain running?
+- and when the host walks out, does the plain carry on from where it was?
+
+`--live` runs the same questions against the competition's own relay,
+which is the only way to find out that the stand-in still tells the truth.
+It earned its keep immediately. Two bugs only the real thing produced:
+
+- **a dt of zero.** Three tabs make the frame clock jump, and two frames
+  inside the same millisecond divide a distance by zero. The infinity
+  reached an oscillator as a NaN and took the whole loop down.
+- **a blast with no size.** The client's derived clash called `boom()`
+  without the power the sound needs, so its gain was NaN - same crash,
+  different door.
+
+Neither is reachable offline. The lesson is the one this project keeps
+learning: the stand-in tells you the protocol is right, and only the real
+thing tells you the game is.
+
+### What it cost
+
+1,675 bytes packed. There were 1,945 to spend.
+
 ## The wall
 
-F4: **11,336 bytes** packed worst-of-5 at O1, limit 13,312. The edge, the
-burn, the fall, the strike and the varied gaits cost about seven hundred
-bytes over F3, and 1,976 remain.
+F5: **13,049 bytes** packed worst-of-5 at O1, limit 13,312. The shared
+plain cost 1,675 bytes on top of F4's ground and blast work, and **263
+remain**. That is the whole of the budget spent, and anything further has
+to pay for itself out of something already there.
 
 ## Where it goes next
 
@@ -409,7 +528,9 @@ bytes over F3, and 1,976 remain.
 - **More clashes.** An answering herd now leads its target rather than
   chasing where it was, and two lit herds still share the plain for about
   a second a match without meeting. The remaining gap is that a rainbow
-  cannot turn hard enough to close on one that swerves.
+  cannot turn hard enough to close on one that swerves. Online sidesteps
+  this rather than solving it: two people close on each other perfectly
+  well, and the brains still cannot.
 - **A skilled policy for the probe.** The autopilot player is the rival
   brain; a policy that hunts wild colours after a kill would say whether the
   snowball is too steep.
@@ -428,6 +549,7 @@ place the rebuild diverges from the 13k original and why.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F5 the plain, shared | 13,312 | 13,049 (O1 worst-of-5) | the Online category: up to seven people on one plain, a herd each and the brains on the rest; a host that writes the whole plain into 564 bytes at 12 Hz, clients that animate it and send three bytes back; hosting settled by sorting names, never by asking; a probe that runs three browsers against a relay of our own and against the real one |
 | F4 the edge and the price | 13,312 | 11,336 (O1 worst-of-5) | leaving the plain is fatal and the brains know it; the rainbow spends the herd and steers worse the bigger it is; the herd dissolves into it and the camera opens up; smooth tunnel, varied gaits, horn strike and fall animations |
 | F3 horns, charge, rainbow | 13,312 | 10,396 (O1 worst-of-5) | fireball removed; momentum melee, the charge as a run, arcs, ignition into a rainbow tunnel, answering brains, steering sign fixed |
 | F2 thumbs and ears | 13,312 | 9,965 (O1 worst-of-5) | touch zones and audio driven by the probe, rival hearts, per-entry build config |

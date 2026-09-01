@@ -87,7 +87,10 @@ await page.evaluate(() => { FB.leaders[0].yaw = -Math.PI / 2; });
 await page.waitForTimeout(400);
 const spd0 = (await st()).spd;
 await page.keyboard.down('Space');
-await page.waitForTimeout(1200);
+// Long enough that a slow frame cannot decide the answer: at 1.2s the
+// speed lands within a tenth of the threshold and the gate turns on the
+// weather rather than on the game.
+await page.waitForTimeout(1700);
 s = await st();
 check('holding SPACE charges', s.chg === 1 && s.charge > .25, `charge ${s.charge.toFixed(2)}`);
 check('...and the herd gathers speed', s.spd > spd0 + 3, `speed ${spd0.toFixed(1)} -> ${s.spd.toFixed(1)}`);

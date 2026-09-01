@@ -73,7 +73,7 @@ export function newWorld(playerCol) {
     // its power; burn is how long it has left; cx/cz/r is the herd's
     // footprint, kept because the rainbow is the size of the band.
     L.spd = 11; L.wave = 0; L.burn = 0; L.n = 0; L.cx = mx; L.cz = mz; L.r = 2; L.threat = null; L.spent = 0;
-    L.ai = i ? { t: rnd(.3), goal: null } : null;
+    L.ai = i ? { t: rnd(.3), goal: null } : null; L.in = null;
     leaders.push(L); units.push(L);
     for (let k = 0; k < PER; k++) {
       const b = rnd(7), d = 3 + rnd(13);
@@ -274,7 +274,7 @@ export function step(dt, input) {
       if (g) turn = Math.max(-1, Math.min(1, wrapA(Math.atan2(g[1] - L.z, g[0] - L.x) - L.yaw) * 3));
       // A rival hunting, fleeing or dodging sprints, as the player can.
       if (L.ai.sprint) want = 15;
-    } else { turn = input.turn; want = input.fwd ? 15 : input.back ? 5 : 11; }
+    } else if (L.in) { turn = L.in.t; want = L.in.f ? 15 : L.in.b ? 5 : 11; }
     if (L.stun > 0) { want = 0; turn = 0; }
     if (L.chg && L.stun <= 0) {
       // The charge builds, and the speed with it - slowly, so the run-up
@@ -464,5 +464,5 @@ export function step(dt, input) {
   }
 }
 
-export const won = () => leaders[0].st !== 3 && alive().length === 1;
-export const lost = () => leaders[0].st === 3;
+export const won = (i) => leaders[i].st !== 3 && alive().length === 1;
+export const lost = (i) => leaders[i].st === 3;

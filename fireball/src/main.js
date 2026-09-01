@@ -10,6 +10,7 @@
 import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox, setDim } from './gl.js';
 import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
 import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, footprint, burnTime, nearEdge, ARENA, EDGE, WILD, now } from './herd.js';
+import { net, open as netOpen, close as netClose, tick as netTick, ghost, restart, spy } from './net.js';
 import { wake, awake, music, join as sJoin, clang, thud, rise, riseOff, whoosh, ignite as sIgnite, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
 
 const VW = 640, VH = 360;
@@ -48,6 +49,8 @@ let acted = false, pick = 0;
 addEventListener('keydown', (e) => {
   if (!held[e.key] && mode === 'title') { if (e.key === 'ArrowLeft' || e.key === 'a') pick--; if (e.key === 'ArrowRight' || e.key === 'd') pick++; }
   held[e.key] = true;
+  if (e.key === 'o' || e.key === 'O') goOnline();
+  if (e.key === 'Escape' && net.on) goHome();
   if (e.key === ' ' || e.key === 'Enter') acted = true;
   if (e.key === ' ') e.preventDefault();
 });
@@ -359,6 +362,21 @@ const BOOMS = [], TRAIL = new Map(), ARCS = [];
 let eye = null, look = null, camYaw = 0;
 const say = (t, d = 2) => { msg = t; msgT = d; };
 
+function goOnline(room) {
+  if (net.on) return;
+  if (!awake()) wake();
+  newRun(); mode = 'run'; say('', 0);
+  netOpen(room);
+}
+function goHome() { netClose(); newRun(1); mode = 'title'; }
+
+function who() {
+  if (!net.on) return leaders[0];
+  const m = net.me >= 0 ? leaders[net.me] : null;
+  if (m && m.st !== 3) return m;
+  return alive().sort((a, b) => b.n - a.n)[0] || leaders[0];
+}
+
 function newRun(attract) {
   newWorld(((pick % 7) + 7) % 7);
   // On the title every herd is a rival's - the plain plays itself under
@@ -368,9 +386,34 @@ function newRun(attract) {
   particleM = partM(); arcM = partM(); trailM = partM();
   PART.length = 0; pcur = 0; BOOMS.length = 0; PUFF.length = 0; TRAIL.clear(); ARCS.length = 0;
   timer = 0; msgT = 0; shake = 0; flash = 0; endT = 0; isBest = false; victory = false;
-  eye = null; camYaw = leaders[0].yaw;
+  eye = null; camYaw = who().yaw;
 }
 newRun(1);
+
+// --- the shared plain -----------------------------------------------------
+let overT = 0;
+function lastOne(dt) {
+  if (!net.host) return;
+  overT = alive().length > 1 ? 0 : overT + dt;
+  if (overT > 5) { overT = 0; restart(); say('A NEW PLAIN', 2.5); }
+}
+
+// A client is told states, not events, so the noises are read back out of
+// what changed since the last packet: a herd that lit, a heart that went.
+const pw = [], ph = [];
+function ghostSound(P) {
+  for (let i = 0; i < 7; i++) {
+    const L = leaders[i], near = Math.hypot(L.cx - P.cx, L.cz - P.cz) < 70;
+    if (L.wave && !pw[i] && near) { sIgnite(); if (L === P) say('RAINBOW', 1.5); }
+    if (ph[i] !== undefined && L.hearts < ph[i]) {
+      // A rainbow that goes out on the same packet that costs a heart is
+      // a clash; anything else is a horn.
+      if (pw[i] && !L.wave) { sBoom(pw[i]); shake = 1; flash = .5; boomCloud(L.cx, L.cz, pw[i]); } else if (near) ouch();
+      if (L === P) say(L.hearts ? 'HEART LOST' : 'THE HERD IS GONE', 2);
+    }
+    pw[i] = L.wave; ph[i] = L.hearts;
+  }
+}
 
 // --- the frame ------------------------------------------------------------
 let last = 0, lastPick = 0;
@@ -381,10 +424,10 @@ function frame(now_) {
   timer += dt;
   if (mode === 'title' && pick !== lastPick) { lastPick = pick; newRun(1); }
 
-  const P = leaders[0];
+  const P = who();
   if (mode === 'title') {
     if (awake()) music(.2, 1);
-    step(dt, { turn: 0, over: 1 });
+    step(dt, { over: 1 });
     if (doAct) {
       if (!awake()) wake();
       else { newRun(); mode = 'run'; say('GATHER YOUR COLOUR', 3); }
@@ -392,16 +435,26 @@ function frame(now_) {
   } else if (mode === 'run') {
     const heat = Math.min(1, P.n / 12);
     music(heat, 0);
-    charge(P, button());
+    const local = {
+      t: turnDir(), f: held.ArrowUp || held.w || (tL && tR) ? 1 : 0,
+      b: held.ArrowDown || held.s ? 1 : 0, c: button() ? 1 : 0,
+    };
+    // Offline this is always ours. Online it is ours only while we host;
+    // otherwise the plain arrives in packets and we animate what we are told.
+    const mine = netTick(dt, local);
     if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
-    step(dt, { turn: turnDir(), fwd: held.ArrowUp || held.w || (tL && tR), back: held.ArrowDown || held.s });
-    if (won() || lost()) {
+    if (mine) {
+      if (!net.on) { P.in = local; charge(P, local.c); }
+      step(dt, {});
+      if (net.on) lastOne(dt);
+    } else { ghost(dt); ghostSound(P); }
+    if (!net.on && (won(0) || lost(0))) {
       // The result is decided HERE and kept. The closing shot keeps the
       // plain running, so asking `lost()` again while it plays could
       // answer differently - which is exactly what happened to the first
       // player to win one: the herd ran on, crossed the line during the
       // end screen, and the screen changed its mind.
-      victory = won();
+      victory = won(0);
       mode = 'end'; endT = 0; riseOff();
       // And the rainbows go out with the run, so nothing is still being
       // ridden by nobody.
@@ -411,7 +464,7 @@ function frame(now_) {
   } else {
     endT += dt;
     music(.2, 1);
-    step(dt, { turn: 0, over: 1 });
+    step(dt, { over: 1 });
     if (doAct && endT > 1) { newRun(1); mode = 'title'; }
   }
   msgT = Math.max(0, msgT - dt);
@@ -615,6 +668,8 @@ function frame(now_) {
     ctx.font = 'bold 18px system-ui';
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
     ctx.fillText(awake() ? 'press SPACE to run' : 'press SPACE', VW / 2, VH - 42);
+    ctx.font = 'bold 14px system-ui'; ctx.fillStyle = '#8fe3c8';
+    ctx.fillText('press O to share the plain with everyone else playing', VW / 2, VH - 62);
     ctx.font = '12px system-ui'; ctx.fillStyle = '#9a90b8';
     ctx.fillText('arrows steer  -  up sprints  -  touch: sides steer, top strip charges', VW / 2, VH - 18);
     ctx.fillText('@gtanczyk | gamedev.pl | 2026', VW / 2, VH - 4);
@@ -679,6 +734,13 @@ function frame(now_) {
     }
     ctx.font = '13px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.6)';
     ctx.fillText(Math.floor(timer / 60) + ':' + String(Math.floor(timer % 60)).padStart(2, '0'), VW / 2, 16);
+    if (net.on) {
+      ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#8fe3c8';
+      ctx.fillText(net.seats + (net.seats > 1 ? ' riders' : ' rider') + ' - ESC to leave', VW / 2, 34);
+      if (net.said) { ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#f3ead6'; ctx.fillText(net.said, VW / 2, VH * .38); }
+      if (net.me < 0) { ctx.font = 'bold 15px system-ui'; ctx.fillStyle = '#ffb0b8'; ctx.fillText('THE PLAIN IS FULL - WATCHING', VW / 2, VH * .3); }
+      else if (P.st === 3) { ctx.font = 'bold 15px system-ui'; ctx.fillStyle = '#ffb0b8'; ctx.fillText('OUT - THE NEXT PLAIN IS COMING', VW / 2, VH * .3); }
+    }
     if (mode === 'end') {
       ctx.fillStyle = 'rgba(5,4,14,.6)'; ctx.fillRect(0, VH * .3, VW, VH * .42);
       ctx.font = 'bold 40px system-ui'; ctx.fillStyle = '#f3ead6';
@@ -694,4 +756,4 @@ function frame(now_) {
 }
 requestAnimationFrame(frame);
 
-if (DEV) window.FB = { units, leaders, events, get victory() { return victory; }, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; } };
+if (DEV) window.FB = { units, leaders, events, net, spy, netOpen, goOnline, goHome, get victory() { return victory; }, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; } };

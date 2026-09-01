@@ -238,20 +238,110 @@ The first build had LEFT raising the yaw, and the touch probe happily
 asserted it, because it only checked that a left thumb *moved* the yaw,
 not which way. Both fixed; the probe now says `yaw falls` and `yaw rises`.
 
+## F4 — the plain has an edge, and the rainbow has a price
+
+A second playtest, ten notes, and none of them about the idea - all about
+the *feel*. In the order they were given:
+
+**The edge kills now.** There was a soft push-back at the boundary, which
+is another way of saying the plain had no edge at all. Crossing it ends
+the run: a leader that steps outside turns to stone and its colour goes
+wild, whether it walked out or rode a rainbow out at thirty a second.
+Inside the last fourteen units the ground lights red in the direction you
+are about to leave in, and the HUD says so. **The brains know**, and that
+is the half that matters: each rival looks along its own nose - fourteen
+units plus a second and a half of its speed, and fifty-five plus its herd
+when lit, because a lit herd turns like a barge - and when the edge is out
+there it drops everything, aims at the middle, and *lets the rainbow go*.
+The probe counts falls against deaths across four whole matches: `0 of 24`.
+The first cut, without the let-go rule, killed a third of the field.
+
+**The rainbow burns the herd.** A rainbow thrown at nothing used to cost
+only its cooldown. It now spends followers as it runs - about one a second
+at a herd of ten, a fifth of the band over a full burn. They drop out
+behind you, dazed for four seconds, still your colour: gatherable again,
+by you or by whoever gets there first. That is the price of a miss, and it
+is a price you can watch being paid, because the herd counter is in the
+bar under the word RAINBOW.
+
+**The bigger it is, the worse it steers.** Turn rate divides by
+`1 + herd × 0.07` while lit, on top of the charge's own heaviness. A herd
+of thirty is a freight train: it wins any clash it reaches and cannot
+correct its aim to reach one.
+
+**The herd vanishes into the rainbow.** Past 82% charge the unicorns fade
+out, and while it burns they are not drawn at all - the light *is* them.
+They fade back in when it goes out. This was the note that made the effect
+finally read: before it, a tunnel of rainbow with a herd of white boxes
+running inside it looked like two effects fighting.
+
+**And the camera opens up.** Lit, it pulls back ten units plus the herd's
+own footprint and rises six more. A shoulder cam on a hundred feet of
+rainbow shows none of it.
+
+**The tunnel stopped stepping.** It sampled the herd's position every
+ninth of a second and left the sample there, so at charge speed the front
+of the tunnel jumped three units at a time. The last sample is now
+rewritten *every frame* and a new one only pushed every twentieth of a
+second, so the front is always exactly where the herd is.
+
+**Nothing runs in lockstep any more.** Every unicorn carries its own
+`gait` (0.82-1.24 leg tempo), `pace` (0.85-1.20 of the slot-chasing
+speed), `size` (±7%) and a leg phase offset, and its slot in the wedge
+drifts on two slow sines. A herd of forty identical animals at an
+identical tempo read as a texture rather than as animals.
+
+**The horn strike has an animation.** The one that lands the blow throws
+its head down and forward; the one that takes it rears back, and both
+decay over a quarter second. It was the one thing in the fight with no
+picture at all.
+
+**And a thrown unicorn now falls properly.** It tumbles about its own long
+axis at its own rate, lands, bounces once if it came down hard, skids, and
+then spends half a second rolling back onto its feet. Before, it snapped
+upright the instant it touched the ground.
+
+**More crackle near the top.** The arc rate went from `k²` to `k³`, which
+is far flatter early and a real storm in the last fifth - the tension
+belongs where the payoff is.
+
+Two things the round did not change: the music, which was the one note
+that came back positive, and the shape of the fight.
+
+### What the probe caught, twice
+
+Both catches were the *test* being wrong, which is its own lesson.
+`the rainbow burns the herd` passed while reading `herd 7 -> 0`: the
+probe's charge ran the player clean off the plain and the wipeout looked
+exactly like the burn. Fixed by measuring the cost in the simulation
+instead, with the rivals frozen at their meadows and the loop stopped
+before the edge. Then `...and the leader survives its own rainbow` failed
+at `hearts 0 at x 95` - the same fault one layer down, a twelve-second
+hold that crossed the whole plain. The rule for a probe on a plain with a
+lethal edge: never drive further than the plain is wide.
+
+```
+  24 autopilot matches: 24 ended, player won 3, avg 154s,
+  13.0 rainbows (5.8 answers, 1.2s of two lit) and 0.3 clashes/match
+  the brains keep off the edge          0 of 24 deaths were falls
+  the rainbow burns the herd as it runs herd 10 -> 9 over two seconds
+```
+
 ## The wall
 
-F3: **10,396 bytes** packed worst-of-5 at O1, limit 13,312. The tunnel,
-the arcs and the new brains cost about four hundred bytes over F2, with
-the fireball's own code gone.
+F4: **11,071 bytes** packed worst-of-5 at O1, limit 13,312. The edge, the
+burn, the fall, the strike and the varied gaits cost about seven hundred
+bytes over F3, and 2,241 remain.
 
 ## Where it goes next
 
 - **Hearts, seen.** A rival at one heart should look it - a dimmer horn, a
   limp - not only read it in the list.
 - **A sky.** The plain has stars, a moon and fog; it wants a horizon.
-- **More clashes.** Two lit herds share the plain for seconds without
-  meeting; the answering brain should steer for the collision, not the
-  attacker's current position.
+- **More clashes.** An answering herd now leads its target rather than
+  chasing where it was, and two lit herds still share the plain for about
+  a second a match without meeting. The remaining gap is that a rainbow
+  cannot turn hard enough to close on one that swerves.
 - **A skilled policy for the probe.** The autopilot player is the rival
   brain; a policy that hunts wild colours after a kill would say whether the
   snowball is too steep.
@@ -270,6 +360,7 @@ place the rebuild diverges from the 13k original and why.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F4 the edge and the price | 13,312 | 11,071 (O1 worst-of-5) | leaving the plain is fatal and the brains know it; the rainbow spends the herd and steers worse the bigger it is; the herd dissolves into it and the camera opens up; smooth tunnel, varied gaits, horn strike and fall animations |
 | F3 horns, charge, rainbow | 13,312 | 10,396 (O1 worst-of-5) | fireball removed; momentum melee, the charge as a run, arcs, ignition into a rainbow tunnel, answering brains, steering sign fixed |
 | F2 thumbs and ears | 13,312 | 9,965 (O1 worst-of-5) | touch zones and audio driven by the probe, rival hearts, per-entry build config |
 | F1 first playable | 13,312 | 9,808 (O0) | seven herds on a plain, gathering, the charge, the fireball as transport and weapon, the clash, wild colours, rival brains, the probe |

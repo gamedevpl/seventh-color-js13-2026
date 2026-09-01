@@ -46,7 +46,7 @@ const check = (name, ok, detail = '') => {
 };
 const st = () => page.evaluate(() => ({
   mode: FB.mode, n: FB.leaders[0].n, st: FB.leaders[0].st, chg: FB.leaders[0].chg, charge: FB.leaders[0].charge,
-  spd: FB.leaders[0].spd, wave: FB.leaders[0].wave, yaw: FB.leaders[0].yaw, alive: FB.leaders.filter((L) => L.st !== 3).length, hearts: FB.leaders[0].hearts,
+  spd: FB.leaders[0].spd, wave: FB.leaders[0].wave, yaw: FB.leaders[0].yaw, hearts: FB.leaders[0].hearts, alive: FB.leaders.filter((L) => L.st !== 3).length, hearts: FB.leaders[0].hearts,
 }));
 
 check('boots to the title', (await st()).mode === 'title');
@@ -60,19 +60,30 @@ check('second press starts the run', (await st()).mode === 'run');
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-start.png') });
 
 // Gathering: walk the meadow for a few seconds.
-// A slow circle round the meadow: forward, with a long turn held.
-await page.keyboard.down('ArrowLeft');
-await page.waitForTimeout(5000);
-await page.keyboard.up('ArrowLeft');
+// A sweep of the home meadow: sprint, with the turn held in bursts, so
+// the circle is wide enough to actually pass the grazing unicorns rather
+// than spinning on the spot in the middle of them.
+await page.keyboard.down('ArrowUp');
+for (let i = 0; i < 4; i++) {
+  await page.keyboard.down('ArrowLeft');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('ArrowLeft');
+  await page.waitForTimeout(900);
+}
+await page.keyboard.up('ArrowUp');
+await page.waitForTimeout(400);
 let s = await st();
-check('walking the meadow gathers a herd', s.n >= 2, `herd ${s.n}`);
+check('sweeping the meadow gathers a herd', s.n >= 2, `herd ${s.n}`);
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-herd.png') });
 
 // The charge, and the rainbow. Holding builds speed slowly; held long
 // enough the herd ignites, and the rainbow runs until the herd is spent.
-// Aimed at the edge of the plain first: a charge aimed at a rival is
-// answered now, and a horn duel mid-charge is a different test.
-await page.evaluate(() => { FB.leaders[0].yaw = Math.PI / 2; });
+// Aimed across the plain rather than off it. This section is for the
+// pictures and for the feel of the button; what the rainbow COSTS is
+// measured below, in the sim, where the rest of the plain can be held
+// still - a live charge through six rival herds loses hearts to horns and
+// reads every one of them as the rainbow burning the herd.
+await page.evaluate(() => { FB.leaders[0].yaw = -Math.PI / 2; });
 await page.waitForTimeout(400);
 const spd0 = (await st()).spd;
 await page.keyboard.down('Space');
@@ -91,6 +102,56 @@ await page.waitForTimeout(700);
 s = await st();
 check('letting go puts the rainbow out', s.wave === 0 && !s.chg, `rainbow ${s.wave}`);
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-land.png') });
+
+// What the rainbow costs, on an empty plain: the rivals are frozen at
+// their meadows, the player charges across the middle, and the herd is
+// counted at ignition and again two seconds into the burn.
+const burn = await page.evaluate(async () => {
+  FB.reset(0, false);
+  const P = FB.leaders[0];
+  for (const L of FB.leaders) if (L !== P) L.ai = null;
+  P.x = -40; P.z = 0; P.yaw = 0;
+  // Hand it a herd: the nearest twelve of its colour fall in behind.
+  let given = 0;
+  for (const u of FB.units) if (u !== P && u.col === P.col && given < 12) { u.lead = 0; u.x = P.x - 2 - given; u.z = P.z; given++; }
+  let lit = 0, after = 0, t = 0;
+  for (let i = 0; i < 30 * 12; i++) {
+    FB.charge(P, 1);
+    FB.step(1 / 30, { turn: 0 });
+    FB.events.length = 0;
+    if (P.wave && !lit) { lit = P.n; t = 0; }
+    if (lit) { t += 1 / 30; if (t > 2 && !after) { after = P.n; break; } }
+  }
+  return { given, lit, after, hearts: P.hearts, x: Math.round(P.x) };
+});
+check('the rainbow burns the herd as it runs', burn.lit > 0 && burn.after > 0 && burn.after < burn.lit,
+  `herd ${burn.lit} -> ${burn.after} over two seconds`);
+check('...and the leader survives its own rainbow', burn.hearts === 3, `hearts ${burn.hearts} at x ${burn.x}`);
+
+// The edge is fatal, for the player and for the brains alike.
+const edge = await page.evaluate(async () => {
+  FB.reset(0, false);
+  const P = FB.leaders[0];
+  P.x = 0; P.z = 0; P.yaw = 0;
+  for (let i = 0; i < 30 * 40 && P.st !== 3; i++) FB.step(1 / 30, { turn: 0, fwd: 1 });
+  const out = { playerDied: P.st === 3, x: Math.round(P.x), z: Math.round(P.z) };
+  // And the brains: run four whole matches and count how many leaders the
+  // edge took. A brain that walks off it would win the plain by accident.
+  let fellCount = 0, deaths = 0;
+  for (let m = 0; m < 4; m++) {
+    FB.reset(m, true);
+    for (let i = 0; i < 30 * 240; i++) {
+      FB.step(1 / 30, { turn: 0 });
+      for (const e of FB.events) { if (e.k === 'fell') fellCount++; if (e.k === 'dead') deaths++; }
+      FB.events.length = 0;
+      if (FB.leaders.filter((L) => L.st !== 3).length <= 1) break;
+    }
+  }
+  out.fellCount = fellCount; out.deaths = deaths;
+  return out;
+});
+check('running off the plain ends the run', edge.playerDied, `at ${edge.x},${edge.z}`);
+check('the brains keep off the edge', edge.fellCount <= edge.deaths * .25, `${edge.fellCount} of ${edge.deaths} deaths were falls`);
 
 // Touch. The lower halves steer, the top strip is the button: a pointer
 // held there must charge, and lifting it must fire. Checked against the
@@ -131,7 +192,7 @@ check('the run makes sound after the gesture', oscs > 20, `${oscs} oscillators s
 // A clash, for looking at: step the sim until two fireballs meet, then
 // let the frame draw it.
 const clashAt = await page.evaluate(async () => {
-  for (let seed = 0; seed < 4; seed++) {
+  for (let seed = 0; seed < 12; seed++) {
     FB.reset(seed, true);
     for (let i = 0; i < 30 * 400; i++) {
       FB.step(1 / 30, { turn: 0 });

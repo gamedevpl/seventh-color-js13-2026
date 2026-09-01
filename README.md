@@ -42,6 +42,7 @@ Each game builds through the same tools, selected with `--game`:
 | `npm run snap:test` | its probe suite: poses, hair, light, paint, the shoot loop, the phone, behaviour |
 | `npm run snap:gate` | the suite plus the balance sweep and a worst-of-5 pack |
 | `npm run snap:poses` | a contact sheet of every pose, for looking at a change rather than measuring it |
+| `npm run snap:promo` | the two images js13kgames.com asks for, rendered from the game itself |
 
 Add `--cheats` to any build for the DEV probes the live measurement tools read;
 they compile out of a shipping build entirely.

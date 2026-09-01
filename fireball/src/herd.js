@@ -58,7 +58,12 @@ export function newWorld(playerCol) {
   // centre - the opening shot looks the same way every time, and the
   // colours simply rotate around it.
   for (let i = 0; i < 7; i++) {
-    const c = (playerCol + i) % 7, a = Math.PI / 2 + i * Math.PI * 2 / 7, R = 66;
+    // The meadow ring. It used to sit at 66, twenty-nine units from an edge
+  // that is now fatal - close enough that a first sweep of your own home
+  // could walk you off the plain. Fifty-six leaves everyone a margin about
+  // as deep as the warning band is wide, and hands the middle back to the
+  // fight, which is where it belongs.
+  const c = (playerCol + i) % 7, a = Math.PI / 2 + i * Math.PI * 2 / 7, R = 56;
     const mx = Math.cos(a) * R, mz = Math.sin(a) * R;
     meadows[c] = [mx, mz];
     const L = unit(mx, mz, c);

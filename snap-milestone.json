@@ -1,5 +1,5 @@
 {
-  "name": "R20 the gauges come back",
-  "description": "FRAME and MOMENT are back on the viewfinder - the hair cards, the sheen and the +N floater paid for them, because a continuous read while you aim beats a sentence after you have aimed - 12,936 packed, 376 bytes free",
+  "name": "R22 the title fits on one line",
+  "description": "the instruction line was capped narrower than its own sentence, so even a wide screen broke it and left an orphan word; the cap is wider than the text now and text-wrap:balance splits the phone case evenly - 13,072 packed, 240 bytes free",
   "ceilingBytes": 13312
 }

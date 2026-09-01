@@ -1717,6 +1717,54 @@ a probe that reads real pixels cannot miss an empty buffer, and that is the
 whole reason it reads pixels rather than asking the code what it thinks it
 drew.
 
+## R21 — the credit, and a rule that undid itself
+
+The title was missing the credit line the other two entries carry. It has it
+now — `@gtanczyk | gamedev.pl | 2026` — and it is the cheapest of the three
+implementations: both of those titles are canvas, so they paint the text and
+hit-test the links against hand-kept rectangles. This title is already DOM,
+so an anchor is an anchor, and it works with a keyboard for free.
+
+### The probe found a real bug on its way past
+
+`test-phone` failed the bench check with **one pose in a twelve-second
+window**. Not flakiness — a fault the check exists for.
+
+"Never twice in a row" fell back to `rep[0]` when a draw repeated the current
+pose, and `rep[0]` is `IDLE` in both tables. So a draw that landed on IDLE
+while the unicorn was already idle got "corrected" to idle: the exact case
+the rule was written to prevent. On the bench, where the calm table is three
+entries and IDLE carries four of its nine weight, standing still
+perpetuated itself. The fallback takes the **next** entry now.
+
+The window went from twelve seconds to eighteen at the same time. A pose
+holds about two and a half seconds, so twelve seconds is five picks, and
+"how many different poses" over five dice rolls is not a measurement — the
+same small-sample trap that had the sleep gate tuned against noise for five
+rounds.
+
+## R22 — a line that broke itself
+
+The title's instruction line wrapped on a 1000-pixel screen and left
+`picture.` alone on the second row. The cause was in the style, not the
+prose: it carried `max-width: 34em`, **narrower than the sentence it holds**,
+so no screen was ever wide enough to fit it.
+
+The cap is wider than the text now, and the sentence is a few characters
+shorter at the end. Measured by counting the line boxes rather than by
+looking:
+
+```
+1200 px   1 line
+ 900 px   1 line
+ 430 px   2 lines
+ 375 px   2 lines
+```
+
+A phone cannot fit that much text on one line at a readable size, so the
+narrow case gets `text-wrap: balance` — two lines of roughly equal length
+rather than a full line and an orphan.
+
 ## Where it goes next
 
 - **A title screen**, which the game does not have at all yet — it opens

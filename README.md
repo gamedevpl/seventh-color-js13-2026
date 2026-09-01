@@ -29,7 +29,10 @@ those rounds in order, including the ones that were wrong.
 
 ## Building
 
-Each game builds through the same tools, selected with `--game`:
+Each game builds through the same tools, selected with `--game`. An entry is a
+directory: `<game>/src/main.js`, `<game>/entry.json` (its title, and whether it
+ships the phone viewport and touch CSS) and `<game>-milestone.json` (its size
+ceiling) - the build tool itself knows no game by name.
 
 | command | what it does |
 | --- | --- |

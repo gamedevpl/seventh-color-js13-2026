@@ -400,6 +400,8 @@ function frame(now_) {
       ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); ctx.beginPath(); ctx.arc(VW - 100, y, 6, 0, TAU); ctx.fill();
       ctx.fillStyle = dead ? '#666' : '#e8e0f4';
       ctx.fillText(dead ? '-' : L.n + (L.chg ? ' !' : L.ball ? ' >' : ''), VW - 112, y);
+      // Its hearts, so you can see who is one hit from stone.
+      if (!dead) { ctx.fillStyle = '#ff6b8a'; ctx.font = '10px system-ui'; ctx.fillText('♥'.repeat(L.hearts), VW - 150, y); ctx.font = 'bold 14px system-ui'; }
     });
     // The radar: the whole plain in a square, leaders as dots sized by
     // herd, fireballs as rings. It is how you see a fireball coming.

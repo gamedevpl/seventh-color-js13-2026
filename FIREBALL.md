@@ -136,13 +136,54 @@ fireballed while still gathering at eleven seconds.
 `max herd 46` is the wild rule working: a leader that takes two statues
 inherits their colours.
 
+## F2 — thumbs and ears
+
+Two things the first probe took on faith. The touch layout - lower halves
+steer, the top strip is the button - had been written but never driven, and
+"pump is called" is not "the browser made a noise". `test-herd.mjs` now
+presses the canvas with a pointer and reads the leader's yaw during the
+hold (left thumb: yaw 4.71 → 6.66; right thumb: back to 4.89), then holds
+the top strip and asserts the charge climbs and lifting fires. For the ear
+it patches `createOscillator` before the page boots and counts: **0**
+before any gesture, 262 by the time the run has fired once. Silence before
+the gesture is as much the requirement as noise after.
+
+The rival list gained hearts under each count, because "who is one hit from
+stone" is the question a fireball answers.
+
+And the build tool stopped knowing games by name: each entry carries an
+`entry.json` (title, phone viewport) beside its `src/`, so the fourth entry
+did not have to edit `native.mjs` the way the third did.
+
 ## The wall
 
-F1: **9,808 bytes** packed at O0, limit 13,312. Three and a half
-kilobytes in hand, which is where the next rounds go.
+F2: **9,965 bytes** packed worst-of-5 at O1, limit 13,312. Three and a
+third kilobytes in hand, which is where the next rounds go.
+
+## Where it goes next
+
+- **Hearts, seen.** A rival at one heart should look it - a dimmer horn, a
+  limp - not only read it in the list.
+- **A sky.** The plain has stars, a moon and fog; it wants a horizon.
+- **The feint as a tell.** A cancelled charge is free; it should cost a
+  beat of stun, or the rivals should learn to call it.
+- **A skilled policy for the probe.** The autopilot player is the rival
+  brain; a policy that hunts wild colours after a kill would say whether the
+  snowball is too steep.
+
+## The director's cut
+
+`games/unicorn-fireball` in the games repo is the editor's-cut port on
+GameKit Scene3D: the same rules and brains in TypeScript, a seeded plain,
+an editor surface (unicorns per colour, rivals, hearts, charge time,
+fireball range), the kit's tracker playing the gallop, point lights on the
+fireballs, bloom, an aurora, and the catalog gate (trace, capture,
+acceptance, agent-play, playtest) green. Its `VISUAL.md` records every
+place the rebuild diverges from the 13k original and why.
 
 ## Milestone log
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
-| F1 first playable | 13,312 | 9,808 | seven herds on a plain, gathering, the charge, the fireball as transport and weapon, the clash, wild colours, rival brains, the probe |
+| F2 thumbs and ears | 13,312 | 9,965 (O1 worst-of-5) | touch zones and audio driven by the probe, rival hearts, per-entry build config |
+| F1 first playable | 13,312 | 9,808 (O0) | seven herds on a plain, gathering, the charge, the fireball as transport and weapon, the clash, wild colours, rival brains, the probe |

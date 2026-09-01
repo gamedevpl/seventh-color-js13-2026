@@ -31,6 +31,11 @@ const page = await browser.newPage({ viewport: { width: 900, height: 640 } });
 const problems = [];
 page.on('console', (m) => { if (m.type() === 'error' && !/GL Driver/.test(m.text())) problems.push(m.text()); });
 page.on('pageerror', (e) => problems.push(e.message));
+await page.addInitScript(() => {
+  const proto = (window.AudioContext || window.webkitAudioContext).prototype, orig = proto.createOscillator;
+  window.__oscs = 0;
+  proto.createOscillator = function () { window.__oscs++; return orig.call(this); };
+});
 await page.goto(pathToFileURL(pagePath).href);
 await page.waitForTimeout(800);
 
@@ -45,6 +50,7 @@ const st = () => page.evaluate(() => ({
 }));
 
 check('boots to the title', (await st()).mode === 'title');
+check('silent before any gesture', (await page.evaluate(() => window.__oscs)) === 0);
 await page.keyboard.press('Space');
 await page.waitForTimeout(300);
 check('one press wakes the title and stays', (await st()).mode === 'title');
@@ -79,6 +85,42 @@ s = await st();
 check('the fireball lands and the herd unfolds', !s.mine && s.st !== 2, `balls ${s.balls} st ${s.st} herd ${s.n}`);
 check('the herd survived the ride, or was hit', s.n >= 2 || s.hearts < 3, `herd ${s.n} hearts ${s.hearts}`);
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-land.png') });
+
+// Touch. The lower halves steer, the top strip is the button: a pointer
+// held there must charge, and lifting it must fire. Checked against the
+// keyboard, which the section above already proved.
+const tap = async (x, y, ms) => {
+  const box = await page.evaluate(() => { const r = document.querySelector('canvas:last-of-type').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+  await page.mouse.move(box[0] + box[2] * x, box[1] + box[3] * y);
+  await page.mouse.down();
+  await page.waitForTimeout(ms);
+  return async () => { await page.mouse.up(); };
+};
+await page.evaluate(() => FB.reset(0, false));
+await page.waitForTimeout(300);
+let yaw0 = await page.evaluate(() => FB.leaders[0].yaw);
+let lift = await tap(.2, .7, 700);
+let yaw1 = await page.evaluate(() => FB.leaders[0].yaw);
+await lift();
+check('a left thumb steers left', yaw1 > yaw0 + .5, `yaw ${yaw0.toFixed(2)} -> ${yaw1.toFixed(2)}`);
+yaw0 = yaw1;
+lift = await tap(.8, .7, 700);
+yaw1 = await page.evaluate(() => FB.leaders[0].yaw);
+await lift();
+check('a right thumb steers right', yaw1 < yaw0 - .5, `yaw ${yaw0.toFixed(2)} -> ${yaw1.toFixed(2)}`);
+await page.waitForTimeout(3500);
+lift = await tap(.5, .12, 1200);
+s = await st();
+check('a thumb on the top strip charges', s.chg === 1 && s.charge > .3, `charge ${s.charge.toFixed(2)}`);
+await lift();
+await page.waitForTimeout(200);
+s = await st();
+check('lifting it fires', s.mine && s.st === 2, `mine ${s.mine} st ${s.st}`);
+
+// Audio: the browser must be silent until a gesture, and the run must be
+// audible after one. Counted in oscillators, as Rainbow Surfer does.
+const oscs = await page.evaluate(() => window.__oscs || 0);
+check('the run makes sound after the gesture', oscs > 20, `${oscs} oscillators so far`);
 
 // A clash, for looking at: step the sim until two fireballs meet, then
 // let the frame draw it.

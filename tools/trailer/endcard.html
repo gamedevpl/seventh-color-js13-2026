@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  html,body{margin:0;padding:0;width:1920px;height:1080px;overflow:hidden;
+    background:radial-gradient(ellipse at 50% 68%, #4a3416 0%, #241705 55%, #120b02 100%);
+    font-family:'Arial Black',Arial,sans-serif;display:flex;align-items:center;justify-content:center}
+  .wrap{display:flex;flex-direction:column;align-items:center;text-align:center}
+  .title{font-size:110px;font-weight:900;color:#fff6dd;letter-spacing:6px;opacity:0;
+    text-shadow:0 4px 22px rgba(0,0,0,.55);
+    transform:translateY(14px);animation:up .6s ease-out .15s forwards}
+  .bar{width:620px;height:18px;margin-top:34px;border-radius:3px;opacity:0;
+    background:linear-gradient(90deg,#ede8e0,#f58cb2,#6bb2f2,#7ae0a8,#f5cc57,#b887f2,#fa8c61,#4d456b);
+    animation:grow .5s ease-out .55s forwards}
+  .tagline{margin-top:30px;font-size:30px;font-weight:400;color:#ffeec4;letter-spacing:1px;
+    font-family:Arial,sans-serif;opacity:0;animation:up .5s ease-out .95s forwards}
+  .js13k{margin-top:46px;font-size:34px;font-weight:900;color:#f5cc57;letter-spacing:1px;
+    opacity:0;animation:up .5s ease-out 1.25s forwards}
+  .sub{margin-top:10px;font-size:22px;font-weight:400;color:#f0dcae;font-family:Arial,sans-serif;
+    opacity:0;animation:up .5s ease-out 1.45s forwards}
+  .byline{margin-top:44px;font-size:18px;font-weight:400;color:#b89a6a;letter-spacing:1px;
+    font-family:Arial,sans-serif;opacity:0;animation:up .5s ease-out 1.7s forwards}
+  @keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes grow{from{opacity:0;transform:scaleX(0)}to{opacity:1;transform:scaleX(1)}}
+</style>
+<div class="wrap">
+  <div class="title">UNICORN SNAP</div>
+  <div class="bar"></div>
+  <div class="tagline">dress it &middot; shoot it &middot; prove it</div>
+  <div class="js13k">js13kGames 2026</div>
+  <div class="sub">a WebGL game in 13 kilobytes &mdash; plays in your browser</div>
+  <div class="byline">@gtanczyk&nbsp;&nbsp;|&nbsp;&nbsp;gamedev.pl&nbsp;&nbsp;|&nbsp;&nbsp;2026</div>
+</div>

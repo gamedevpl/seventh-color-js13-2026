@@ -1,0 +1,80 @@
+// Puts the three pieces together: the frame sequence, the end card, and the
+// music. Everything here is measured rather than typed in - the shot list
+// gets retimed constantly, and every hardcoded duration in this pipeline
+// eventually became a crossfade landing in the wrong place.
+//
+// Run order: `npm run snap:dev` (the recorder needs the DEV hooks), then
+// trailer:frames, trailer:endcard, trailer:audio, then this.
+import { existsSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const build = path.join(root, 'build', 'trailer');
+const framesDir = path.join(build, 'frames');
+const endcard = path.join(build, 'endcard', 'endcard.webm');
+const music = path.join(build, 'audio', 'strut.wav');
+const out = process.argv[2] || path.join(build, 'unicorn-snap-trailer.mp4');
+
+const FPS = 30;
+// Long enough to read as a dissolve rather than a cut, short enough that the
+// closing shot is still arriving at the lens while it happens.
+const XFADE = 0.9;
+// The trailer opens from black. The game itself has no fade-in - it is a
+// page that simply starts drawing - so this is the one piece of grammar the
+// capture cannot provide and the mux has to.
+const FADE_IN = 1.0;
+// Playwright's recorder writes a few malformed frames before it settles;
+// they show up as a white flash at the cut. Trimming the head is cheaper
+// than trying to make the recorder behave.
+const ENDCARD_LEAD = 0.32;
+
+const sh = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8' });
+const probe = (file) => Number(sh('ffprobe', [
+  '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file,
+]).trim());
+
+for (const [what, p] of [['frames', framesDir], ['end card', endcard], ['music', music]]) {
+  if (!existsSync(p)) {
+    console.error(`missing ${what}: ${path.relative(root, p)}`);
+    console.error('run: npm run trailer:frames / trailer:endcard / trailer:audio');
+    process.exit(1);
+  }
+}
+
+const frameCount = readdirSync(framesDir).filter((f) => f.endsWith('.png')).length;
+const gameplay = path.join(build, 'gameplay.mp4');
+console.log(`encoding ${frameCount} frames (${(frameCount / FPS).toFixed(2)}s)`);
+sh('ffmpeg', [
+  '-y', '-framerate', String(FPS), '-i', path.join(framesDir, 'f%06d.png'),
+  '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', gameplay,
+]);
+
+// Normalised to the gameplay's frame rate first: xfade blends two streams
+// frame by frame and quietly produces judder if they disagree, and
+// Playwright records at 25.
+const endcard30 = path.join(build, 'endcard-30.mp4');
+sh('ffmpeg', [
+  '-y', '-ss', String(ENDCARD_LEAD), '-i', endcard,
+  '-vf', `fps=${FPS},setpts=PTS-STARTPTS`,
+  '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', endcard30,
+]);
+
+const gameDur = probe(gameplay);
+const offset = (gameDur - XFADE).toFixed(3);
+console.log(`gameplay ${gameDur.toFixed(2)}s, crossfade at ${offset}s`);
+
+// transition=fade, not dissolve: dissolve is a dithered blend and reads as
+// television static across a whole-frame crossfade.
+sh('ffmpeg', [
+  '-y', '-i', gameplay, '-i', endcard30, '-i', music,
+  '-filter_complex',
+  `[0:v]fade=t=in:st=0:d=${FADE_IN}:color=black[v0];`
+  + `[v0][1:v]xfade=transition=fade:duration=${XFADE}:offset=${offset}[v]`,
+  '-map', '[v]', '-map', '2:a',
+  '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium',
+  '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', out,
+]);
+
+console.log(`${path.relative(root, out)}  ${probe(out).toFixed(2)}s`);

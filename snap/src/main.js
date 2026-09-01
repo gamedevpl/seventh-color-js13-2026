@@ -459,6 +459,13 @@ const card = el('div', 'background:#f5e6bd;border-radius:14px;padding:16px 18px;
 // are a photographer's three controls and they are the whole of the skill:
 // hold the subject, fill the frame, wait for the moment.
 const R = 4.6;
+// The lens rides a fixed circle at radius R, which is the whole of the
+// game's camera and exactly the wrong instrument for a trailer: a promo
+// shot wants the lens ANYWHERE - a hand's width from a horn, planted on the
+// floor while the animal walks into it. These two let tools/trailer/ put it
+// there. Both fold away with DEV (see the `eye` assignment below), so the
+// shipping build is byte-for-byte what it was without them.
+let dolly = R, eyeH = 1.15;
 // It starts at its WIDEST. The probe found the old default already framing
 // at 0.69 of a perfect shot, which left aiming almost nothing to earn - a
 // camera handed to you already composed is a camera you need not use. A
@@ -654,7 +661,20 @@ function frame(now) {
   // like a post - you never saw the tail, and a horse that ignores you
   // while you dress it is not the character this game is about.
   // Calm on the bench: everything showy waits for the camera.
-  if (phase < 2 && !FROZEN) { act(A, anim, dt, deco, phase === 0); move(A, anim, P, dt); }
+  if (phase < 2 && !FROZEN) {
+    act(A, anim, dt, deco, phase === 0);
+    // The actor picks its own heading at random, which is right for play and
+    // useless for a closing shot that has to end with the animal arriving at
+    // a stated point. SNAPAIM replaces that random turn rate with a steer
+    // toward one, and nothing else about the actor changes.
+    if (DEV && window.__snapAim) {
+      const [tx, tz] = window.__snapAim;
+      const want = Math.atan2(tx - P.x, tz - P.z);
+      const d = ((want - P.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      A.turn = Math.max(-3, Math.min(3, d * 3));
+    }
+    move(A, anim, P, dt);
+  }
   if (winkT > 0) {
     winkT = Math.max(0, winkT - dt);
     // Light, back, dark, back.
@@ -694,7 +714,13 @@ function frame(now) {
   // The lens is placed BEFORE anything reads it. It depends only on the
   // camera, never on the pose, and the gaze below needs it in the same
   // frame - computing it after the rig left the unicorn looking at a null.
-  eye = [Math.sin(cam.ang) * R, 1.15, Math.cos(cam.ang) * R];
+  // The ternary is what keeps the trailer's free camera free: DEV is a
+  // substituted literal, so a shipping build compiles this straight back
+  // down to the fixed-radius line it has always been and drops dolly/eyeH
+  // as unreachable.
+  eye = DEV
+    ? [Math.sin(cam.ang) * dolly, eyeH, Math.cos(cam.ang) * dolly]
+    : [Math.sin(cam.ang) * R, 1.15, Math.cos(cam.ang) * R];
   const cp = Math.cos(cam.p);
   const at = [
     eye[0] + Math.sin(cam.a) * cp,
@@ -823,8 +849,31 @@ function frame(now) {
     // The balance policies drive the game through these rather than through
     // synthetic input events: what is being measured is a way of PLAYING,
     // and routing it through keyboard timing would measure the harness.
-    window.SNAPCAM = (a, p, f, ang) => { cam.a = a; cam.p = p; cam.fov = f; if (ang !== undefined) cam.ang = ang; };
+    // d and h are the trailer's two extra controls: how far out the lens
+    // sits and how high off the floor. A probe that only wants to aim
+    // passes neither and gets the game's own tripod.
+    window.SNAPCAM = (a, p, f, ang, d, h) => {
+      cam.a = a; cam.p = p; cam.fov = f;
+      if (ang !== undefined) cam.ang = ang;
+      if (d !== undefined) dolly = d;
+      if (h !== undefined) eyeH = h;
+    };
     window.SNAPFIRE = () => { wantShot = 1; };
+    // World position of one bone, so a shot can be framed on the horn or a
+    // hoof rather than on the animal as a whole.
+    window.SNAPBONE = (i) => [P.w[i][12], P.w[i][13], P.w[i][14]];
+    // Phase drives act()/move(), and the results screen freezes both - which
+    // leaves whatever pose was mid-cycle replaying off anim.t forever. Going
+    // back to 1 without calling layout() resumes the actor while the HUD
+    // stays exactly as hidden as the trailer left it.
+    window.SNAPPHASE = (p) => { phase = p; };
+    // Steer the actor's heading at a fixed world point instead of its own
+    // random wander - read by move()'s caller above.
+    window.SNAPAIM = (x, z) => { window.__snapAim = [x, z]; };
+    // Commit to one gait and hold it: A.next=999 stops act() ever picking
+    // again, so a closing shot cannot be spent on the animal deciding to
+    // graze. Mode numbers are pose.js's (2 walk, 3 trot, 4 gallop).
+    window.SNAPGAIT = (m) => { anim.mode = m; anim.hold = 0; A.hold = 0; A.next = 999; };
     // Boredom and spark both move the same weights the look does, so a probe
     // measuring what a LOOK is worth has to be able to hold the mood still -
     // otherwise it measures the two together and can attribute neither.

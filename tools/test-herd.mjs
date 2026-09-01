@@ -207,6 +207,25 @@ check('two rainbows clash within an autopilot match', !!clashAt);
 await page.waitForTimeout(250);
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-clash.png') });
 
+// A win stays won. The closing shot keeps the plain running, so a herd
+// still carrying speed can cross the line while nobody is steering - the
+// first player to win a match watched the end screen change its mind.
+// Driven through the real loop, because the win transition lives there.
+await page.evaluate(() => {
+  FB.reset(0, false);
+  const P = FB.leaders[0];
+  for (const L of FB.leaders) if (L !== P) L.st = 3;
+  P.x = 80; P.z = 0; P.yaw = 0; P.spd = 30;
+});
+await page.keyboard.down('ArrowUp');
+await page.waitForTimeout(900);
+let vic = await page.evaluate(() => ({ victory: FB.victory, mode: FB.mode, st: FB.leaders[0].st }));
+check('winning the plain is recorded as a win', vic.victory === true && vic.mode === 'end', `victory ${vic.victory}, mode ${vic.mode}`);
+await page.waitForTimeout(4000);
+await page.keyboard.up('ArrowUp');
+vic = await page.evaluate(() => ({ victory: FB.victory, st: FB.leaders[0].st, x: Math.round(FB.leaders[0].x) }));
+check('...and running on afterwards cannot undo it', vic.victory === true && vic.st !== 3, `victory ${vic.victory}, leader st ${vic.st} at x ${vic.x}`);
+
 // Balance: run whole matches through the sim with the player on autopilot.
 // The player brain is the rival brain, so this measures whether the rules
 // converge, not whether a human can win them.

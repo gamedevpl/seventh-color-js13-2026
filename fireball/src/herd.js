@@ -243,7 +243,15 @@ function think(L, dt) {
 
 // --- the step -------------------------------------------------------------
 // `input` is the player's: turn (-1..1), fwd (0/1 sprint), back (0/1).
+// Put something back just inside the line, at a stop.
+function clamp(u) {
+  u.x = Math.max(-ARENA + 2, Math.min(ARENA - 2, u.x));
+  u.z = Math.max(-ARENA + 2, Math.min(ARENA - 2, u.z));
+  u.vx = u.vz = 0; u.spd = 0;
+}
+
 export function step(dt, input) {
+  const over = input.over;
   time += dt;
   for (const L of leaders) { L.n = 0; L.cx = L.x; L.cz = L.z; }
   for (const u of units) if (u.lead >= 0 && u !== leaders[u.lead] && u.st !== 3) {
@@ -415,7 +423,11 @@ export function step(dt, input) {
     // crosses it is finished; anything else that crosses is simply gone
     // from the plain, and goes back to grazing just inside it.
     if (OUT(u.x, u.z)) {
-      if (u.hearts) { if (u.st === 0) fell(u); }
+      // Once the run is over the plain stops taking leaders. The closing
+      // shot keeps running, and a herd still carrying speed - a lit one
+      // especially - will cross the line while nobody is steering; that
+      // used to turn a win into a loss on the end screen.
+      if (u.hearts) { if (u.st === 0 && !over) fell(u); else clamp(u); }
       else {
         u.lead = -1; u.daze = 2; u.col = WILD;
         u.x = Math.max(-ARENA + 2, Math.min(ARENA - 2, u.x));

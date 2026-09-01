@@ -327,11 +327,39 @@ lethal edge: never drive further than the plain is wide.
   the rainbow burns the herd as it runs herd 10 -> 9 over two seconds
 ```
 
+### F4a — the win that unwon itself
+
+The first player to win a match reported it immediately: *"as soon as I
+won I lost control, the unicorns rode off the map and in the end I lost."*
+Both halves were real, and both were this round's own doing.
+
+The end screen asked `lost()` **live**, every frame it painted. The run
+was over, but the plain was not: the closing shot keeps stepping the
+simulation, so a herd still carrying thirty a second - and nobody
+steering it any more - ran on and crossed the fatal line a second later.
+The screen dutifully changed its mind.
+
+Three lines, all of them the same idea: **the result is decided once, at
+the moment it happens, and kept.** `victory` is recorded on the
+transition and the end screen reads that. Every rainbow goes out with the
+run, so nothing is still being ridden by nobody. And `step` now takes an
+`over` flag: once a run has ended, the plain stops taking leaders, and
+anything that reaches the line is simply set down just inside it.
+
+The probe grew the case, driven through the real loop rather than through
+`step` - the win transition lives in the frame loop, and the first cut of
+this test drove the simulation directly and never saw it:
+
+```
+ok  winning the plain is recorded as a win        victory true, mode end
+ok  ...and running on afterwards cannot undo it   victory true, leader st 0 at x 93
+```
+
 ## The wall
 
-F4: **11,071 bytes** packed worst-of-5 at O1, limit 13,312. The edge, the
+F4: **11,086 bytes** packed worst-of-5 at O1, limit 13,312. The edge, the
 burn, the fall, the strike and the varied gaits cost about seven hundred
-bytes over F3, and 2,241 remain.
+bytes over F3, and 2,226 remain.
 
 ## Where it goes next
 
@@ -360,7 +388,7 @@ place the rebuild diverges from the 13k original and why.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
-| F4 the edge and the price | 13,312 | 11,071 (O1 worst-of-5) | leaving the plain is fatal and the brains know it; the rainbow spends the herd and steers worse the bigger it is; the herd dissolves into it and the camera opens up; smooth tunnel, varied gaits, horn strike and fall animations |
+| F4 the edge and the price | 13,312 | 11,086 (O1 worst-of-5) | leaving the plain is fatal and the brains know it; the rainbow spends the herd and steers worse the bigger it is; the herd dissolves into it and the camera opens up; smooth tunnel, varied gaits, horn strike and fall animations |
 | F3 horns, charge, rainbow | 13,312 | 10,396 (O1 worst-of-5) | fireball removed; momentum melee, the charge as a run, arcs, ignition into a rainbow tunnel, answering brains, steering sign fixed |
 | F2 thumbs and ears | 13,312 | 9,965 (O1 worst-of-5) | touch zones and audio driven by the probe, rival hearts, per-entry build config |
 | F1 first playable | 13,312 | 9,808 (O0) | seven herds on a plain, gathering, the charge, the fireball as transport and weapon, the clash, wild colours, rival brains, the probe |

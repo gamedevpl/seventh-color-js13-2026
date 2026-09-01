@@ -318,7 +318,7 @@ let mode = 'title', timer = 0, msg = '', msgT = 0, shake = 0, flash = 0, endT = 
 // A private window throws on the FIRST TOUCH of localStorage - the read as
 // much as the write - and a best time is a nicety, never a reason for the
 // game to fail to boot. Both ends are guarded.
-let best = 0, isBest = false;
+let best = 0, isBest = false, victory = false;
 try { best = +localStorage.fbBest || 0; } catch {}
 const BOOMS = [], TRAIL = new Map(), ARCS = [];
 let eye = null, look = null, camYaw = 0;
@@ -332,7 +332,7 @@ function newRun(attract) {
   buildPlain();
   particleM = partM(); arcM = partM(); trailM = partM();
   PART.length = 0; pcur = 0; BOOMS.length = 0; TRAIL.clear(); ARCS.length = 0;
-  timer = 0; msgT = 0; shake = 0; flash = 0; endT = 0; isBest = false;
+  timer = 0; msgT = 0; shake = 0; flash = 0; endT = 0; isBest = false; victory = false;
   eye = null; camYaw = leaders[0].yaw;
 }
 newRun(1);
@@ -349,7 +349,7 @@ function frame(now_) {
   const P = leaders[0];
   if (mode === 'title') {
     if (awake()) music(.2, 1);
-    step(dt, { turn: 0 });
+    step(dt, { turn: 0, over: 1 });
     if (doAct) {
       if (!awake()) wake();
       else { newRun(); mode = 'run'; say('GATHER YOUR COLOUR', 3); }
@@ -361,13 +361,22 @@ function frame(now_) {
     if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
     step(dt, { turn: turnDir(), fwd: held.ArrowUp || held.w || (tL && tR), back: held.ArrowDown || held.s });
     if (won() || lost()) {
+      // The result is decided HERE and kept. The closing shot keeps the
+      // plain running, so asking `lost()` again while it plays could
+      // answer differently - which is exactly what happened to the first
+      // player to win one: the herd ran on, crossed the line during the
+      // end screen, and the screen changed its mind.
+      victory = won();
       mode = 'end'; endT = 0; riseOff();
-      if (won()) { isBest = !best || timer < best; if (isBest) { best = timer; try { localStorage.fbBest = timer; } catch {} } }
+      // And the rainbows go out with the run, so nothing is still being
+      // ridden by nobody.
+      for (const L of leaders) { L.wave = 0; L.chg = 0; L.charge = 0; }
+      if (victory) { isBest = !best || timer < best; if (isBest) { best = timer; try { localStorage.fbBest = timer; } catch {} } }
     }
   } else {
     endT += dt;
     music(.2, 1);
-    step(dt, { turn: 0 });
+    step(dt, { turn: 0, over: 1 });
     if (doAct && endT > 1) { newRun(1); mode = 'title'; }
   }
   msgT = Math.max(0, msgT - dt);
@@ -612,9 +621,9 @@ function frame(now_) {
     if (mode === 'end') {
       ctx.fillStyle = 'rgba(5,4,14,.6)'; ctx.fillRect(0, VH * .3, VW, VH * .42);
       ctx.font = 'bold 40px system-ui'; ctx.fillStyle = '#f3ead6';
-      ctx.fillText(lost() ? 'THE PLAIN FORGETS YOU' : 'THE PLAIN IS YOURS', VW / 2, VH * .44);
+      ctx.fillText(victory ? 'THE PLAIN IS YOURS' : 'THE PLAIN FORGETS YOU', VW / 2, VH * .44);
       ctx.font = '17px system-ui'; ctx.fillStyle = '#d8d0ea';
-      if (!lost()) ctx.fillText((isBest ? 'best time  ' : 'time  ') + timer.toFixed(1) + 's' + (best && !isBest ? '   best ' + best.toFixed(1) + 's' : ''), VW / 2, VH * .56);
+      if (victory) ctx.fillText((isBest ? 'best time  ' : 'time  ') + timer.toFixed(1) + 's' + (best && !isBest ? '   best ' + best.toFixed(1) + 's' : ''), VW / 2, VH * .56);
       else ctx.fillText('every unicorn you gathered has gone wild', VW / 2, VH * .56);
       if (endT > 1) ctx.fillText('press SPACE', VW / 2, VH * .66);
     }
@@ -624,4 +633,4 @@ function frame(now_) {
 }
 requestAnimationFrame(frame);
 
-if (DEV) window.FB = { units, leaders, events, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; } };
+if (DEV) window.FB = { units, leaders, events, get victory() { return victory; }, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; } };

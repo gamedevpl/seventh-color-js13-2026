@@ -184,7 +184,11 @@ function particleVerts(dt) {
 
 // --- state ----------------------------------------------------------------
 let mode = 'title', timer = 0, msg = '', msgT = 0, shake = 0, flash = 0, endT = 0;
-let best = +localStorage.fbBest || 0, isBest = false;
+// A private window throws on the FIRST TOUCH of localStorage - the read as
+// much as the write - and a best time is a nicety, never a reason for the
+// game to fail to boot. Both ends are guarded.
+let best = 0, isBest = false;
+try { best = +localStorage.fbBest || 0; } catch {}
 const BOOMS = [];
 let eye = null, look = null, camYaw = 0;
 const say = (t, d = 2) => { msg = t; msgT = d; };
@@ -228,7 +232,7 @@ function frame(now_) {
     step(dt, { turn: turnDir(), fwd: held.ArrowUp || held.w || (tL && tR), back: held.ArrowDown || held.s });
     if (won() || lost()) {
       mode = 'end'; endT = 0; riseOff();
-      if (won()) { isBest = !best || timer < best; if (isBest) localStorage.fbBest = best = timer; }
+      if (won()) { isBest = !best || timer < best; if (isBest) { best = timer; try { localStorage.fbBest = timer; } catch {} } }
     }
   } else {
     endT += dt;
@@ -400,8 +404,11 @@ function frame(now_) {
       ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); ctx.beginPath(); ctx.arc(VW - 100, y, 6, 0, TAU); ctx.fill();
       ctx.fillStyle = dead ? '#666' : '#e8e0f4';
       ctx.fillText(dead ? '-' : L.n + (L.chg ? ' !' : L.ball ? ' >' : ''), VW - 112, y);
-      // Its hearts, so you can see who is one hit from stone.
-      if (!dead) { ctx.fillStyle = '#ff6b8a'; ctx.font = '10px system-ui'; ctx.fillText('♥'.repeat(L.hearts), VW - 150, y); ctx.font = 'bold 14px system-ui'; }
+      // Its hearts, but only once it has lost one. Three hearts beside
+      // every rival is a wall of pink that says nothing; the row you want
+      // to find is the one that is DOWN to one, and it only reads as an
+      // alarm if the quiet rows next to it are quiet.
+      if (!dead && L.hearts < 3) { ctx.fillStyle = '#ff6b8a'; ctx.font = '10px system-ui'; ctx.fillText('♥'.repeat(L.hearts), VW - 150, y); ctx.font = 'bold 14px system-ui'; }
     });
     // The radar: the whole plain in a square, leaders as dots sized by
     // herd, fireballs as rings. It is how you see a fireball coming.

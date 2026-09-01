@@ -35,7 +35,8 @@
     "fireball:gate": "npm run fireball:test && node tools/native.mjs --game=fireball --O1 --rolls=5 && npm run fireball:verify",
     "fireball:ship": "node tools/native.mjs --game=fireball --O2 && npm run fireball:verify",
     "fireball:online": "npm run fireball:dev && node tools/test-online.mjs",
-    "fireball:online:live": "node tools/test-online.mjs --live"
+    "fireball:online:live": "node tools/test-online.mjs --live",
+    "fireball:play": "node tools/native.mjs --game=fireball --O1 && cp build/fireball/index.html play/unicorn-fireball.html"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",

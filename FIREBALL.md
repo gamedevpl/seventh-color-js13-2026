@@ -355,11 +355,51 @@ ok  winning the plain is recorded as a win        victory true, mode end
 ok  ...and running on afterwards cannot undo it   victory true, leader st 0 at x 93
 ```
 
+### F4b — a ground you can measure, and a blast with a volume
+
+Two looks, one question each. *Why is the 13k ground black and the
+director's cut green - which is right?* And: *the explosion is gradienty,
+not volumetric.*
+
+**The ground.** Dark is right, and for a reason that is not taste: every
+important thing in this game is additive light - the meadows, the arcs,
+the rainbow, the blast - and additive light over a pale ground reads as
+the ground rather than as light. The 13k plain was not too dark, it was
+too *uniform*: one flat slab has nothing on it for the eye to measure
+against, so a herd at thirty a second looked like it was standing still.
+It now carries 260 low-contrast patches, laid flat over the slab, dark
+enough that the light is still the only bright thing and varied enough
+that the ground moves under you. The director's cut got the same treatment
+from the other direction: its noise texture went darker so the glow reads
+against it.
+
+**The blast.** It was seven concentric rings on the ground and seven more
+rising in a stack - which is a *gradient*, drawn once and scaled up.
+Rings do not make a volume; overlapping bodies do. The explosion is now:
+
+- **one shockwave**, thin and fast, travelling out along the ground, with
+  a second just inside it cycling the colours;
+- **a cloud of puffs** - up to fifty little billowing balls, each born on
+  a shell a couple of metres out along its own direction rather than all
+  at the same point (which is what made the old one a saturated blob with
+  a fringe), each with its own birth delay so the thing *blooms* over a
+  quarter second, its own colour, and a size drawn from a squared random
+  so a few slow boulders sit among a lot of small fast ones. They are
+  thrown outward, slowed hard by drag, lifted gently, and drawn as two
+  discs each - one inside the other - so every puff has a core;
+- **a small, brief white flash**, and nothing else at the centre. The old
+  version's big white core disc was most of why the whole blast read flat.
+
+The probe photographs one on purpose now, twenty units in front of the
+lens, at a third of a second and again at seven tenths - the simulation's
+own clashes land in whatever frame the search stopped on, which is never
+the one worth looking at.
+
 ## The wall
 
-F4: **11,086 bytes** packed worst-of-5 at O1, limit 13,312. The edge, the
+F4: **11,336 bytes** packed worst-of-5 at O1, limit 13,312. The edge, the
 burn, the fall, the strike and the varied gaits cost about seven hundred
-bytes over F3, and 2,226 remain.
+bytes over F3, and 1,976 remain.
 
 ## Where it goes next
 
@@ -388,7 +428,7 @@ place the rebuild diverges from the 13k original and why.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
-| F4 the edge and the price | 13,312 | 11,086 (O1 worst-of-5) | leaving the plain is fatal and the brains know it; the rainbow spends the herd and steers worse the bigger it is; the herd dissolves into it and the camera opens up; smooth tunnel, varied gaits, horn strike and fall animations |
+| F4 the edge and the price | 13,312 | 11,336 (O1 worst-of-5) | leaving the plain is fatal and the brains know it; the rainbow spends the herd and steers worse the bigger it is; the herd dissolves into it and the camera opens up; smooth tunnel, varied gaits, horn strike and fall animations |
 | F3 horns, charge, rainbow | 13,312 | 10,396 (O1 worst-of-5) | fireball removed; momentum melee, the charge as a run, arcs, ignition into a rainbow tunnel, answering brains, steering sign fixed |
 | F2 thumbs and ears | 13,312 | 9,965 (O1 worst-of-5) | touch zones and audio driven by the probe, rival hearts, per-entry build config |
 | F1 first playable | 13,312 | 9,808 (O0) | seven herds on a plain, gathering, the charge, the fireball as transport and weapon, the clash, wild colours, rival brains, the probe |

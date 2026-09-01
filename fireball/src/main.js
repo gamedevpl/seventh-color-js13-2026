@@ -88,7 +88,17 @@ let groundM, tuftM, starM, postM;
 function partM() { return createMesh(new Float32Array(0), true); }
 function buildPlain() {
   const g = [];
-  pushBox(g, 0, -.5, 0, 600, 1, 600, .14, .17, .17);
+  pushBox(g, 0, -.5, 0, 600, 1, 600, .13, .16, .15);
+  // Patches. A single flat slab is a colour, not a ground: with nothing on
+  // it the eye has nothing to measure speed against, which is why the
+  // plain read as a void. These are large, low-contrast and laid flat over
+  // the slab - dark enough that the light in this game is still the only
+  // bright thing, varied enough that the ground moves under you.
+  for (let i = 0; i < 260; i++) {
+    const x = (Math.random() - .5) * ARENA * 2.1, z = (Math.random() - .5) * ARENA * 2.1;
+    const w = 5 + Math.random() * 11, v = .88 + Math.random() * .26;
+    pushBox(g, x, .02, z, w, .04, w * (.6 + Math.random()), .125 * v, .15 * v, .152 * v);
+  }
   groundM = createMesh(g);
   // Each meadow glows faintly in its own colour: the map tells you where a
   // colour lives before a single unicorn does.
@@ -157,6 +167,31 @@ function disc(col, x, y, z, r) {
 }
 
 // --- particles: bloomy sparks, from Rainbow Surfer ------------------------
+// The explosion's cloud: puffs, not rings. Each carries its own birth
+// delay, so a blast unfolds over a quarter second instead of appearing
+// whole, and its own colour, so the cloud is a rainbow rather than a tint.
+const PUFF = [];
+function boomCloud(x, z, pw) {
+  const n = 26 + Math.min(30, pw * 2);
+  for (let i = 0; i < n; i++) {
+    // Born on a SHELL, not at a point. Every puff starting in the same
+    // place makes one saturated blob with a fringe; started a couple of
+    // metres out along its own direction, the lobes stay separable and the
+    // ball reads as a ball.
+    const a = Math.random() * TAU, e = Math.random() * 1.15;
+    const sp = (3 + Math.random() * 8) * (1 + pw * .05), d = 1.4 + Math.random() * (2 + pw * .16);
+    const dx = Math.cos(a) * Math.cos(e), dy = Math.sin(e), dz = Math.sin(a) * Math.cos(e);
+    PUFF.push({
+      x: x + dx * d, y: .7 + dy * d * .8, z: z + dz * d,
+      vx: dx * sp, vy: dy * sp * .6 + .8, vz: dz * sp,
+      // A wide spread of sizes: a few slow boulders among a lot of small
+      // fast ones is what a cloud looks like from outside.
+      r0: (1 + Math.random() * Math.random() * 3.8) + pw * .09,
+      t: -Math.random() * .26, life: 1.1 + Math.random() * 1,
+      col: Math.random() < .18 ? WILD : (Math.random() * 7) | 0,
+    });
+  }
+}
 const PMAX = 220, PART = [];
 let pcur = 0;
 function spawnP(p, v, col, life) { PART[pcur++ % PMAX] = { p: [...p], v, col, life, max: life }; }
@@ -331,7 +366,7 @@ function newRun(attract) {
   if (attract) leaders[0].ai = { t: 0, goal: null };
   buildPlain();
   particleM = partM(); arcM = partM(); trailM = partM();
-  PART.length = 0; pcur = 0; BOOMS.length = 0; TRAIL.clear(); ARCS.length = 0;
+  PART.length = 0; pcur = 0; BOOMS.length = 0; PUFF.length = 0; TRAIL.clear(); ARCS.length = 0;
   timer = 0; msgT = 0; shake = 0; flash = 0; endT = 0; isBest = false; victory = false;
   eye = null; camYaw = leaders[0].yaw;
 }
@@ -404,7 +439,7 @@ function frame(now_) {
       if (e.L === P) say('OFF THE PLAIN', 3); else say('A RIVAL RUNS OFF THE PLAIN', 2.5);
     }
     else if (e.k === 'blast') { burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
-    else if (e.k === 'boom') { sBoom(e.pw); BOOMS.push({ x: e.x, z: e.z, t: 0, pw: e.pw }); burst([e.x, 1.5, e.z], 120, 9 + e.pw * .4); shake = 1; flash = .4; }
+    else if (e.k === 'boom') { sBoom(e.pw); BOOMS.push({ x: e.x, z: e.z, t: 0, pw: e.pw }); boomCloud(e.x, e.z, e.pw); burst([e.x, 1.5, e.z], 120, 9 + e.pw * .4); shake = 1; flash = .4; }
     else if (e.k === 'hurt') { if (e.L === P) { ouch(); say(P.hearts ? 'HEART LOST' : 'THE HERD IS GONE', 2); } }
     else if (e.k === 'dead') { if (e.L !== P) say(alive().length > 1 ? 'A RIVAL FALLS' : 'THE PLAIN IS YOURS', 2.5); }
   }
@@ -503,15 +538,41 @@ function frame(now_) {
     setDim(1);
   }
   for (const b of BOOMS) {
-    // The rainbow: seven shockwaves racing outward on the ground, red on
-    // the outside, and a slower dome of the same rising off it.
-    const k = b.t / 1.6, R = (4 + b.pw * .6) * Math.sqrt(k) * 2.2;
-    for (let i = 0; i < 7; i++) {
-      ring(i, flat(b.x, .15 + i * .05, b.z, R * (1 - i * .07) * (1.3 - k)));
-      ring(i, bill(b.x, 1 + k * 6, b.z, R * .5 * (1 - i * .07)));
-    }
-    disc(WILD, b.x, 1.5, b.z, R * .5 * (1 - k));
+    // The shockwave: one ring on the ground, thin and fast, with a second
+    // just inside it cycling through the colours. Seven concentric rings
+    // rising in a stack read as a gradient; one ring travelling reads as a
+    // blast, and the volume comes from the cloud below instead.
+    const k = b.t / 1.6, R = (5 + b.pw * .7) * Math.sqrt(k) * 3;
+    setDim((1 - k) * (1 - k));
+    ring(WILD, flat(b.x, .12, b.z, R));
+    ring(((b.t * 14) | 0) % 7, flat(b.x, .15, b.z, R * .82));
+    // And the core: a hard white flash for a fifth of a second.
+    // And the core: small and brief. A big white disc at the centre is
+    // what turned the whole blast into one flat blowout.
+    if (k < .12) { setDim(1 - k * 8); disc(WILD, b.x, 1.4, b.z, (1.6 + b.pw * .12) * (1 + k * 6)); }
+    setDim(1);
   }
+  // The cloud itself. Each puff is its own little billowing ball - born a
+  // moment apart so the thing BLOOMS rather than appearing, thrown outward
+  // and up, slowed by drag, growing as it goes and fading as it grows.
+  // Two discs to a puff, one inside the other, so it has a core; several
+  // dozen of them overlapping is what makes a volume out of flat sprites.
+  for (let i = PUFF.length - 1; i >= 0; i--) {
+    const p = PUFF[i];
+    p.t += dt;
+    if (p.t < 0) continue;
+    if (p.t > p.life) { PUFF.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+    const dr = 1 - Math.min(.9, dt * 3.2);
+    p.vx *= dr; p.vz *= dr; p.vy = p.vy * dr + dt * 1.6;
+    const f = p.t / p.life, r = p.r0 * (.5 + f * 1.6), a = (1 - f) * (1 - f);
+    setDim(a * .42);
+    disc(p.col, p.x, p.y, p.z, r);
+    setDim(a * .6);
+    disc(p.col, p.x, p.y, p.z, r * .45);
+  }
+  setDim(1);
+
   const tn = trailVerts(T, dt, e2);
   updateMesh(trailM, TBUF, tn);
   if (tn) drawMesh(trailM, IDENT);

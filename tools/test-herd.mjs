@@ -204,7 +204,21 @@ const clashAt = await page.evaluate(async () => {
   }
 });
 check('two rainbows clash within an autopilot match', !!clashAt);
-await page.waitForTimeout(250);
+
+// And one blast, photographed on purpose: the sim's own clash lands in
+// whatever frame the search happened to stop on, which is never the one
+// worth looking at.
+await page.evaluate(() => {
+  FB.reset(0, false);
+  const P = FB.leaders[0];
+  // In front of the lens: the camera looks along the leader's own yaw.
+  FB.events.push({ k: 'boom', x: P.x + Math.cos(P.yaw) * 20, z: P.z + Math.sin(P.yaw) * 20, pw: 14 });
+});
+await page.waitForTimeout(330);
+await page.screenshot({ path: path.join(root, 'build/fireball/probe-boom.png') });
+await page.waitForTimeout(380);
+await page.screenshot({ path: path.join(root, 'build/fireball/probe-boom2.png') });
+await page.waitForTimeout(420);
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-clash.png') });
 
 // A win stays won. The closing shot keeps the plain running, so a herd

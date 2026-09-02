@@ -5,10 +5,11 @@
 // bent - ignition and the clash play at a fraction of speed, which a
 // pumped virtual clock gives away for nothing.
 //
-// The story, in five movements: one unicorn alone on the plain; seven
-// colours; gathering its own; the hold, and the drop - the herd becomes
-// the rainbow; two rainbows meeting. Then the one unicorn again, with a
-// herd behind it.
+// The cut is Apocalypse Now, played straight: a man narrating a tour he
+// has stopped understanding, over unicorns. The plain is the river, the
+// charge is the air cavalry - and the score quotes Ride of the Valkyries
+// on the game's own lead sample at the ignition, which is the joke doing
+// itself. The narration never once acknowledges what is on screen.
 //
 // Every cut is a bar of the game's own music (132 BPM, 1.818s), so the
 // score can be arranged to the picture: this file writes beats.json with
@@ -95,23 +96,39 @@ await page.evaluate(([RAINBOW]) => {
   document.querySelectorAll('canvas')[1].style.visibility = 'hidden';
 
   const el = (css) => { const n = document.createElement('div'); n.style.cssText = css; document.body.appendChild(n); return n; };
-  const FONT = "font-family:'Arial Black',Arial,sans-serif;";
+  const HEAVY = "font-family:'Arial Black',Arial,sans-serif;";
+  // The cut is deadpan, so the type is too: a plain sans at a reasonable
+  // size reads as a caption on a nature programme. Arial Black at 72px
+  // reads as a man saying IN A WORLD, which was the first cut's problem.
+  const PLAIN = 'font-family:Helvetica,Arial,sans-serif;';
   // Black: the cards' ground and the fade from nothing.
   const black = el('position:fixed;inset:0;background:#000;opacity:1;pointer-events:none;z-index:9000');
   // White: the game's own flash (ignition, the boom) - the HUD used to draw
   // it, and the HUD is off.
   const white = el('position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9001');
-  // Cards: one line, lowercase, letterspaced, on black.
+  // Cards: one flat line on black, lowercase.
   const card = el('position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;'
-    + 'opacity:0;pointer-events:none;z-index:9002;color:#fdf6ec;padding:0 8%;letter-spacing:.06em;'
-    + FONT + 'font-weight:900;font-size:72px');
-  // The one line over the picture, in the game's own seven.
-  const title = el('position:fixed;left:0;right:0;top:15%;text-align:center;opacity:0;pointer-events:none;z-index:9002;'
-    + FONT + 'font-weight:900;font-size:128px;letter-spacing:.04em;line-height:1;'
-    + `background:linear-gradient(90deg,${RAINBOW.join(',')});-webkit-background-clip:text;background-clip:text;color:transparent;`
-    + 'filter:drop-shadow(0 6px 24px rgba(0,0,0,.8))');
-  const sub = el('position:fixed;left:0;right:0;bottom:16%;text-align:center;opacity:0;pointer-events:none;z-index:9002;'
-    + FONT + 'font-weight:900;font-size:60px;color:#fdf6ec;letter-spacing:.06em;text-shadow:0 4px 20px rgba(0,0,0,.85)');
+    + 'opacity:0;pointer-events:none;z-index:9002;color:#fdf6ec;padding:0 8%;letter-spacing:.01em;'
+    + PLAIN + 'font-weight:400;font-size:56px');
+  // The caption over the picture: the same voice as the cards, lower and
+  // smaller, narrating the shot rather than interrupting it.
+  const note = el('position:fixed;left:0;right:0;bottom:11%;text-align:center;opacity:0;pointer-events:none;z-index:9002;'
+    + PLAIN + 'font-weight:400;font-size:46px;color:#fdf6ec;letter-spacing:.01em;'
+    + 'text-shadow:0 2px 18px rgba(0,0,0,.95),0 0 60px rgba(0,0,0,.7)');
+  // The one shout in the film. Cream on a heavy shadow, NOT a rainbow
+  // gradient - the shot under it is already a rainbow, and the last cut put
+  // one on top of the other and lost the words.
+  const title = el('position:fixed;left:0;right:0;top:13%;text-align:center;opacity:0;pointer-events:none;z-index:9002;'
+    + HEAVY + 'font-weight:900;font-size:118px;letter-spacing:.03em;line-height:1.02;color:#fffaf0;'
+    + 'text-shadow:0 6px 34px rgba(0,0,0,.95),0 0 90px rgba(0,0,0,.8)');
+  // The running gag: the game's own herd count, large, while the herd is
+  // being assembled. It is read off the leader every frame - the joke only
+  // works because the number is real.
+  const count = el('position:fixed;right:6%;bottom:12%;text-align:right;opacity:0;pointer-events:none;z-index:9002;'
+    + HEAVY + 'color:#fffaf0;text-shadow:0 4px 26px rgba(0,0,0,.9)');
+  count.innerHTML = `<div style="${PLAIN}font-weight:400;font-size:26px;letter-spacing:.34em;opacity:.75">HERD</div>`
+    + '<div id="fbn" style="font-size:150px;line-height:.92">1</div>';
+  const countN = count.querySelector('#fbn');
 
   const ease = (u, kind) => kind === 'in' ? u * u : kind === 'out' ? 1 - (1 - u) * (1 - u)
     : kind === 'lin' ? u : u < .5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u);
@@ -222,10 +239,12 @@ await page.evaluate(([RAINBOW]) => {
     card.textContent = s.cardText || '';
     card.style.opacity = s.card;
     if (s.cardColor) card.style.color = s.cardColor;
+    note.textContent = s.noteText || '';
+    note.style.opacity = s.note;
     title.textContent = s.titleText || '';
     title.style.opacity = s.title;
-    sub.textContent = s.subText || '';
-    sub.style.opacity = s.sub;
+    count.style.opacity = s.count;
+    countN.textContent = String(window.FB.leaders[0].n + 1);
     const { leaders } = window.FB;
     const P = leaders[0], R = leaders[1];
     const wasLit = !!P.wave, bothLit = !!(P.wave && R.wave);
@@ -249,6 +268,9 @@ const stage = (fn, arg) => page.evaluate(fn, arg);
 const key = (k, down) => page.evaluate(([k, down]) => {
   dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key: k, code: k === ' ' ? 'Space' : k, bubbles: true }));
 }, [k, down]);
+// A line may be a string or a function of the shot's own time, so one
+// unbroken camera move can carry a setup and its correction.
+const text = (v, t) => (typeof v === 'function' ? v(t) : v) || '';
 // Fade in from `at` over `dur`, and its mirror.
 const fin = (t, at, dur) => Math.max(0, Math.min(1, (t - at) / dur));
 const fout = (t, at, dur) => 1 - fin(t, at, dur);
@@ -274,8 +296,9 @@ async function shoot(shot) {
     const ov = shot.overlay ? shot.overlay(t, u) : {};
     info = await page.evaluate((s) => window.__tick(s), {
       dtGame: DT * sc, cam: shot.cam || null, shotId: shot.id, u, guard: shot.guard || {},
-      black: ov.black ?? (shot.card ? 1 : 0), card: ov.card ?? 0, cardText: shot.card || '', cardColor: shot.cardColor,
-      title: ov.title ?? 0, titleText: shot.title || '', sub: ov.sub ?? 0, subText: shot.sub || '',
+      black: ov.black ?? (shot.card ? 1 : 0), card: ov.card ?? 0, cardText: text(shot.card, t), cardColor: shot.cardColor,
+      note: ov.note ?? (shot.note ? 1 : 0), noteText: text(shot.note, t),
+      title: ov.title ?? 0, titleText: shot.title || '', count: ov.count ?? 0,
     });
     // A take is over the moment the match is: every later shot is the end
     // screen or the title. Say so at the frame it happened, with the state
@@ -352,7 +375,7 @@ console.log('recording Unicorn Fireball');
 await stage((c) => {
   window.FB.reset(c, 0);
   // The rivals are set dressing until the clash: brains off for the whole
-  // cut. Left on, they HUNT - the fourth preview had them horn the player's
+  // cut. Left on, they HUNT - a preview had them horn the player's
   // followers loose faster than the gather could add them, and the herd
   // that reached the hold was two.
   for (const L of window.FB.leaders) if (L.ai) L.ai = null;
@@ -360,70 +383,86 @@ await stage((c) => {
 let id = 0;
 const S = (o) => ({ id: id++, ...o });
 
-// --- I. alone --------------------------------------------------------------
-await shoot(S(cardShot('card1', 'one plain.', bars(1.25))));
-// The player's own colour grazes at its meadow. Pushed out to the middle
-// distance: a unicorn alone, with its kind visible but not with it.
+// --- I. the specimen -------------------------------------------------------
+// One animal, tight and low, with the other seventy simply out of frame -
+// and then a camera move, not a change of staging, puts them in it. The
+// joke only works if nothing is teleported: they were there the whole time.
+await stage(() => {
+  const { units, leaders } = window.FB, P = leaders[0];
+  for (const u of units) if (u !== P && u.col === P.col) {
+    const a = Math.random() * Math.PI * 2, r = 11 + Math.random() * 11;
+    u.x = P.x + Math.cos(a) * r; u.z = P.z + Math.sin(a) * r;
+  }
+  // The other six herds ring it at conversational distance.
+  for (let i = 1; i < leaders.length; i++) {
+    const L = leaders[i], a = (i - 1) / 6 * Math.PI * 2 + 0.5, r = 19 + (i % 3) * 10;
+    L.x = P.x + Math.cos(a) * r; L.z = P.z + Math.sin(a) * r;
+    for (const u of units) if (u.lead === i && u !== L) { u.x = L.x + (Math.random() - .5) * 13; u.z = L.z + (Math.random() - .5) * 13; }
+  }
+});
 await shoot(S({
-  name: 'lone', dur: bars(1.5), scale: 1, guard: { pin: 0 },
-  stage: () => {
-    const { units, leaders } = window.FB, P = leaders[0];
-    // Its own colour, and anything else that wandered in close: the frame
-    // is one animal.
-    for (const u of units) if (u !== P && (u.col === P.col || Math.hypot(u.x - P.x, u.z - P.z) < 16)) {
-      const a = Math.random() * Math.PI * 2, r = 16 + Math.random() * 14;
-      u.x = P.x + Math.cos(a) * r; u.z = P.z + Math.sin(a) * r;
-    }
-  },
-  cam: { subj: 0, orbit: { a0: 2.35, a1: 3.05, r0: 5.2, r1: 4.2, h0: 0.8, h1: 1.35 }, l0: [0.4, 1.25, 0], fov0: 0.85, fov1: 0.8, ease: 'io' },
-  overlay: (t) => ({ black: fout(t, 0, 0.8) }),
+  name: 'lone', dur: bars(2), scale: 1, guard: { pin: 0 },
+  cam: { subj: 0, orbit: { a0: 2.3, a1: 2.85, r0: 4.5, r1: 3.8, h0: .85, h1: 1.3 }, l0: [.3, 1.25, 0], fov0: .8, ease: 'io' },
+  // "Saigon... I'm still only in Saigon." The film opens on a man who has
+  // been waiting too long in a place he cannot leave, and so does this.
+  note: (t) => (t < bars(1.15) ? 'the plain.' : "i'm still only on the plain."),
+  overlay: (t) => ({ black: fout(t, 0, .9), note: Math.min(fin(t, .9, .35), fout(t, bars(2) - .45, .3)) }),
+}));
+// The reveal, in one move: the line goes up while the frame still holds one
+// animal, and is still up when the frame holds seventy.
+await shoot(S({
+  name: 'reveal', dur: bars(2.25), scale: 1, guard: { pin: 0 },
+  cam: { subj: 0, orbit: { a0: 2.85, a1: 3.35, r0: 3.8, r1: 34, h0: 1.3, h1: 9.5 }, l0: [0, 1.2, 0], l1: [0, .5, 0], fov0: .8, fov1: .98, ease: 'in' },
+  note: 'seven colours out here.',
+  overlay: (t) => ({ note: Math.min(fin(t, .1, .3), fout(t, bars(2.25) - .45, .35)) }),
 }));
 
-// --- II. seven colours -----------------------------------------------------
-await shoot(S(cardShot('card7', 'seven colours.', bars(1))));
-// A cut on every half bar, one colour each: a low three-quarter close-up
-// on that colour's leader among its own grass. The player's colour last,
-// so the next card lands on it.
+// --- II. seven of them -----------------------------------------------------
+// A cut on every half bar, one colour each, low and close among its own
+// grass. The player's colour last, so the card after it lands on red.
 for (let i = 1; i <= 7; i++) {
   const who = i % 7;
   await shoot(S({
-    name: `colour${i}`, dur: bars(0.5), scale: 1, cardColor: RAINBOW[who],
-    cam: { subj: who, e0: [6.0, 3.4 * (i % 2 ? 1 : -1), 1.5], e1: [5.0, 2.8 * (i % 2 ? 1 : -1), 1.6], l0: [0, 1.1, 0], fov0: 0.8, ease: 'lin' },
+    name: `colour${i}`, dur: bars(.5), scale: 1,
+    cam: { subj: who, e0: [6.0, 3.4 * (i % 2 ? 1 : -1), 1.5], e1: [5.0, 2.8 * (i % 2 ? 1 : -1), 1.6], l0: [0, 1.1, 0], fov0: .8, ease: 'lin' },
+    note: i >= 4 ? 'nobody wants the other six on it.' : '',
+    overlay: () => ({ note: i >= 4 ? 1 : 0 }),
   }));
 }
-await shoot(S(cardShot('cardYours', 'one of them is yours.', bars(1), RAINBOW[PLAYER])));
 
-// --- III. gather -----------------------------------------------------------
-// Three shots that cut on the bar, the herd bigger in each: a low side
-// track as the first ones join; three-quarters from behind and above as it
-// thickens; then planted low in its path as the whole herd comes at the
-// lens.
-await place(-30, 20, 0.4);
+// --- III. step one ---------------------------------------------------------
+await shoot(S(cardShot('cardHerd', 'they gave me a herd.', bars(1))));
+await place(-30, 20, .4);
 await clearTheField(64);
 await seedPath(5, 6, 30, 7);
 await shoot(S({
   name: 'gatherA', dur: bars(1.5), scale: 1, keys: [['ArrowUp', true]],
-  cam: { subj: 0, e0: [2.5, 7.5, 1.6], e1: [-1.5, 7.5, 1.9], l0: [0.5, 1.0, 0], fov0: 0.82, ease: 'lin' },
+  cam: { subj: 0, e0: [2.5, 7.5, 1.6], e1: [-1.5, 7.5, 1.9], l0: [.5, 1.0, 0], fov0: .82, ease: 'lin' },
+  overlay: (t) => ({ count: fin(t, .3, .5) }),
 }));
 await giveHerd(6, 6);
 await seedPath(5, 8, 26, 9);
 await shoot(S({
   name: 'gatherB', dur: bars(1.25), scale: 1,
-  cam: { subj: 'herd', follow: true, e0: [-10, 4, 5.5], e1: [-13, 5.5, 7], l0: [4, 0.8, 0], fov0: 0.9, ease: 'lin' },
+  cam: { subj: 'herd', follow: true, e0: [-10, 4, 5.5], e1: [-13, 5.5, 7], l0: [4, .8, 0], fov0: .9, ease: 'lin' },
+  overlay: () => ({ count: 1 }),
 }));
 await giveHerd(8, 8);
+// Planted low in the herd's path, so the punchline arrives at the lens.
 await shoot(S({
   name: 'gatherC', dur: bars(1.25), scale: 1,
-  cam: { subj: 'herd', plant: true, e0: [26, 3, 1.0], l0: [0, 1.2, 0], fov0: 0.85, ease: 'lin' },
+  cam: { subj: 'herd', plant: true, e0: [26, 3, 1.0], l0: [0, 1.2, 0], fov0: .85, ease: 'lin' },
+  note: 'it kept getting bigger.',
+  overlay: (t) => ({ count: 1, note: fin(t, .35, .3) }),
 }));
 
-// --- IV. the hold, and the drop ---------------------------------------------
-await shoot(S(cardShot('cardHold', 'hold.', bars(1))));
+// --- IV. step two ----------------------------------------------------------
+await shoot(S(cardShot('cardButton', 'then somebody showed me the button.', bars(1))));
 // The charge folds the herd tight and fades the unicorns out as it tops,
-// and the clock slows with it. Ignition is placed on the FIRST frame of
-// the next shot - charge is set to 1 there - so this one is given the head
+// and the clock slows with it. Ignition is placed on the FIRST frame of the
+// next shot - charge is set to 1 there - so this one is given the head
 // start that ends it at .97: the fold complete, the light not yet on.
-const HOLD = bars(2.5), HOLD_SCALE = [1, 0.35];
+const HOLD = bars(2.25), HOLD_SCALE = [1, .35];
 const holdGame = HOLD * (HOLD_SCALE[0] + HOLD_SCALE[1]) / 2;
 await clearTheField(66);
 await shoot(S({
@@ -434,25 +473,21 @@ await shoot(S({
     P.charge = Math.max(0, 0.97 - g / chargeTime);
     P.cool = 0;
   }, arg: holdGame,
-  cam: { subj: 'herd', orbit: { a0: 2.3, a1: 3.7, r0: 15, r1: 9, h0: 12, h1: 7.5 }, l0: [0, 0.6, 0], fov0: 0.95, fov1: 0.85, ease: 'io' },
+  cam: { subj: 'herd', orbit: { a0: 2.3, a1: 3.7, r0: 15, r1: 9, h0: 12, h1: 7.5 }, l0: [0, .6, 0], fov0: .95, fov1: .85, ease: 'io' },
+  overlay: (t) => ({ count: fout(t, HOLD - .5, .4) }),
 }));
 await shoot(S({
-  name: 'ignite', dur: bars(1), scale: 0.22, guard: { hold: 1 },
+  name: 'ignite', dur: bars(1), scale: .22, guard: { hold: 1 },
   stage: () => { const P = window.FB.leaders[0]; P.charge = 1; P.cool = 0; },
-  cam: { subj: 'herd', e0: [-7, 4, 1.2], e1: [-17, 9, 4.8], l0: [5, 1.6, 0], l1: [3, 2.4, 0], fov0: 0.85, fov1: 1.05, ease: 'out' },
-  title: 'BECOME THE RAINBOW',
-  overlay: (t) => ({ title: fin(t, 0.25, 0.5) }),
+  cam: { subj: 'herd', e0: [-7, 4, 1.2], e1: [-17, 9, 4.8], l0: [5, 1.6, 0], l1: [3, 2.4, 0], fov0: .85, fov1: 1.05, ease: 'out' },
 }));
 await shoot(S({
   name: 'rideA', dur: bars(1), scale: 1, guard: { hold: 1, pin: 26 },
   cam: { subj: 'herd', follow: true, e0: [-26, -8, 12], e1: [-30, -10, 14], l0: [8, 2.5, 0], fov0: 1.0, ease: 'lin' },
-  title: 'BECOME THE RAINBOW',
-  overlay: (t) => ({ title: fout(t, bars(1) - 0.6, 0.5) }),
 }));
-// Planted low in the band's path, a rival herd between it and the lens:
-// what a rainbow does to what is under it.
+// A rival herd between the band and the lens. The line goes over it.
 await shoot(S({
-  name: 'rideB', dur: bars(1.25), scale: 1, guard: { hold: 1, pin: 26 },
+  name: 'rideB', dur: bars(1.5), scale: 1, guard: { hold: 1, pin: 26 },
   stage: () => {
     const { units, leaders } = window.FB, P = leaders[0], R = leaders[3];
     P.x = -20; P.z = 0; P.yaw = 0;
@@ -465,23 +500,28 @@ await shoot(S({
       u.x = R.x + (Math.random() - .5) * 8; u.z = R.z + (Math.random() - .5) * 8; n++;
     }
   },
-  cam: { subj: 'herd', plant: true, e0: [46, 5, 1.3], l0: [0, 1.8, 0], fov0: 0.9, ease: 'lin' },
+  cam: { subj: 'herd', plant: true, e0: [46, 5, 1.3], l0: [0, 1.8, 0], fov0: .9, ease: 'lin' },
+  // The line, over the shot it belongs to: a rainbow ploughing through
+  // somebody else's herd.
+  note: 'i love the smell of rainbows in the morning.',
+  overlay: (t) => ({ note: Math.min(fin(t, .5, .35), fout(t, bars(1.5) - .45, .35)) }),
 }));
 await shoot(S({
-  name: 'rideC', dur: bars(1), scale: 1, guard: { hold: 1, pin: 30 },
-  cam: { subj: 'herd', e0: [2, 22, 5], e1: [-6, 22, 5.5], l0: [0, 2.5, 0], fov0: 0.95, ease: 'lin' },
+  name: 'rideC', dur: bars(.75), scale: 1, guard: { hold: 1, pin: 30 },
+  cam: { subj: 'herd', e0: [2, 22, 5], e1: [-6, 22, 5.5], l0: [0, 2.5, 0], fov0: .95, ease: 'lin' },
 }));
 
-// --- V. two rainbows ---------------------------------------------------------
-await shoot(S(cardShot('cardTwo', 'two rainbows meet.', bars(1))));
+// --- V. step three ---------------------------------------------------------
+// The card sets it up and the picture is the punchline.
+await shoot(S(cardShot('cardOther', 'somebody else had a herd.', bars(1))));
 await shoot(S({
-  name: 'approach', until: (info, st, t) => (st.boomAt !== undefined && t - st.boomAt > 0.9) || t > 7,
+  name: 'approach', until: (info, st, t) => (st.boomAt !== undefined && t - st.boomAt > .9) || t > 7,
   scale: (info, st, t) => {
     if (info && info.boom) st.boomAt = t;
-    if (st.boomAt !== undefined) return 0.18;
+    if (st.boomAt !== undefined) return .18;
     // A fifth of speed from twenty-five units out: about two and a half
     // seconds of two lights closing before they touch.
-    return info && info.wave && info.dCent < 25 ? 0.18 : 1;
+    return info && info.wave && info.dCent < 25 ? .18 : 1;
   },
   slowCue: 'slowmo',
   guard: { aim: 12 },
@@ -506,13 +546,16 @@ await shoot(S({
       for (const u of units) if (u.lead === i && u !== L) { u.x = L.x + (Math.random() - .5) * 7; u.z = L.z + (Math.random() - .5) * 7; }
     }
   },
-  cam: { world: true, e0: [0, 15, 38], e1: [0, 9, 22], l0: [0, 2, 0], l1: [0, 1.5, 0], fov0: 1.0, fov1: 0.9, ease: 'in' },
+  cam: { world: true, e0: [0, 15, 38], e1: [0, 9, 22], l0: [0, 2, 0], l1: [0, 1.5, 0], fov0: 1.0, fov1: .9, ease: 'in' },
+  overlay: () => ({}),
 }));
 // Back to speed on the hit: the ring goes out across the plain and the
 // camera goes up with it.
 await shoot(S({
   name: 'boom', dur: bars(1.5), scale: 1, keys: [[' ', false], ['ArrowUp', false]],
-  cam: { world: true, e0: [0, 5, 24], e1: [0, 22, 40], l0: [0, 1, 0], l1: [0, 0, 0], fov0: 0.95, fov1: 1.05, ease: 'out' },
+  cam: { world: true, e0: [0, 5, 24], e1: [0, 22, 40], l0: [0, 1, 0], l1: [0, 0, 0], fov0: .95, fov1: 1.05, ease: 'out' },
+  note: 'the horror.',
+  overlay: (t) => ({ note: Math.min(fin(t, .7, .4), fout(t, bars(1.5) - .5, .35)) }),
 }));
 
 // --- coda: the one unicorn, and now a herd round it --------------------------
@@ -530,9 +573,9 @@ await shoot(S({
       u.x = P.x + Math.cos(a) * r; u.z = P.z + Math.sin(a) * r; u.st = 0; u.vx = u.vz = 0; u.daze = 0;
     }
   },
-  cam: { subj: 0, orbit: { a0: 0.7, a1: 0.35, r0: 17, r1: 11.5, h0: 3.4, h1: 2.1 }, l0: [0, 1.2, 0], fov0: 0.8, ease: 'io' },
-  sub: 'gather your colour. become the rainbow.',
-  overlay: (t) => ({ sub: fin(t, 1.1, 0.6) }),
+  cam: { subj: 0, orbit: { a0: .7, a1: .35, r0: 17, r1: 11.5, h0: 3.4, h1: 2.1 }, l0: [0, 1.2, 0], fov0: .8, ease: 'io' },
+  note: "someday this plain's gonna end.",
+  overlay: (t) => ({ note: Math.min(fin(t, .9, .45), fout(t, bars(2) - .5, .35)) }),
 }));
 
 await browser.close();

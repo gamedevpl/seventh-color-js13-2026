@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """THE STAMPEDE, arranged for the Unicorn Fireball trailer.
 
+The cut is Apocalypse Now, so the drop is the air cavalry: the game's own
+lead sample plays Ride of the Valkyries over the game's own gallop. That
+is the whole joke, and it is made of nothing but the game.
+
 Like render.py this is a port, not a new composition: BPM, the gallop, the
 bassline and the lead are fireball/src/snd.js. What is new is that it is an
 ARRANGEMENT rather than a mix: the game scales one groove by herd size, and
@@ -88,7 +92,26 @@ GALLOP = [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0]
 # The answer: the same A-minor pentatonic the lead lives in, climbing to
 # the octave and falling back, so a four-bar phrase is lead / lead / answer
 # / lead instead of the same two bars round and round.
+# (kept for the build, which still plays the game's own tune)
 ANSWER = [24, R, 22, R, 19, R, 22, R, 24, R, 27, R, 24, R, R, R]
+
+# RIDE OF THE VALKYRIES, on the game's own lead sample. Wagner died in 1883
+# and the piece is public domain; what makes it work here is the
+# instrument, not the tune - it arrives on the same sampled lead the game
+# has been playing all along, over the game's own gallop, which is already
+# a rhythm of hooves.
+#
+# The recognisable gesture is short-short-LONG climbing a minor arpeggio:
+# a dotted eighth, a sixteenth, a quarter (3 + 1 + 4 sixteenths = half a
+# bar), transposed up the triad each time. Written from A, the trailer's
+# tonic, as (step within a 32-step cycle, semitone, length in sixteenths).
+VALKYRIES = [
+    (0, -5, 3), (3, 0, 1), (4, 3, 4),
+    (8, 0, 3), (11, 3, 1), (12, 7, 4),
+    (16, 3, 3), (19, 7, 1), (20, 12, 4),
+    (24, 7, 3), (27, 12, 1), (28, 15, 4),
+]
+VALK_AT = {step: (semi, length) for step, semi, length in VALKYRIES}
 
 # ---------------------------------------------------------------- the cut --
 with open(BEATS_JSON) as fh:
@@ -101,11 +124,11 @@ DUR = END + ENDCARD + 1.0
 # Which movement each shot belongs to. Anything not named falls into the
 # movement of the cue before it.
 MOVEMENT = {
-    'card1': 'intro', 'lone': 'intro', 'card7': 'intro', 'cardYours': 'intro',
-    'gatherA': 'build1', 'gatherB': 'build2', 'gatherC': 'build3',
-    'cardHold': 'break', 'hold': 'break',
+    'lone': 'intro', 'reveal': 'intro',
+    'cardHerd': 'build1', 'gatherA': 'build1', 'gatherB': 'build2', 'gatherC': 'build3',
+    'cardButton': 'break', 'hold': 'break',
     'ignite': 'drop', 'rideA': 'drop', 'rideB': 'drop', 'rideC': 'drop',
-    'cardTwo': 'thin', 'approach': 'half', 'slowmo': 'still', 'clash': 'hit',
+    'cardOther': 'thin', 'approach': 'half', 'slowmo': 'still', 'clash': 'hit',
     'boom': 'hit', 'after': 'coda',
 }
 for i in range(1, 8):
@@ -247,13 +270,13 @@ while t < END + 0.5:
             f = NOTE(BASS[h] - 12)
             add(t, env(resample(bass_s, f / bass_f0), 0.2, 1.4), 1.0)
             add(t, sine(f / 2, 0.24, 1.3), 1.0)
-        # lead / lead / answer / lead, stacked an octave apart.
-        ph = (step // 16) % 4
-        pat = LEAD[:16] if ph == 0 else LEAD[16:] if ph in (1, 3) else ANSWER
-        if pat[h] != R:
-            f = NOTE(pat[h] + 12)
-            add(t, env(resample(lead_s, f / lead_f0), 0.26, 1.05), 1.0, pan=0.18)
-            add(t, env(resample(lead_s, 2 * f / lead_f0), 0.22, 0.5), 1.0, pan=-0.22)
+        # The Valkyries, doubled an octave down for the weight a horn has.
+        if s in VALK_AT:
+            semi, length = VALK_AT[s]
+            f, dur = NOTE(semi + 12), length * STEP * 1.15
+            add(t, env(resample(lead_s, f / lead_f0), dur, 1.15), 1.0, pan=0.16)
+            add(t, env(resample(lead_s, (f / 2) / lead_f0), dur, 0.6), 1.0, pan=-0.2)
+            add(t, sine(f / 2, dur, 0.34, attack=0.008, partial2=0.4), 1.0)
 
     elif m == 'thin':
         # Hooves and the root only: the floor drops out ahead of the meeting.
@@ -295,7 +318,7 @@ for semi, g in ((0, 0.4), (7, 0.28), (12, 0.2), (19, 0.14)):
     add(ig, held(NOTE(semi), BAR * 2, g, attack=0.02, release=0.8), 1.0)
 
 # The riser under the hold: pitch climbing three octaves, the game's rise(k).
-t0, t1 = C['cardHold'], ig
+t0, t1 = C['cardButton'], ig
 n = int(SR * (t1 - t0))
 tt = np.arange(n) / SR
 k = tt / (t1 - t0)
@@ -310,7 +333,7 @@ add(t1 - 2.0, sw, 1.0)
 # The second riser: shorter and higher, from the card into the approach,
 # then a swell into the boom while the picture is at a fifth of speed.
 if 'slowmo' in C:
-    t0, t1 = C['cardTwo'], C['slowmo']
+    t0, t1 = C['cardOther'], C['slowmo']
     n = int(SR * (t1 - t0))
     tt = np.arange(n) / SR
     k = tt / (t1 - t0)

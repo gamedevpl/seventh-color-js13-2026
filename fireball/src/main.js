@@ -443,7 +443,7 @@ function frame(now_) {
     // otherwise the plain arrives in packets and we animate what we are told.
     const mine = netTick(dt, local);
     if (net.news) { say(net.news.k ? 'RIDER JOINED' : 'RIDER LEFT', 2.5, css(COL[leaders[net.news.i].col])); net.news = null; }
-    if (net.said !== lastSaid) { lastSaid = net.said; if (net.said && !net.on) say(net.said, 3); }
+    if (net.said !== lastSaid) { lastSaid = net.said; if (net.said) say(net.said, 3); }
     if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
     if (mine) {
       if (!net.on || net.quiet) { P.in = local; charge(P, local.c); }
@@ -668,7 +668,7 @@ function frame(now_) {
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
     ctx.fillText(awake() ? 'press SPACE to run' : 'press SPACE', VW / 2, VH - 42);
     ctx.font = 'bold 14px system-ui'; ctx.fillStyle = '#8fe3c8';
-    ctx.fillText((net.on ? net.around ? net.around + ' riding online now' : 'nobody riding online yet' : 'ride online') + ' - press O', VW / 2, VH - 62);
+    ctx.fillText((net.on ? net.around ? net.around + ' online now' : 'nobody online yet' : 'go online') + ' - press O', VW / 2, VH - 62);
     ctx.font = '12px system-ui'; ctx.fillStyle = '#9a90b8';
     ctx.fillText('@gtanczyk | gamedev.pl | 2026', VW / 2, VH - 4);
   } else {
@@ -736,7 +736,6 @@ function frame(now_) {
     if (net.on) {
       ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#8fe3c8';
       ctx.fillText(net.seats + ' riding - ESC leaves', VW / 2, 34);
-      if (net.said) { ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#f3ead6'; ctx.fillText(net.said, VW / 2, VH * .38); }
       if (watching()) {
         const mine = net.me >= 0 ? leaders[net.me] : null;
         ctx.font = 'bold 17px system-ui'; ctx.fillStyle = '#ffb0b8';
@@ -749,7 +748,7 @@ function frame(now_) {
       ctx.font = 'bold 40px system-ui'; ctx.fillStyle = '#f3ead6';
       ctx.fillText(victory ? 'THE PLAIN IS YOURS' : 'THE PLAIN FORGETS YOU', VW / 2, VH * .44);
       ctx.font = '17px system-ui'; ctx.fillStyle = '#d8d0ea';
-      if (victory) ctx.fillText((isBest ? 'best time  ' : 'time  ') + timer.toFixed(1) + 's' + (best && !isBest ? '   best ' + best.toFixed(1) + 's' : ''), VW / 2, VH * .56);
+      if (victory) ctx.fillText('time ' + timer.toFixed(1) + 's' + (isBest ? ' - your best' : ''), VW / 2, VH * .56);
       else ctx.fillText('your herd has gone wild', VW / 2, VH * .56);
       if (endT > 1) ctx.fillText('press SPACE', VW / 2, VH * .66);
     }

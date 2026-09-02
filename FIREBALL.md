@@ -778,8 +778,11 @@ The autopilot matches went from 129 seconds to 93. Whether that is now
 
 ## The wall
 
-F8a: **13,293 bytes** packed worst-of-5 at O1, limit 13,312, and **19
-remain**. The ring was free; the shadow's own pass cost what the second
+F9: **13,286 bytes** packed worst-of-5 at O1, limit 13,312, and **26
+remain**. The brains going for the player put it three bytes OVER, and it
+came back under on six ring meshes nothing had drawn since the second
+shockwave ring went, a billboard helper with no callers left, and the
+SPENT message. The ring was free; the shadow's own pass cost what the second
 shockwave ring and the graze shake gave back, and a little more. F7a stood at 13,203; nine notes cost 74 net, because five were
 free and two paid for themselves. F6 stood at 13,239; presence cost about 190 and paid back about
 140 out of things that were no longer earning their place. Every change from here has to pay for itself out of something
@@ -838,6 +841,7 @@ written again in every party game.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F9 the brains go for the player | 13,312 | 13,286 (O1 worst-of-5) | brains hunt people and the leader, flee only from 2.2x; six unused ring meshes and a dead helper cut to pay for it |
 | F8a the ring and the shadow | 13,312 | 13,293 (O1 worst-of-5) | the herd around its leader; the shadow drawn flat in its own pass |
 | F8 nine notes | 13,312 | 13,277 (O1 worst-of-5) | harder charge, no shrinking, followers a beat behind, bigger blast, bolder brains with a final; the edge as a frame; grazing rainbows deflect, head-on explodes; shadows; stagger before the knock |
 | F7a the black sectors | 13,312 | 13,203 (O1 worst-of-5) | the ground slab tiled so per-vertex fog no longer paints the whole plain fog-coloured; mottling down to a few percent; end-screen time line and best-time save removed |

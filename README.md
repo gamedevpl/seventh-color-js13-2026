@@ -1,8 +1,8 @@
-# js13kGames 2026 — three entries
+# js13kGames 2026 — four entries
 
-This repo holds three js13kGames 2026 entries. They share a build, measurement
+This repo holds four js13kGames 2026 entries. They share a build, measurement
 and verification toolchain and **nothing else**: separate source trees,
-separate game code, separate budgets, separate size gates. All three are
+separate game code, separate budgets, separate size gates. All four are
 written to the 2026 theme, *rainbows and unicorns*.
 
 | entry | source | zipped | limit | write-up |
@@ -10,6 +10,7 @@ written to the 2026 theme, *rainbows and unicorns*.
 | **The Seventh Color** — a twelve-beat story game with four playable mechanics | `native/src` (9 files) | **12,160** | 13,312 | [`NATIVE.md`](./NATIVE.md) |
 | **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,247** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
 | **Unicorn Snap** — photograph a unicorn that knows how good it looks | `snap/src` (10 files) | **12,936** | 13,312 | [`SNAP.md`](./SNAP.md) |
+| **Unicorn Fireball** — gather your colour into a herd, charge, and become the rainbow | `fireball/src` (5 files) | **11,336** | 13,312 | [`FIREBALL.md`](./FIREBALL.md) |
 
 Rainbow Surfer: <https://js13kgames.com/2026/games/rainbow-surfer>
 
@@ -28,7 +29,10 @@ those rounds in order, including the ones that were wrong.
 
 ## Building
 
-Each game builds through the same tools, selected with `--game`:
+Each game builds through the same tools, selected with `--game`. An entry is a
+directory: `<game>/src/main.js`, `<game>/entry.json` (its title, and whether it
+ships the phone viewport and touch CSS) and `<game>-milestone.json` (its size
+ceiling) - the build tool itself knows no game by name.
 
 | command | what it does |
 | --- | --- |
@@ -43,6 +47,10 @@ Each game builds through the same tools, selected with `--game`:
 | `npm run snap:gate` | the suite plus the balance sweep and a worst-of-5 pack |
 | `npm run snap:poses` | a contact sheet of every pose, for looking at a change rather than measuring it |
 | `npm run snap:promo` | the two images js13kgames.com asks for, rendered from the game itself |
+| `npm run fireball` | build Unicorn Fireball |
+| `npm run fireball:test` | its probes: boot, gather, charge, fire, land, autopilot balance, and two browsers on a shared plain |
+| `npm run fireball:gate` | the probes, a worst-of-5 pack, and the zip driven in a browser |
+| `npm run fireball:play` | refresh `play/unicorn-fireball.html`, the build you can open from a link |
 
 Add `--cheats` to any build for the DEV probes the live measurement tools read;
 they compile out of a shipping build entirely.
@@ -107,7 +115,7 @@ that led to the decision.
 
 The packer is still wired up as `npm run size` and its per-transform notes are
 kept below, because the engineering in them is sound and reusable — but none of
-the three entries ships through it, and it has not been exercised since the
+the four entries ships through it, and it has not been exercised since the
 rewrite.
 
 ### The transforms

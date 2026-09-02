@@ -22,11 +22,15 @@ const noRoadroller = args.includes('--no-roadroller');
 // the shipped zip carries none of it - a debug key that reaches a compo
 // judge is a liability, and one that costs bytes is two.
 const cheats = args.includes('--cheats');
-// Two entries live in this repo now. --game picks which one this run
-// builds; each has its own source dir, milestone file and title, and both
-// go through the same squeeze chain so their numbers stay comparable.
+// Four entries live in this repo now. --game picks which one this run
+// builds; each has its own source dir, milestone file and a small
+// `<game>/entry.json` (title, and whether it ships the phone viewport and
+// touch CSS), and all go through the same squeeze chain so their numbers
+// stay comparable. The per-game facts used to be maps in this file, which
+// meant every new entry edited the build tool; now a new entry is a
+// directory.
 const game = args.find((a) => /^--game=/.test(a))?.split('=')[1] || 'native';
-const TITLES = { native: 'The Seventh Color', strands: 'Rainbow Surfer', snap: 'Unicorn Snap' };
+const entry = JSON.parse(readFileSync(path.join(root, game, 'entry.json'), 'utf8'));
 
 const num = (n) => n.toLocaleString('en-US');
 
@@ -66,14 +70,14 @@ const markup = '<canvas id=c></canvas>';
 const MOBILE = '<meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">';
 const TOUCHCSS = 'html,body{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;'
   + '-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}';
-const head = game === 'snap' ? MOBILE : '';
+const head = entry.mobile ? MOBILE : '';
 const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center}'
-  + (game === 'snap' ? TOUCHCSS : '');
+  + (entry.mobile ? TOUCHCSS : '');
 
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {
   const out = await squeeze({
-    js: minified, css, markup, head, title: TITLES[game] || game,
+    js: minified, css, markup, head, title: entry.title,
     roadroller: !noRoadroller, level, zopfliIterations: rolls > 1 ? 15 : 200,
   });
   console.log(`  roll ${i + 1}/${rolls}: index.zip = ${num(out.archiveBytes)}`);

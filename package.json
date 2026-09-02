@@ -33,7 +33,16 @@
     "trailer:endcard": "node tools/trailer/record-endcard.mjs",
     "trailer:audio": "python3 tools/trailer/audio/render.py",
     "trailer:assemble": "node tools/trailer/assemble.mjs",
-    "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak"
+    "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak",
+    "fireball": "node tools/native.mjs --game=fireball",
+    "fireball:dev": "node tools/native.mjs --game=fireball --no-roadroller --cheats",
+    "fireball:verify": "node tools/verify-native.mjs 3 --game=fireball --keys=space,space,up:3000,left:600,space:2500,up:3000",
+    "fireball:test": "npm run fireball:dev && node tools/test-herd.mjs && node tools/test-online.mjs",
+    "fireball:gate": "npm run fireball:test && node tools/native.mjs --game=fireball --O1 --rolls=5 && npm run fireball:verify",
+    "fireball:ship": "node tools/native.mjs --game=fireball --O2 && npm run fireball:verify",
+    "fireball:online": "npm run fireball:dev && node tools/test-online.mjs",
+    "fireball:online:live": "node tools/test-online.mjs --live",
+    "fireball:play": "node tools/native.mjs --game=fireball --O1 && cp build/fireball/index.html play/unicorn-fireball.html"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",

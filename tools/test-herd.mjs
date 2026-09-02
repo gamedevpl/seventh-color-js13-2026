@@ -204,7 +204,7 @@ const clashAt = await page.evaluate(async () => {
     FB.reset(seed, true);
     for (let i = 0; i < 30 * 400; i++) {
       FB.step(1 / 30, { turn: 0 });
-      const e = FB.events.find((e) => e.k === 'boom');
+      const e = FB.events.find((e) => e.k === 'boom' || e.k === 'graze');
       FB.events.length = 0;
       if (e) return [e.x, e.z];
       if (FB.leaders.filter((L) => L.st !== 3).length <= 1) break;
@@ -255,12 +255,12 @@ const raw = await page.evaluate(async (matches) => {
   const out = [];
   for (let m = 0; m < matches; m++) {
     FB.reset(m % 7, true);
-    let t = 0, ignitions = 0, answers = 0, litPairs = 0, clashes = 0, maxHerd = 0;
+    let t = 0, ignitions = 0, answers = 0, litPairs = 0, clashes = 0, grazes = 0, maxHerd = 0;
     while (t < 420) {
       FB.step(1 / 30, { turn: 0 });
       t += 1 / 30;
       for (const L of FB.leaders) maxHerd = Math.max(maxHerd, L.n);
-      for (const e of FB.events) { if (e.k === 'boom') clashes++; if (e.k === 'ignite') { ignitions++; if (e.L.threat) answers++; } }
+      for (const e of FB.events) { if (e.k === 'boom') clashes++; if (e.k === 'graze') grazes++; if (e.k === 'ignite') { ignitions++; if (e.L.threat) answers++; } }
       const lit = FB.leaders.filter((L) => L.wave && L.st === 0);
       if (lit.length > 1) litPairs++;
       FB.events.length = 0;
@@ -269,7 +269,7 @@ const raw = await page.evaluate(async (matches) => {
     }
     const alive = FB.leaders.filter((L) => L.st !== 3);
     if (alive.length > 1) out.push({ stall: alive.map((L) => ({ col: L.col, n: L.n, hearts: L.hearts, chg: L.chg, charge: +L.charge.toFixed(2), cool: +L.cool.toFixed(1), stun: +L.stun.toFixed(1), st: L.st, d: Math.round(Math.hypot(L.x - alive[0].x, L.z - alive[0].z)) })) });
-    out.push({ t: Math.round(t), ended: alive.length <= 1, playerWon: alive.length === 1 && alive[0] === FB.leaders[0], playerAlive: FB.leaders[0].st !== 3, ignitions, answers, litPairs, clashes, maxHerd });
+    out.push({ t: Math.round(t), ended: alive.length <= 1, playerWon: alive.length === 1 && alive[0] === FB.leaders[0], playerAlive: FB.leaders[0].st !== 3, ignitions, answers, litPairs, clashes, grazes, maxHerd });
   }
   return out;
 }, matches);
@@ -279,9 +279,10 @@ const ended = results.filter((r) => r.ended).length;
 const wins = results.filter((r) => r.playerWon).length;
 const avgT = results.reduce((a, r) => a + r.t, 0) / results.length;
 const clashes = results.reduce((a, r) => a + r.clashes, 0) / results.length;
+const grazes = results.reduce((a, r) => a + r.grazes, 0) / results.length;
 const ignitions = results.reduce((a, r) => a + r.ignitions, 0) / results.length;
 const answers = results.reduce((a, r) => a + r.answers, 0) / results.length, litPairs = results.reduce((a, r) => a + r.litPairs, 0) / results.length;
-console.log(`  ${matches} autopilot matches: ${ended} ended, player won ${wins}, avg ${avgT.toFixed(0)}s, ${ignitions.toFixed(1)} rainbows (${answers.toFixed(1)} answers, ${(litPairs / 30).toFixed(1)}s of two lit) and ${clashes.toFixed(1)} clashes/match, max herd ${Math.max(...results.map((r) => r.maxHerd))}`);
+console.log(`  ${matches} autopilot matches: ${ended} ended, player won ${wins}, avg ${avgT.toFixed(0)}s, ${ignitions.toFixed(1)} rainbows (${answers.toFixed(1)} answers, ${(litPairs / 30).toFixed(1)}s of two lit) and ${clashes.toFixed(1)} clashes + ${grazes.toFixed(1)} grazes/match, max herd ${Math.max(...results.map((r) => r.maxHerd))}`);
 check('autopilot matches end inside 7 minutes', ended / matches >= .8, `${ended}/${matches}`);
 check('matches end by fighting, not waiting', clashes >= .3 || ignitions >= 3, `${clashes.toFixed(1)} clashes, ${ignitions.toFixed(1)} rainbows/match`);
 check('rainbows ignite, one a match at least', ignitions >= 1, `${ignitions.toFixed(1)}/match`);

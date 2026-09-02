@@ -663,6 +663,65 @@ texture, not geography.
 The end screen also lost its time line and the best-time save behind it.
 A detail nobody asked for, and forty bytes.
 
+## F8 — nine notes from the owner, and where the bytes were
+
+A byte map first, because "we are at the limit" deserves a number. The
+minified bundle is 37.5 KB before roadroller; **main.js is 46% of it**,
+and inside main.js the frame - the sim call, the camera, every draw pass
+and the HUD - is about 40% of everything. herd.js is 22%, net.js 12%,
+gl.js 10%, snd.js 7%, the unicorn 2%. There is no fat to speak of; it is
+a dense game. So the nine notes were sorted by bytes-per-value, and it
+turned out five were free, two paid for themselves, and only three cost
+anything.
+
+**Free (constants only):**
+
+- *Space builds the charge but does not seem to accelerate.* It did, but
+  the run-up eased in at 1.1/s toward a top of 33. Now 1.7/s toward 37:
+  you feel it in the first second.
+- *The unicorn shrinks while charging.* It did - the herd dissolved into
+  the rainbow from 82% charge by scaling down, an F4 idea that read as a
+  bug. Nothing shrinks now; the herd goes at ignition, all at once, and
+  the change saved bytes.
+- *Followers move in lockstep with the leader.* They closed on their
+  slots at 3.2 units per unit of distance and eased at 5/s; now 2.2 and
+  3.5/s, so a leader that stops is a beat ahead of the herd stopping.
+- *The explosion is the weaker of the two effects.* More puffs (40 to 80
+  rather than 26 to 56), bigger, and living a third longer.
+- *The brains are a weak challenge and solo has no finale.* Boldness
+  rises over 70 seconds rather than 90, a hunter goes for herds up to 1.3
+  times its own size and from 120 units away at full boldness - and **the
+  last rival standing is always at full boldness**, so the end of a solo
+  run is a fight rather than a chase.
+
+**Paid for themselves:**
+
+- *The red gradient on the ground near the edge is odd.* Seven additive
+  discs on the ground became a red frame closing in from the screen's
+  rim, drawn under the HUD so it never covers the radar. Sixty bytes
+  cheaper and it reads as danger rather than as a spill.
+
+**Cost something:**
+
+- *Two rainbows meeting at an angle should deflect; only head-on should
+  explode.* `clash` now looks at the two headings. Within about 66
+  degrees of opposite it is the explosion as before; anything else is a
+  graze: both are thrown 40 degrees off their line, both keep burning,
+  sparks and a clang, and the fight goes on. The guard that stops them
+  grazing again every frame while still overlapping reuses `cool`, which
+  a lit herd has no other use for - the first draft used `hit`, which the
+  horn fight also uses, and no leader ever clashed at all. About 75
+  bytes. The autopilot now meets 0.4 times a match, a quarter of them
+  head-on.
+- *No shadow under the unicorns.* One flat dark box in the body mesh. It
+  rides with the body, so it lifts with a thrown unicorn - for a box
+  animal that reads fine, and it costs one box rather than a pass. About
+  30 bytes.
+- *A stagger before the knock-down.* The first horn on a follower dazes
+  it for most of a second and shoves it; only a second horn while it is
+  still reeling throws it. Fights read as fights now. About 50 bytes.
+  The autopilot matches got shorter, not longer: 129 seconds on average.
+
 ## The wall
 
 F7a: **13,203 bytes** packed worst-of-5 at O1, limit 13,312, and **109

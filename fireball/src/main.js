@@ -185,7 +185,7 @@ function disc(col, x, y, z, r) {
 // whole, and its own colour, so the cloud is a rainbow rather than a tint.
 const PUFF = [];
 function boomCloud(x, z, pw) {
-  const n = 26 + Math.min(30, pw * 2);
+  const n = 40 + Math.min(40, pw * 3);
   for (let i = 0; i < n; i++) {
     // Born on a SHELL, not at a point. Every puff starting in the same
     // place makes one saturated blob with a fringe; started a couple of
@@ -199,8 +199,8 @@ function boomCloud(x, z, pw) {
       vx: dx * sp, vy: dy * sp * .6 + .8, vz: dz * sp,
       // A wide spread of sizes: a few slow boulders among a lot of small
       // fast ones is what a cloud looks like from outside.
-      r0: (1 + Math.random() * Math.random() * 3.8) + pw * .09,
-      t: -Math.random() * .26, life: 1.1 + Math.random() * 1,
+      r0: (1.4 + Math.random() * Math.random() * 5) + pw * .12,
+      t: -Math.random() * .3, life: 1.4 + Math.random() * 1.2,
       col: Math.random() < .18 ? WILD : (Math.random() * 7) | 0,
     });
   }
@@ -478,6 +478,7 @@ function frame(now_) {
     if (e.k === 'join') { if (e.L === P) sJoin(P.n); burst([e.u.x, .8, e.u.z], 6, 2, COL[e.u.col]); }
     else if (e.k === 'knock') { thud(); burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
     else if (e.k === 'horn') { clang(); burst([e.x, 1, e.z], 5, 3, [1, .9, .6]); }
+    else if (e.k === 'graze') { clang(); burst([e.x, 1.5, e.z], 40, 7); shake = Math.max(shake, .5); }
     else if (e.k === 'chg') { if (e.L === P) say('CHARGE!', 1); }
     else if (e.k === 'ignite') {
       // The band lights: a flash, a fan of sparks the size of the herd, and
@@ -544,10 +545,10 @@ function frame(now_) {
     // it burns. They fade out as the charge tops out and fade back in when
     // it goes out, so the change of state is a dissolve, not a cut.
     const L0 = u.lead >= 0 ? leaders[u.lead] : null;
-    const gone = L0 ? (L0.wave ? 1 : Math.max(0, (L0.charge - .82) / .18)) : 0;
+    const gone = L0 && L0.wave ? 1 : 0;
     if (gone >= 1) continue;
     const set = U[u.st === 3 ? WILD : u.col];
-    const x = u.x, y = u.y, z = u.z, s = (u.hearts ? 1.25 : 1) * u.size * (1 - gone * .6), yaw = u.yaw;
+    const x = u.x, y = u.y, z = u.z, s = (u.hearts ? 1.25 : 1) * u.size, yaw = u.yaw;
     const bob = u.st ? 0 : Math.sin(u.ph * 2) * .05 * Math.min(1, u.sp / 5);
     const M = modelTR(x, y + bob, z, -yaw + Math.PI / 2, s);
     // Thrown: it tumbles about its long axis, and lands on its side. `up`
@@ -580,18 +581,6 @@ function frame(now_) {
   glMode(1);
   drawMesh(tuftM, IDENT); drawMesh(postM, IDENT); drawMesh(starM, IDENT);
   for (const L of leaders) if (L.st !== 3) drawCharge(L, T, dt);
-  // The edge, while you are near it: a band of red light on the ground
-  // between the herd and the posts. It is drawn from the herd outward, so
-  // the warning arrives in the direction you are about to leave in.
-  if (mode !== 'title' && nearEdge(P.x, P.z) && P.st !== 3) {
-    const w = (Math.max(Math.abs(P.x), Math.abs(P.z)) - (ARENA - EDGE)) / EDGE;
-    setDim(.25 + .45 * w * (.7 + .3 * Math.sin(T * 12)));
-    for (let i = -3; i <= 3; i++) {
-      const a = camYaw + i * .18;
-      disc(0, P.x + Math.cos(a) * 14, .06, P.z + Math.sin(a) * 14, 7);
-    }
-    setDim(1);
-  }
   for (const b of BOOMS) {
     // The shockwave: one ring on the ground, thin and fast, with a second
     // just inside it cycling through the colours. Seven concentric rings
@@ -644,6 +633,13 @@ function frame(now_) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (flash) { ctx.fillStyle = `rgba(255,255,255,${flash * .6})`; ctx.fillRect(0, 0, VW, VH); }
+  // The edge: a red frame closing in from the screen's rim, under the
+  // HUD so it never covers the radar - which is what you need most there.
+  if (mode === 'run' && nearEdge(P.x, P.z) && P.st !== 3) {
+    const w = (Math.max(Math.abs(P.x), Math.abs(P.z)) - (ARENA - EDGE)) / EDGE;
+    ctx.strokeStyle = `rgba(255,40,60,${.25 + .35 * w * (.7 + .3 * Math.sin(timer * 12))})`; ctx.lineWidth = 14 + 40 * w;
+    ctx.strokeRect(0, 0, VW, VH);
+  }
   const pc = COL[P.col];
   if (mode === 'title') {
     const sc = ctx.createLinearGradient(0, 0, 0, VH);
@@ -698,7 +694,7 @@ function frame(now_) {
     // to plot all seventy-seven unicorns, which at this size is a texture
     // rather than information - what you need to find is a herd behind you.
     const RX = VW - 78, RY = 10, RS = 68;
-    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(RX, RY, RS, RS);
+    ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(RX, RY, RS, RS);
     for (const L of leaders) {
       if (L.st === 3) continue;
       const x = RX + (L.cx / ARENA + 1) * RS / 2, y = RY + (L.cz / ARENA + 1) * RS / 2;

@@ -176,8 +176,19 @@ export function charge(L, on) {
 // is thrown across the plain and its leader pays a heart. The winner keeps
 // its herd but the rainbow goes out - a clash costs the momentum too.
 function clash(A, B) {
-  const [W, Lo] = A.wave >= B.wave ? [A, B] : [B, A];
   const cx = (A.cx + B.cx) / 2, cz = (A.cz + B.cz) / 2;
+  // Only a head-on meeting explodes. Two rainbows crossing at an angle
+  // glance off each other: both are thrown off their line, both keep
+  // burning, and the fight goes on. `cool` keeps them from grazing again
+  // every frame while they still overlap; a lit herd has no other use for it.
+  if (Math.cos(A.yaw - B.yaw) > -.4) {
+    const side = Math.sign(Math.sin(B.yaw - A.yaw)) || 1;
+    A.yaw -= side * .7; B.yaw += side * .7;
+    A.cool = B.cool = .6;
+    events.push({ k: 'graze', x: cx, z: cz });
+    return;
+  }
+  const [W, Lo] = A.wave >= B.wave ? [A, B] : [B, A];
   events.push({ k: 'boom', x: cx, z: cz, pw: A.wave + B.wave });
   breakHerd(Lo, cx, cz, 16);
   if (A.wave === B.wave) { breakHerd(W, cx, cz, 16); return; }
@@ -196,7 +207,7 @@ function think(L, dt) {
   ai.t -= dt;
   if (ai.t > 0) return;
   ai.t = .25;
-  const bold = Math.min(1, time / 90);
+  const bold = alive().length < 3 ? 1 : Math.min(1, time / 70);
   let want = null, run = false;
   // A rainbow, or a charge about to become one, heading our way? Near
   // enough in size, it is met - a clash is a coin worth flipping, and a
@@ -222,7 +233,7 @@ function think(L, dt) {
     for (const R of leaders) {
       if (R === L || R.st === 3) continue;
       const d = Math.hypot(R.x - L.x, R.z - L.z);
-      if (time > 15 && R.n + 1 <= (L.n + 1) * (.7 + .4 * bold) && d < 30 + 60 * bold && d < hd && L.n >= 3) { hunt = R; hd = d; }
+      if (time > 15 && R.n + 1 <= (L.n + 1) * (.7 + .6 * bold) && d < 30 + 90 * bold && d < hd && L.n >= 3) { hunt = R; hd = d; }
       if (R.n > (L.n + 1) * 1.5 && d < 22 && d < fd) { flee = R; fd = d; }
     }
     if (flee && !hunt) { want = [L.x + (L.x - flee.x), L.z + (L.z - flee.z)]; sprint = true; }
@@ -306,7 +317,7 @@ export function step(dt, input) {
       // The charge builds, and the speed with it - slowly, so the run-up
       // is a thing you can see coming and a thing you can misjudge.
       if (!L.wave) L.charge = Math.min(1, L.charge + dt / chargeTime(L));
-      want = 11 + 22 * L.charge;
+      want = 11 + 26 * L.charge;
       if (L.charge >= 1 && !L.wave) {
         // IGNITION. The band is the rainbow now, for as long as the herd
         // can hold it - bigger herds burn longer.
@@ -338,7 +349,7 @@ export function step(dt, input) {
     // and a LIT herd is heavier again the bigger it is, so the biggest
     // rainbow on the plain is also the one that cannot correct its aim.
     L.yaw += turn * dt * 2.6 * (1 - .6 * L.charge) / (L.wave ? 1 + L.n * .07 : 1);
-    L.spd = lerp(L.spd, want, dt * (want > L.spd ? 1.1 : 4));
+    L.spd = lerp(L.spd, want, dt * (want > L.spd ? 1.7 : 4));
     const tx = Math.cos(L.yaw) * L.spd, tz = Math.sin(L.yaw) * L.spd;
     L.vx = lerp(L.vx, tx, dt * 6); L.vz = lerp(L.vz, tz, dt * 6);
   }
@@ -375,7 +386,7 @@ export function step(dt, input) {
       const dx = gx - u.x, dz = gz - u.z, d = Math.hypot(dx, dz) || 1;
       // Its own pace, and a slot that drifts: a herd running in lockstep
       // reads as a texture rather than as animals.
-      const spd = Math.min((L.spd + 9) * u.pace, d * 3.2 * u.pace);
+      const spd = Math.min((L.spd + 7) * u.pace, d * 2.2 * u.pace);
       tx = dx / d * spd; tz = dz / d * spd;
     } else {
       // Grazing: drift, keep near home, and shy away from any leader that
@@ -399,7 +410,7 @@ export function step(dt, input) {
         if (Math.abs(o.x - u.x) < near && Math.abs(o.z - u.z) < near) { u.lead = o.lead; events.push({ k: 'join', u, L: Lo }); break; }
       }
     }
-    u.vx = lerp(u.vx, tx, dt * 5); u.vz = lerp(u.vz, tz, dt * 5);
+    u.vx = lerp(u.vx, tx, dt * 3.5); u.vz = lerp(u.vz, tz, dt * 3.5);
   }
 
   // Separation, and the horn fight. One pass over the pairs does both.
@@ -437,6 +448,8 @@ export function step(dt, input) {
         continue;
       }
       win.lunge = 1; lose.recoil = 1;
+      // The first horn staggers; the second, while still reeling, throws.
+      if (lose.daze <= 0) { lose.daze = .9; lose.vx += (lose.x - win.x) * 5; lose.vz += (lose.z - win.z) * 5; continue; }
       scatter(lose, lose.x - win.x, lose.z - win.z, 7 + mom(win) * 2);
       events.push({ k: 'knock', x: lose.x, z: lose.z, col: lose.col });
     }
@@ -472,7 +485,7 @@ export function step(dt, input) {
   for (const L of leaders) {
     if (!L.wave || L.st !== 0) continue;
     for (const R of leaders) {
-      if (R !== L && R.wave && R.st === 0 && Math.hypot(R.cx - L.cx, R.cz - L.cz) < R.r + L.r) { clash(L, R); break; }
+      if (R !== L && R.wave && R.st === 0 && !L.cool && Math.hypot(R.cx - L.cx, R.cz - L.cz) < R.r + L.r) { clash(L, R); break; }
     }
     if (!L.wave) continue;
     for (const u of units) {

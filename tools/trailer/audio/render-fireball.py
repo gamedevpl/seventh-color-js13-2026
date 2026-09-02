@@ -231,7 +231,9 @@ while t < END + 0.5:
             add(t, resample(hoof_s, 180 / 400), 0.42, pan=0.25 if bar % 2 else -0.25)
 
     elif m.startswith('build'):
-        lvl = {'build1': 0.0, 'build2': 0.5, 'build3': 1.0}[m]
+        # The build must land LOUDER than the intro it interrupts; its first
+        # step measured 4 dB under the music box it was supposed to answer.
+        lvl = {'build1': 0.35, 'build2': 0.7, 'build3': 1.0}[m]
         if GALLOP[h]:
             g = (0.45 + lvl * 0.25) * (1.25 if dum else 1.0)
             add(t, resample(hoof_s, (180 if dum else 320) / 400), g, pan=-0.1 if h % 2 else 0.1)
@@ -273,7 +275,11 @@ while t < END + 0.5:
         # The Valkyries, doubled an octave down for the weight a horn has.
         if s in VALK_AT:
             semi, length = VALK_AT[s]
-            f, dur = NOTE(semi + 12), length * STEP * 1.15
+            # A sixteenth is 0.11s, and a sixteenth that decays to silence
+            # inside its own length does not speak - the two passing notes
+            # of each da-da-DUM measured at the level of the bed. They get
+            # a floor, so the figure is heard as three notes and not one.
+            f, dur = NOTE(semi + 12), max(length, 2.2) * STEP * 1.15
             add(t, env(resample(lead_s, f / lead_f0), dur, 1.15), 1.0, pan=0.16)
             add(t, env(resample(lead_s, (f / 2) / lead_f0), dur, 0.6), 1.0, pan=-0.2)
             add(t, sine(f / 2, dur, 0.34, attack=0.008, partial2=0.4), 1.0)

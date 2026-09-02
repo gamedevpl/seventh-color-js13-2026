@@ -144,7 +144,13 @@ await page.evaluate(([RAINBOW]) => {
     const L = leaders[s || 0];
     return { x: L.x, z: L.z, yaw: L.yaw };
   };
-  // [along, side, up] in the subject's frame -> world.
+  // [along, side, height] in the subject's frame -> world. BOTH the eye and
+  // the look point go through this, so a look point is an offset in those
+  // same three axes - not [x, y, z]. Every shot in the first cut wrote its
+  // look point as [along, height, 0], which aimed the camera at the ground
+  // and slid it sideways: harmless at thirty units, and the reason the
+  // close-ups sat low and showed so much floor. `world: true` shots are the
+  // exception and give real [x, y, z] for both.
   const rel = (S, yaw, o) => [S.x + Math.cos(yaw) * o[0] + Math.sin(yaw) * o[1], o[2], S.z + Math.sin(yaw) * o[0] - Math.cos(yaw) * o[1]];
 
   let camState = { id: -1 };
@@ -390,19 +396,20 @@ const S = (o) => ({ id: id++, ...o });
 await stage(() => {
   const { units, leaders } = window.FB, P = leaders[0];
   for (const u of units) if (u !== P && u.col === P.col) {
-    const a = Math.random() * Math.PI * 2, r = 11 + Math.random() * 11;
+    const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 16;
     u.x = P.x + Math.cos(a) * r; u.z = P.z + Math.sin(a) * r;
   }
-  // The other six herds ring it at conversational distance.
+  // The other six herds ring it far enough out that a long lens at four
+  // units finds nothing behind it, and near enough that the pull-back does.
   for (let i = 1; i < leaders.length; i++) {
-    const L = leaders[i], a = (i - 1) / 6 * Math.PI * 2 + 0.5, r = 19 + (i % 3) * 10;
+    const L = leaders[i], a = (i - 1) / 6 * Math.PI * 2 + 0.5, r = 34 + (i % 3) * 9;
     L.x = P.x + Math.cos(a) * r; L.z = P.z + Math.sin(a) * r;
     for (const u of units) if (u.lead === i && u !== L) { u.x = L.x + (Math.random() - .5) * 13; u.z = L.z + (Math.random() - .5) * 13; }
   }
 });
 await shoot(S({
   name: 'lone', dur: bars(2), scale: 1, guard: { pin: 0 },
-  cam: { subj: 0, orbit: { a0: 2.3, a1: 2.85, r0: 4.5, r1: 3.8, h0: .85, h1: 1.3 }, l0: [.3, 1.25, 0], fov0: .8, ease: 'io' },
+  cam: { subj: 0, orbit: { a0: 2.3, a1: 2.85, r0: 3.9, r1: 3.4, h0: .55, h1: .8 }, l0: [.3, 0, 1.25], fov0: .72, ease: 'io' },
   // "Saigon... I'm still only in Saigon." The film opens on a man who has
   // been waiting too long in a place he cannot leave, and so does this.
   note: (t) => (t < bars(1.15) ? 'the plain.' : "i'm still only on the plain."),
@@ -412,7 +419,7 @@ await shoot(S({
 // animal, and is still up when the frame holds seventy.
 await shoot(S({
   name: 'reveal', dur: bars(2.25), scale: 1, guard: { pin: 0 },
-  cam: { subj: 0, orbit: { a0: 2.85, a1: 3.35, r0: 3.8, r1: 34, h0: 1.3, h1: 9.5 }, l0: [0, 1.2, 0], l1: [0, .5, 0], fov0: .8, fov1: .98, ease: 'in' },
+  cam: { subj: 0, orbit: { a0: 2.85, a1: 3.35, r0: 3.4, r1: 36, h0: .8, h1: 11 }, l0: [0, 0, 1.2], l1: [0, 0, .6], fov0: .72, fov1: 1.0, ease: 'in' },
   note: 'seven colours out here.',
   overlay: (t) => ({ note: Math.min(fin(t, .1, .3), fout(t, bars(2.25) - .45, .35)) }),
 }));
@@ -424,7 +431,7 @@ for (let i = 1; i <= 7; i++) {
   const who = i % 7;
   await shoot(S({
     name: `colour${i}`, dur: bars(.5), scale: 1,
-    cam: { subj: who, e0: [6.0, 3.4 * (i % 2 ? 1 : -1), 1.5], e1: [5.0, 2.8 * (i % 2 ? 1 : -1), 1.6], l0: [0, 1.1, 0], fov0: .8, ease: 'lin' },
+    cam: { subj: who, e0: [6.0, 3.4 * (i % 2 ? 1 : -1), 1.5], e1: [5.0, 2.8 * (i % 2 ? 1 : -1), 1.6], l0: [0, 0, 1.1], fov0: .8, ease: 'lin' },
     note: i >= 4 ? 'nobody wants the other six on it.' : '',
     overlay: () => ({ note: i >= 4 ? 1 : 0 }),
   }));
@@ -437,21 +444,21 @@ await clearTheField(64);
 await seedPath(5, 6, 30, 7);
 await shoot(S({
   name: 'gatherA', dur: bars(1.5), scale: 1, keys: [['ArrowUp', true]],
-  cam: { subj: 0, e0: [2.5, 7.5, 1.6], e1: [-1.5, 7.5, 1.9], l0: [.5, 1.0, 0], fov0: .82, ease: 'lin' },
+  cam: { subj: 0, e0: [2.5, 7.5, 1.6], e1: [-1.5, 7.5, 1.9], l0: [.5, 0, 1.0], fov0: .82, ease: 'lin' },
   overlay: (t) => ({ count: fin(t, .3, .5) }),
 }));
 await giveHerd(6, 6);
 await seedPath(5, 8, 26, 9);
 await shoot(S({
   name: 'gatherB', dur: bars(1.25), scale: 1,
-  cam: { subj: 'herd', follow: true, e0: [-10, 4, 5.5], e1: [-13, 5.5, 7], l0: [4, .8, 0], fov0: .9, ease: 'lin' },
+  cam: { subj: 'herd', follow: true, e0: [-10, 4, 5.5], e1: [-13, 5.5, 7], l0: [4, 0, .8], fov0: .9, ease: 'lin' },
   overlay: () => ({ count: 1 }),
 }));
 await giveHerd(8, 8);
 // Planted low in the herd's path, so the punchline arrives at the lens.
 await shoot(S({
   name: 'gatherC', dur: bars(1.25), scale: 1,
-  cam: { subj: 'herd', plant: true, e0: [26, 3, 1.0], l0: [0, 1.2, 0], fov0: .85, ease: 'lin' },
+  cam: { subj: 'herd', plant: true, e0: [26, 3, 1.0], l0: [0, 0, 1.2], fov0: .85, ease: 'lin' },
   note: 'it kept getting bigger.',
   overlay: (t) => ({ count: 1, note: fin(t, .35, .3) }),
 }));
@@ -473,17 +480,17 @@ await shoot(S({
     P.charge = Math.max(0, 0.97 - g / chargeTime);
     P.cool = 0;
   }, arg: holdGame,
-  cam: { subj: 'herd', orbit: { a0: 2.3, a1: 3.7, r0: 15, r1: 9, h0: 12, h1: 7.5 }, l0: [0, .6, 0], fov0: .95, fov1: .85, ease: 'io' },
+  cam: { subj: 'herd', orbit: { a0: 2.3, a1: 3.7, r0: 15, r1: 9, h0: 12, h1: 7.5 }, l0: [0, 0, .6], fov0: .95, fov1: .85, ease: 'io' },
   overlay: (t) => ({ count: fout(t, HOLD - .5, .4) }),
 }));
 await shoot(S({
   name: 'ignite', dur: bars(1), scale: .22, guard: { hold: 1 },
   stage: () => { const P = window.FB.leaders[0]; P.charge = 1; P.cool = 0; },
-  cam: { subj: 'herd', e0: [-7, 4, 1.2], e1: [-17, 9, 4.8], l0: [5, 1.6, 0], l1: [3, 2.4, 0], fov0: .85, fov1: 1.05, ease: 'out' },
+  cam: { subj: 'herd', e0: [-7, 4, 1.2], e1: [-17, 9, 4.8], l0: [5, 0, 1.6], l1: [3, 0, 2.4], fov0: .85, fov1: 1.05, ease: 'out' },
 }));
 await shoot(S({
   name: 'rideA', dur: bars(1), scale: 1, guard: { hold: 1, pin: 26 },
-  cam: { subj: 'herd', follow: true, e0: [-26, -8, 12], e1: [-30, -10, 14], l0: [8, 2.5, 0], fov0: 1.0, ease: 'lin' },
+  cam: { subj: 'herd', follow: true, e0: [-26, -8, 12], e1: [-30, -10, 14], l0: [8, 0, 2.5], fov0: 1.0, ease: 'lin' },
 }));
 // A rival herd between the band and the lens. The line goes over it.
 await shoot(S({
@@ -500,7 +507,12 @@ await shoot(S({
       u.x = R.x + (Math.random() - .5) * 8; u.z = R.z + (Math.random() - .5) * 8; n++;
     }
   },
-  cam: { subj: 'herd', plant: true, e0: [46, 5, 1.3], l0: [0, 1.8, 0], fov0: .9, ease: 'lin' },
+  // Side on, in world coordinates, framed on the herd that is about to be
+  // hit rather than on the band that is about to do it. Planted in the
+  // band's own path the shot is over in a third of a second: it arrives at
+  // twenty-six units a second, fills the lens, and is behind you - and the
+  // line lands on an empty horizon.
+  cam: { world: true, e0: [16, 5, 26], e1: [13, 4.2, 21], l0: [11, 1.6, 1], fov0: .9, ease: 'lin' },
   // The line, over the shot it belongs to: a rainbow ploughing through
   // somebody else's herd.
   note: 'i love the smell of rainbows in the morning.',
@@ -508,7 +520,7 @@ await shoot(S({
 }));
 await shoot(S({
   name: 'rideC', dur: bars(.75), scale: 1, guard: { hold: 1, pin: 30 },
-  cam: { subj: 'herd', e0: [2, 22, 5], e1: [-6, 22, 5.5], l0: [0, 2.5, 0], fov0: .95, ease: 'lin' },
+  cam: { subj: 'herd', e0: [2, 22, 5], e1: [-6, 22, 5.5], l0: [0, 0, 2.5], fov0: .95, ease: 'lin' },
 }));
 
 // --- V. step three ---------------------------------------------------------
@@ -573,7 +585,7 @@ await shoot(S({
       u.x = P.x + Math.cos(a) * r; u.z = P.z + Math.sin(a) * r; u.st = 0; u.vx = u.vz = 0; u.daze = 0;
     }
   },
-  cam: { subj: 0, orbit: { a0: .7, a1: .35, r0: 17, r1: 11.5, h0: 3.4, h1: 2.1 }, l0: [0, 1.2, 0], fov0: .8, ease: 'io' },
+  cam: { subj: 0, orbit: { a0: .7, a1: .35, r0: 17, r1: 11.5, h0: 3.4, h1: 2.1 }, l0: [0, 0, 1.2], fov0: .8, ease: 'io' },
   note: "someday this plain's gonna end.",
   overlay: (t) => ({ note: Math.min(fin(t, .9, .45), fout(t, bars(2) - .5, .35)) }),
 }));

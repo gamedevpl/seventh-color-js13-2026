@@ -416,7 +416,7 @@ function ghostSound(P) {
 }
 
 // --- the frame ------------------------------------------------------------
-let last = 0, lastPick = 0;
+let last = 0, lastPick = 0, lastSaid = '';
 function frame(now_) {
   const dt = Math.min(.05, (now_ - last) / 1000 || 0);
   last = now_;
@@ -442,6 +442,7 @@ function frame(now_) {
     // Offline this is always ours. Online it is ours only while we host;
     // otherwise the plain arrives in packets and we animate what we are told.
     const mine = netTick(dt, local);
+    if (net.said !== lastSaid) { lastSaid = net.said; if (net.said && !net.on) say(net.said, 3); }
     if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
     if (mine) {
       if (!net.on) { P.in = local; charge(P, local.c); }
@@ -734,9 +735,9 @@ function frame(now_) {
     }
     ctx.font = '13px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.6)';
     ctx.fillText(Math.floor(timer / 60) + ':' + String(Math.floor(timer % 60)).padStart(2, '0'), VW / 2, 16);
-    if (net.on || net.said) {
+    if (net.on) {
       ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#8fe3c8';
-      if (net.on) ctx.fillText(net.seats + (net.seats > 1 ? ' riders' : ' rider') + ' - ESC to leave', VW / 2, 34);
+      ctx.fillText(net.seats + (net.seats > 1 ? ' riders' : ' rider') + ' - ESC to leave', VW / 2, 34);
       if (net.said) { ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#f3ead6'; ctx.fillText(net.said, VW / 2, VH * .38); }
       if (net.me < 0) { ctx.font = 'bold 15px system-ui'; ctx.fillStyle = '#ffb0b8'; ctx.fillText('THE PLAIN IS FULL - WATCHING', VW / 2, VH * .3); }
       else if (P.st === 3) { ctx.font = 'bold 15px system-ui'; ctx.fillStyle = '#ffb0b8'; ctx.fillText('OUT - THE NEXT PLAIN IS COMING', VW / 2, VH * .3); }

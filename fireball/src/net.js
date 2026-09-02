@@ -50,6 +50,10 @@ export function open(room) {
   try { ws = new WebSocket(room || ROOM); } catch { net.said = 'NO PLAIN FOUND'; return; }
   ws.binaryType = 'arraybuffer';
   ws.onopen = () => { net.on = 1; t = 0; tHeard = -99; joined = 0; };
+  // A socket that is refused says so; a socket that is merely blocked can
+  // hang forever, and the message must not go on claiming we are joining
+  // something while the plain runs on underneath it.
+  setTimeout(() => { if (ws && !net.on) { net.said = 'NO PLAIN HERE - PLAYING ALONE'; close(); } }, 6000);
   ws.onclose = () => { net.on = net.host = 0; net.me = 0; ws = null; if (!net.said) net.said = 'THE PLAIN IS GONE'; };
   ws.onerror = () => { net.said = 'NO PLAIN HERE - PLAYING ALONE'; net.on = 0; };
   ws.onmessage = (e) => hear(e.data);

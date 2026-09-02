@@ -349,7 +349,13 @@ async function shoot(shot) {
     // Cues inside a shot: a herd sent across the frame, a fog change, a
     // charge lit by hand. Each fires once, on the first frame past `at`.
     for (const [bi, b] of (shot.beats || []).entries()) {
-      if (t >= b.at && !state['beat' + bi]) { state['beat' + bi] = 1; await (b.send ? b.send() : stage(b.fn, b.arg)); }
+      if (t >= b.at && !state['beat' + bi]) {
+        state['beat' + bi] = 1;
+        await (b.send ? b.send() : stage(b.fn, b.arg));
+        // A fallback throw fires between frames, where the tick's "left
+        // the ground this frame" cannot see it; it is a hit all the same.
+        if (b.hit && !cues[shot.name + 'Hit']) cues[shot.name + 'Hit'] = +vt.toFixed(4);
+      }
     }
     const sc = typeof shot.scale === 'function' ? shot.scale(info, state, t) : Array.isArray(shot.scale) ? shot.scale[0] + (shot.scale[1] - shot.scale[0]) * u : (shot.scale ?? 1);
     const ov = shot.overlay ? shot.overlay(t, u, info) : {};
@@ -498,10 +504,10 @@ const WHITE = [1, .96, .9];
 const FACE_FLASHES = [
   { at: .95, col: RGB(RAINBOW[4]), dir: [1, .4, 1], len: .4, gain: 1.6, air: .3 },
   { at: 1.75, col: RGB(RAINBOW[0]), dir: [1, .5, -1], len: .35, gain: 1.7, air: .3 },
-  { at: 2.3, col: WHITE, dir: [1, .3, .7], len: .55, gain: 1.6, air: .32, boom: 1 },
+  { at: 2.3, col: WHITE, dir: [1, .3, .7], len: .55, gain: 1.6, air: .22, boom: 1 },
   { at: 3.05, col: RGB(RAINBOW[3]), dir: [1, .4, -.6], len: .35, gain: 1.5, air: .3 },
   { at: 3.55, col: RGB(RAINBOW[6]), dir: [1, .6, 1.2], len: .35, gain: 1.6, air: .3 },
-  { at: 4.05, col: WHITE, dir: [1, .2, -1], len: .7, gain: 1.9, air: .4, boom: 1 },
+  { at: 4.05, col: WHITE, dir: [1, .2, -1], len: .7, gain: 1.9, air: .28, boom: 1 },
   { at: 4.8, col: RGB(RAINBOW[1]), dir: [1, .5, .8], len: .35, gain: 1.5, air: .3 },
 ];
 const faceFlash = flashes(FACE_FLASHES);
@@ -524,7 +530,7 @@ await shoot(S({
   guard: (t) => (t < HIT1 - 1.0 ? { pin: 5.5, yaw: 0 } : { mortal: 1, horns: 1, pin: 5.5, drive: [{ i: 1, spd: 30, charge: .8 }] }),
   beats: [
     { at: HIT1 - 1.0, send: () => crossHerd(1, 1, false, 5.5) },
-    { at: HIT1 + .25, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 5; } }, arg: [2, -9, 8] },
+    { at: HIT1 + .25, hit: 1, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 5; } }, arg: [2, -9, 8] },
   ],
 }));
 
@@ -548,8 +554,11 @@ await shoot(S({
   stage: () => { const P = window.FB.leaders[0]; P.yaw = 0; P.up = 0; P.st = 0; P.y = 0; },
   guard: (t) => (t < HIT2 - 1.0 ? { pin: 5.5, yaw: 0 } : { mortal: 1, pin: 5.5, drive: [{ i: 2, spd: 30 }] }),
   beats: [
-    { at: HIT2 - 1.0, send: () => crossHerd(2, -1, true, 5.5) },
-    { at: HIT2 + .55, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 6; } }, arg: [3, 11, 12] },
+    // The band is the herd's centroid, and at thirty units a second the
+    // centroid trails the leader by thirteen - so the leader is aimed at
+    // where the hero will be when the BAND arrives, not the leader.
+    { at: HIT2 - 1.0, send: () => crossHerd(2, -1, true, 8) },
+    { at: HIT2 + .95, hit: 1, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 6; } }, arg: [3, 11, 12] },
   ],
 }));
 // --- V. kaput. the crane. ---------------------------------------------------------

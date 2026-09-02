@@ -115,71 +115,74 @@ things in there are less obvious than they look:
   starting at full gain - these are percussive one-shots, and triggering one
   cold as a sustained note is an audible thump.
 
-## Unicorn Fireball: directed, not captured
+## Unicorn Fireball: slapstick, with lights of its own
 
-The first cut of this one played the game with its own chase camera and
-its HUD on, and captioned it. It was a screencast. The cut that replaced
-it is a film with a shot list, and three things make it one:
+The cut is a story with a hero. A face in the dark, lit by the flashes of
+a fight it is not in. It sets off, hopeful, the lens backing away ahead of
+it - and a herd runs it down. It lies there, gets up like a hero (at a
+third of speed), shakes it off, sets off again, same shot, same hope - and
+a *rainbow* runs it down. It stays down. The camera goes straight up off
+the body, turning, and the whole plain is at war. Then how: gather your
+herd, trample the rest, become the rainbow - and two rainbows meet and
+everything goes white, and the end card dissolves out of the white.
 
-- **A camera of its own.** `FBCAM_` is a DEV hook in `main.js` (the
-  shipping build is byte-identical without it) that places the eye, the
-  look point and the field of view for a frame. `record-fireball.mjs`
-  animates it one pumped frame at a time - orbits, cranes, tracking shots
-  in the subject's own frame, a tripod planted in the herd's path - and
-  keeps the HUD canvas hidden for the whole length. The one thing the
-  plain will not give is a high angle: from above, the fog swallows it, so
-  everything is shot from grass height.
-- **A story.** Cards on black between the movements: *one plain. / seven
-  colours. / one of them is yours. / hold. / two rainbows meet.* - and one
-  line over the picture at the drop. A unicorn alone; each of the seven
-  colours in a cut on the half-bar; gathering its own; the fold; the
-  rainbow; two rainbows meeting; the same animal with a herd round it.
-- **Time.** A pumped clock costs nothing to slow: the hold ramps down to a
-  third of speed as the charge tops, ignition plays at a fifth, and the
-  clash goes to a fifth from twenty-five units out and snaps back to full
-  speed on the hit.
+Four things the game did not have, all DEV hooks that compile out of the
+shipping build byte for byte (`cmp` says so after every change):
 
-Every cut is a bar of the game's own music (132 BPM), so the score can be
-arranged to the picture. The recorder writes `beats.json` - the second
-each shot starts, and the frames on which the rainbow lit and the clash
-detonated, which are physics - and `audio/render-fireball.py` reads it and
-lays out its movements on those cues: a music-box intro (the lead at half
-speed, two octaves up, with an echo), a build, a breakdown with the game's
-riser, the drop (the lead stacked in octaves, its second bar answered by a
-phrase of its own), half time under the slow motion, the hit, and the
-music box back over a held chord. `FB_PREVIEW=10` captures every tenth
-frame at half size, for looking at a shot list in two minutes.
+- **A camera.** `FBCAM_` places the eye, the look point and the field of
+  view; `record-fireball.mjs` animates it a pumped frame at a time - orbits,
+  a lens that backs away ahead of a walking animal, a tripod planted in a
+  herd's path, a crane that goes to eighty units. Look points are offsets in
+  the subject's own frame, `[along, side, height]`, the same as the eye.
+- **Lighting.** `FBGL({flash, dir, fog, glow})`. `flash` is a directional
+  light added to the lambert term in a DEV variant of the vertex shader -
+  the box faces that face it brighten, the rest do not, which is what a
+  rainbow going off out of frame does to a face. `fog` is the range the
+  shader used to hardcode: solid geometry fogged out fully at seventy
+  units, which is why every high angle died, and the crane pushes it to
+  seven hundred. `glow` is a gain on every additive layer.
+- **Pyrotechnics.** `FB.boom(x, z, pw)` sets off the game's own explosion
+  at a point - ring, cloud, sparks, flash, shake.
+- **Bloom**, in the mux rather than the game: `assemble.mjs` lifts the
+  bright pixels of every frame, blurs them and adds them back. The rainbow
+  is additive geometry and blooms the moment it is blurred over itself;
+  it reads as plasma, and the explosions as clouds.
 
-### What the previews taught
+The falls are the game's own. `st = 1` is the tumble (it rolls about its
+long axis and lands on its side); `up` pinned at .55 is the knocked-flat
+pose, held; let go of, the game rolls it back onto its feet in half a
+second, and the recorder runs that at a third of speed. The shake is a
+wiggle the game does not have, done to the yaw.
 
-None of this was found by reading the source. Five previews, five ways
-for a take to die:
+The guard - the per-frame hand on the world - grew a vocabulary for this
+cut, and every word of it is a rule of the game found in a preview:
 
-- The player was hunted down while it stood with a herd of three during
-  the montage. The match ends in the SAME step that kills the player -
-  `hurt()` to no hearts, then `lost()` right after `step()` - so healing it
-  next frame is a frame too late. Protection is preventive: the player
-  cannot be horned (`hit` is the fight loop's own per-pair cooldown), and
-  rivals are held under the charge that makes a horn lethal.
-- The player never stands still. With an input object and no key held the
-  game's `want` is eleven units a second, and eleven units a second for
-  the length of the intro is off the far edge of the plain - it fell at
-  `[3, -95]`, during a card. Steering is on for every shot; the "standing"
-  shots pin the speed to zero and get a creep, which reads as an animal
-  shifting its weight.
-- The rivals' brains hunt the player's followers loose faster than the
-  gather adds them (the herd that reached the hold was two). They are set
-  dressing until the clash: brains off for the whole cut, and pinned,
-  because a brainless rival walks too.
-- Two rainbows only explode if their herd CENTROIDS come within the sum of
-  the two footprints, and a centroid trails its leader by about
-  `spd / 2.2`. At a lit herd's natural 37 that lag is ten, wider than either
-  footprint, so the leader reaches the other band first and is run over;
-  pinned to twelve, the centroids meet first and it detonates.
-- Ignition is placed, not hoped for: the hold is given the head start that
-  ends it at a charge of .97, and the first frame of the next shot sets it
-  to 1.
+| flag | what it does, and why |
+| --- | --- |
+| `pin` | the player's speed. `pin: 0` is as near to standing as the game allows - with an input object and no key held the game walks at eleven, and eleven for the length of an intro is off the edge of the plain |
+| `mortal` | rivals keep their charge and their rainbow. Otherwise both are held down: a charging rival's herd landed three horns on the standing hero inside one step, and the match ends in the same step that kills the player |
+| `horns` | a horn may land on the hero (`hit` is the fight loop's own per-pair cooldown). The first fall is horns; the second is the rainbow ALONE - a lit leader's horn would throw the hero half a second before its band arrived |
+| `lie` | the knocked-flat pose, held |
+| `drive` | a rival sent somewhere at a speed: a herd crossing the frame on cue. Its brain is off, so this is its brain. A brainless rival not driven is pinned, because it walks too |
+| `pairs` | lit rivals held head-on at the speed that lets their centroids meet (a centroid trails its leader by spd/2.2), and lit AGAIN the moment the game's cooldown allows - a war, not one clash |
+| `aim` | the final two, head-on, for the white |
+| `wide` | no clamp ring: the war spreads |
 
-`FB_STRICT=1` makes the recorder stop at the first frame the match is not
-running, with the frame before it in the log - that frame is the one that
-explains it.
+`FB_PREVIEW=10` captures every tenth frame at half size, for looking at a
+shot list in five minutes. `FB_STRICT=1` stops at the first frame the
+match is not running, with the frame before it in the log - that frame is
+the one that explains it.
+
+### The score follows the cut
+
+`record-fireball.mjs` writes `beats.json`: the second every shot starts, the
+frames the hero left the ground on (`walk1Hit`, `walk2Hit` - measured off
+the physics, or off the fallback throw when the physics missed), the
+frames the face flashes hit, the frames the war's explosions go off, and
+ignition, slow motion and the clash. `audio/render-fireball.py` reads it.
+The fight next door is on the flashes; the walk - the tune in a music box
+at the game's own tempo, counted from the frame the walk starts so the
+second walk begins on the same note as the first - stops dead on the hit;
+the get-up is four notes climbing on the lead; the war swells in with the
+crane; the game's groove plays the part that explains the game; the drop
+lands on ignition; the white gets a chord that holds under the end card.

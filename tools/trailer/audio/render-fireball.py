@@ -255,22 +255,28 @@ while t < END + 0.5:
     dum = h % 4 == 2
 
     if m == 'dark':
-        # The room: a sub that breathes. The fight is one-shots below.
+        # The room: a sub that breathes. The fight is one-shots below. Quiet
+        # - the walk that follows has to arrive as a lift.
         if downbeat:
-            add(t, held(NOTE(-24), BAR * 1.05, 0.28, attack=0.4, release=0.5, partial2=0.1), 1.0)
+            add(t, held(NOTE(-24), BAR * 1.05, 0.16, attack=0.4, release=0.5, partial2=0.1), 1.0)
 
     elif m == 'walk':
         # Hopeful: the tune, in the music box, at the game's own tempo, with
         # a hoof ticking under it and a pluck on the root. It is the same
-        # both times, on purpose.
-        if LEAD[s] != R:
-            music_box(t, LEAD[s], 0.34, pan=0.2 if s % 4 < 2 else -0.2)
-        if h % 4 == 0:
+        # both times, on purpose - so the phrase is counted from the frame
+        # the walk starts, not from the top of the file, and the second
+        # walk begins on the same note as the first.
+        w0 = max(v for k, v in C.items() if k in ('walk1', 'walk2') and v <= t + 1e-6)
+        ws = int(round((t - w0) / STEP)) % 32
+        wh = ws % 16
+        if LEAD[ws] != R:
+            music_box(t, LEAD[ws], 0.34, pan=0.2 if ws % 4 < 2 else -0.2)
+        if wh % 4 == 0:
             add(t, resample(hoof_s, 320 / 400), 0.32, pan=0.12)
-        if h % 8 == 4:
+        if wh % 8 == 4:
             add(t, resample(hoof_s, 180 / 400), 0.22, pan=-0.12)
-        if BASS[h] != R and h % 4 == 0:
-            add(t, env(resample(bass_s, NOTE(BASS[h] - 12) / bass_f0), 0.3, 0.55), 1.0)
+        if BASS[wh] != R and wh % 4 == 0:
+            add(t, env(resample(bass_s, NOTE(BASS[wh] - 12) / bass_f0), 0.3, 0.55), 1.0)
 
     elif m in ('silence', 'down'):
         # Nothing. A room tone so it is a held breath and not a dropout.
@@ -361,13 +367,13 @@ while t < END + 0.5:
 rng = np.random.default_rng(3)
 for i, f in enumerate(C.get('faceFlashes', [])):
     if f.get('boom'):
-        far_boom(f['at'], 0.7)
+        far_boom(f['at'], 0.38)
     else:
-        far_rainbow(f['at'], 0.05, pan=(-0.5 if i % 2 else 0.5))
+        far_rainbow(f['at'], 0.045, pan=(-0.5 if i % 2 else 0.5))
 t0, t1 = C['face'], C['walk1']
 for tt in np.arange(t0 + 0.4, t1 - 0.3, 0.55):
     if rng.random() < 0.7:
-        add(tt + rng.random() * 0.3, resample(hoof_s, 140 / 400), 0.10 + rng.random() * 0.12, pan=rng.uniform(-0.6, 0.6))
+        add(tt + rng.random() * 0.3, resample(hoof_s, 140 / 400), 0.06 + rng.random() * 0.08, pan=rng.uniform(-0.6, 0.6))
 
 # The two hits. The second bigger, and with the rainbow's own chord jammed
 # into it, because that one was a rainbow.

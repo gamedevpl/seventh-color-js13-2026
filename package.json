@@ -18,6 +18,7 @@
     "native:dev": "node tools/native.mjs --no-roadroller --cheats",
     "native:coverage": "npm run native:dev && node tools/verify-native.mjs 1 --skipall",
     "strands": "node tools/native.mjs --game=strands",
+    "strands:dev": "node tools/native.mjs --game=strands --no-roadroller --cheats",
     "strands:verify": "node tools/verify-native.mjs --game=strands",
     "strands:ship": "node tools/native.mjs --game=strands --O2 && node tools/verify-native.mjs 3 --game=strands --keys=space,up:5000,left:900,up:5000,right:900,up:5000",
     "strands:gate": "node tools/test-course.mjs && node tools/test-smooth.mjs && node tools/native.mjs --game=strands --O1 --rolls=5 && node tools/verify-native.mjs 3 --game=strands --keys=space,up:5000,left:900,up:5000,right:900,up:5000,down:1200,up:5000",
@@ -33,6 +34,11 @@
     "trailer:endcard": "node tools/trailer/record-endcard.mjs",
     "trailer:audio": "python3 tools/trailer/audio/render.py",
     "trailer:assemble": "node tools/trailer/assemble.mjs",
+    "fireball:trailer": "npm run fireball:dev && npm run fireball:trailer:frames && npm run fireball:trailer:endcard && npm run fireball:trailer:audio && npm run fireball:trailer:assemble",
+    "fireball:trailer:frames": "node tools/trailer/record-fireball.mjs",
+    "fireball:trailer:endcard": "node tools/trailer/record-endcard.mjs --game=fireball",
+    "fireball:trailer:audio": "python3 tools/trailer/audio/render-fireball.py",
+    "fireball:trailer:assemble": "node tools/trailer/assemble.mjs --game=fireball",
     "native:gate": "node tools/check-puzzles.mjs && node tools/play-native.mjs && npm run native:coverage && node tools/native.mjs --O1 --rolls=5 && npm run native:verify && npm run native:soak",
     "fireball": "node tools/native.mjs --game=fireball",
     "fireball:dev": "node tools/native.mjs --game=fireball --no-roadroller --cheats",
@@ -42,7 +48,9 @@
     "fireball:ship": "node tools/native.mjs --game=fireball --O2 && npm run fireball:verify",
     "fireball:online": "npm run fireball:dev && node tools/test-online.mjs",
     "fireball:online:live": "node tools/test-online.mjs --live",
-    "fireball:play": "node tools/native.mjs --game=fireball --O1 && cp build/fireball/index.html play/unicorn-fireball.html"
+    "fireball:play": "node tools/native.mjs --game=fireball --O1 && cp build/fireball/index.html play/unicorn-fireball.html",
+    "showcase:build": "node tools/native.mjs --no-roadroller && npm run strands:dev && npm run snap:dev && npm run fireball:dev",
+    "showcase": "npm run showcase:build && node tools/showcase.mjs"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",

@@ -3,27 +3,45 @@
 // gets retimed constantly, and every hardcoded duration in this pipeline
 // eventually became a crossfade landing in the wrong place.
 //
-// Run order: `npm run snap:dev` (the recorder needs the DEV hooks), then
-// trailer:frames, trailer:endcard, trailer:audio, then this.
+//   node tools/trailer/assemble.mjs [--game=snap|fireball] [out.mp4]
+//
+// Run order per game: build it with cheats (the recorders need the DEV
+// hooks), then frames, end card, audio, then this.
 import { existsSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const build = path.join(root, 'build', 'trailer');
+
+// Each entry says where that game's recorders put things. Adding a third
+// trailer should be a row here, not a fork of this file.
+const GAMES = {
+  // `npm` is the prefix its stages carry in package.json - Snap's came
+  // first and got the unprefixed names.
+  snap: { dir: 'trailer', music: 'strut.wav', out: 'unicorn-snap-trailer.mp4', npm: 'trailer' },
+  fireball: { dir: 'trailer-fireball', music: 'stampede.wav', out: 'unicorn-fireball-trailer.mp4', npm: 'fireball:trailer' },
+};
+const which = (process.argv.find((a) => a.startsWith('--game=')) || '--game=snap').split('=')[1];
+const game = GAMES[which];
+if (!game) {
+  console.error(`unknown game '${which}' - expected one of: ${Object.keys(GAMES).join(', ')}`);
+  process.exit(1);
+}
+
+const build = path.join(root, 'build', game.dir);
 const framesDir = path.join(build, 'frames');
 const endcard = path.join(build, 'endcard', 'endcard.webm');
-const music = path.join(build, 'audio', 'strut.wav');
-const out = process.argv[2] || path.join(build, 'unicorn-snap-trailer.mp4');
+const music = path.join(build, 'audio', game.music);
+const out = process.argv.find((a) => a.endsWith('.mp4')) || path.join(build, game.out);
 
 const FPS = 30;
 // Long enough to read as a dissolve rather than a cut, short enough that the
-// closing shot is still arriving at the lens while it happens.
+// closing shot is still playing while it happens.
 const XFADE = 0.9;
-// The trailer opens from black. The game itself has no fade-in - it is a
-// page that simply starts drawing - so this is the one piece of grammar the
-// capture cannot provide and the mux has to.
+// The trailer opens from black. Neither game fades in - they are pages that
+// simply start drawing - so this is the one piece of grammar the capture
+// cannot provide and the mux has to.
 const FADE_IN = 1.0;
 // Playwright's recorder writes a few malformed frames before it settles;
 // they show up as a white flash at the cut. Trimming the head is cheaper
@@ -38,14 +56,14 @@ const probe = (file) => Number(sh('ffprobe', [
 for (const [what, p] of [['frames', framesDir], ['end card', endcard], ['music', music]]) {
   if (!existsSync(p)) {
     console.error(`missing ${what}: ${path.relative(root, p)}`);
-    console.error('run: npm run trailer:frames / trailer:endcard / trailer:audio');
+    console.error(`run: npm run ${game.npm}:frames / :endcard / :audio`);
     process.exit(1);
   }
 }
 
 const frameCount = readdirSync(framesDir).filter((f) => f.endsWith('.png')).length;
 const gameplay = path.join(build, 'gameplay.mp4');
-console.log(`encoding ${frameCount} frames (${(frameCount / FPS).toFixed(2)}s)`);
+console.log(`${which}: encoding ${frameCount} frames (${(frameCount / FPS).toFixed(2)}s)`);
 sh('ffmpeg', [
   '-y', '-framerate', String(FPS), '-i', path.join(framesDir, 'f%06d.png'),
   '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', gameplay,
@@ -63,7 +81,7 @@ sh('ffmpeg', [
 
 const gameDur = probe(gameplay);
 const offset = (gameDur - XFADE).toFixed(3);
-console.log(`gameplay ${gameDur.toFixed(2)}s, crossfade at ${offset}s`);
+console.log(`  gameplay ${gameDur.toFixed(2)}s, crossfade at ${offset}s`);
 
 // transition=fade, not dissolve: dissolve is a dithered blend and reads as
 // television static across a whole-frame crossfade.

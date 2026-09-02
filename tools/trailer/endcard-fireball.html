@@ -1,0 +1,41 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Unicorn Fireball — end card</title>
+<style>
+  /* The plain's own night: a deep violet that the game fogs its horizon to,
+     rather than a neutral black. The seven stops in the bar are RAINBOW from
+     fireball/src/uni.js, in order, so the card is literally the game's
+     palette and not an approximation of it. */
+  html,body{margin:0;padding:0;width:1920px;height:1080px;overflow:hidden;
+    background:radial-gradient(ellipse at 50% 72%, #241a3d 0%, #150f26 55%, #090713 100%);
+    font-family:'Arial Black',Arial,sans-serif;display:flex;align-items:center;justify-content:center}
+  .wrap{display:flex;flex-direction:column;align-items:center;text-align:center}
+  /* The title carries the same chromatic split the game's own title uses -
+     three offset copies, warm on one side and cool on the other. */
+  .title{position:relative;font-size:118px;font-weight:900;letter-spacing:5px;opacity:0;
+    color:#fdf6ec;transform:translateY(16px);animation:up .6s ease-out .15s forwards}
+  .title::before,.title::after{content:'UNICORN FIREBALL';position:absolute;left:0;top:0;z-index:-1}
+  .title::before{color:#db4d52;transform:translate(-5px,-2px)}
+  .title::after{color:#6b7ae0;transform:translate(5px,2px)}
+  .bar{width:660px;height:16px;margin-top:36px;border-radius:3px;opacity:0;
+    background:linear-gradient(90deg,#db4d52,#e58f42,#e6d14d,#70c26b,#52a8c7,#6b7ae0,#ad6bd6);
+    animation:grow .5s ease-out .55s forwards}
+  .tagline{margin-top:30px;font-size:31px;font-weight:400;color:#efe6ff;letter-spacing:1px;
+    font-family:Arial,sans-serif;opacity:0;animation:up .5s ease-out .95s forwards}
+  .js13k{margin-top:46px;font-size:34px;font-weight:900;color:#e6d14d;letter-spacing:1px;
+    opacity:0;animation:up .5s ease-out 1.25s forwards}
+  .sub{margin-top:10px;font-size:22px;font-weight:400;color:#c9bde4;font-family:Arial,sans-serif;
+    opacity:0;animation:up .5s ease-out 1.45s forwards}
+  .byline{margin-top:44px;font-size:18px;font-weight:400;color:#8579a8;letter-spacing:1px;
+    font-family:Arial,sans-serif;opacity:0;animation:up .5s ease-out 1.7s forwards}
+  @keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes grow{from{opacity:0;transform:scaleX(0)}to{opacity:1;transform:scaleX(1)}}
+</style>
+<div class="wrap">
+  <div class="title">UNICORN FIREBALL</div>
+  <div class="bar"></div>
+  <div class="tagline">gather your colour &middot; become the rainbow</div>
+  <div class="js13k">js13kGames 2026</div>
+  <div class="sub">a WebGL game in 13 kilobytes &mdash; plays in your browser</div>
+  <div class="byline">@gtanczyk&nbsp;&nbsp;|&nbsp;&nbsp;gamedev.pl&nbsp;&nbsp;|&nbsp;&nbsp;2026</div>
+</div>

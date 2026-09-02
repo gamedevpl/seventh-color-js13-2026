@@ -1,9 +1,74 @@
 # js13kGames 2026 — four entries
 
-This repo holds four js13kGames 2026 entries. They share a build, measurement
-and verification toolchain and **nothing else**: separate source trees,
-separate game code, separate budgets, separate size gates. All four are
-written to the 2026 theme, *rainbows and unicorns*.
+Four entries, one toolchain, 13,312 bytes each, all four written to the 2026
+theme — *rainbows and unicorns*. Every picture on this page is rendered from
+the game itself by `npm run showcase`: a scripted headless run of the real
+build, stepped a frame at a time. Nothing here is a mockup, and nothing is
+a feature the games do not have.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/showcase/native.gif" alt="The Seventh Color — creeping up on three unicorns while their heads are down" width="100%"></td>
+<td width="50%"><img src="docs/showcase/strands.gif" alt="Rainbow Surfer — riding the rainbow at 400 km/h" width="100%"></td>
+</tr>
+<tr>
+<td><b><a href="./NATIVE.md">The Seventh Color</a></b><br>A twelve-beat story game with four playable mechanics. Canvas 2D, a hand-rolled tracker, and a puzzle in the middle of the fairy tale.<br><sub><b>12,160 bytes</b></sub></td>
+<td><b><a href="./RAINBOW-SURFER.md">Rainbow Surfer</a></b><br>A 3D coaster chase where speed is a resource. Catch the rainbow, then <i>be</i> it — and jump the gaps to keep it burning.<br><sub><b>13,247 bytes</b> · <a href="https://js13kgames.com/2026/games/rainbow-surfer">play</a></sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/showcase/snap.gif" alt="Unicorn Snap — aiming at the subject while the gauges read the frame" width="100%"></td>
+<td width="50%"><img src="docs/showcase/fireball.gif" alt="Unicorn Fireball — a herd folding into a rainbow" width="100%"></td>
+</tr>
+<tr>
+<td><b><a href="./SNAP.md">Unicorn Snap</a></b><br>Photograph a unicorn that knows how good it looks. Dress it up, then work for the shot: the score reads the state of the world at the shutter, not the pixels.<br><sub><b>12,936 bytes</b></sub></td>
+<td><b><a href="./FIREBALL.md">Unicorn Fireball</a></b><br>Gather your colour into a herd, hold the charge, and the herd <i>becomes</i> the rainbow. Seven colours on one plain, and an edge that is fatal.<br><sub><b>11,336 bytes</b> · <a href="./play/">play</a></sub></td>
+</tr>
+</table>
+
+<details>
+<summary><b>More pictures</b> — every one of them a frame of the run above</summary>
+
+**The Seventh Color**
+
+| | |
+| --- | --- |
+| ![the title](docs/showcase/native-title.png) | ![the Shadow Council](docs/showcase/native-council.png) |
+| ![Jack's glade](docs/showcase/native-glade.png) | ![the stillness puzzle](docs/showcase/native-stillness.png) |
+
+**Rainbow Surfer**
+
+| | |
+| --- | --- |
+| ![the title](docs/showcase/strands-title.png) | ![the line](docs/showcase/strands-ride.png) |
+| ![you are the rainbow](docs/showcase/strands-rainbow.png) | |
+
+**Unicorn Snap**
+
+| | |
+| --- | --- |
+| ![the title](docs/showcase/snap-title.png) | ![the studio](docs/showcase/snap-studio.png) |
+| ![the shoot](docs/showcase/snap-shoot.png) | ![the shot](docs/showcase/snap-shot.png) |
+
+**Unicorn Fireball**
+
+| | |
+| --- | --- |
+| ![the plain at night](docs/showcase/fireball-title.png) | ![the herd](docs/showcase/fireball-herd.png) |
+| ![the rainbow](docs/showcase/fireball-rainbow.png) | |
+
+</details>
+
+There are trailers, too, cut the same way — from scripted runs of the real
+games rather than screen recordings. `tools/trailer/` builds them: see
+[`tools/trailer/README.md`](./tools/trailer/README.md) for how a frame-stepped
+capture and a re-orchestrated version of each game's own music get muxed into
+one file.
+
+## The four entries
+
+They share a build, measurement and verification toolchain and **nothing
+else**: separate source trees, separate game code, separate budgets, separate
+size gates.
 
 | entry | source | zipped | limit | write-up |
 | --- | --- | ---: | ---: | --- |
@@ -51,9 +116,15 @@ ceiling) - the build tool itself knows no game by name.
 | `npm run fireball:test` | its probes: boot, gather, charge, fire, land, autopilot balance, and two browsers on a shared plain |
 | `npm run fireball:gate` | the probes, a worst-of-5 pack, and the zip driven in a browser |
 | `npm run fireball:play` | refresh `play/unicorn-fireball.html`, the build you can open from a link |
+| `npm run showcase` | the pictures at the top of this file, re-rendered from all four games |
+| `npm run trailer` / `npm run fireball:trailer` | the trailers, end to end: frames, end card, music, mux |
 
 Add `--cheats` to any build for the DEV probes the live measurement tools read;
-they compile out of a shipping build entirely.
+they compile out of a shipping build entirely. One exception is worth knowing
+about: The Seventh Color's probes DRAW - the beat id and `shift+shift = skip`
+along the bottom edge - so anything photographing it wants a plain build. The
+other three keep their probes to telemetry, and `npm run showcase:build`
+builds each of the four the way its capture needs.
 
 ### The measuring tools
 
@@ -70,6 +141,7 @@ telemetry back out of it:
 | `tools/test-course.mjs`, `test-smooth.mjs`, `test-cam.mjs`, `test-fov.mjs`, `test-bank.mjs`, `test-dust.mjs` | course invariants, motion, camera and effect geometry |
 | `tools/test-fps.mjs` | what an effect costs in frames |
 | `tools/shots.mjs` | promo frames, rendered at twice the game's own resolution |
+| `tools/showcase.mjs` | the stills and GIFs above - one scripted run per game, so a still is a frame of the clip beside it |
 
 Unicorn Snap's are the same idea aimed at a subject rather than a track:
 

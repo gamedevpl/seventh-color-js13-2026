@@ -26,7 +26,8 @@
 //     centroid trails its leader by spd/2.2. Pinned to 12 they meet;
 //     at the natural 37 the leader is run over first and they graze.
 //   * The rival's brain lets the rainbow go when it reads the edge down
-//     its nose. Off with it for the approach.
+//     its nose, and hunts the player's followers loose the rest of the
+//     time. Off with it, for the whole cut.
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -178,6 +179,10 @@ await page.evaluate(([RAINBOW]) => {
         R.charge = Math.min(R.charge, 0.4);
         if (R.wave) { R.wave = 0; R.chg = 0; R.burn = 0; R.cool = 3; }
       }
+      // A rival with no brain still walks (see the steering note) - and
+      // walked, it piles up on the clamp ring. Pinned, it stands with its
+      // herd ringed round it, which is what set dressing should do.
+      if (!R.ai && !g.aim) R.spd = 0;
     }
     // Steering is on unless the shot is the clash: the player WALKS - with
     // an input object and no key held, the game's `want` is eleven units a
@@ -344,7 +349,14 @@ const place = (x, z, yaw) => stage(({ x, z, yaw }) => {
 }, { x, z, yaw });
 
 console.log('recording Unicorn Fireball');
-await stage((c) => window.FB.reset(c, 0), PLAYER);
+await stage((c) => {
+  window.FB.reset(c, 0);
+  // The rivals are set dressing until the clash: brains off for the whole
+  // cut. Left on, they HUNT - the fourth preview had them horn the player's
+  // followers loose faster than the gather could add them, and the herd
+  // that reached the hold was two.
+  for (const L of window.FB.leaders) if (L.ai) L.ai = null;
+}, PLAYER);
 let id = 0;
 const S = (o) => ({ id: id++, ...o });
 
@@ -444,7 +456,7 @@ await shoot(S({
   stage: () => {
     const { units, leaders } = window.FB, P = leaders[0], R = leaders[3];
     P.x = -20; P.z = 0; P.yaw = 0;
-    R.x = 12; R.z = 1; R.yaw = Math.PI / 2; R.st = 0; R.stun = 0; R.__ai = R.ai; R.ai = null;
+    R.x = 12; R.z = 1; R.yaw = Math.PI / 2; R.st = 0; R.stun = 0;
     let n = 0;
     for (const u of units) {
       if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
@@ -454,7 +466,6 @@ await shoot(S({
     }
   },
   cam: { subj: 'herd', plant: true, e0: [46, 5, 1.3], l0: [0, 1.8, 0], fov0: 0.9, ease: 'lin' },
-  after: () => { const R = window.FB.leaders[3]; if (R.__ai) { R.ai = R.__ai; R.__ai = null; } },
 }));
 await shoot(S({
   name: 'rideC', dur: bars(1), scale: 1, guard: { hold: 1, pin: 30 },
@@ -468,7 +479,9 @@ await shoot(S({
   scale: (info, st, t) => {
     if (info && info.boom) st.boomAt = t;
     if (st.boomAt !== undefined) return 0.18;
-    return info && info.wave && info.dCent < 30 ? 0.18 : 1;
+    // A fifth of speed from twenty-five units out: about two and a half
+    // seconds of two lights closing before they touch.
+    return info && info.wave && info.dCent < 25 ? 0.18 : 1;
   },
   slowCue: 'slowmo',
   guard: { aim: 12 },
@@ -485,11 +498,15 @@ await shoot(S({
       u.x = R.x + 3 + (Math.random() - .5) * 7; u.z = R.z + (Math.random() - .5) * 7; given++;
     }
     R.n = given; R.charge = 1; R.chg = 1; R.wave = 1 + given; R.burn = 6; R.spent = 0;
-    R.__ai = R.ai; R.ai = null;
-    for (let i = 2; i < leaders.length; i++) { const L = leaders[i], a = i / 7 * Math.PI * 2; L.x = Math.cos(a) * 70; L.z = Math.sin(a) * 70; }
+    // The other five go to the far side of the plain: the camera is on +z,
+    // and a herd of set dressing in its foreground is a herd in the shot.
+    for (let i = 2; i < leaders.length; i++) {
+      const L = leaders[i], a = Math.PI + ((i - 2) / 4 - 0.5) * 1.6;
+      L.x = Math.cos(a + Math.PI / 2) * 64; L.z = -Math.abs(Math.sin(a + Math.PI / 2) * 64) - 20;
+      for (const u of units) if (u.lead === i && u !== L) { u.x = L.x + (Math.random() - .5) * 7; u.z = L.z + (Math.random() - .5) * 7; }
+    }
   },
   cam: { world: true, e0: [0, 15, 38], e1: [0, 9, 22], l0: [0, 2, 0], l1: [0, 1.5, 0], fov0: 1.0, fov1: 0.9, ease: 'in' },
-  after: () => { const R = window.FB.leaders[1]; if (R.__ai) { R.ai = R.__ai; R.__ai = null; } },
 }));
 // Back to speed on the hit: the ring goes out across the plain and the
 // camera goes up with it.

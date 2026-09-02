@@ -738,8 +738,9 @@ Two more from the same play:
 
 ## The wall
 
-F8: **13,277 bytes** packed worst-of-5 at O1, limit 13,312, and **35
-remain**. F7a stood at 13,203; nine notes cost 74 net, because five were
+F8a: **13,293 bytes** packed worst-of-5 at O1, limit 13,312, and **19
+remain**. The ring was free; the shadow's own pass cost what the second
+shockwave ring and the graze shake gave back, and a little more. F7a stood at 13,203; nine notes cost 74 net, because five were
 free and two paid for themselves. F6 stood at 13,239; presence cost about 190 and paid back about
 140 out of things that were no longer earning their place. Every change from here has to pay for itself out of something
 already in the build - the stand, the pips and the respawn were paid for
@@ -797,6 +798,7 @@ written again in every party game.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F8a the ring and the shadow | 13,312 | 13,293 (O1 worst-of-5) | the herd around its leader; the shadow drawn flat in its own pass |
 | F8 nine notes | 13,312 | 13,277 (O1 worst-of-5) | harder charge, no shrinking, followers a beat behind, bigger blast, bolder brains with a final; the edge as a frame; grazing rainbows deflect, head-on explodes; shadows; stagger before the knock |
 | F7a the black sectors | 13,312 | 13,203 (O1 worst-of-5) | the ground slab tiled so per-vertex fog no longer paints the whole plain fog-coloured; mottling down to a few percent; end-screen time line and best-time save removed |
 | F7 is anybody there? | 13,312 | 13,285 (O1 worst-of-5) | the title listens quietly and counts the riders before O is pressed; RIDER JOINED / LEFT said once in the herd's colour; hellos on a wall clock; one room, always; the whoosh, the re-announce and join() gone |

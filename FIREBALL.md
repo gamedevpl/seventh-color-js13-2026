@@ -513,12 +513,88 @@ thing tells you the game is.
 
 1,675 bytes packed. There were 1,945 to spend.
 
+## F6 — nobody waits for a round
+
+The first shared plain had rounds: one herd left standing, five seconds,
+everybody dealt a new plain. Playing it, the first question was *"when do I
+start - am I waiting for a round to finish?"*, which is the sound of a rule
+nobody can see. Worse, it was not even the rule that hurt: a person taking
+a seat mid-run inherited whatever the brains had left there, which could be
+a leader on its last heart with nothing behind it, or a statue.
+
+So the plain no longer ends.
+
+- **Five seconds after a leader turns to stone it rises again** at its own
+  meadow with three hearts, and its colour is called home out of the wild
+  ones nobody is holding. Losing the herd is the whole punishment - you
+  have to gather it again, which is most of the game - and losing the
+  session would only empty the room.
+- **A seat just taken gets a herd worth taking**: the same fresh deal. Only
+  on the way in, though. A rider who dies waits out the five seconds like
+  everybody else, or the plain has no teeth for the people on it.
+- Nobody waits for anything. There is no round to sit out and no round to
+  explain.
+
+### The stand
+
+Being out is a seat in the stand, not a black screen. While your leader is
+stone - or while the plain is full and you have no seat at all - the camera
+lifts and pulls back, **left and right walk the herds still standing**, and
+the screen says which of the two you are: `DOWN - RIDING AGAIN IN 4`, or
+`NO SEAT - WATCHING`. The count is real: a stone leader has no rainbow left
+to burn, so that byte of the packet carries the seconds until it rises
+instead, and costs nothing.
+
+### Which of them is a person
+
+Every herd used to look the same from outside, so you could not choose your
+fight - and choosing your fight is the entire reason to be in a room with
+other people. One spare bit in the leader's flag byte says a person is
+riding, and it draws as **a white pip**, on the rival list and on the
+radar.
+
+The radar was rebuilt around it. It used to plot all seventy-seven
+unicorns, which at sixty-eight pixels is a texture rather than
+information; now it is one dot a herd, sized by the herd, ringed when it
+is lit and pipped when somebody is riding it. It says less and shows more,
+and it paid for the pips.
+
+### Are the brains worth keeping online?
+
+Yes, and it is worth writing down why, because the obvious answer is no.
+
+- **They hold the unicorns.** Without led herds the plain is seven meadows
+  of loose grazers and no reason to cross it: everyone gathers their own
+  colour in peace. The brains are what makes the middle contested.
+- **Two people on an empty plain is not a game.** A public room usually has
+  one to three people in it. With nothing else on the plain that is a duel
+  across a hundred and ninety units of nothing, most of it spent running
+  toward each other.
+- **Leaving must not leave a hole.** People go. Their herd has to keep
+  existing or the plain empties over an evening.
+
+The problem was never that the brains are there; it was that you could not
+tell them from people. That is the pip.
+
+What is NOT done, and is the obvious next move: **fewer brains as more
+people arrive**. A colour nobody is riding could graze wild instead of
+being led, so a full room is all human and the loose unicorns become the
+prize everyone is crossing the plain for. It did not fit in what was left
+of the budget.
+
+### What it cost
+
+The whole of it, plus the ground for it: 13,239 packed worst-of-5 at O1
+against a 13,312 ceiling. The radar rebuild and a shorter title paid for
+most of it.
+
 ## The wall
 
-F5: **13,049 bytes** packed worst-of-5 at O1, limit 13,312. The shared
-plain cost 1,675 bytes on top of F4's ground and blast work, and **263
-remain**. That is the whole of the budget spent, and anything further has
-to pay for itself out of something already there.
+F6: **13,239 bytes** packed worst-of-5 at O1, limit 13,312, and **73
+remain**. Every change from here has to pay for itself out of something
+already in the build - the stand, the pips and the respawn were paid for
+by a radar that said less, and by four lines of title prose becoming
+three.
 
 ## Where it goes next
 
@@ -571,6 +647,7 @@ written again in every party game.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F6 nobody waits for a round | 13,312 | 13,239 (O1 worst-of-5) | the shared plain never ends: five seconds after a leader falls it rises at its meadow with its colour called home, and a seat just taken is dealt the same fresh herd; a stand to watch from with left and right walking the herds and a real countdown; a white pip on every herd a person is riding, on the list and on a radar rebuilt to say less |
 | F5 the plain, shared | 13,312 | 13,049 (O1 worst-of-5) | the Online category: up to seven people on one plain, a herd each and the brains on the rest; a host that writes the whole plain into 564 bytes at 12 Hz, clients that animate it and send three bytes back; hosting settled by sorting names, never by asking; a probe that runs three browsers against a relay of our own and against the real one |
 | F4 the edge and the price | 13,312 | 11,336 (O1 worst-of-5) | leaving the plain is fatal and the brains know it; the rainbow spends the herd and steers worse the bigger it is; the herd dissolves into it and the camera opens up; smooth tunnel, varied gaits, horn strike and fall animations |
 | F3 horns, charge, rainbow | 13,312 | 10,396 (O1 worst-of-5) | fireball removed; momentum melee, the charge as a run, arcs, ignition into a rainbow tunnel, answering brains, steering sign fixed |

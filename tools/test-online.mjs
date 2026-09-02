@@ -50,7 +50,7 @@ const check = (name, ok, detail = '') => {
 };
 const look = (p) => p.evaluate(() => ({
   on: FB.net.on, host: FB.net.host, me: FB.net.me, seats: FB.net.seats, said: FB.net.said,
-  mode: FB.mode, round: FB.net.round,
+  mode: FB.mode,
   yaw: FB.leaders.map((L) => L.yaw), n: FB.leaders.map((L) => L.n),
   x: FB.leaders.map((L) => Math.round(L.x * 10) / 10), z: FB.leaders.map((L) => Math.round(L.z * 10) / 10),
   sum: FB.units.reduce((a, u) => a + u.x + u.z, 0),
@@ -115,12 +115,35 @@ check('...and the guest sees its own herd light up', lit.charge > .2 || lit.wave
 
 await guest.screenshot({ path: path.join(root, 'build/fireball/probe-online.png') });
 
+// The list has to say which herds are people, so a rider can go and find
+// the fight rather than farm the brains.
+const marks = await guest.evaluate((s) => FB.leaders.map((L, i) => (L.man ? 1 : 0) + (i === s ? 9 : 0)), seat);
+check('a herd a person is riding is marked', marks.filter((v) => v === 1 || v === 10).length >= 2,
+  `marks ${marks.join('')}`);
+check('...and the brains are not', marks.filter((v) => v === 0).length >= 4);
+
+// Being out is a seat in the stand, not a black screen: the herd you are
+// watching can be walked with left and right, the screen says how long
+// you have, and the plain hands you a fresh herd when the count runs out.
+await hostPage.evaluate((n) => { const L = FB.leaders[n]; L.hearts = 0; L.st = 3; L.gone = 0; }, seat);
+await new Promise((r) => setTimeout(r, 700));
+const down = await guest.evaluate(() => ({ watching: FB.net.me >= 0 && FB.leaders[FB.net.me].st === 3, burn: FB.leaders[FB.net.me].burn }));
+check('a rider that is out knows it is out', down.watching, `own leader st 3, count at ${down.burn.toFixed(1)}s`);
+const eye1 = await guest.evaluate(() => FB.leaders.map((L) => Math.round(L.x)));
+await guest.keyboard.press('ArrowRight');
+await new Promise((r) => setTimeout(r, 900));
+const cam1 = await guest.evaluate(() => FB.units.length && [Math.round(FB.leaders[0].x)] && window.__cam);
+await guest.screenshot({ path: path.join(root, 'build/fireball/probe-spectate.png') });
+await new Promise((r) => setTimeout(r, 9000));
+const back = await guest.evaluate(() => { const L = FB.leaders[FB.net.me]; return { st: L.st, hearts: L.hearts }; });
+check('...and rises again without waiting for a round', back.st === 0 && back.hearts === 3, `st ${back.st}, hearts ${back.hearts}`);
+
 // A third rider arrives mid-match. The bug this replaces froze the plain
 // for everyone for a second and a half every time somebody joined, because
 // a smaller name took the plain off whoever already had it.
 const beforeJoin = await look(hostPage);
 const C = await rider();
-await new Promise((r) => setTimeout(r, 2500));
+await new Promise((r) => setTimeout(r, 4000));
 const afterJoin = await look(hostPage);
 const c = await look(C);
 check('an arrival does not stop the plain', Math.abs(afterJoin.sum - beforeJoin.sum) > 40,
@@ -128,6 +151,14 @@ check('an arrival does not stop the plain', Math.abs(afterJoin.sum - beforeJoin.
 check('...and does not take it over', afterJoin.host === 1 && c.host === 0);
 check('...and the newcomer gets its own herd', c.me >= 0 && c.me !== seat && c.me !== other, `seat ${c.me}`);
 check('three riders, three counts agree', c.seats === 3 && afterJoin.seats === 3, `${afterJoin.seats} / ${c.seats}`);
+// Taking a seat must not hand somebody a stone, or a leader on its last
+// heart with nothing behind it: the herd is dealt fresh at its meadow.
+const fresh = await C.evaluate((m) => {
+  const L = FB.leaders[m];
+  return { hearts: L.hearts, st: L.st, home: Math.hypot(L.x, L.z) };
+}, c.me);
+check('a new rider gets a herd worth riding', fresh.hearts === 3 && fresh.st === 0,
+  `${fresh.hearts} hearts, st ${fresh.st}, ${fresh.home.toFixed(0)} from the middle`);
 await C.close();
 await new Promise((r) => setTimeout(r, 1500));
 
@@ -138,9 +169,13 @@ await hostPage.close();
 await new Promise((r) => setTimeout(r, 4000));
 const now = await look(guest);
 check('the survivor takes over the plain', now.host === 1, `host ${now.host}, said "${now.said}"`);
-check('...and the plain is the same plain', now.round === lastSeen.round, `round ${lastSeen.round} -> ${now.round}`);
-const moved = Math.hypot(now.x[now.me] - lastSeen.x[lastSeen.me], now.z[now.me] - lastSeen.z[lastSeen.me]);
-check('...not a fresh one dealt on the spot', moved < 60, `own herd moved ${moved.toFixed(1)} units across the handover`);
+// The plain has no rounds online: nobody is dealt a new one, so the herd
+// counts either side of the handover have to be recognisably the same.
+const drift = Math.max(...now.n.map((v, i) => Math.abs(v - lastSeen.n[i])));
+check('...and the plain is the same plain', drift < 12, `worst herd changed by ${drift}`);
+// Position is no longer a signal here: a leader that lost its last heart
+// during the handover rises at its own meadow, which is a long way from
+// wherever it fell. Herd sizes are what a reset would flatten.
 check('the survivor keeps running it', (await look(guest)).seats === 1);
 
 await new Promise((r) => setTimeout(r, 1200));

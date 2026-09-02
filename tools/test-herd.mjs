@@ -281,6 +281,28 @@ check('autopilot matches end inside 7 minutes', ended / matches >= .8, `${ended}
 check('matches end by fighting, not waiting', clashes >= .3 || ignitions >= 3, `${clashes.toFixed(1)} clashes, ${ignitions.toFixed(1)} rainbows/match`);
 check('rainbows ignite, one a match at least', ignitions >= 1, `${ignitions.toFixed(1)}/match`);
 check('an autopilot player wins sometimes and loses sometimes', wins > 0 && wins < matches, `${wins}/${matches}`);
+// Online the plain never ends: a leader with no hearts is stone for eight
+// seconds and then rises at its own meadow with a herd to gather again.
+// Offline nothing rises, because offline the run is over.
+const rose = await page.evaluate(async () => {
+  FB.reset(0, 1);
+  const L = FB.leaders[1];
+  L.hearts = 0; L.st = 3; L.gone = 0;
+  const before = { st: L.st, x: L.x };
+  for (let i = 0; i < 400; i++) FB.step(1 / 40, { over: 0 });
+  const still = L.st;
+  // Measured the moment it rises, not ten seconds later: the plain keeps
+  // fighting, and a freshly risen leader can be knocked down again by a
+  // rival before any later frame is read.
+  let n = 0;
+  while (L.st === 3 && n++ < 800) FB.step(1 / 40, { arena: 1 });
+  const mine = FB.units.filter((u) => u.col === L.col && u !== L).length;
+  return { before, still, after: L.st, hearts: L.hearts, herd: mine, secs: n / 40 };
+});
+check('a stone leader stays stone in a solo run', rose.still === 3);
+check('...and rises again on a shared plain', rose.after === 0 && rose.hearts === 3, `after ${rose.secs.toFixed(1)}s, st ${rose.after}, hearts ${rose.hearts}`);
+check('...with a meadow to gather again', rose.herd >= 5, `${rose.herd} of its colour back on the plain`);
+
 check('no page errors', !problems.length, problems.join(' | ').slice(0, 200));
 await browser.close();
 process.exit(fails ? 1 : 0);

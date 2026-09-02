@@ -10,7 +10,7 @@
 import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox, setDim } from './gl.js';
 import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
 import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, footprint, burnTime, nearEdge, ARENA, EDGE, WILD, now } from './herd.js';
-import { net, open as netOpen, close as netClose, tick as netTick, ghost, restart, spy } from './net.js';
+import { net, open as netOpen, close as netClose, tick as netTick, ghost, spy } from './net.js';
 import { wake, awake, music, join as sJoin, clang, thud, rise, riseOff, whoosh, ignite as sIgnite, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
 
 const VW = 640, VH = 360;
@@ -47,7 +47,11 @@ resize();
 const held = {};
 let acted = false, pick = 0;
 addEventListener('keydown', (e) => {
-  if (!held[e.key] && mode === 'title') { if (e.key === 'ArrowLeft' || e.key === 'a') pick--; if (e.key === 'ArrowRight' || e.key === 'd') pick++; }
+  if (!held[e.key]) {
+    const l = e.key === 'ArrowLeft' || e.key === 'a', r = e.key === 'ArrowRight' || e.key === 'd';
+    if (mode === 'title') { if (l) pick--; if (r) pick++; }
+    else if (watching()) { if (l) watch--; if (r) watch++; }
+  }
   held[e.key] = true;
   if (e.key === 'o' || e.key === 'O') goOnline();
   if (e.key === 'Escape' && net.on) goHome();
@@ -72,6 +76,7 @@ hud.addEventListener('pointerdown', (e) => {
   const [x, y] = at(e);
   pts.set(e.pointerId, [x, y]); scan();
   if (mode === 'title') { if (y > VH * .58 && y < VH * .72) { pick += x < VW / 2 ? -1 : 1; return; } }
+  if (watching()) { watch += x < VW / 2 ? -1 : 1; return; }
   if (mode !== 'run') acted = true;
 });
 hud.addEventListener('pointermove', (e) => { if (pts.has(e.pointerId)) { pts.set(e.pointerId, at(e)); scan(); } });
@@ -370,11 +375,16 @@ function goOnline(room) {
 }
 function goHome() { netClose(); newRun(1); mode = 'title'; }
 
+let watch = 0;
+const watching = () => net.on && (net.me < 0 || leaders[net.me].st === 3);
 function who() {
   if (!net.on) return leaders[0];
   const m = net.me >= 0 ? leaders[net.me] : null;
   if (m && m.st !== 3) return m;
-  return alive().sort((a, b) => b.n - a.n)[0] || leaders[0];
+  // Watching. Left and right walk the herds still standing, so being out
+  // is a seat in the stand rather than a black screen.
+  const live = alive();
+  return live.length ? live[((watch % live.length) + live.length) % live.length] : leaders[0];
 }
 
 function newRun(attract) {
@@ -391,13 +401,6 @@ function newRun(attract) {
 newRun(1);
 
 // --- the shared plain -----------------------------------------------------
-let overT = 0;
-function lastOne(dt) {
-  if (!net.host) return;
-  overT = alive().length > 1 ? 0 : overT + dt;
-  if (overT > 5) { overT = 0; restart(); say('A NEW PLAIN', 2.5); }
-}
-
 // A client is told states, not events, so the noises are read back out of
 // what changed since the last packet: a herd that lit, a heart that went.
 const pw = [], ph = [];
@@ -446,8 +449,7 @@ function frame(now_) {
     if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
     if (mine) {
       if (!net.on) { P.in = local; charge(P, local.c); }
-      step(dt, {});
-      if (net.on) lastOne(dt);
+      step(dt, { arena: net.on });
     } else { ghost(dt); ghostSound(P); }
     if (!net.on && (won(0) || lost(0))) {
       // The result is decided HERE and kept. The closing shot keeps the
@@ -517,9 +519,9 @@ function frame(now_) {
     const sp = Math.min(1, P.spd / 33);
     // Lit, the shot opens right up: you are a hundred feet of rainbow now,
     // and a camera on your shoulder shows none of it.
-    const lit = P.wave ? 1 : 0;
-    const back = 9 + Math.sqrt(P.n) * 1.6 + sp * 5 + lit * (10 + P.r * 1.6);
-    const up = 3.6 + Math.sqrt(P.n) * .6 + sp * 1.2 + lit * (6 + P.r);
+    const lit = P.wave ? 1 : 0, seat = watching() ? 0 : 1;
+    const back = 9 + Math.sqrt(P.n) * 1.6 + sp * 5 + lit * (10 + P.r * 1.6) + (1 - seat) * 12;
+    const up = 3.6 + Math.sqrt(P.n) * .6 + sp * 1.2 + lit * (6 + P.r) + (1 - seat) * 9;
     ex = P.x - Math.cos(camYaw) * back; ey = up; ez = P.z - Math.sin(camYaw) * back;
     lx = P.x + Math.cos(camYaw) * (6 + sp * 8); ly = 1 + lit * 2; lz = P.z + Math.sin(camYaw) * (6 + sp * 8);
     if (P.st === 3) { ex = P.x + 10; ey = 8; ez = P.z + 10; lx = P.x; lz = P.z; ly = 1; }
@@ -654,11 +656,10 @@ function frame(now_) {
     ctx.fillStyle = '#f3ead6'; ctx.fillText('UNICORN FIREBALL', VW / 2, 70);
     ctx.font = '15px system-ui';
     ctx.fillStyle = '#d8d0ea';
-    ctx.fillText('gather every unicorn of your colour into a herd, and fight horn to horn', VW / 2, 120);
-    ctx.fillText('hold SPACE to charge: the herd gathers speed, and lights up as it runs', VW / 2, 142);
-    ctx.fillText('hold long enough and the herd BECOMES the rainbow - the bigger one wins', VW / 2, 164);
+    ctx.fillText('gather every unicorn of your colour, and fight horn to horn', VW / 2, 126);
+    ctx.fillText('hold SPACE to charge: the herd gathers speed and lights up', VW / 2, 150);
     ctx.fillStyle = '#ffb0b8';
-    ctx.fillText('the rainbow burns your herd as it runs, and the edge of the plain is the end', VW / 2, 186);
+    ctx.fillText('held long enough the herd BECOMES the rainbow - and burns itself', VW / 2, 174);
     ctx.fillStyle = '#d8d0ea';
     ctx.font = 'bold 15px system-ui';
     ctx.fillStyle = pc;
@@ -670,7 +671,7 @@ function frame(now_) {
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
     ctx.fillText(awake() ? 'press SPACE to run' : 'press SPACE', VW / 2, VH - 42);
     ctx.font = 'bold 14px system-ui'; ctx.fillStyle = '#8fe3c8';
-    ctx.fillText('press O to share the plain with everyone else playing', VW / 2, VH - 62);
+    ctx.fillText('press O to share the plain with everyone else playing it', VW / 2, VH - 62);
     ctx.font = '12px system-ui'; ctx.fillStyle = '#9a90b8';
     ctx.fillText('arrows steer  -  up sprints  -  touch: sides steer, top strip charges', VW / 2, VH - 18);
     ctx.fillText('@gtanczyk | gamedev.pl | 2026', VW / 2, VH - 4);
@@ -683,9 +684,10 @@ function frame(now_) {
     ctx.fillText('♥'.repeat(P.hearts), 90, 23);
     // The rivals, biggest first, so the threat is at the top.
     ctx.textAlign = 'right'; ctx.font = 'bold 14px system-ui';
-    [...leaders].slice(1).sort((a, b) => b.n - a.n).forEach((L, i) => {
+    leaders.filter((L) => L !== P).sort((a, b) => b.n - a.n).forEach((L, i) => {
       const y = 22 + i * 20, dead = L.st === 3;
       ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); ctx.beginPath(); ctx.arc(VW - 100, y, 6, 0, TAU); ctx.fill();
+      if (L.man) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(VW - 100, y, 2.5, 0, TAU); ctx.fill(); }
       ctx.fillStyle = dead ? '#666' : '#e8e0f4';
       ctx.fillText(dead ? '-' : L.n + (L.wave ? ' ~' : L.chg ? ' !' : ''), VW - 112, y);
       // Its hearts, but only once it has lost one. Three hearts beside
@@ -694,20 +696,20 @@ function frame(now_) {
       // alarm if the quiet rows next to it are quiet.
       if (!dead && L.hearts < 3) { ctx.fillStyle = '#ff6b8a'; ctx.font = '10px system-ui'; ctx.fillText('♥'.repeat(L.hearts), VW - 150, y); ctx.font = 'bold 14px system-ui'; }
     });
-    // The radar: the whole plain in a square, leaders as dots sized by
-    // herd, a rainbow as a ring. It is how you see one coming from behind.
+    // The radar: the whole plain in a square, one dot a herd, sized by it,
+    // ringed when it is lit and pipped when a person is riding it. It used
+    // to plot all seventy-seven unicorns, which at this size is a texture
+    // rather than information - what you need to find is a herd behind you.
     const RX = VW - 78, RY = 10, RS = 68;
     ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(RX, RY, RS, RS);
-    const rp = (x, z) => [RX + (x / ARENA + 1) * RS / 2, RY + (z / ARENA + 1) * RS / 2];
-    for (const u of units) {
-      if (u.st === 3 || u.lead >= 0 && u.st !== 0 && !u.hearts) continue;
-      const [x, y] = rp(u.x, u.z);
-      ctx.fillStyle = css(COL[u.col], u.lead < 0 ? .45 : .9);
-      ctx.fillRect(x - .7, y - .7, 1.5, 1.5);
-      if (u.hearts) { ctx.beginPath(); ctx.arc(x, y, 1.5 + Math.sqrt(u.n) * .8, 0, TAU); ctx.fill(); }
+    for (const L of leaders) {
+      if (L.st === 3) continue;
+      const x = RX + (L.cx / ARENA + 1) * RS / 2, y = RY + (L.cz / ARENA + 1) * RS / 2;
+      ctx.fillStyle = css(COL[L.col]);
+      ctx.beginPath(); ctx.arc(x, y, 1.6 + Math.sqrt(L.n) * .8, 0, TAU); ctx.fill();
+      if (L.man) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 1.3, 0, TAU); ctx.fill(); }
+      if (L.wave) { ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 2 + L.r * .4, 0, TAU); ctx.stroke(); }
     }
-    ctx.strokeStyle = '#fff';
-    for (const L of leaders) if (L.wave) { const [x, y] = rp(L.cx, L.cz); ctx.beginPath(); ctx.arc(x, y, 2 + L.r * .4, 0, TAU); ctx.stroke(); }
     ctx.strokeStyle = css(pc); ctx.strokeRect(RX + .5, RY + .5, RS - 1, RS - 1);
     ctx.textAlign = 'center';
     // The charge bar: how far the charge is from igniting, then how much
@@ -737,10 +739,16 @@ function frame(now_) {
     ctx.fillText(Math.floor(timer / 60) + ':' + String(Math.floor(timer % 60)).padStart(2, '0'), VW / 2, 16);
     if (net.on) {
       ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#8fe3c8';
-      ctx.fillText(net.seats + (net.seats > 1 ? ' riders' : ' rider') + ' - ESC to leave', VW / 2, 34);
+      ctx.fillText(net.seats + (net.seats > 1 ? ' riders' : ' rider') + ' - ESC leaves', VW / 2, 34);
       if (net.said) { ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#f3ead6'; ctx.fillText(net.said, VW / 2, VH * .38); }
-      if (net.me < 0) { ctx.font = 'bold 15px system-ui'; ctx.fillStyle = '#ffb0b8'; ctx.fillText('THE PLAIN IS FULL - WATCHING', VW / 2, VH * .3); }
-      else if (P.st === 3) { ctx.font = 'bold 15px system-ui'; ctx.fillStyle = '#ffb0b8'; ctx.fillText('OUT - THE NEXT PLAIN IS COMING', VW / 2, VH * .3); }
+      if (watching()) {
+        const mine = net.me >= 0 ? leaders[net.me] : null;
+        ctx.font = 'bold 17px system-ui'; ctx.fillStyle = '#ffb0b8';
+        // A stone leader's burn byte carries the seconds until it rises.
+        ctx.fillText(mine ? 'DOWN - RIDING AGAIN IN ' + Math.max(1, Math.ceil(5 - mine.burn)) : 'NO SEAT - WATCHING', VW / 2, VH * .28);
+        ctx.font = '13px system-ui'; ctx.fillStyle = '#d8d0ea';
+        ctx.fillText('left / right to look around', VW / 2, VH * .34);
+      }
     }
     if (mode === 'end') {
       ctx.fillStyle = 'rgba(5,4,14,.6)'; ctx.fillRect(0, VH * .3, VW, VH * .42);

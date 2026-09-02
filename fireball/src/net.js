@@ -17,11 +17,13 @@
 // second, so everyone knows the same set of names, and the smallest name
 // hosts. When it leaves, the next smallest simply starts writing packets.
 
-import { units, leaders, newWorld, charge, footprint } from './herd.js';
+import { units, leaders, newWorld, charge, footprint, revive } from './herd.js';
 
 const TAU = Math.PI * 2;
 const ROOM = 'wss://relay.js13kgames.com/unicorn-fireball';
 const SEATS = 7;
+const JOINING = 'JOINING THE PLAIN';
+const ALONE = 'NO PLAIN HERE - PLAYING ALONE';
 const SNAP = 1 / 12;                      // the plain, twelve times a second
 const IN = 1 / 20;                        // input, a little faster
 const HELLO = 1;                          // and a name once a second
@@ -30,9 +32,11 @@ const GONE = 3.5;                         // silence this long and you are out
 export const net = {
   on: 0,                                  // is the socket up at all
   host: 0,                                // are we the one running the plain
-  me: 0,                                  // the leader we drive, -1 watching
+  // The leader we drive, -1 when we have none. It must start at -1: a
+  // client that has not been dealt a seat yet used to believe it held the
+  // first one, and sent its thumbs to somebody else's herd.
+  me: -1,
   seats: 1,                               // people on the plain
-  round: 0,                               // bumped when the host restarts
   said: '',                               // a line for the HUD
 };
 
@@ -41,24 +45,25 @@ let seen = new Map();                     // id -> when we last heard it
 let roster = [];                          // seat -> id, '' for a free one
 let t = 0, tHello = 0, tSnap = 0, tIn = 0, tSeen = 0, tHeard = -99, joined = 0;
 let netIn = [];                           // seat -> the input it last sent
+let held = [];                            // seat -> was somebody on it last frame
 let bump = 0;                             // re-announce soon, someone is new
 
 export function open(room) {
   if (ws) return;
   tag = (Math.random() * 65536) | 0;
-  net.said = 'JOINING THE PLAIN';
+  net.said = JOINING;
   try { ws = new WebSocket(room || ROOM); } catch { net.said = 'NO PLAIN FOUND'; return; }
   ws.binaryType = 'arraybuffer';
   ws.onopen = () => { net.on = 1; t = 0; tHeard = -99; joined = 0; };
   // A socket that is refused says so; a socket that is merely blocked can
   // hang forever, and the message must not go on claiming we are joining
   // something while the plain runs on underneath it.
-  setTimeout(() => { if (ws && !net.on) { net.said = 'NO PLAIN HERE - PLAYING ALONE'; close(); } }, 6000);
-  ws.onclose = () => { net.on = net.host = 0; net.me = 0; ws = null; if (!net.said) net.said = 'THE PLAIN IS GONE'; };
-  ws.onerror = () => { net.said = 'NO PLAIN HERE - PLAYING ALONE'; net.on = 0; };
+  setTimeout(() => { if (ws && !net.on) { net.said = ALONE; close(); } }, 6000);
+  ws.onclose = () => { net.on = net.host = 0; net.me = -1; ws = null; if (!net.said) net.said = ALONE; };
+  ws.onerror = () => { net.said = ALONE; net.on = 0; };
   ws.onmessage = (e) => hear(e.data);
 }
-export function close() { if (ws) { const w = ws; ws = null; net.on = net.host = 0; net.me = 0; w.close(); } }
+export function close() { if (ws) { const w = ws; ws = null; net.on = net.host = 0; net.me = -1; w.close(); } }
 
 function hear(d) {
   if (typeof d !== 'string') {
@@ -97,7 +102,7 @@ function room() {
 }
 function write() {
   const v = room();
-  v.setUint8(0, 1); v.setUint16(1, tag); v.setUint8(3, net.round & 255);
+  v.setUint8(0, 1); v.setUint16(1, tag); v.setUint8(3, 0);
   v.setUint8(4, net.seats);
   let o = 5;
   for (const u of units) {
@@ -108,11 +113,12 @@ function write() {
     v.setUint8(o++, (u.st & 3) | (ld << 2) | ((u.col & 7) << 5));
     v.setUint8(o++, Math.min(255, u.y * 16));
   }
-  for (const L of leaders) {
+  for (let i = 0; i < leaders.length; i++) {
+    const L = leaders[i];
     v.setUint8(o++, L.charge * 255);
     v.setUint8(o++, Math.min(255, L.wave));
-    v.setUint8(o++, Math.min(255, L.burn * 20));
-    v.setUint8(o++, (L.hearts & 3) | ((L.st & 3) << 2) | (L.cool > 0 ? 16 : 0) | (L.chg ? 32 : 0));
+    v.setUint8(o++, Math.min(255, (L.st === 3 ? L.gone || 0 : L.burn) * 20));
+    v.setUint8(o++, (L.hearts & 3) | ((L.st & 3) << 2) | (L.cool > 0 ? 16 : 0) | (L.chg ? 32 : 0) | (roster[i] ? 64 : 0));
   }
   ws.send(buf);
 }
@@ -126,8 +132,6 @@ function packet(v) {
   // smaller tag keeps the plain; the other one stands down mid-packet.
   if (net.host) { if (theirs >= tag) return; net.host = 0; }
   tHeard = t;
-  const r = v.getUint8(3);
-  if (r !== net.round) { net.round = r; net.said = 'A NEW PLAIN'; }
   net.seats = v.getUint8(4);
   let o = 5;
   for (const u of units) {
@@ -145,7 +149,7 @@ function packet(v) {
     L.wave = v.getUint8(o++);
     L.burn = v.getUint8(o++) / 20;
     const f = v.getUint8(o++);
-    L.hearts = f & 3; L.st = (f >> 2) & 3; L.cool = f & 16 ? 1 : 0; L.chg = f & 32 ? 1 : 0;
+    L.hearts = f & 3; L.st = (f >> 2) & 3; L.cool = f & 16 ? 1 : 0; L.chg = f & 32 ? 1 : 0; L.man = f & 64 ? 1 : 0;
   }
 }
 
@@ -204,7 +208,7 @@ export function tick(dt, local) {
 
   // A second of listening before we decide anything: long enough to have
   // heard everyone already on the plain announce themselves.
-  if (!joined) { if (t > 1.2) joined = 1; else { net.said = 'JOINING THE PLAIN'; return 0; } }
+  if (!joined) { if (t > 1.2) joined = 1; else { net.said = JOINING; return 0; } }
 
   // Whoever is running the plain keeps running it. Only silence hands it
   // on, and then it goes to the smallest name, which everybody sorts the
@@ -230,7 +234,7 @@ export function tick(dt, local) {
   }
   // Watching someone else's plain. If the packets stop, the host is gone
   // and the sort above will hand the plain to whoever is next.
-  if (t - tHeard > 2) { net.said = 'LOOKING FOR THE PLAIN'; return 0; }
+  if (t - tHeard > 2) { net.said = JOINING; return 0; }
   net.said = '';
   tIn += dt;
   if (tIn >= IN && net.me >= 0) {
@@ -246,18 +250,9 @@ function start() {
   net.host = 1;
   // Taking over from a host that left keeps the plain exactly as it was -
   // we have been drawing it all along. Only an empty room gets a new one.
-  if (tHeard < 0) { net.round = (net.round + 1) & 255; newWorld(0); }
-  net.said = 'THE PLAIN IS YOURS';
+  if (tHeard < 0) newWorld(0);
 }
 
-// The host starts the next plain when one herd is left standing.
-export function restart() {
-  if (!net.host) return;
-  net.round = (net.round + 1) & 255;
-  newWorld(0);
-  for (let i = 0; i < SEATS; i++) leaders[i].in = null;
-  netIn = [];
-}
 
 // The host deals the seats and only says so when they change. Nobody who
 // already has a colour ever loses it to somebody else arriving.
@@ -277,7 +272,12 @@ function seat(names) {
 function drive(local) {
   for (let i = 0; i < SEATS; i++) {
     const L = leaders[i];
-    if (!roster[i]) { L.ai = L.ai || { t: 0, goal: null }; L.in = null; continue; }
+    if (!roster[i]) { L.ai = L.ai || { t: 0, goal: null }; L.in = null; held[i] = 0; continue; }
+    // A seat just TAKEN gets a herd worth taking: nobody should inherit a
+    // statue, or a leader on its last heart with nothing behind it. Only
+    // on the way in, though - a rider who dies waits out the five seconds
+    // like everybody else, or the plain has no teeth for the people on it.
+    if (!held[i]) { held[i] = 1; revive(L); }
     L.ai = null;
     const q = i === net.me ? local : netIn[i];
     if (!q || t - (q.at || t) > 1.5) { L.in = { t: 0, f: 0, b: 0 }; charge(L, 0); continue; }

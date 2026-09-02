@@ -112,7 +112,7 @@ function scatter(u, fx, fz, s) {
 // is the same for the player and for the brains, and the brains are told
 // about it in `think` - an edge that only kills the player is a trap.
 function fell(L) {
-  L.hearts = 0; L.chg = 0; L.charge = 0; L.wave = 0; L.spd = 0; L.st = 3;
+  L.hearts = 0; L.chg = 0; L.charge = 0; L.wave = 0; L.spd = 0; L.st = 3; L.gone = 0;
   for (const u of units) if (u !== L && u.col === L.col) { u.col = WILD; if (u.lead === L.lead) u.lead = -1; }
   events.push({ k: 'fell', L });
   events.push({ k: 'dead', L });
@@ -124,7 +124,7 @@ function hurt(L, fx, fz) {
   if (L.hearts <= 0) {
     // A leader with no hearts turns to stone where it stands, and its
     // colour is nobody's: every unicorn that wore it goes wild.
-    L.st = 3;
+    L.st = 3; L.gone = 0;
     for (const u of units) if (u !== L && u.col === L.col) { u.col = WILD; if (u.lead === L.lead) u.lead = -1; }
     events.push({ k: 'dead', L });
   } else {
@@ -139,6 +139,29 @@ function breakHerd(L, cx, cz, s) {
     scatter(u, u.x - cx + rnd(2) - 1, u.z - cz + rnd(2) - 1, s + rnd(4));
   }
   hurt(L, (L.x - cx) * 3, (L.z - cz) * 3);
+}
+
+// Back on your feet. Online the plain never ends and nobody sits out a
+// round: five seconds after a leader turns to stone it rises at its own
+// meadow, and its colour is called home out of the wild ones nobody is
+// holding. Losing the herd is the whole punishment; losing the session
+// would just empty the room.
+export function revive(L) {
+  const [mx, mz] = meadows[L.col];
+  L.st = 0; L.hearts = 3; L.chg = 0; L.charge = 0; L.wave = 0; L.burn = 0;
+  L.spd = 11; L.cool = 0; L.stun = 0; L.spent = 0; L.daze = 0; L.gone = 0;
+  L.x = mx; L.z = mz; L.y = 0; L.vx = L.vz = L.vy = 0;
+  L.yaw = Math.atan2(-mz, -mx);
+  let n = PER;
+  for (const u of units) {
+    if (n <= 0) break;
+    if (u === L || u.hearts || u.col !== WILD || u.st !== 0 || u.lead >= 0) continue;
+    u.col = L.col; u.daze = 0;
+    const a = rnd(7), d = 3 + rnd(13);
+    u.x = mx + Math.cos(a) * d; u.z = mz + Math.sin(a) * d;
+    n--;
+  }
+  events.push({ k: 'rise', L });
 }
 
 // The button. Held, the herd charges; let go, it eases off. Nothing fires
@@ -262,7 +285,10 @@ export function step(dt, input) {
 
   // Leaders steer; everyone else reacts.
   for (const L of leaders) {
-    if (L.st === 3) continue;
+    if (L.st === 3) {
+      if (input.arena && (L.gone = (L.gone || 0) + dt) > 5) revive(L);
+      continue;
+    }
     L.cool = Math.max(0, L.cool - dt);
     L.threat = threatened(L);
     if (L.ai) think(L, dt);

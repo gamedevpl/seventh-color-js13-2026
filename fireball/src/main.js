@@ -637,7 +637,7 @@ function frame(now_) {
   if (mode === 'run' && nearEdge(P.x, P.z) && P.st !== 3) {
     const w = (Math.max(Math.abs(P.x), Math.abs(P.z)) - (ARENA - EDGE)) / EDGE;
     ctx.strokeStyle = `rgba(255,40,60,${.25 + .35 * w * (.7 + .3 * Math.sin(timer * 12))})`; ctx.lineWidth = 14 + 40 * w;
-    ctx.strokeRect(0, 0, VW, VH);
+    ctx.strokeRect(0, 0, VW, VH); ctx.lineWidth = 1;
   }
   const pc = COL[P.col];
   if (mode === 'title') {

@@ -736,6 +736,12 @@ Two more from the same play:
   for by dropping the second, colour-cycling shockwave ring - the puff
   cloud carries the volume now - and the screen shake on a graze.
 
+And one the frame left behind: the edge vignette set the canvas line
+width to as much as fifty pixels and never put it back, so every stroke
+drawn after it in the HUD - the radar's one-pixel frame in your colour
+first of all - came out as a fat orange band. A canvas context is shared
+state; whatever you set, you reset.
+
 ## The wall
 
 F8a: **13,293 bytes** packed worst-of-5 at O1, limit 13,312, and **19

@@ -665,8 +665,9 @@ A detail nobody asked for, and forty bytes.
 
 ## The wall
 
-F7: **13,285 bytes** packed worst-of-5 at O1, limit 13,312, and **27
-remain**. F6 stood at 13,239; presence cost about 190 and paid back about
+F7a: **13,203 bytes** packed worst-of-5 at O1, limit 13,312, and **109
+remain** - the best-time save bought the tiles and more. F7 stood at
+13,285 with 27 to spare. F6 stood at 13,239; presence cost about 190 and paid back about
 140 out of things that were no longer earning their place. Every change from here has to pay for itself out of something
 already in the build - the stand, the pips and the respawn were paid for
 by a radar that said less, and by four lines of title prose becoming
@@ -723,6 +724,7 @@ written again in every party game.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F7a the black sectors | 13,312 | 13,203 (O1 worst-of-5) | the ground slab tiled so per-vertex fog no longer paints the whole plain fog-coloured; mottling down to a few percent; end-screen time line and best-time save removed |
 | F7 is anybody there? | 13,312 | 13,285 (O1 worst-of-5) | the title listens quietly and counts the riders before O is pressed; RIDER JOINED / LEFT said once in the herd's colour; hellos on a wall clock; one room, always; the whoosh, the re-announce and join() gone |
 | F6 nobody waits for a round | 13,312 | 13,239 (O1 worst-of-5) | the shared plain never ends: five seconds after a leader falls it rises at its meadow with its colour called home, and a seat just taken is dealt the same fresh herd; a stand to watch from with left and right walking the herds and a real countdown; a white pip on every herd a person is riding, on the list and on a radar rebuilt to say less |
 | F5 the plain, shared | 13,312 | 13,049 (O1 worst-of-5) | the Online category: up to seven people on one plain, a herd each and the brains on the rest; a host that writes the whole plain into 564 bytes at 12 Hz, clients that animate it and send three bytes back; hosting settled by sorting names, never by asking; a probe that runs three browsers against a relay of our own and against the real one |

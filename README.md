@@ -46,9 +46,11 @@ ceiling) - the build tool itself knows no game by name.
 | `npm run snap:test` | its probe suite: poses, hair, light, paint, the shoot loop, the phone, behaviour |
 | `npm run snap:gate` | the suite plus the balance sweep and a worst-of-5 pack |
 | `npm run snap:poses` | a contact sheet of every pose, for looking at a change rather than measuring it |
+| `npm run snap:promo` | the two images js13kgames.com asks for, rendered from the game itself |
 | `npm run fireball` | build Unicorn Fireball |
-| `npm run fireball:test` | its probe: boot, gather, charge, fire, land, and thirty autopilot matches for balance |
-| `npm run fireball:gate` | the probe, a worst-of-5 pack, and the zip driven in a browser |
+| `npm run fireball:test` | its probes: boot, gather, charge, fire, land, autopilot balance, and two browsers on a shared plain |
+| `npm run fireball:gate` | the probes, a worst-of-5 pack, and the zip driven in a browser |
+| `npm run fireball:play` | refresh `play/unicorn-fireball.html`, the build you can open from a link |
 
 Add `--cheats` to any build for the DEV probes the live measurement tools read;
 they compile out of a shipping build entirely.

@@ -161,20 +161,19 @@ const DISC = COL.map((c) => {
   }
   return createMesh(v);
 });
-// And a ring of the same: an annulus, bright in the middle of its band.
-const RINGM = COL.map((c) => {
-  const v = [], N = 24, put = (a, r, al) => v.push(Math.cos(a) * r, Math.sin(a) * r, 0, 0, 0, 1, c[0], c[1], c[2], al);
+// And one ring of the same: an annulus, bright in the middle of its band.
+// Seven of them existed while a second ring cycled the colours inside the
+// shockwave; there is one ring now, and it is always the wild white-gold.
+const RINGM = (() => {
+  const c = COL[WILD], v = [], N = 24;
+  const put = (a, r, al) => v.push(Math.cos(a) * r, Math.sin(a) * r, 0, 0, 0, 1, c[0], c[1], c[2], al);
   for (let i = 0; i < N; i++) {
     const a = i / N * TAU, b = (i + 1) / N * TAU;
     put(a, .78, 0); put(b, .78, 0); put(b, .9, .5); put(a, .78, 0); put(b, .9, .5); put(a, .9, .5);
     put(a, .9, .5); put(b, .9, .5); put(b, 1, 0); put(a, .9, .5); put(b, 1, 0); put(a, 1, 0);
   }
   return createMesh(v);
-});
-const bill = (x, y, z, r) => [camR[0] * r, camR[1] * r, camR[2] * r, 0, camU[0] * r, camU[1] * r, camU[2] * r, 0, 0, 0, 1, 0, x, y, z, 1];
-// A ring lying flat on the ground, for the explosion's shockwaves.
-const flat = (x, y, z, r) => [r, 0, 0, 0, 0, 0, r, 0, 0, 1, 0, 0, x, y, z, 1];
-const ring = (col, M) => drawMesh(RINGM[col], M);
+})();
 function disc(col, x, y, z, r) {
   drawMesh(DISC[col], [camR[0] * r, camR[1] * r, camR[2] * r, 0, camU[0] * r, camU[1] * r, camU[2] * r, 0, 0, 0, 1, 0, x, y, z, 1]);
 }
@@ -486,7 +485,6 @@ function frame(now_) {
       burst([e.L.cx, 1.2, e.L.cz], 40 + e.L.n * 6, 5 + e.L.r);
       if (e.L === P) { say('RAINBOW!', 1.5); flash = Math.max(flash, .35); }
     }
-    else if (e.k === 'fizzle') { if (e.L === P) say(P.cool ? 'SPENT' : '', 1); }
     else if (e.k === 'spend') { burst([e.u.x, .8, e.u.z], 5, 3, COL[e.u.col]); }
     else if (e.k === 'lost') { thud(); burst([e.u.x, .8, e.u.z], 8, 5, COL[WILD]); }
     else if (e.k === 'fell') {
@@ -587,7 +585,8 @@ function frame(now_) {
     // blast, and the volume comes from the cloud below instead.
     const k = b.t / 1.6, R = (5 + b.pw * .7) * Math.sqrt(k) * 3;
     setDim((1 - k) * (1 - k));
-    ring(WILD, flat(b.x, .12, b.z, R));
+    // Flat on the ground: the billboard basis swapped for the world's.
+    drawMesh(RINGM, [R, 0, 0, 0, 0, 0, R, 0, 0, 1, 0, 0, b.x, .12, b.z, 1]);
     // And the core: a hard white flash for a fifth of a second.
     // And the core: small and brief. A big white disc at the centre is
     // what turned the whole blast into one flat blowout.

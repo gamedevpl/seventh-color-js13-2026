@@ -130,12 +130,13 @@ DUR = END + ENDCARD + 1.0
 MOVEMENT = {
     'face': 'dark',
     'walk1': 'walk', 'walk1Hit': 'silence', 'down1': 'down',
-    # The second walk does NOT reset to the first walk's music box: it
-    # carries the motif from the get-up, so the hero sets off again inside
-    # the tune it stood up to.
-    'walk2': 'walk2', 'walk2Hit': 'silence',
+    # It does not set off again - it stands and waits, and the music waits
+    # with it: the bassline alone until the rainbow arrives.
+    'wait': 'stand', 'waitHit': 'silence',
     'crane': 'war',
-    'cardGather': 'groove', 'gatherA': 'groove', 'gatherB': 'groove', 'cardTrample': 'groove', 'trample': 'groove',
+    'cardGather': 'gather', 'gatherA': 'gather', 'gatherB': 'gather', 'gatherC': 'gather',
+    'cardTrample': 'groove', 'trampleA': 'groove', 'trampleB': 'groove',
+    'trampleC': 'groove', 'plough': 'groove',
     'cardRainbow': 'break', 'hold': 'break',
     'ignite': 'drop', 'ride': 'drop',
     'approach': 'half', 'slowmo': 'still', 'clash': 'hit',
@@ -212,14 +213,6 @@ def lowpass(a, k=0.02):
     return out
 
 
-def music_box(t, semi, gain, pan=0.0):
-    f = NOTE(semi + 24)
-    tone = sine(f, 0.9, gain, attack=0.004, partial2=0.35)
-    add(t, tone, 1.0, pan)
-    add(t + STEP * 3, tone, 0.42, -pan)
-    add(t + STEP * 6, tone, 0.18, pan)
-
-
 def far_boom(t, gain):
     """An explosion somewhere else. Distance takes the crack off a blast and
     leaves a roll: no transient at all, a slow swell into a long decay, and
@@ -285,36 +278,24 @@ while t < END + 0.5:
             add(t, held(NOTE(-24), BAR * 1.05, 0.16, attack=0.4, release=0.5, partial2=0.1), 1.0)
 
     elif m == 'walk':
-        # Hopeful: the tune, in the music box, at the game's own tempo, with
-        # a hoof ticking under it and a pluck on the root. It is the same
-        # both times, on purpose - so the phrase is counted from the frame
-        # the walk starts, not from the top of the file, and the second
-        # walk begins on the same note as the first.
-        w0 = max(v for k, v in C.items() if k in ('walk1', 'walk2') and v <= t + 1e-6)
-        ws = int(round((t - w0) / STEP)) % 32
-        wh = ws % 16
-        if LEAD[ws] != R:
-            music_box(t, LEAD[ws], 0.34, pan=0.2 if ws % 4 < 2 else -0.2)
-        if wh % 4 == 0:
-            add(t, resample(hoof_s, 320 / 400), 0.32, pan=0.12)
-        if wh % 8 == 4:
-            add(t, resample(hoof_s, 180 / 400), 0.22, pan=-0.12)
-        if BASS[wh] != R and wh % 4 == 0:
-            add(t, env(resample(bass_s, NOTE(BASS[wh] - 12) / bass_f0), 0.3, 0.55), 1.0)
+        # THE GAME'S OWN BIT, bare: the gallop on hooves and the bassline,
+        # which is what snd.js plays under its own title screen. An earlier
+        # cut put a music box here - the lead at half speed, two octaves up
+        # - and it pipped over the top of a game that gallops.
+        if GALLOP[h]:
+            add(t, resample(hoof_s, (180 if dum else 320) / 400), 0.34 * (1.25 if dum else 1.0), pan=-0.1 if h % 2 else 0.1)
+        if BASS[h] != R:
+            add(t, env(resample(bass_s, NOTE(BASS[h] - 12) / bass_f0), 0.22, 0.7), 1.0)
+        if dum:
+            add(t, env(kick_s, 0.2, 0.5), 1.0)
 
-    elif m == 'walk2':
-        # The get-up's climbing figure, in the music box, over its chord:
-        # the same four notes it stood up to, now walking.
-        rise4 = [12, R, 15, R, 19, R, 15, R, 12, R, 19, R, 24, R, R, R]
-        w0 = C['walk2']
-        ws = int(round((t - w0) / STEP)) % 16
-        if rise4[ws] != R:
-            music_box(t, rise4[ws], 0.32, pan=0.2 if ws % 4 < 2 else -0.2)
-        if ws % 4 == 0:
-            add(t, resample(hoof_s, 320 / 400), 0.30, pan=0.12)
-        if ws == 0:
-            for semi, g in ((-12, 0.34), (-5, 0.2), (0, 0.14)):
-                add(t, held(NOTE(semi), BAR * 1.05, g, attack=0.25, release=0.45), 1.0)
+    elif m == 'stand':
+        # Standing, waiting: the bassline alone, hooves gone. The groove is
+        # still running underneath, stripped to its root.
+        if BASS[h] != R and h % 2 == 0:
+            add(t, env(resample(bass_s, NOTE(BASS[h] - 12) / bass_f0), 0.26, 0.5), 1.0)
+        if downbeat:
+            add(t, held(NOTE(-24), BAR * 1.05, 0.16, attack=0.35, release=0.5), 1.0)
 
     elif m in ('silence', 'down'):
         # Nothing. A room tone so it is a held breath and not a dropout.
@@ -338,6 +319,25 @@ while t < END + 0.5:
             f = NOTE(LEAD[s] + 12)
             add(t, env(resample(lead_s, f / lead_f0), 0.26, (k - 0.62) / 0.38 * 0.95), 1.0, pan=0.18)
 
+    elif m == 'gather':
+        # The groove, building, the lead arriving in its second half: the
+        # herd is growing and the music grows with it. The bells that count
+        # it are one-shots below, on the frames units actually joined.
+        k = min(1.0, max(0.0, (t - C['cardGather']) / (BAR * 3.0)))
+        if GALLOP[h]:
+            add(t, resample(hoof_s, (180 if dum else 320) / 400), (0.34 + k * 0.34) * (1.25 if dum else 1.0), pan=-0.1 if h % 2 else 0.1)
+        if dum:
+            add(t, env(kick_s, 0.22, 0.9 + k * 0.6), 1.0)
+        if h % 8 == 6 and k > 0.3:
+            add(t, env(hat_s, 0.07, 0.3), 1.0, pan=-0.18)
+        if BASS[h] != R:
+            f = NOTE(BASS[h] - 12)
+            add(t, env(resample(bass_s, f / bass_f0), 0.2, 0.9 + k * 0.4), 1.0)
+            add(t, sine(f / 2, 0.22, 0.5 + k * 0.5), 1.0)
+        if LEAD[s] != R and k > 0.45:
+            f = NOTE(LEAD[s] + 12)
+            add(t, env(resample(lead_s, f / lead_f0), 0.26, (k - 0.45) / 0.55 * 0.8), 1.0, pan=0.18)
+
     elif m == 'groove':
         if GALLOP[h]:
             add(t, resample(hoof_s, (180 if dum else 320) / 400), 0.7 * (1.25 if dum else 1.0), pan=-0.1 if h % 2 else 0.1)
@@ -358,7 +358,7 @@ while t < END + 0.5:
             add(t, env(resample(bass_s, NOTE(-12) / bass_f0), BAR * 1.1, 0.28, attack=0.05), 1.0)
             add(t, held(NOTE(-24), BAR * 1.05, 0.22, attack=0.3, release=0.4), 1.0)
         if h in (0, 2, 4):
-            music_box(t, LEAD[h], 0.16 * (1 - h * 0.12), pan=0.15 - h * 0.1)
+            add(t, env(resample(lead_s, NOTE(LEAD[h] + 12) / lead_f0), 0.3, 0.34 * (1 - h * 0.12)), 1.0, pan=0.15 - h * 0.1)
 
     elif m == 'drop':
         if GALLOP[h]:
@@ -385,7 +385,7 @@ while t < END + 0.5:
         if h == 8:
             add(t, resample(hoof_s, 180 / 400), 0.45, 1.0)
         if step % 2 == 0 and LEAD[(step // 2) % 32] != R:
-            music_box(t, LEAD[(step // 2) % 32], 0.2)
+            add(t, env(resample(lead_s, NOTE(LEAD[(step // 2) % 32] + 12) / lead_f0), 0.45, 0.42), 1.0)
 
     elif m in ('still', 'hit'):
         if downbeat:
@@ -393,7 +393,8 @@ while t < END + 0.5:
 
     elif m == 'coda':
         if step % 2 == 0 and LEAD[(step // 2) % 32] != R:
-            music_box(t, LEAD[(step // 2) % 32], 0.3, pan=0.2 if (step // 2) % 4 < 2 else -0.2)
+            add(t, env(resample(lead_s, NOTE(LEAD[(step // 2) % 32] + 12) / lead_f0), 0.5, 0.5), 1.0,
+                pan=0.2 if (step // 2) % 4 < 2 else -0.2)
 
     t += STEP
     step += 1
@@ -413,15 +414,24 @@ for tt in np.arange(t0 + 0.4, t1 - 0.3, 0.55):
     if rng.random() < 0.7:
         add(tt + rng.random() * 0.3, resample(hoof_s, 140 / 400), 0.06 + rng.random() * 0.08, pan=rng.uniform(-0.6, 0.6))
 
+# EVERY JOIN RINGS. The game's own join(n) - a bell climbing a pentatonic,
+# one per unicorn taken - on the frames the recorder measured units
+# actually joining. It is what makes a gather feel like a gather instead of
+# a number moving in a corner.
+PENTA = [0, 2, 4, 7, 9]
+for n, tt in enumerate(C.get('joins', [])):
+    semi = 12 + PENTA[n % 5] + 12 * ((n // 5) & 1)
+    add(tt, sine(NOTE(semi), 0.4, 0.22, attack=0.003, partial2=0.3), 1.0, pan=-0.3 + (n % 7) * 0.1)
+
 # The ground under each walk: a roar that grows for the second and a
 # quarter before the hit, the audio half of the tremor in the picture.
-for key, gain in (('walk1Hit', 0.5), ('walk2Hit', 0.6)):
+for key, gain in (('walk1Hit', 0.5), ('waitHit', 0.6)):
     if key in C:
         rumble_in(C[key] - 1.25, 1.25, gain)
 
 # The two hits. The second bigger, and with the rainbow's own chord jammed
 # into it, because that one was a rainbow.
-for k, key in enumerate(('walk1Hit', 'walk2Hit')):
+for k, key in enumerate(('walk1Hit', 'waitHit')):
     if key in C:
         impact(C[key], 1.0 if k == 0 else 1.35)
         if k == 1:

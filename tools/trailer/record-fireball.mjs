@@ -163,7 +163,7 @@ await page.evaluate(([RAINBOW]) => {
   const camera = (d, id, u) => {
     if (!d) { window.FBCAM_ = null; return; }
     const S = subject(d.subj);
-    if (camState.id !== id) camState = { id, yaw: S.yaw, eye: null };
+    if (camState.id !== id) camState = { id, yaw: S.yaw, eye: null, se: null, sl: null };
     const yaw = d.follow ? S.yaw : camState.yaw;
     const k = ease(u, d.ease);
     let e, l;
@@ -180,6 +180,18 @@ await page.evaluate(([RAINBOW]) => {
       // and left there while the subject comes to it.
       if (d.plant) { if (!camState.eye) camState.eye = e; e = camState.eye; }
       l = rel(S, yaw, d.l0 ? lerp3(d.l0, d.l1 || d.l0, k) : [0, 1.1, 0]);
+    }
+    // A following shot is eased, in VIDEO frames, not game time: `subject`
+    // is the herd's CENTROID, and the centroid steps sideways every time
+    // the band spends a unit out of the herd - which at a fifth of speed
+    // is a camera that ticks and jerks behind a rainbow that is gliding.
+    // The game eases its own camera for exactly this reason; FBCAM_ places
+    // the eye instead, so a shot that follows has to do it here.
+    if (d.smooth) {
+      if (!camState.se) { camState.se = e.slice(); camState.sl = l.slice(); }
+      camState.se = lerp3(camState.se, e, d.smooth);
+      camState.sl = lerp3(camState.sl, l, d.smooth);
+      e = camState.se.slice(); l = camState.sl.slice();
     }
     if (d.shake) { const j = d.shake; e = [e[0] + (Math.random() - .5) * j, e[1] + (Math.random() - .5) * j, e[2] + (Math.random() - .5) * j]; }
     window.FBCAM_ = { e, l, fov: lerp(d.fov0 ?? .9, d.fov1 ?? d.fov0 ?? .9, k) };
@@ -304,7 +316,13 @@ await page.evaluate(([RAINBOW]) => {
     if (s.guard) guard(s.guard, s.dtGame);
     camera(s.cam, s.shotId, s.u);
     window.__pump(s.dtGame * 1000);
-    white.style.opacity = Math.max(s.white ?? 0, Math.min(1, window.FB.flash * 1.2));
+    // The white is a flash washing outward from the blast, not a cut to a
+    // white card: a disc that grows past the corners while it brightens.
+    const wk = Math.max(s.white ?? 0, Math.min(1, window.FB.flash * 1.2));
+    const wr = (s.whiteR ?? 1) * 150;
+    white.style.background = wr >= 149 ? '#fff'
+      : `radial-gradient(circle at 50% 52%, #fff ${wr.toFixed(1)}%, rgba(255,255,255,0) ${(wr * 1.7 + 6).toFixed(1)}%)`;
+    white.style.opacity = wk;
     const dCent = Math.hypot(R.cx - P.cx, R.cz - P.cz);
     return {
       ignited: !wasLit && !!P.wave, boom: bothLit && !(P.wave && R.wave), dCent, wave: P.wave, n: P.n, charge: P.charge, mode: window.FB.mode,
@@ -366,7 +384,7 @@ async function shoot(shot) {
       fx: ov.fx, flash: ov.flash, white: ov.white,
       black: ov.black ?? (shot.card ? 1 : 0), card: ov.card ?? 0, cardText: text(shot.card, t), cardColor: shot.cardColor,
       note: ov.note ?? (shot.note ? 1 : 0), noteText: text(shot.note, t),
-      title: ov.title ?? 0, titleText: shot.title || '', count: ov.count ?? 0,
+      title: ov.title ?? 0, titleText: shot.title || '', count: ov.count ?? 0, whiteR: ov.whiteR,
     });
     // A take is over the moment the match is: every later shot is the end
     // screen or the title. Say so at the frame it happened, with the state
@@ -377,6 +395,13 @@ async function shoot(shot) {
       if (process.env.FB_STRICT) { await browser.close(); process.exit(1); }
     }
     state.prev = { st: info.st, hearts: info.hearts, at: info.at, alive: info.alive, n: info.n };
+    // Every unicorn that joins gets a frame, so the score can ring a bell
+    // on it: the herd growing is the thing the gather is about, and a
+    // number climbing in a corner is not a feeling.
+    if (info && state.lastN !== undefined && info.n > state.lastN) {
+      for (let k = state.lastN; k < info.n; k++) (cues.joins = cues.joins || []).push(+vt.toFixed(4));
+    }
+    if (info) state.lastN = info.n;
     if (info.ignited && !cues.ignite) cues.ignite = +vt.toFixed(4);
     if (info.boom && !cues.clash) cues.clash = +vt.toFixed(4);
     if (sc < 0.5 && !state.slow) { state.slow = 1; if (shot.slowCue) cues[shot.slowCue] = +vt.toFixed(4); }
@@ -557,22 +582,26 @@ await shoot(S({
   cam: { subj: 0, orbit: { a0: 2.55, a1: 2.15, r0: 4.8, r1: 3.7, h0: .5, h1: .85 }, l0: [0, 0, .6], l1: [0, 0, 1.15], fov0: .68, ease: 'io' },
 }));
 
-// --- IV. sets off again ---------------------------------------------------------
-// The same shot, the same walk, the same hope. A rainbow this time.
-const HIT2 = bars(2.25) - 1.1;
+// --- IV. up, and standing ------------------------------------------------------
+// It does NOT set off again. It gets up, it stands there, and the lens
+// backs away and settles - and the shot waits, holding on an animal with
+// nowhere to be, until the rainbow arrives. A second identical walk was
+// the joke; a second identical walk is also two of the same shot.
+const HITW = bars(2.75) - 1.05;
 await shoot(S({
-  name: 'walk2', dur: bars(2.25), scale: 1, cam: WALK,
-  stage: () => { const P = window.FB.leaders[0]; P.yaw = 0; P.up = 0; P.st = 0; P.y = 0; },
-  guard: (t) => (t < HIT2 - 1.0 ? { pin: 5.5, yaw: 0 } : { mortal: 1, pin: 5.5, drive: [{ i: 2, spd: 30 }] }),
-  overlay: (t) => ({ shake: tremor(t, HIT2) }),
+  name: 'wait', dur: bars(2.75), scale: 1,
+  stage: () => { const P = window.FB.leaders[0]; P.yaw = 0; P.up = 0; P.st = 0; P.y = 0; P.spd = 0; },
+  guard: (t) => (t < HITW - 1.0 ? { pin: 0, yaw: 0 } : { mortal: 1, pin: 0, drive: [{ i: 2, spd: 30 }] }),
+  // Out and up, decelerating: the camera runs out of interest before the
+  // rainbow does.
+  cam: { subj: 0, e0: [4.6, .6, 1.35], e1: [13, 2.6, 2.7], l0: [.7, 0, 1.2], fov0: .72, fov1: .95, ease: 'out' },
+  overlay: (t) => ({ shake: tremor(t, HITW) }),
   beats: [
-    // The band is the herd's centroid, and at thirty units a second the
-    // centroid trails the leader by thirteen - so the leader is aimed at
-    // where the hero will be when the BAND arrives, not the leader.
-    { at: HIT2 - 1.0, send: () => crossHerd(2, -1, true, 8) },
-    { at: HIT2 + .95, hit: 1, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 6; } }, arg: [3, 11, 12] },
+    { at: HITW - 1.0, send: () => crossHerd(2, -1, true, 8) },
+    { at: HITW + .95, hit: 1, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 6; } }, arg: [3, 11, 12] },
   ],
 }));
+
 // --- V. kaput. the crane. ---------------------------------------------------------
 // When the explosions go off, in seconds from the top of the shot. The
 // score gets these, so each one has a sound.
@@ -611,34 +640,62 @@ await shoot(S({
 // --- VI. how ------------------------------------------------------------------
 await stage(() => window.FBGL({ fog: [30, 220], glow: 1.35 }));
 await shoot(S(cardShot('cardGather', 'gather your herd.', bars(.75))));
-await place(-30, 20, .4);
-await clearTheField(64);
-await giveHerd(3, 4);
-await seedPath(6, 6, 30, 8);
+
+// Loose unicorns of the hero's colour, sown in a band down its nose. They
+// are taken off whatever herd holds them, which is the only way to get
+// enough of them: seventy followers exist and six rivals own most.
+const sow = (n, from, to, width) => stage(({ n, from, to, width }) => {
+  const { units, leaders } = window.FB, P = leaders[0];
+  const c = Math.cos(P.yaw), s2 = Math.sin(P.yaw);
+  let placed = 0;
+  for (const u of units) {
+    if (u === P || leaders.includes(u) || u.lead === 0 || u.st === 3) continue;
+    if (placed >= n) break;
+    u.lead = -1; u.col = P.col; u.st = 0; u.daze = 0; u.y = 0; u.vx = u.vz = 0; u.hit = 0;
+    const d = from + (to - from) * (placed + .5) / n, w = (Math.random() - .5) * width;
+    u.x = P.x + c * d + s2 * w; u.z = P.z + s2 * d - c * w;
+    placed++;
+  }
+  return placed;
+}, { n, from, to, width });
+
+// Six seconds of it, in three looks, and the herd genuinely grows: the
+// game's own join rule does the work (a loose one within five of the
+// leader, or two and a half of a follower, is taken), and every join is a
+// cue the score rings a bell on.
+await place(-46, 8, 0);
+await clearTheField(70);
+await stage(() => {
+  const { units, leaders } = window.FB, P = leaders[0];
+  for (const u of units) if (u.lead === 0 && u !== P) { u.x = P.x - 3 + (Math.random() - .5) * 6; u.z = P.z + (Math.random() - .5) * 6; }
+});
+await sow(26, 8, 46, 15);
 await shoot(S({
-  name: 'gatherA', dur: bars(1.25), scale: 1, keys: [['ArrowUp', true]],
-  cam: { subj: 'herd', follow: true, e0: [-10, 4, 5.5], e1: [-13, 5.5, 7], l0: [4, 0, .8], fov0: .9, ease: 'lin' },
-  overlay: (t) => ({ count: fin(t, .2, .4) }),
+  name: 'gatherA', dur: bars(1.5), scale: 1, keys: [['ArrowUp', true]], guard: { pin: 15 },
+  // Over its shoulder, the way the game rides: you see what it is running
+  // into, and you see the band behind it thicken.
+  cam: { subj: 'herd', follow: true, smooth: .11, e0: [-11, 0, 4.2], e1: [-13, 0, 5.0], l0: [10, 0, 1.4], fov0: .95, ease: 'lin' },
+  overlay: (t) => ({ count: fin(t, .25, .45) }),
 }));
-await giveHerd(9, 8);
-await seedPath(5, 8, 26, 9);
+await sow(20, 14, 44, 16);
 await shoot(S({
-  name: 'gatherB', dur: bars(1.25), scale: 1,
-  cam: { subj: 'herd', plant: true, e0: [26, 3, 1.0], l0: [0, 0, 1.2], fov0: .85, ease: 'lin' },
+  name: 'gatherB', dur: bars(1.25), scale: 1, guard: { pin: 15 },
+  // Grass height, planted, and the whole thing sweeps over it - loose ones
+  // on one side, herd on the other, the join happening between.
+  cam: { subj: 'herd', plant: true, e0: [21, 5.5, 1.15], l0: [0, 0, 1.2], fov0: .85, ease: 'lin' },
   overlay: () => ({ count: 1 }),
 }));
-await giveHerd(8, 8);
+await sow(18, 12, 40, 14);
+await shoot(S({
+  name: 'gatherC', dur: bars(1.25), scale: 1, guard: { pin: 15 },
+  // And back out: it is a herd now, not an animal with company.
+  cam: { subj: 'herd', follow: true, smooth: .1, e0: [-16, -7, 7], e1: [-20, -9, 9], l0: [8, 0, 1.6], fov0: 1.0, ease: 'lin' },
+  overlay: () => ({ count: 1 }),
+}));
 
 await shoot(S(cardShot('cardTrample', 'trample the rest.', bars(.75))));
-// Three looks at the same thing, because one side-on wide said nothing:
-// the game's own chase camera behind the herd, a lens down among the ones
-// being hit, and a static wide the whole thing crosses. The charge is held
-// short of ignition throughout, so the herd runs hard and its horns count
-// and nothing lights.
-// `from` is where the herd starts. At twenty-six units a second it covers
-// thirty-five in a shot this long, so starting it twenty-two out puts the
-// impact in the last tenth of the cut - which is what the first pass did,
-// three times, and why all three read as the aftermath.
+// Four looks at the same thing. The charge is held short of ignition
+// throughout, so the herd runs hard and its horns count and nothing lights.
 const victims = (i, x, z, n, from) => stage(({ i, x, z, n, from }) => {
   const { units, leaders } = window.FB, P = leaders[0], R = leaders[i];
   P.x = from; P.z = 0; P.yaw = 0; P.spd = 26;
@@ -654,22 +711,33 @@ const victims = (i, x, z, n, from) => stage(({ i, x, z, n, from }) => {
   R.n = k;
 }, { i, x, z, n, from });
 
-await victims(3, 10, 1, 12, -16);
+await victims(3, 10, 1, 15, -16);
 await shoot(S({
   name: 'trampleA', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26 },
-  cam: { subj: 'herd', follow: true, e0: [-13, 0, 4.5], e1: [-11, 0, 4.0], l0: [9, 0, 1.4], fov0: .95, ease: 'lin' },
+  cam: { subj: 'herd', follow: true, smooth: .12, e0: [-13, 0, 4.5], e1: [-11, 0, 4.0], l0: [9, 0, 1.4], fov0: .95, ease: 'lin' },
 }));
-await victims(4, 8, 0, 12, -13);
+// BULLET TIME. Down among them, and the clock drops to a quarter just as
+// the horns land - the scatter is the game's own, six unicorns leaving the
+// ground on their own arcs, and at full speed it was over before it read.
+await victims(4, 8, 0, 15, -13);
 await shoot(S({
-  name: 'trampleB', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26 },
-  // Down among them, a stride from where it lands.
-  cam: { world: true, e0: [13, 1.15, 7.5], e1: [12, 1.0, 6.6], l0: [4, 1.0, 0], fov0: .85, ease: 'lin' },
+  name: 'trampleB', dur: bars(1.75), scale: (info, st, t) => (t < .72 ? 1 : .22), guard: { charge: .75, pin: 26 },
+  // Back and up a little from the first framing: at grass height inside a
+  // fifty-strong herd the lens saw nothing but flanks, and the unicorn
+  // actually leaving the ground was behind three that were not.
+  cam: { world: true, e0: [14.5, 2.4, 9.5], e1: [12.5, 1.9, 7.6], l0: [4, 1.2, 0], fov0: .9, ease: 'lin' },
 }));
-await victims(5, 9, 1, 12, -12);
+await victims(5, 9, 1, 15, -12);
 await shoot(S({
   name: 'trampleC', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26 },
-  // Locked off, and the whole thing crosses it.
   cam: { world: true, e0: [4, 3.4, 21], l0: [3, 1.3, 0], fov0: .95, ease: 'lin' },
+}));
+// And once more from where the player sits: the game's own third person,
+// wide, ploughing straight through a herd that does not move.
+await victims(6, 12, 0, 13, -20);
+await shoot(S({
+  name: 'plough', dur: bars(1.25), scale: 1, guard: { charge: .8, pin: 28 },
+  cam: { subj: 'herd', follow: true, smooth: .12, e0: [-15, 0, 5.5], e1: [-17, 0, 6.2], l0: [11, 0, 1.6], fov0: 1.0, ease: 'lin' },
 }));
 
 await shoot(S(cardShot('cardRainbow', 'become the rainbow.', bars(.75))));
@@ -695,7 +763,7 @@ await shoot(S({
 }));
 await shoot(S({
   name: 'ride', dur: bars(1), scale: 1, guard: { hold: 1, pin: 26 },
-  cam: { subj: 'herd', follow: true, e0: [-26, -8, 12], e1: [-30, -10, 14], l0: [8, 0, 2.5], fov0: 1.0, ease: 'lin' },
+  cam: { subj: 'herd', follow: true, smooth: .1, e0: [-26, -8, 12], e1: [-30, -10, 14], l0: [8, 0, 2.5], fov0: 1.0, ease: 'lin' },
 }));
 
 // --- VII. two rainbows ---------------------------------------------------------
@@ -738,15 +806,18 @@ await shoot(S({
   cam: { world: true, e0: [0, 34, 60], e1: [0, 23, 42], l0: [0, 3, 0], l1: [0, 2, 0], fov0: 1.05, fov1: .95, ease: 'in' },
   overlay: (t, u, info) => {
     if (info && info.boom && boomT === null) boomT = t;
-    // The white comes LATE now - the ring and the cloud get their two
-    // seconds first, and the end card dissolves out of what is left.
-    return { white: boomT === null ? 0 : fin(t, boomT + 1.5, .9) };
+    // The white comes late, and then SPREADS: a disc opening from the
+    // blast, past the corners, over a second and a half. Cutting to a
+    // white card in a third of a second is a cut, not a flash.
+    if (boomT === null) return { white: 0 };
+    const k = fin(t, boomT + 1.1, 1.5);
+    return { white: Math.min(1, k * 1.6), whiteR: k * k };
   },
 }));
 
 await browser.close();
 cues.end = +vt.toFixed(4);
-cues.hits = ['walk1Hit', 'walk2Hit'].map((k) => cues[k]).filter((v) => v !== undefined);
+cues.hits = ['walk1Hit', 'waitHit'].map((k) => cues[k]).filter((v) => v !== undefined);
 cues.craneBooms = CRANE_BOOMS.map((a) => +(cues.crane + a).toFixed(3));
 writeFileSync(path.join(outDir, 'beats.json'), JSON.stringify({ fps: FPS, bpm: BPM, cues, duration: frame / FPS }, null, 2));
 console.log(`  ignite ${cues.ignite?.toFixed(2)}s  slow-mo ${cues.slowmo?.toFixed(2)}s  clash ${cues.clash?.toFixed(2)}s`);

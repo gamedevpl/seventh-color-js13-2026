@@ -515,19 +515,22 @@ await shoot(S({
   cam: { world: true, e0: [0, 5, 24], e1: [0, 22, 40], l0: [0, 1, 0], l1: [0, 0, 0], fov0: 0.95, fov1: 1.05, ease: 'out' },
 }));
 
-// --- coda: the one unicorn, with a herd behind it ----------------------------
+// --- coda: the one unicorn, and now a herd round it --------------------------
+// A herd is a ring around its leader - the game re-forms it on the next
+// step, so 'leader in front, herd behind' cannot be staged and a camera
+// inside the ring sees flanks. From outside, pushing in slowly, it is the
+// opening shot answered: the same animal, no longer alone.
 await shoot(S({
   name: 'after', dur: bars(2), scale: 1, guard: { pin: 0 },
   stage: () => {
     const { units, leaders } = window.FB, P = leaders[0];
     P.x = 0; P.z = 0; P.yaw = 0; P.spd = 0; P.vx = P.vz = 0;
-    let k = 0;
     for (const u of units) if (u.lead === 0 && u !== P) {
-      const a = Math.PI + (Math.random() - .5) * 1.6, r = 4 + Math.random() * 9;
-      u.x = P.x + Math.cos(a) * r; u.z = P.z + Math.sin(a) * r; u.st = 0; u.vx = u.vz = 0; u.daze = 0; k++;
+      const a = Math.random() * Math.PI * 2, r = 2.5 + Math.random() * 6;
+      u.x = P.x + Math.cos(a) * r; u.z = P.z + Math.sin(a) * r; u.st = 0; u.vx = u.vz = 0; u.daze = 0;
     }
   },
-  cam: { subj: 0, orbit: { a0: 0.55, a1: 0.15, r0: 6.5, r1: 5.2, h0: 1.1, h1: 1.5 }, l0: [-0.5, 1.2, 0], fov0: 0.8, ease: 'io' },
+  cam: { subj: 0, orbit: { a0: 0.7, a1: 0.35, r0: 17, r1: 11.5, h0: 3.4, h1: 2.1 }, l0: [0, 1.2, 0], fov0: 0.8, ease: 'io' },
   sub: 'gather your colour. become the rainbow.',
   overlay: (t) => ({ sub: fin(t, 1.1, 0.6) }),
 }));

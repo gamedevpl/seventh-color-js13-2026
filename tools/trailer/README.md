@@ -115,62 +115,71 @@ things in there are less obvious than they look:
   starting at full gain - these are percussive one-shots, and triggering one
   cold as a sustained note is an audible thump.
 
-## Unicorn Fireball: directed by playing it
+## Unicorn Fireball: directed, not captured
 
-Snap needed a free camera because the camera IS that game and its own lens
-sits on a fixed tripod. Fireball's camera is already the shot you want - it
-rides behind the herd, pulls back as the herd grows and opens right up when
-the rainbow lights - so `record-fireball.mjs` never touches it. It plays the
-game instead: real `keydown`/`keyup`, and the world staged between beats
-through the `window.FB` handle.
+The first cut of this one played the game with its own chase camera and
+its HUD on, and captioned it. It was a screencast. The cut that replaced
+it is a film with a shot list, and three things make it one:
 
-Which turns out to be the harder job, because the game is trying to end.
+- **A camera of its own.** `FBCAM_` is a DEV hook in `main.js` (the
+  shipping build is byte-identical without it) that places the eye, the
+  look point and the field of view for a frame. `record-fireball.mjs`
+  animates it one pumped frame at a time - orbits, cranes, tracking shots
+  in the subject's own frame, a tripod planted in the herd's path - and
+  keeps the HUD canvas hidden for the whole length. The one thing the
+  plain will not give is a high angle: from above, the fog swallows it, so
+  everything is shot from grass height.
+- **A story.** Cards on black between the movements: *one plain. / seven
+  colours. / one of them is yours. / hold. / two rainbows meet.* - and one
+  line over the picture at the drop. A unicorn alone; each of the seven
+  colours in a cut on the half-bar; gathering its own; the fold; the
+  rainbow; two rainbows meeting; the same animal with a herd round it.
+- **Time.** A pumped clock costs nothing to slow: the hold ramps down to a
+  third of speed as the charge tops, ignition plays at a fifth, and the
+  clash goes to a fifth from twenty-five units out and snaps back to full
+  speed on the hit.
 
-- **A trailer is a long time to survive.** ArrowUp is fifteen units a second
-  and the plain is fatal at its rim, ninety-five out; held down for the nine
-  seconds of the opening beats the player simply runs off the edge of the
-  world. `fell()` takes its hearts, turns every unicorn that wore its colour
-  wild, and `lost()` latches `mode = 'end'` - and then the very next SPACE,
-  the one meant to start the charge, dismisses the end screen to the title.
-  A whole trailer recorded on the attract loop, and the only symptom in the
-  log is one field reading `"end"`. The guard now runs *every* frame rather
-  than every tenth (nine frames is enough to die in), keeps the player's
-  hearts, stands rivals back up, and steers - only once the rim is actually
-  coming, and toward whichever tangent is nearer the current heading, so the
-  correction reads as a turn rather than a rail.
-- **Ignition is placed, not hoped for.** `chargeTime` is `2.4 + .08n` seconds
-  and the herd's size is only known at the beat, so the charge is handed
-  exactly the head start that lights the rainbow inside the shot. An earlier
-  cut topped the charge up afterwards if it had not lit, which worked and
-  stretched the beat by 0.7s, putting every later beat out of step with the
-  music.
-- **The clash needed a probe to get right, twice.** `clash()` only detonates
-  when the two headings oppose - and the rival's brain answers a bigger
-  rainbow by *sidestepping*, which is correct play and a graze on camera. Aim
-  both by hand and they still graze, because two rainbows explode only when
-  their herd CENTROIDS come within the sum of the two footprints, and a herd's
-  centroid trails its leader by about `spd / 2.2` - the followers settle where
-  their catch-up speed matches the leader's. At a lit herd's natural 37 units a
-  second that lag is ten, wider than either footprint, so the leader reaches
-  the other band first and is simply run over: a heart, the rainbow out, and
-  the pair pass through each other still lit. Pinned to twelve the lag is six,
-  the footprints are seven and eight, and the centroids meet first. The rival
-  also has its brain taken off it for the length of the approach, because with
-  it on it reads the edge eighty units down its own nose and lets the rainbow
-  go.
+Every cut is a bar of the game's own music (132 BPM), so the score can be
+arranged to the picture. The recorder writes `beats.json` - the second
+each shot starts, and the frames on which the rainbow lit and the clash
+detonated, which are physics - and `audio/render-fireball.py` reads it and
+lays out its movements on those cues: a music-box intro (the lead at half
+speed, two octaves up, with an echo), a build, a breakdown with the game's
+riser, the drop (the lead stacked in octaves, its second bar answered by a
+phrase of its own), half time under the slow motion, the hit, and the
+music box back over a held chord. `FB_PREVIEW=10` captures every tenth
+frame at half size, for looking at a shot list in two minutes.
 
-None of that was found by reading the source. It was found by writing a
-throwaway probe that staged the clash alone, stepped it a frame at a time and
-printed the six numbers the rule is made of.
+### What the previews taught
 
-### The score follows the cut, not the other way round
+None of this was found by reading the source. Five previews, five ways
+for a take to die:
 
-`record-fireball.mjs` writes `build/trailer-fireball/beats.json` - the beat
-boundaries it used AND the second the two rainbows actually detonated.
-`audio/render-fireball.py` reads it. The clash is physics, not a cue: it moves
-when the approach is retuned, and typing its timestamp into two files is how a
-score ends up hitting its boom a second after the screen does.
+- The player was hunted down while it stood with a herd of three during
+  the montage. The match ends in the SAME step that kills the player -
+  `hurt()` to no hearts, then `lost()` right after `step()` - so healing it
+  next frame is a frame too late. Protection is preventive: the player
+  cannot be horned (`hit` is the fight loop's own per-pair cooldown), and
+  rivals are held under the charge that makes a horn lethal.
+- The player never stands still. With an input object and no key held the
+  game's `want` is eleven units a second, and eleven units a second for
+  the length of the intro is off the far edge of the plain - it fell at
+  `[3, -95]`, during a card. Steering is on for every shot; the "standing"
+  shots pin the speed to zero and get a creep, which reads as an animal
+  shifting its weight.
+- The rivals' brains hunt the player's followers loose faster than the
+  gather adds them (the herd that reached the hold was two). They are set
+  dressing until the clash: brains off for the whole cut, and pinned,
+  because a brainless rival walks too.
+- Two rainbows only explode if their herd CENTROIDS come within the sum of
+  the two footprints, and a centroid trails its leader by about
+  `spd / 2.2`. At a lit herd's natural 37 that lag is ten, wider than either
+  footprint, so the leader reaches the other band first and is run over;
+  pinned to twelve, the centroids meet first and it detonates.
+- Ignition is placed, not hoped for: the hold is given the head start that
+  ends it at a charge of .97, and the first frame of the next shot sets it
+  to 1.
 
-The music itself is the same idea as Snap's - a port of `snd.js` (tempo,
-gallop pattern, bassline, lead) played on the sampled one-shots, arranged
-against the trailer's beats instead of against a herd size.
+`FB_STRICT=1` makes the recorder stop at the first frame the match is not
+running, with the frame before it in the log - that frame is the one that
+explains it.

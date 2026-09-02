@@ -1,41 +1,61 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Unicorn Fireball — end card</title>
+<title>Unicorn Fireball &mdash; end card</title>
 <style>
-  /* The plain's own night: a deep violet that the game fogs its horizon to,
-     rather than a neutral black. The seven stops in the bar are RAINBOW from
-     fireball/src/uni.js, in order, so the card is literally the game's
-     palette and not an approximation of it. */
+  /* The game's own title screen, at 1080p. Seven copies of the word, one
+     per colour of RAINBOW, stacked and offset exactly as fireball/src/main.js
+     stacks them - and shaken on the beat the way the game shakes them, by
+     the same arithmetic (x = (3-i)*1.5 - beat*(3-i), y = (i-3)*2.5), scaled
+     by 1920/640. The cream copy sits on top. */
   html,body{margin:0;padding:0;width:1920px;height:1080px;overflow:hidden;
-    background:radial-gradient(ellipse at 50% 72%, #241a3d 0%, #150f26 55%, #090713 100%);
-    font-family:'Arial Black',Arial,sans-serif;display:flex;align-items:center;justify-content:center}
-  .wrap{display:flex;flex-direction:column;align-items:center;text-align:center}
-  /* The title carries the same chromatic split the game's own title uses -
-     three offset copies, warm on one side and cool on the other. */
-  .title{position:relative;font-size:118px;font-weight:900;letter-spacing:5px;opacity:0;
-    color:#fdf6ec;transform:translateY(16px);animation:up .6s ease-out .15s forwards}
-  .title::before,.title::after{content:'UNICORN FIREBALL';position:absolute;left:0;top:0;z-index:-1}
-  .title::before{color:#db4d52;transform:translate(-5px,-2px)}
-  .title::after{color:#6b7ae0;transform:translate(5px,2px)}
-  .bar{width:660px;height:16px;margin-top:36px;border-radius:3px;opacity:0;
-    background:linear-gradient(90deg,#db4d52,#e58f42,#e6d14d,#70c26b,#52a8c7,#6b7ae0,#ad6bd6);
-    animation:grow .5s ease-out .55s forwards}
-  .tagline{margin-top:30px;font-size:31px;font-weight:400;color:#efe6ff;letter-spacing:1px;
-    font-family:Arial,sans-serif;opacity:0;animation:up .5s ease-out .95s forwards}
-  .js13k{margin-top:46px;font-size:34px;font-weight:900;color:#e6d14d;letter-spacing:1px;
-    opacity:0;animation:up .5s ease-out 1.25s forwards}
-  .sub{margin-top:10px;font-size:22px;font-weight:400;color:#c9bde4;font-family:Arial,sans-serif;
-    opacity:0;animation:up .5s ease-out 1.45s forwards}
-  .byline{margin-top:44px;font-size:18px;font-weight:400;color:#8579a8;letter-spacing:1px;
-    font-family:Arial,sans-serif;opacity:0;animation:up .5s ease-out 1.7s forwards}
-  @keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-  @keyframes grow{from{opacity:0;transform:scaleX(0)}to{opacity:1;transform:scaleX(1)}}
+    background:#050410;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+    display:flex;align-items:center;justify-content:center}
+  /* The plain's own night behind it, and the game's top-down scrim. */
+  .sky{position:fixed;inset:0;background:
+    linear-gradient(180deg,rgba(5,4,14,.7) 0%,rgba(5,4,14,.25) 55%,rgba(5,4,14,0) 100%),
+    radial-gradient(ellipse at 50% 78%,#241a3d 0%,#150f26 55%,#090713 100%)}
+  .wrap{position:relative;text-align:center;z-index:1}
+  .title{position:relative;height:150px}
+  .c{position:absolute;left:0;right:0;font-weight:700;font-size:132px;letter-spacing:0;
+    white-space:nowrap;opacity:.9}
+  .top{position:relative;color:#f3ead6;font-weight:700;font-size:132px;white-space:nowrap}
+  .l1{margin-top:64px;font-size:45px;color:#d8d0ea;opacity:0;animation:up .5s ease-out .5s forwards}
+  .l2{margin-top:28px;font-size:45px;color:#ffb0b8;opacity:0;animation:up .5s ease-out .75s forwards}
+  .js13k{margin-top:70px;font-size:54px;font-weight:700;color:#c9b8ff;opacity:0;
+    animation:up .5s ease-out 1.1s forwards}
+  .sub{margin-top:16px;font-size:36px;color:#8fe3c8;opacity:0;animation:up .5s ease-out 1.3s forwards}
+  .byline{margin-top:56px;font-size:36px;color:#9a90b8;opacity:0;animation:up .5s ease-out 1.55s forwards}
+  @keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.c0{transform:translate(13.5px,-22.5px);animation:k0 0.4545s steps(1,end) infinite}
+@keyframes k0{0%{transform:translate(4.5px,-22.5px)}26%{transform:translate(13.5px,-22.5px)}100%{transform:translate(13.5px,-22.5px)}}
+.c1{transform:translate(9.0px,-15.0px);animation:k1 0.4545s steps(1,end) infinite}
+@keyframes k1{0%{transform:translate(3.0px,-15.0px)}26%{transform:translate(9.0px,-15.0px)}100%{transform:translate(9.0px,-15.0px)}}
+.c2{transform:translate(4.5px,-7.5px);animation:k2 0.4545s steps(1,end) infinite}
+@keyframes k2{0%{transform:translate(1.5px,-7.5px)}26%{transform:translate(4.5px,-7.5px)}100%{transform:translate(4.5px,-7.5px)}}
+.c3{transform:translate(0.0px,0.0px);animation:k3 0.4545s steps(1,end) infinite}
+@keyframes k3{0%{transform:translate(0.0px,0.0px)}26%{transform:translate(0.0px,0.0px)}100%{transform:translate(0.0px,0.0px)}}
+.c4{transform:translate(-4.5px,7.5px);animation:k4 0.4545s steps(1,end) infinite}
+@keyframes k4{0%{transform:translate(-1.5px,7.5px)}26%{transform:translate(-4.5px,7.5px)}100%{transform:translate(-4.5px,7.5px)}}
+.c5{transform:translate(-9.0px,15.0px);animation:k5 0.4545s steps(1,end) infinite}
+@keyframes k5{0%{transform:translate(-3.0px,15.0px)}26%{transform:translate(-9.0px,15.0px)}100%{transform:translate(-9.0px,15.0px)}}
+.c6{transform:translate(-13.5px,22.5px);animation:k6 0.4545s steps(1,end) infinite}
+@keyframes k6{0%{transform:translate(-4.5px,22.5px)}26%{transform:translate(-13.5px,22.5px)}100%{transform:translate(-13.5px,22.5px)}}
 </style>
+<div class="sky"></div>
 <div class="wrap">
-  <div class="title">UNICORN FIREBALL</div>
-  <div class="bar"></div>
-  <div class="tagline">gather it &middot; hold it &middot; become it</div>
+  <div class="title">
+        <span class="c c0" style="color:#db4d52">UNICORN FIREBALL</span>
+    <span class="c c1" style="color:#e58f42">UNICORN FIREBALL</span>
+    <span class="c c2" style="color:#e6d14d">UNICORN FIREBALL</span>
+    <span class="c c3" style="color:#70c26b">UNICORN FIREBALL</span>
+    <span class="c c4" style="color:#52a8c7">UNICORN FIREBALL</span>
+    <span class="c c5" style="color:#6b7ae0">UNICORN FIREBALL</span>
+    <span class="c c6" style="color:#ad6bd6">UNICORN FIREBALL</span>
+    <div class="top">UNICORN FIREBALL</div>
+  </div>
+  <div class="l1">gather your colour into a herd, fight horn to horn</div>
+  <div class="l2">hold SPACE to charge: held long enough, the herd BECOMES the rainbow</div>
   <div class="js13k">js13kGames 2026</div>
   <div class="sub">a WebGL game in 13 kilobytes &mdash; plays in your browser</div>
-  <div class="byline">@gtanczyk&nbsp;&nbsp;|&nbsp;&nbsp;gamedev.pl&nbsp;&nbsp;|&nbsp;&nbsp;2026</div>
+  <div class="byline">@gtanczyk&nbsp;|&nbsp;gamedev.pl&nbsp;|&nbsp;2026</div>
 </div>

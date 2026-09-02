@@ -130,7 +130,10 @@ DUR = END + ENDCARD + 1.0
 MOVEMENT = {
     'face': 'dark',
     'walk1': 'walk', 'walk1Hit': 'silence', 'down1': 'down',
-    'walk2': 'walk', 'walk2Hit': 'silence',
+    # The second walk does NOT reset to the first walk's music box: it
+    # carries the motif from the get-up, so the hero sets off again inside
+    # the tune it stood up to.
+    'walk2': 'walk2', 'walk2Hit': 'silence',
     'crane': 'war',
     'cardGather': 'groove', 'gatherA': 'groove', 'gatherB': 'groove', 'cardTrample': 'groove', 'trample': 'groove',
     'cardRainbow': 'break', 'hold': 'break',
@@ -218,9 +221,19 @@ def music_box(t, semi, gain, pan=0.0):
 
 
 def far_boom(t, gain):
-    """An explosion somewhere else: the sub arrives, the crack does not."""
-    add(t, sine(64, 1.4, gain, attack=0.01, f2=22), 1.0)
-    add(t, lowpass(noise(0.9, int(t * 100) % 977)) * np.exp(np.arange(int(SR * 0.9)) / SR / 0.9 * np.log(0.002)) * gain * 4.0, 1.0)
+    """An explosion somewhere else. Distance takes the crack off a blast and
+    leaves a roll: no transient at all, a slow swell into a long decay, and
+    nothing above a few hundred hertz. The first cut fired a sharp noise
+    burst with a hard attack, and four seconds in it read as a firecracker
+    going off next to the microphone."""
+    d = 2.6
+    n = int(SR * d)
+    tt = np.arange(n) / SR
+    # Swell in over a fifth of a second, then roll away.
+    shape = np.minimum(1.0, tt / 0.22) * np.exp(-tt / (d * 0.34))
+    rumble = lowpass(noise(d, int(t * 100) % 977), 0.006) * shape * gain * 9.0
+    add(t, rumble, 1.0)
+    add(t, sine(48, d * 0.8, gain * 0.5, attack=0.18, f2=19), 1.0)
 
 
 def near_boom(t, gain):
@@ -234,6 +247,17 @@ def far_rainbow(t, gain, pan):
     """The seven-note fan the game plays at ignition, from across the plain."""
     for i, semi in enumerate([0, 4, 7, 11, 14, 16, 19]):
         add(t + i * 0.05, sine(NOTE(semi), 0.9, gain, attack=0.01), 1.0, pan=pan)
+
+
+def rumble_in(t, dur, gain):
+    """The herd approaching: a low roar that grows, under everything."""
+    n = int(SR * dur)
+    tt = np.arange(n) / SR
+    k = (tt / dur) ** 2.2
+    body = lowpass(noise(dur, int(t * 100) % 811), 0.010) * k * gain * 7.0
+    # A tremble on top of it, not quite a rhythm - hooves too many to count.
+    body += np.sin(2 * np.pi * 34 * tt) * k * gain * 0.5
+    add(t, body, 1.0)
 
 
 def impact(t, gain):
@@ -277,6 +301,20 @@ while t < END + 0.5:
             add(t, resample(hoof_s, 180 / 400), 0.22, pan=-0.12)
         if BASS[wh] != R and wh % 4 == 0:
             add(t, env(resample(bass_s, NOTE(BASS[wh] - 12) / bass_f0), 0.3, 0.55), 1.0)
+
+    elif m == 'walk2':
+        # The get-up's climbing figure, in the music box, over its chord:
+        # the same four notes it stood up to, now walking.
+        rise4 = [12, R, 15, R, 19, R, 15, R, 12, R, 19, R, 24, R, R, R]
+        w0 = C['walk2']
+        ws = int(round((t - w0) / STEP)) % 16
+        if rise4[ws] != R:
+            music_box(t, rise4[ws], 0.32, pan=0.2 if ws % 4 < 2 else -0.2)
+        if ws % 4 == 0:
+            add(t, resample(hoof_s, 320 / 400), 0.30, pan=0.12)
+        if ws == 0:
+            for semi, g in ((-12, 0.34), (-5, 0.2), (0, 0.14)):
+                add(t, held(NOTE(semi), BAR * 1.05, g, attack=0.25, release=0.45), 1.0)
 
     elif m in ('silence', 'down'):
         # Nothing. A room tone so it is a held breath and not a dropout.
@@ -375,6 +413,12 @@ for tt in np.arange(t0 + 0.4, t1 - 0.3, 0.55):
     if rng.random() < 0.7:
         add(tt + rng.random() * 0.3, resample(hoof_s, 140 / 400), 0.06 + rng.random() * 0.08, pan=rng.uniform(-0.6, 0.6))
 
+# The ground under each walk: a roar that grows for the second and a
+# quarter before the hit, the audio half of the tremor in the picture.
+for key, gain in (('walk1Hit', 0.5), ('walk2Hit', 0.6)):
+    if key in C:
+        rumble_in(C[key] - 1.25, 1.25, gain)
+
 # The two hits. The second bigger, and with the rainbow's own chord jammed
 # into it, because that one was a rainbow.
 for k, key in enumerate(('walk1Hit', 'walk2Hit')):
@@ -408,6 +452,14 @@ for i, semi in enumerate([0, 4, 7, 11, 14, 16, 19]):
     add(ig + i * 0.035, sine(NOTE(12 + semi), 0.8, 0.2, attack=0.004), 1.0, pan=-0.3 + i * 0.1)
 for semi, g in ((0, 0.4), (7, 0.28), (12, 0.2), (19, 0.14)):
     add(ig, held(NOTE(semi), BAR * 2, g, attack=0.02, release=0.8), 1.0)
+# And then it is a MELODY, not a one-shot: the same seven-note fan four more
+# times over the ride, transposed up the herd's own pentatonic and back, one
+# per half bar, so the sound the rainbow makes is the tune of the sequence.
+for k, semi in enumerate([5, 7, 12, 7]):
+    at = ig + BAR * (0.5 + k * 0.5)
+    for i, n2 in enumerate([0, 4, 7, 11, 14, 16, 19]):
+        add(at + i * 0.03, sine(NOTE(12 + semi + n2), 0.55, 0.115, attack=0.004), 1.0,
+            pan=-0.3 + i * 0.1)
 
 # The riser under the hold: pitch climbing three octaves, the game's rise(k).
 t0, t1 = C['cardRainbow'], ig
@@ -421,16 +473,10 @@ add(t0, riser, 1.0)
 sw = noise(2.0, 5) * (np.arange(int(SR * 2.0)) / SR / 2.0) ** 2.5 * 0.5
 add(t1 - 2.0, sw, 1.0)
 
-# Into the slow motion, and the swell into the clash.
+# Into the slow motion. NO riser over the approach - the two bands are
+# already running and already lit, and a rising tone under them read as a
+# second ignition that never came.
 if 'slowmo' in C:
-    t0, t1 = C['approach'], C['slowmo']
-    n = int(SR * max(0.2, t1 - t0))
-    tt = np.arange(n) / SR
-    k = tt / max(0.2, t1 - t0)
-    sweep = 220 * 2 ** (k * 2)
-    riser = np.sin(2 * np.pi * np.cumsum(sweep) / SR) * (0.05 + k ** 2 * 0.2) * np.minimum(1, tt / 0.4)
-    riser *= np.minimum(1, (max(0.2, t1 - t0) - tt) / 0.05)
-    add(t0, riser, 1.0)
     t0, t1 = C['slowmo'], C['clash']
     d = max(0.3, t1 - t0)
     sw = noise(d, 7) * (np.arange(int(SR * d)) / SR / d) ** 3 * 0.6
@@ -440,6 +486,13 @@ if 'slowmo' in C:
 # card with the music box coming back over it.
 cl = C['clash']
 near_boom(cl, 1.6)
+# The picture holds the blast for two seconds at an eighth speed now, so the
+# sound holds too: a second sub under the first, slower, and the rainbow's
+# seven notes again underneath, spread wide.
+add(cl + 0.06, sine(52, 3.4, 0.85, attack=0.02, f2=17), 1.0)
+add(cl + 0.3, lowpass(noise(3.0, 23), 0.008) * np.exp(-np.arange(int(SR * 3.0)) / SR / 1.1) * 3.2, 1.0)
+for i, semi in enumerate([0, 4, 7, 12, 16, 19, 24]):
+    add(cl + 0.5 + i * 0.16, sine(NOTE(semi), 1.5, 0.13, attack=0.02), 1.0, pan=-0.35 + i * 0.12)
 for semi, g in ((0, 0.26), (7, 0.17), (12, 0.12), (16, 0.07)):
     add(cl + 0.4, held(NOTE(semi - 12), DUR - cl - 0.4, g, attack=1.4, release=1.0), 1.0)
     add(cl + 0.4, held(NOTE(semi), DUR - cl - 0.4, g * 0.5, attack=1.6, release=1.0, partial2=0.2), 1.0)

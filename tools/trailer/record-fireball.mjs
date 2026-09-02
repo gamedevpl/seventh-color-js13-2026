@@ -453,10 +453,15 @@ const S = (o) => ({ id: id++, ...o });
 // A rival herd sent across the hero's path from one side, at speed, with
 // its charge up so its horns count - or lit, so its rainbow does. Aimed at
 // where the hero WILL be, `lead` units on, since the hero keeps walking.
-const crossHerd = (i, side, lit, lead, size = 18) => stage(({ i, side, lit, lead, size }) => {
+// `ang` is where it comes FROM, measured off the hero's own heading. A
+// right angle sends it clipping across a frame edge; a hundred and fifteen
+// degrees starts it behind the hero's shoulder and runs it forward through
+// the middle of the shot, toward the lens, so the hit lands centre frame.
+const crossHerd = (i, side, lit, lead, size = 18, ang = 2.0) => stage(({ i, side, lit, lead, size, ang }) => {
   const { units, leaders } = window.FB, P = leaders[0], R = leaders[i];
   const px = Math.cos(P.yaw), pz = Math.sin(P.yaw);
-  const sx = -pz * side, sz = px * side;
+  const a = P.yaw + side * ang;
+  const sx = Math.cos(a), sz = Math.sin(a);
   const tx = P.x + px * lead, tz = P.z + pz * lead;
   R.x = tx + sx * 30; R.z = tz + sz * 30; R.yaw = Math.atan2(-sz, -sx);
   R.st = 0; R.stun = 0; R.hearts = 3; R.cool = 0; R.spd = 30; R.charge = .8; R.chg = 1; R.y = 0;
@@ -469,7 +474,7 @@ const crossHerd = (i, side, lit, lead, size = 18) => stage(({ i, side, lit, lead
   }
   R.n = n;
   if (lit) { R.charge = 1; R.wave = 1 + n; R.burn = 9; R.spent = 0; }
-}, { i, side, lit, lead, size });
+}, { i, side, lit, lead, size, ang });
 // Belt and braces for the two falls: if the physics has not thrown the
 // hero by the frame it should have, throw it. Same pose, same tumble - the
 // game's own - just not left to a horn's dice.
@@ -502,13 +507,12 @@ await stage(() => {
 });
 const WHITE = [1, .96, .9];
 const FACE_FLASHES = [
-  { at: .95, col: RGB(RAINBOW[4]), dir: [1, .4, 1], len: .4, gain: 1.6, air: .3 },
-  { at: 1.75, col: RGB(RAINBOW[0]), dir: [1, .5, -1], len: .35, gain: 1.7, air: .3 },
-  { at: 2.3, col: WHITE, dir: [1, .3, .7], len: .55, gain: 1.6, air: .22, boom: 1 },
-  { at: 3.05, col: RGB(RAINBOW[3]), dir: [1, .4, -.6], len: .35, gain: 1.5, air: .3 },
-  { at: 3.55, col: RGB(RAINBOW[6]), dir: [1, .6, 1.2], len: .35, gain: 1.6, air: .3 },
-  { at: 4.05, col: WHITE, dir: [1, .2, -1], len: .7, gain: 1.9, air: .28, boom: 1 },
-  { at: 4.8, col: RGB(RAINBOW[1]), dir: [1, .5, .8], len: .35, gain: 1.5, air: .3 },
+  // Four, not seven. A fight next door is a thing you catch glimpses of;
+  // seven in five seconds is a disco.
+  { at: 1.15, col: RGB(RAINBOW[4]), dir: [1, .4, 1], len: .45, gain: 1.5, air: .26 },
+  { at: 2.55, col: WHITE, dir: [1, .3, .7], len: .8, gain: 1.5, air: .2, boom: 1 },
+  { at: 3.9, col: RGB(RAINBOW[0]), dir: [1, .5, -1], len: .45, gain: 1.6, air: .26 },
+  { at: 4.85, col: RGB(RAINBOW[6]), dir: [1, .6, 1.2], len: .5, gain: 1.4, air: .24 },
 ];
 const faceFlash = flashes(FACE_FLASHES);
 await shoot(S({
@@ -523,11 +527,18 @@ cues.faceFlashes = FACE_FLASHES.map((f) => ({ at: +(cues.face + f.at).toFixed(3)
 
 // --- II. sets off, hopeful ------------------------------------------------------
 // The lens ahead of it, backing away as it comes on. Then a herd.
-const WALK = { subj: 0, e0: [4.2, .5, 1.25], e1: [7.6, .9, 1.65], l0: [.7, 0, 1.15], fov0: .7, fov1: .78, ease: 'lin' };
+// Backing away ahead of it, and widening as it goes: by the hit the lens
+// is far enough out and open enough to hold the herd arriving AND the hero
+// it arrives on, with the impact in the middle of the frame.
+const WALK = { subj: 0, e0: [4.2, .5, 1.25], e1: [10.5, 1.9, 2.3], l0: [.7, 0, 1.15], fov0: .7, fov1: .95, ease: 'lin' };
+// The ground, felt before the herd is seen: nothing, then a tremor that
+// grows over the last second and a quarter into the hit.
+const tremor = (t, hit) => Math.max(0, Math.min(1, (t - (hit - 1.25)) / 1.25)) ** 2 * .34;
 const HIT1 = bars(2.5) - 1.15;
 await shoot(S({
   name: 'walk1', dur: bars(2.5), scale: 1, cam: WALK,
   guard: (t) => (t < HIT1 - 1.0 ? { pin: 5.5, yaw: 0 } : { mortal: 1, horns: 1, pin: 5.5, drive: [{ i: 1, spd: 30, charge: .8 }] }),
+  overlay: (t) => ({ shake: tremor(t, HIT1) }),
   beats: [
     { at: HIT1 - 1.0, send: () => crossHerd(1, 1, false, 5.5) },
     { at: HIT1 + .25, hit: 1, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 5; } }, arg: [2, -9, 8] },
@@ -553,6 +564,7 @@ await shoot(S({
   name: 'walk2', dur: bars(2.25), scale: 1, cam: WALK,
   stage: () => { const P = window.FB.leaders[0]; P.yaw = 0; P.up = 0; P.st = 0; P.y = 0; },
   guard: (t) => (t < HIT2 - 1.0 ? { pin: 5.5, yaw: 0 } : { mortal: 1, pin: 5.5, drive: [{ i: 2, spd: 30 }] }),
+  overlay: (t) => ({ shake: tremor(t, HIT2) }),
   beats: [
     // The band is the herd's centroid, and at thirty units a second the
     // centroid trails the leader by thirteen - so the leader is aimed at
@@ -618,25 +630,46 @@ await shoot(S({
 await giveHerd(8, 8);
 
 await shoot(S(cardShot('cardTrample', 'trample the rest.', bars(.75))));
-// Charge held short of ignition, so the herd runs hard and its horns count,
-// into a herd parked in its way. Side on, framed on the ones about to be hit.
+// Three looks at the same thing, because one side-on wide said nothing:
+// the game's own chase camera behind the herd, a lens down among the ones
+// being hit, and a static wide the whole thing crosses. The charge is held
+// short of ignition throughout, so the herd runs hard and its horns count
+// and nothing lights.
+// `from` is where the herd starts. At twenty-six units a second it covers
+// thirty-five in a shot this long, so starting it twenty-two out puts the
+// impact in the last tenth of the cut - which is what the first pass did,
+// three times, and why all three read as the aftermath.
+const victims = (i, x, z, n, from) => stage(({ i, x, z, n, from }) => {
+  const { units, leaders } = window.FB, P = leaders[0], R = leaders[i];
+  P.x = from; P.z = 0; P.yaw = 0; P.spd = 26;
+  for (const u of units) if (u.lead === 0 && u !== P) { u.x = P.x - 4 + (Math.random() - .5) * 9; u.z = P.z + (Math.random() - .5) * 9; }
+  R.x = x; R.z = z; R.yaw = Math.PI / 2; R.st = 0; R.stun = 0; R.hearts = 3; R.wave = 0; R.charge = 0; R.chg = 0; R.y = 0;
+  let k = 0;
+  for (const u of units) {
+    if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
+    if (k >= n) break;
+    u.lead = i; u.col = R.col; u.st = 0; u.daze = 0;
+    u.x = R.x + (Math.random() - .5) * 9; u.z = R.z + (Math.random() - .5) * 9; k++;
+  }
+  R.n = k;
+}, { i, x, z, n, from });
+
+await victims(3, 10, 1, 12, -16);
 await shoot(S({
-  name: 'trample', dur: bars(1.5), scale: 1, guard: { charge: .75 },
-  stage: () => {
-    const { units, leaders } = window.FB, P = leaders[0], R = leaders[3];
-    P.x = -22; P.z = 0; P.yaw = 0;
-    for (const u of units) if (u.lead === 0 && u !== P) { u.x = P.x - 4 + (Math.random() - .5) * 8; u.z = P.z + (Math.random() - .5) * 8; }
-    R.x = 12; R.z = 1; R.yaw = Math.PI / 2; R.st = 0; R.stun = 0; R.wave = 0; R.charge = 0; R.chg = 0;
-    let n = 0;
-    for (const u of units) {
-      if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
-      if (n >= 11) break;
-      u.lead = 3; u.col = R.col; u.st = 0; u.daze = 0;
-      u.x = R.x + (Math.random() - .5) * 8; u.z = R.z + (Math.random() - .5) * 8; n++;
-    }
-    R.n = n;
-  },
-  cam: { world: true, e0: [16, 4.5, 24], e1: [13, 3.8, 19], l0: [11, 1.5, 1], fov0: .9, ease: 'lin' },
+  name: 'trampleA', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26 },
+  cam: { subj: 'herd', follow: true, e0: [-13, 0, 4.5], e1: [-11, 0, 4.0], l0: [9, 0, 1.4], fov0: .95, ease: 'lin' },
+}));
+await victims(4, 8, 0, 12, -13);
+await shoot(S({
+  name: 'trampleB', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26 },
+  // Down among them, a stride from where it lands.
+  cam: { world: true, e0: [13, 1.15, 7.5], e1: [12, 1.0, 6.6], l0: [4, 1.0, 0], fov0: .85, ease: 'lin' },
+}));
+await victims(5, 9, 1, 12, -12);
+await shoot(S({
+  name: 'trampleC', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26 },
+  // Locked off, and the whole thing crosses it.
+  cam: { world: true, e0: [4, 3.4, 21], l0: [3, 1.3, 0], fov0: .95, ease: 'lin' },
 }));
 
 await shoot(S(cardShot('cardRainbow', 'become the rainbow.', bars(.75))));
@@ -671,10 +704,12 @@ await shoot(S({
 // the white is what the end card dissolves out of.
 let boomT = null;
 await shoot(S({
-  name: 'approach', until: (info, st, t) => (st.boomAt !== undefined && t - st.boomAt > 1.0) || t > 7.5,
+  name: 'approach', until: (info, st, t) => (st.boomAt !== undefined && t - st.boomAt > 2.6) || t > 9,
   scale: (info, st, t) => {
     if (info && info.boom) st.boomAt = t;
-    if (st.boomAt !== undefined) return .18;
+    // Slower still after the hit, and held: the last cut ran the blast off
+    // in a third of a second and went to white before it had opened.
+    if (st.boomAt !== undefined) return .12;
     return info && info.wave && info.dCent < 25 ? .18 : 1;
   },
   slowCue: 'slowmo',
@@ -698,8 +733,15 @@ await shoot(S({
       for (const u of units) if (u.lead === i && u !== L) { u.x = L.x + (Math.random() - .5) * 7; u.z = L.z + (Math.random() - .5) * 7; }
     }
   },
-  cam: { subj: 'herd', follow: true, e0: [-34, 0, 15], e1: [-22, 0, 9.5], l0: [22, 0, 2.5], l1: [14, 0, 2], fov0: .95, fov1: .88, ease: 'in' },
-  overlay: (t, u, info) => { if (info && info.boom && boomT === null) boomT = t; return { white: boomT === null ? 0 : fin(t, boomT, .32) }; },
+  // Side on and high, both bands in one frame and both already running -
+  // from behind our own we could only see the other one arrive.
+  cam: { world: true, e0: [0, 34, 60], e1: [0, 23, 42], l0: [0, 3, 0], l1: [0, 2, 0], fov0: 1.05, fov1: .95, ease: 'in' },
+  overlay: (t, u, info) => {
+    if (info && info.boom && boomT === null) boomT = t;
+    // The white comes LATE now - the ring and the cloud get their two
+    // seconds first, and the end card dissolves out of what is left.
+    return { white: boomT === null ? 0 : fin(t, boomT + 1.5, .9) };
+  },
 }));
 
 await browser.close();

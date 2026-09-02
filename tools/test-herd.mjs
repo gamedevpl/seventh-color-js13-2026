@@ -29,7 +29,10 @@ writeFileSync(pagePath, html);
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 900, height: 640 } });
 const problems = [];
-page.on('console', (m) => { if (m.type() === 'error' && !/GL Driver/.test(m.text())) problems.push(m.text()); });
+// The title listens to the competition relay for a rider count; this
+// sandbox has no route to it, and that is weather, not a page error.
+const weather = (t) => /GL Driver|WebSocket connection to 'wss:\/\/relay\.js13kgames\.com/.test(t);
+page.on('console', (m) => { if (m.type() === 'error' && !weather(m.text())) problems.push(m.text()); });
 page.on('pageerror', (e) => problems.push(e.message));
 await page.addInitScript(() => {
   const proto = (window.AudioContext || window.webkitAudioContext).prototype, orig = proto.createOscillator;

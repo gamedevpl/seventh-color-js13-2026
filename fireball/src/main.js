@@ -527,11 +527,14 @@ function frame(now_) {
   const k = Math.min(1, dt * 5);
   eye[0] = lerp(eye[0], ex, k); eye[1] = lerp(eye[1], ey, k); eye[2] = lerp(eye[2], ez, k);
   look[0] = lerp(look[0], lx, k); look[1] = lerp(look[1], ly, k); look[2] = lerp(look[2], lz, k);
+  // The trailer's tripod. Placed, not eased: the recorder animates its own
+  // moves one pumped frame at a time, and a lerp on top of that is lag.
+  if (DEV && window.FBCAM_) { eye = [...window.FBCAM_.e]; look = [...window.FBCAM_.l]; }
   const sh = shake * shake * .5;
   const e2 = [eye[0] + (Math.random() - .5) * sh, eye[1] + (Math.random() - .5) * sh, eye[2] + (Math.random() - .5) * sh];
   const view = lookAt(e2, look);
   camR = [view[0], view[4], view[8]]; camU = [view[1], view[5], view[9]];
-  const vp = mul(perspective(mode === 'title' ? .8 : 1.0, VW / VH, .1, 1500), view);
+  const vp = mul(perspective(DEV && window.FBCAM_ ? window.FBCAM_.fov : mode === 'title' ? .8 : 1.0, VW / VH, .1, 1500), view);
 
   // --- draw ---------------------------------------------------------------
   frameGL(vp, e2, FOG);
@@ -751,4 +754,4 @@ function frame(now_) {
 }
 requestAnimationFrame(frame);
 
-if (DEV) window.FB = { units, leaders, events, net, spy, netOpen, goOnline, goHome, get victory() { return victory; }, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; } };
+if (DEV) window.FB = { units, leaders, events, net, spy, netOpen, goOnline, goHome, get victory() { return victory; }, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; }, get flash() { return flash; }, get shake() { return shake; } };

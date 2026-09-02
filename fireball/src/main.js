@@ -478,7 +478,7 @@ function frame(now_) {
     if (e.k === 'join') { if (e.L === P) sJoin(P.n); burst([e.u.x, .8, e.u.z], 6, 2, COL[e.u.col]); }
     else if (e.k === 'knock') { thud(); burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
     else if (e.k === 'horn') { clang(); burst([e.x, 1, e.z], 5, 3, [1, .9, .6]); }
-    else if (e.k === 'graze') { clang(); burst([e.x, 1.5, e.z], 40, 7); shake = Math.max(shake, .5); }
+    else if (e.k === 'graze') { clang(); burst([e.x, 1.5, e.z], 40, 7); }
     else if (e.k === 'chg') { if (e.L === P) say('CHARGE!', 1); }
     else if (e.k === 'ignite') {
       // The band lights: a flash, a fan of sparks the size of the herd, and
@@ -550,6 +550,7 @@ function frame(now_) {
     const set = U[u.st === 3 ? WILD : u.col];
     const x = u.x, y = u.y, z = u.z, s = (u.hearts ? 1.25 : 1) * u.size, yaw = u.yaw;
     const bob = u.st ? 0 : Math.sin(u.ph * 2) * .05 * Math.min(1, u.sp / 5);
+    drawMesh(set.shadow, modelTR(x, 0, z, -yaw + Math.PI / 2, s));
     const M = modelTR(x, y + bob, z, -yaw + Math.PI / 2, s);
     // Thrown: it tumbles about its long axis, and lands on its side. `up`
     // is the second and a half it spends rolling back onto its feet -
@@ -582,14 +583,12 @@ function frame(now_) {
   drawMesh(tuftM, IDENT); drawMesh(postM, IDENT); drawMesh(starM, IDENT);
   for (const L of leaders) if (L.st !== 3) drawCharge(L, T, dt);
   for (const b of BOOMS) {
-    // The shockwave: one ring on the ground, thin and fast, with a second
-    // just inside it cycling through the colours. Seven concentric rings
+    // The shockwave: one ring on the ground, thin and fast. Seven concentric rings
     // rising in a stack read as a gradient; one ring travelling reads as a
     // blast, and the volume comes from the cloud below instead.
     const k = b.t / 1.6, R = (5 + b.pw * .7) * Math.sqrt(k) * 3;
     setDim((1 - k) * (1 - k));
     ring(WILD, flat(b.x, .12, b.z, R));
-    ring(((b.t * 14) | 0) % 7, flat(b.x, .15, b.z, R * .82));
     // And the core: a hard white flash for a fifth of a second.
     // And the core: small and brief. A big white disc at the centre is
     // what turned the whole blast into one flat blowout.

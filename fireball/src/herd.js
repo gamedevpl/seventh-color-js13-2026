@@ -380,7 +380,11 @@ export function step(dt, input) {
       // pulls that wedge tight, shoulder to shoulder.
       const n = Math.sqrt(L.n + 1), tight = 1 - .45 * L.charge;
       const drift = Math.sin(time * .7 + u.seed * 5) * .5 + Math.sin(time * .43 + u.seed) * .3;
-      const w = (Math.sin(u.seed * 3) * n * 1.4 + drift) * tight, back = (1.4 + (Math.cos(u.seed * 5) * .5 + .5) * n * 1.6 + drift * .5) * tight;
+      // Slots all round the leader, not a wake behind it: a herd runs
+      // AROUND the one it follows. Each unicorn's seed puts it at a fixed
+      // angle and radius, so the ring is a ring and not a queue.
+      const ang = u.seed * 2.3, rad = (1.6 + (Math.cos(u.seed * 5) * .5 + .5) * n * 1.5) * tight;
+      const w = Math.sin(ang) * rad + drift, back = Math.cos(ang) * rad + drift * .5;
       const c = Math.cos(L.yaw), s = Math.sin(L.yaw);
       const gx = L.x - c * back - s * w, gz = L.z - s * back + c * w;
       const dx = gx - u.x, dz = gz - u.z, d = Math.hypot(dx, dz) || 1;

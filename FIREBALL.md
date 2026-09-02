@@ -722,6 +722,20 @@ anything.
   still reeling throws it. Fights read as fights now. About 50 bytes.
   The autopilot matches got shorter, not longer: 129 seconds on average.
 
+Two more from the same play:
+
+- *The leader runs at the front; the herd should be around it.* The slots
+  were a wake: every follower's place was behind the leader, offset
+  sideways by its seed. Now each seed is an angle and a radius, so the
+  herd is a ring with the leader in it and a charge tightens the ring
+  rather than the wedge. Constants only.
+- *The shadow tumbles with the unicorn.* It was a box in the body mesh,
+  so it inherited the roll and the height of a thrown animal. It is now
+  one shared mesh drawn on the ground in its own pass, before the body,
+  and stays flat whatever the body does. One extra draw a unicorn; paid
+  for by dropping the second, colour-cycling shockwave ring - the puff
+  cloud carries the volume now - and the screen shake on a graze.
+
 ## The wall
 
 F8: **13,277 bytes** packed worst-of-5 at O1, limit 13,312, and **35

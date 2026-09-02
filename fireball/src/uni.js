@@ -23,10 +23,6 @@ export const HIPS = [[-.15, .34], [.15, .34], [-.15, -.34], [.15, -.34]];
 
 export function bodyMesh(c) {
   const v = [];
-  // A shadow: a flat dark slab under the body. It rides with the body,
-  // so it lifts with a thrown unicorn - which, for a box animal, reads
-  // fine, and costs one box rather than a pass.
-  pushBox(v, 0, .03, 0, .7, .02, 1.3, .02, .02, .03);
   pushBox(v, 0, .62, 0, .46, .40, .96, ...W);          // body
   pushBox(v, 0, .58, .42, .40, .34, .30, ...W);        // chest
   // the tail: three strands of the herd colour, fanned
@@ -64,5 +60,11 @@ export function headMesh(c, leader) {
 }
 
 export function buildAll() {
-  return COL.map((c) => ({ body: bodyMesh(c), leg: legMesh(c), head: headMesh(c), crown: headMesh(c, 1) }));
+  // One shadow for everybody: a flat dark slab, drawn on the ground under
+  // each unicorn in its own pass, so it stays down when the body is
+  // thrown or rolls. In the body mesh it tumbled with the body.
+  const sh = [];
+  pushBox(sh, 0, .03, 0, .7, .02, 1.3, .02, .02, .03);
+  const shadow = createMesh(sh);
+  return COL.map((c) => ({ body: bodyMesh(c), leg: legMesh(c), head: headMesh(c), crown: headMesh(c, 1), shadow }));
 }

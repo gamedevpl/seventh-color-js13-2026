@@ -20,7 +20,15 @@ const GAMES = {
   // `npm` is the prefix its stages carry in package.json - Snap's came
   // first and got the unprefixed names.
   snap: { dir: 'trailer', music: 'strut.wav', out: 'unicorn-snap-trailer.mp4', npm: 'trailer' },
-  fireball: { dir: 'trailer-fireball', music: 'stampede.wav', out: 'unicorn-fireball-trailer.mp4', npm: 'fireball:trailer' },
+  // Fireball's glow - the rainbow, the arcs, the explosions - is additive
+  // geometry, and additive geometry blooms the moment it is blurred and
+  // laid back over itself. The mux does that rather than the game: bright
+  // pixels above `thresh` are lifted by `gain`, blurred by `sigma`, and
+  // added back at `opacity`. Every frame, no shader.
+  fireball: {
+    dir: 'trailer-fireball', music: 'stampede.wav', out: 'unicorn-fireball-trailer.mp4', npm: 'fireball:trailer',
+    bloom: { thresh: 120, gain: 2.4, sigma: 28, opacity: 0.75 },
+  },
 };
 const which = (process.argv.find((a) => a.startsWith('--game=')) || '--game=snap').split('=')[1];
 const game = GAMES[which];
@@ -64,8 +72,13 @@ for (const [what, p] of [['frames', framesDir], ['end card', endcard], ['music',
 const frameCount = readdirSync(framesDir).filter((f) => f.endsWith('.png')).length;
 const gameplay = path.join(build, 'gameplay.mp4');
 console.log(`${which}: encoding ${frameCount} frames (${(frameCount / FPS).toFixed(2)}s)`);
+const bloom = game.bloom ? ['-filter_complex',
+  `[0]split[a][b];[b]lutrgb=r='clip((val-${game.bloom.thresh})*${game.bloom.gain},0,255)'`
+  + `:g='clip((val-${game.bloom.thresh})*${game.bloom.gain},0,255)'`
+  + `:b='clip((val-${game.bloom.thresh})*${game.bloom.gain},0,255)',gblur=sigma=${game.bloom.sigma}[g];`
+  + `[a][g]blend=all_mode=addition:all_opacity=${game.bloom.opacity}`] : [];
 sh('ffmpeg', [
-  '-y', '-framerate', String(FPS), '-i', path.join(framesDir, 'f%06d.png'),
+  '-y', '-framerate', String(FPS), '-i', path.join(framesDir, 'f%06d.png'), ...bloom,
   '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', gameplay,
 ]);
 

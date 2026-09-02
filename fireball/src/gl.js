@@ -26,6 +26,17 @@ vc=c*mix(l,1.,add);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(ad
 // it paints a thin black curve across it. Keeping its colour means the
 // overlap is deck-over-deck - the same hue, so the seam disappears - while
 // the alpha fade still lets it die away with distance.
+// The trailer's shader, compiled in by --cheats only. Three things the
+// shipping one hardcodes become uniforms: the fog's start and range (a
+// crane over the plain sees nothing past seventy units otherwise), a
+// coloured flash with a direction of its own (the faces of a box that face
+// it brighten, the rest do not - a rainbow going off out of frame shows on
+// the animal's face), and a gain on every glow's alpha (see setDim).
+const VS_DEV = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam,fl,fd;uniform vec2 fz;
+uniform mediump float add,dim,gls;varying vec3 vc;varying float vf,va;
+void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;vec3 nn=normalize((md*vec4(n,0.)).xyz);
+float l=.55+.45*max(dot(nn,normalize(vec3(.4,1.,.3))),0.);
+vc=c*mix(l,1.,add)+c*fl*max(dot(nn,normalize(fd)),0.)*(1.-add);va=a*dim;vf=clamp((length(w.xyz-cam)-fz.x)/mix(fz.y,fz.y*2.5862,max(add,gls)),0.,1.);}`;
 const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
 uniform vec3 fog;uniform float add,gls;
 void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
@@ -47,12 +58,24 @@ export function initGL(c) {
     return s;
   };
   prog = gl.createProgram();
-  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, DEV ? VS_DEV : VS));
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
   for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls']) loc[u] = gl.getUniformLocation(prog, u);
   gl.uniform1f(loc.dim, 1);
+  if (DEV) {
+    for (const u of ['fl', 'fd', 'fz']) loc[u] = gl.getUniformLocation(prog, u);
+    gl.uniform3f(loc.fl, 0, 0, 0); gl.uniform3f(loc.fd, 0, 1, 0); gl.uniform2f(loc.fz, 12, 58);
+    // FBGL({ flash: [r,g,b], dir: [x,y,z], fog: [start, range], glow: k })
+    // - any subset. Defaults reproduce the shipping shader exactly.
+    window.FBGL = (o) => {
+      if (o.flash) gl.uniform3fv(loc.fl, o.flash);
+      if (o.dir) gl.uniform3fv(loc.fd, o.dir);
+      if (o.fog) gl.uniform2fv(loc.fz, o.fog);
+      if (o.glow !== undefined) gain = o.glow;
+    };
+  }
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
 }
@@ -86,7 +109,11 @@ export function mode(m) {
 
 // A blanket multiplier on every vertex alpha, so one mesh can be drawn a
 // second time as a faint ghost of itself - which is all a reflection is.
-export const setDim = (v) => gl.uniform1f(loc.dim, v);
+// Every glow's alpha goes through `dim`, so a gain here is a gain on the
+// rainbow, the arcs, the explosions and the tufts at once - which is what
+// the trailer means by "more".
+let gain = 1;
+export const setDim = (v) => gl.uniform1f(loc.dim, DEV ? v * gain : v);
 
 // A planar reflection needs a MASK. A mirror image floating beside the
 // track - out over a gap, past the edge, in the empty air - is worse than

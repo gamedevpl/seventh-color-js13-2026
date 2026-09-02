@@ -1,34 +1,36 @@
 // Unicorn Fireball's trailer. Captured the frame-stepped way Snap's is (see
-// record-frames.mjs for why the clock is faked), but this cut is DIRECTED,
-// not captured: a shot list with its own camera, cards on black between
-// the movements, the HUD off for the whole length, and the clock itself
-// bent - ignition and the clash play at a fraction of speed, which a
-// pumped virtual clock gives away for nothing.
+// record-frames.mjs for why the clock is faked), with its own camera
+// (FBCAM_), its own lighting (FBGL: a directional flash, the fog pushed
+// out, a gain on every glow) and its own pyrotechnics (FB.boom), all of
+// them DEV hooks that compile out of the shipping build byte for byte. The
+// HUD is off for the whole length, and the clock is bent where a fall or a
+// light wants a moment.
 //
-// The cut is Apocalypse Now, played straight: a man narrating a tour he
-// has stopped understanding, over unicorns. The plain is the river, the
-// charge is the air cavalry - and the score quotes Ride of the Valkyries
-// on the game's own lead sample at the ignition, which is the joke doing
-// itself. The narration never once acknowledges what is on screen.
+// The story is slapstick with a hero. A face in the dark, lit by the
+// flashes of a fight it is not in. It sets off, hopeful - and a herd runs
+// it down. It lies there, gets up like a hero, shakes it off, sets off
+// again - and a RAINBOW runs it down. It stays down. The camera goes
+// straight up off it, turning, and the whole plain is at war. Then the
+// second half says how: gather a herd, trample the others, become the
+// rainbow - and two rainbows meet, and everything goes white.
 //
-// Every cut is a bar of the game's own music (132 BPM, 1.818s), so the
-// score can be arranged to the picture: this file writes beats.json with
-// the second every shot starts and the frames on which the rainbow lit and
-// the clash detonated, and audio/render-fireball.py reads it.
+// Every cut is a bar of the game's own music (132 BPM, 1.818s) and this
+// file writes beats.json - the second every shot starts and the frames of
+// every hit - for audio/render-fireball.py to score against.
 //
 // Staging notes that cost a while to learn (all still true):
-//   * FB.reset(colour, 0) - the second argument gives the PLAYER an AI
-//     brain. Pass 0.
-//   * The rim is fatal (95 out) and ArrowUp is 15 units a second: held for
-//     long the player runs off the world, fell() takes its hearts, lost()
-//     latches mode='end'. The guard steers, every frame, once the rim is
-//     coming.
+//   * FB.reset(colour, 0) - the second argument gives the PLAYER a brain.
+//   * The player never stands still: with an input object and no key held
+//     the game's `want` is eleven units a second. Steering is on for every
+//     shot; the "standing" shots pin the speed and get a creep.
+//   * A leader with no brain still walks - pinned, it stands.
+//   * The match ends in the SAME step that kills the player, so protection
+//     is preventive: the player cannot be horned unless a shot says
+//     `mortal`, and that is exactly the two shots where it gets run down.
 //   * Two rainbows only explode if their herd CENTROIDS meet, and a
-//     centroid trails its leader by spd/2.2. Pinned to 12 they meet;
-//     at the natural 37 the leader is run over first and they graze.
-//   * The rival's brain lets the rainbow go when it reads the edge down
-//     its nose, and hunts the player's followers loose the rest of the
-//     time. Off with it, for the whole cut.
+//     centroid trails its leader by spd/2.2. Pinned to 12 they meet.
+//   * `up` is the game's own get-up: pinned at .55 the animal lies on its
+//     side, let go it rolls back onto its feet in half a second.
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -129,6 +131,10 @@ await page.evaluate(([RAINBOW]) => {
   count.innerHTML = `<div style="${PLAIN}font-weight:400;font-size:26px;letter-spacing:.34em;opacity:.75">HERD</div>`
     + '<div id="fbn" style="font-size:150px;line-height:.92">1</div>';
   const countN = count.querySelector('#fbn');
+  // A colour over the whole frame at low opacity, screened: what a flash
+  // does to the air between the lens and the animal, while FBGL's
+  // directional flash does what it does to the animal.
+  const tint = el('position:fixed;inset:0;opacity:0;pointer-events:none;z-index:9001;mix-blend-mode:screen');
 
   const ease = (u, kind) => kind === 'in' ? u * u : kind === 'out' ? 1 - (1 - u) * (1 - u)
     : kind === 'lin' ? u : u < .5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u);
@@ -175,47 +181,75 @@ await page.evaluate(([RAINBOW]) => {
       if (d.plant) { if (!camState.eye) camState.eye = e; e = camState.eye; }
       l = rel(S, yaw, d.l0 ? lerp3(d.l0, d.l1 || d.l0, k) : [0, 1.1, 0]);
     }
+    if (d.shake) { const j = d.shake; e = [e[0] + (Math.random() - .5) * j, e[1] + (Math.random() - .5) * j, e[2] + (Math.random() - .5) * j]; }
     window.FBCAM_ = { e, l, fov: lerp(d.fov0 ?? .9, d.fov1 ?? d.fov0 ?? .9, k) };
   };
 
-  // Nobody dies on camera, and the player goes where the shot needs it.
+  // Nobody dies on camera unless the shot says so, and everyone goes where
+  // the shot needs them.
   //
   // PREVENTIVE, not corrective. The match ends in the same step that kills
   // the player - hurt() to no hearts, then lost() right after step() - so
-  // healing it before the next frame is a frame too late. The second
-  // preview of this cut had a charging rival's herd land three horns on the
-  // standing player inside one step. So: the player cannot be horned at
-  // all (`hit` is the per-pair cooldown the fight loop honours), rivals
-  // are held under the charge that makes a horn lethal, and no rival
-  // rainbow burns outside the clash.
+  // healing it before the next frame is a frame too late. So: the player
+  // cannot be horned (`hit` is the per-pair cooldown the fight loop
+  // honours), rivals are held under the charge that makes a horn lethal,
+  // and no rival rainbow burns - EXCEPT in a `mortal` shot, which is the
+  // two where the hero gets run down, and there the guard keeps the hearts
+  // topped up so the throw happens and the death does not.
   const guard = (g, dtGame) => {
     const { leaders } = window.FB;
     const P = leaders[0];
-    P.hearts = 3; P.stun = 0; P.hit = 0.4;
+    P.hearts = 3; P.stun = 0;
+    // `horns` lets a horn land on the hero; `mortal` lets rivals keep a
+    // charge and a rainbow. The first fall is horns; the second is the
+    // rainbow alone - a lit leader's horn would throw the hero half a
+    // second before its band arrived, and the fall would not be the band's.
+    if (!g.horns) P.hit = 0.4;
     if (P.st === 3) { P.st = 0; P.gone = 0; P.spd = 11; }
     for (let i = 1; i < leaders.length; i++) {
       const R = leaders[i];
       if (R.st === 3) { R.st = 0; R.hearts = 3; R.stun = 0; R.gone = 0; R.spd = 11; }
       const d = Math.hypot(R.x, R.z) || 1;
-      if (d > 68) { R.x *= 68 / d; R.z *= 68 / d; }
-      if (!g.aim) {
-        R.charge = Math.min(R.charge, 0.4);
-        if (R.wave) { R.wave = 0; R.chg = 0; R.burn = 0; R.cool = 3; }
+      if (d > 68 && !g.wide) { R.x *= 68 / d; R.z *= 68 / d; }
+      const drv = g.drive && g.drive.find((o) => o.i === i);
+      const paired = g.pairs && g.pairs.some((pr) => pr.includes(i));
+      if (drv) {
+        // Driven: a rival sent somewhere at a speed, a herd that crosses
+        // the frame on cue. Its brain is off, so this IS its brain.
+        if (drv.yaw !== undefined) R.yaw = drv.yaw;
+        R.spd = drv.spd; R.stun = 0;
+        if (drv.charge !== undefined) { R.charge = drv.charge; R.chg = 1; }
+        if (R.wave) { R.burn = Math.max(R.burn, 1.5); R.cool = 0; }
+      } else if (!g.aim && !paired) {
+        if (!g.mortal) { R.charge = Math.min(R.charge, 0.4); if (R.wave) { R.wave = 0; R.chg = 0; R.burn = 0; R.cool = 3; } }
+        // A rival with no brain still walks - pinned, it stands with its
+        // herd ringed round it, which is what set dressing should do.
+        if (!R.ai) R.spd = 0;
       }
-      // A rival with no brain still walks (see the steering note) - and
-      // walked, it piles up on the clamp ring. Pinned, it stands with its
-      // herd ringed round it, which is what set dressing should do.
-      if (!R.ai && !g.aim) R.spd = 0;
+    }
+    // Pairs of lit rivals held head-on at the speed that lets their
+    // centroids meet (see the notes at the top): the war in the background.
+    if (g.pairs) for (const [a, b] of g.pairs) {
+      const A = leaders[a], B = leaders[b];
+      for (const L of [A, B]) {
+        // Lit again the moment the game's own cooldown allows: a war, not
+        // one clash. The first crane found both pairs spent and dark by
+        // the time the lens was high enough to see them.
+        if (!L.wave && L.st === 0 && L.cool <= 0) { L.charge = 1; L.chg = 1; L.wave = 1 + L.n; L.burn = 9; L.spent = 0; }
+        if (L.wave) L.burn = Math.max(L.burn, 1.5);
+        L.stun = 0;
+      }
+      A.yaw = Math.atan2(B.z - A.z, B.x - A.x); B.yaw = Math.atan2(A.z - B.z, A.x - B.x);
+      A.spd = B.spd = 13;
     }
     // Steering is on unless the shot is the clash: the player WALKS - with
-    // an input object and no key held, the game's `want` is eleven units a
-    // second, there is no standing still - and eleven units a second for
-    // the length of the intro is off the far edge of the plain. The third
-    // preview of this cut fell off at [3, -95], during a card.
-    if (!g.aim) {
+    // an input object and no key held the game's `want` is eleven units a
+    // second, and eleven units a second for the length of the intro is off
+    // the far edge of the plain.
+    if (!g.aim && !g.lie) {
       const r = Math.hypot(P.x, P.z) || 1, a = Math.atan2(P.z, P.x);
       const outward = (P.x * Math.cos(P.yaw) + P.z * Math.sin(P.yaw)) / r;
-      if (r > 48 && outward > -0.2) {
+      if (r > 48 && outward > -0.2 && P.st === 0) {
         const side = Math.sign(Math.sin(P.yaw - a)) || 1;
         const want = a + side * (Math.PI / 2 + 0.35);
         const dd = Math.atan2(Math.sin(want - P.yaw), Math.cos(want - P.yaw));
@@ -224,13 +258,18 @@ await page.evaluate(([RAINBOW]) => {
       }
       if (r > 84) { P.x *= 84 / r; P.z *= 84 / r; }
     }
+    // Down: the game's own knocked-flat pose, held.
+    if (g.lie) { P.st = 0; P.y = 0; P.vy = 0; P.vx = P.vz = 0; P.up = .55; P.spd = 0; P.chg = 0; P.charge = 0; }
     if (g.hold && P.wave) { P.burn = Math.max(P.burn, 1.5); P.cool = 0; }
     // `pin: 0` is as near to standing as the game allows - the step still
     // eases toward eleven, so it creeps, which reads as an animal shifting
     // its weight rather than one frozen in place.
-    if (g.pin !== undefined) P.spd = g.pin;
+    if (g.pin !== undefined && P.st === 0) P.spd = g.pin;
+    if (g.yaw !== undefined && P.st === 0) P.yaw = g.yaw;
+    // A charge held short of ignition: the herd runs hard and its horns
+    // count, and nothing lights.
+    if (g.charge !== undefined) { P.charge = g.charge; P.chg = 1; P.cool = 0; }
     if (g.aim) {
-      // Head-on, slow, every frame - see the notes at the top.
       const R = leaders[1];
       if (P.wave && R.wave) {
         P.burn = Math.max(P.burn, 1.5); R.burn = Math.max(R.burn, 1.5); P.cool = 0; R.cool = 0;
@@ -251,18 +290,27 @@ await page.evaluate(([RAINBOW]) => {
     title.style.opacity = s.title;
     count.style.opacity = s.count;
     countN.textContent = String(window.FB.leaders[0].n + 1);
+    if (s.fx) window.FBGL(s.fx);
+    // The flash: on the geometry through the shader, and on the air
+    // through the tint. Both from the same colour and the same moment.
+    const fl = s.flash || { col: [0, 0, 0], k: 0 };
+    window.FBGL({ flash: fl.col.map((c) => c * fl.k), dir: fl.dir || [0, 1, 0] });
+    tint.style.background = `rgb(${fl.col.map((c) => Math.min(255, c * 160) | 0).join(',')})`;
+    tint.style.opacity = Math.min(1, fl.k * (fl.air ?? .5));
     const { leaders } = window.FB;
     const P = leaders[0], R = leaders[1];
     const wasLit = !!P.wave, bothLit = !!(P.wave && R.wave);
+    const wasUp = P.st === 0;
     if (s.guard) guard(s.guard, s.dtGame);
     camera(s.cam, s.shotId, s.u);
     window.__pump(s.dtGame * 1000);
-    white.style.opacity = Math.min(1, window.FB.flash * 1.2);
+    white.style.opacity = Math.max(s.white ?? 0, Math.min(1, window.FB.flash * 1.2));
     const dCent = Math.hypot(R.cx - P.cx, R.cz - P.cz);
     return {
       ignited: !wasLit && !!P.wave, boom: bothLit && !(P.wave && R.wave), dCent, wave: P.wave, n: P.n, charge: P.charge, mode: window.FB.mode,
       // For the take-failed report below: where the player was and what it had.
       st: P.st, hearts: P.hearts, at: [Math.round(P.x), Math.round(P.z)], alive: leaders.filter((L) => L.st !== 3).length,
+      thrown: wasUp && P.st === 1,
     };
   };
 }, [RAINBOW]);
@@ -298,10 +346,18 @@ async function shoot(shot) {
   const state = {};
   for (let i = 0; i < n; i++) {
     const t = i * DT, u = shot.dur ? i / Math.max(1, n - 1) : 0;
+    // Cues inside a shot: a herd sent across the frame, a fog change, a
+    // charge lit by hand. Each fires once, on the first frame past `at`.
+    for (const [bi, b] of (shot.beats || []).entries()) {
+      if (t >= b.at && !state['beat' + bi]) { state['beat' + bi] = 1; await (b.send ? b.send() : stage(b.fn, b.arg)); }
+    }
     const sc = typeof shot.scale === 'function' ? shot.scale(info, state, t) : Array.isArray(shot.scale) ? shot.scale[0] + (shot.scale[1] - shot.scale[0]) * u : (shot.scale ?? 1);
-    const ov = shot.overlay ? shot.overlay(t, u) : {};
+    const ov = shot.overlay ? shot.overlay(t, u, info) : {};
+    const g = typeof shot.guard === 'function' ? shot.guard(t, info, state) : (shot.guard || {});
+    if (info && info.thrown && !cues[shot.name + 'Hit']) cues[shot.name + 'Hit'] = +vt.toFixed(4);
     info = await page.evaluate((s) => window.__tick(s), {
-      dtGame: DT * sc, cam: shot.cam || null, shotId: shot.id, u, guard: shot.guard || {},
+      dtGame: DT * sc, cam: shot.cam ? { ...shot.cam, shake: ov.shake ?? shot.cam.shake } : null, shotId: shot.id, u, guard: g,
+      fx: ov.fx, flash: ov.flash, white: ov.white,
       black: ov.black ?? (shot.card ? 1 : 0), card: ov.card ?? 0, cardText: text(shot.card, t), cardColor: shot.cardColor,
       note: ov.note ?? (shot.note ? 1 : 0), noteText: text(shot.note, t),
       title: ov.title ?? 0, titleText: shot.title || '', count: ov.count ?? 0,
@@ -380,96 +436,202 @@ const place = (x, z, yaw) => stage(({ x, z, yaw }) => {
 console.log('recording Unicorn Fireball');
 await stage((c) => {
   window.FB.reset(c, 0);
-  // The rivals are set dressing until the clash: brains off for the whole
-  // cut. Left on, they HUNT - a preview had them horn the player's
-  // followers loose faster than the gather could add them, and the herd
-  // that reached the hold was two.
+  // The rivals are set dressing, or driven by the guard: brains off for the
+  // whole cut. Left on they hunt the hero's followers loose faster than a
+  // gather can add them.
   for (const L of window.FB.leaders) if (L.ai) L.ai = null;
 }, PLAYER);
 let id = 0;
 const S = (o) => ({ id: id++, ...o });
 
-// --- I. the specimen -------------------------------------------------------
-// One animal, tight and low, with the other seventy simply out of frame -
-// and then a camera move, not a change of staging, puts them in it. The
-// joke only works if nothing is teleported: they were there the whole time.
+// A rival herd sent across the hero's path from one side, at speed, with
+// its charge up so its horns count - or lit, so its rainbow does. Aimed at
+// where the hero WILL be, `lead` units on, since the hero keeps walking.
+const crossHerd = (i, side, lit, lead, size = 18) => stage(({ i, side, lit, lead, size }) => {
+  const { units, leaders } = window.FB, P = leaders[0], R = leaders[i];
+  const px = Math.cos(P.yaw), pz = Math.sin(P.yaw);
+  const sx = -pz * side, sz = px * side;
+  const tx = P.x + px * lead, tz = P.z + pz * lead;
+  R.x = tx + sx * 30; R.z = tz + sz * 30; R.yaw = Math.atan2(-sz, -sx);
+  R.st = 0; R.stun = 0; R.hearts = 3; R.cool = 0; R.spd = 30; R.charge = .8; R.chg = 1; R.y = 0;
+  let n = 0;
+  for (const u of units) {
+    if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
+    if (n >= size) break;
+    u.lead = i; u.col = R.col; u.st = 0; u.daze = 0;
+    u.x = R.x - Math.cos(R.yaw) * 3 + (Math.random() - .5) * 10; u.z = R.z - Math.sin(R.yaw) * 3 + (Math.random() - .5) * 10; n++;
+  }
+  R.n = n;
+  if (lit) { R.charge = 1; R.wave = 1 + n; R.burn = 9; R.spent = 0; }
+}, { i, side, lit, lead, size });
+// Belt and braces for the two falls: if the physics has not thrown the
+// hero by the frame it should have, throw it. Same pose, same tumble - the
+// game's own - just not left to a horn's dice.
+const throwHero = (vx, vz, vy) => stage(([vx, vz, vy]) => {
+  const P = window.FB.leaders[0];
+  if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 4 + Math.random() * 3; P.chg = 0; P.charge = 0; }
+}, [vx, vz, vy]);
+const RGB = (hex) => [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16) / 255);
+const flashes = (list) => (t) => {
+  let best = null;
+  for (const f of list) {
+    const k = t < f.at ? 0 : Math.max(0, 1 - (t - f.at) / f.len) ** 1.6 * f.gain;
+    if (k > 0 && (!best || k > best.k)) best = { col: f.col, dir: f.dir, k, air: f.air ?? .4, boom: f.boom };
+  }
+  return best;
+};
+
+// --- I. a face in the dark ---------------------------------------------------
+// The hero at the origin facing +x, everything else forty units off. The
+// lens is a hand's width from its face. What lights it is a fight it is
+// not in: rainbows going off out of frame, one colour at a time, and two
+// explosions, white, with the camera flinching.
 await stage(() => {
   const { units, leaders } = window.FB, P = leaders[0];
-  for (const u of units) if (u !== P && u.col === P.col) {
-    const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 16;
+  P.x = 0; P.z = 0; P.yaw = 0; P.spd = 0;
+  for (const u of units) if (u !== P && Math.hypot(u.x - P.x, u.z - P.z) < 42) {
+    const a = Math.random() * Math.PI * 2, r = 42 + Math.random() * 20;
     u.x = P.x + Math.cos(a) * r; u.z = P.z + Math.sin(a) * r;
   }
-  // The other six herds ring it far enough out that a long lens at four
-  // units finds nothing behind it, and near enough that the pull-back does.
-  for (let i = 1; i < leaders.length; i++) {
-    const L = leaders[i], a = (i - 1) / 6 * Math.PI * 2 + 0.5, r = 34 + (i % 3) * 9;
-    L.x = P.x + Math.cos(a) * r; L.z = P.z + Math.sin(a) * r;
-    for (const u of units) if (u.lead === i && u !== L) { u.x = L.x + (Math.random() - .5) * 13; u.z = L.z + (Math.random() - .5) * 13; }
-  }
 });
+const WHITE = [1, .96, .9];
+const FACE_FLASHES = [
+  { at: .95, col: RGB(RAINBOW[4]), dir: [1, .4, 1], len: .4, gain: 1.6, air: .3 },
+  { at: 1.75, col: RGB(RAINBOW[0]), dir: [1, .5, -1], len: .35, gain: 1.7, air: .3 },
+  { at: 2.3, col: WHITE, dir: [1, .3, .7], len: .55, gain: 1.6, air: .32, boom: 1 },
+  { at: 3.05, col: RGB(RAINBOW[3]), dir: [1, .4, -.6], len: .35, gain: 1.5, air: .3 },
+  { at: 3.55, col: RGB(RAINBOW[6]), dir: [1, .6, 1.2], len: .35, gain: 1.6, air: .3 },
+  { at: 4.05, col: WHITE, dir: [1, .2, -1], len: .7, gain: 1.9, air: .4, boom: 1 },
+  { at: 4.8, col: RGB(RAINBOW[1]), dir: [1, .5, .8], len: .35, gain: 1.5, air: .3 },
+];
+const faceFlash = flashes(FACE_FLASHES);
 await shoot(S({
-  name: 'lone', dur: bars(2), scale: 1, guard: { pin: 0 },
-  cam: { subj: 0, orbit: { a0: 2.3, a1: 2.85, r0: 3.9, r1: 3.4, h0: .55, h1: .8 }, l0: [.3, 0, 1.25], fov0: .72, ease: 'io' },
-  // "Saigon... I'm still only in Saigon." The film opens on a man who has
-  // been waiting too long in a place he cannot leave, and so does this.
-  note: (t) => (t < bars(1.15) ? 'the plain.' : "i'm still only on the plain."),
-  overlay: (t) => ({ black: fout(t, 0, .9), note: Math.min(fin(t, .9, .35), fout(t, bars(2) - .45, .3)) }),
+  name: 'face', dur: bars(3), scale: 1, guard: { pin: 0, yaw: 0 },
+  // Three-quarters, head and neck: the head is a box with a horn and a
+  // mane, and a lens on the box alone is a lens on a box. From the front
+  // quarter the horn, the jaw and the mane make it an animal.
+  cam: { subj: 0, e0: [3.3, 1.4, 1.5], e1: [2.85, 1.15, 1.45], l0: [.8, 0, 1.35], fov0: .55, fov1: .5, ease: 'io' },
+  overlay: (t) => { const f = faceFlash(t); return { black: fout(t, 0, 1.2), flash: f, shake: f && f.boom ? f.k * .1 : 0 }; },
 }));
-// The reveal, in one move: the line goes up while the frame still holds one
-// animal, and is still up when the frame holds seventy.
+cues.faceFlashes = FACE_FLASHES.map((f) => ({ at: +(cues.face + f.at).toFixed(3), boom: !!f.boom }));
+
+// --- II. sets off, hopeful ------------------------------------------------------
+// The lens ahead of it, backing away as it comes on. Then a herd.
+const WALK = { subj: 0, e0: [4.2, .5, 1.25], e1: [7.6, .9, 1.65], l0: [.7, 0, 1.15], fov0: .7, fov1: .78, ease: 'lin' };
+const HIT1 = bars(2.5) - 1.15;
 await shoot(S({
-  name: 'reveal', dur: bars(2.25), scale: 1, guard: { pin: 0 },
-  cam: { subj: 0, orbit: { a0: 2.85, a1: 3.35, r0: 3.4, r1: 36, h0: .8, h1: 11 }, l0: [0, 0, 1.2], l1: [0, 0, .6], fov0: .72, fov1: 1.0, ease: 'in' },
-  note: 'seven colours out here.',
-  overlay: (t) => ({ note: Math.min(fin(t, .1, .3), fout(t, bars(2.25) - .45, .35)) }),
+  name: 'walk1', dur: bars(2.5), scale: 1, cam: WALK,
+  guard: (t) => (t < HIT1 - 1.0 ? { pin: 5.5, yaw: 0 } : { mortal: 1, horns: 1, pin: 5.5, drive: [{ i: 1, spd: 30, charge: .8 }] }),
+  beats: [
+    { at: HIT1 - 1.0, send: () => crossHerd(1, 1, false, 5.5) },
+    { at: HIT1 + .25, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 5; } }, arg: [2, -9, 8] },
+  ],
 }));
 
-// --- II. seven of them -----------------------------------------------------
-// A cut on every half bar, one colour each, low and close among its own
-// grass. The player's colour last, so the card after it lands on red.
-for (let i = 1; i <= 7; i++) {
-  const who = i % 7;
-  await shoot(S({
-    name: `colour${i}`, dur: bars(.5), scale: 1,
-    cam: { subj: who, e0: [6.0, 3.4 * (i % 2 ? 1 : -1), 1.5], e1: [5.0, 2.8 * (i % 2 ? 1 : -1), 1.6], l0: [0, 0, 1.1], fov0: .8, ease: 'lin' },
-    note: i >= 4 ? 'nobody wants the other six on it.' : '',
-    overlay: () => ({ note: i >= 4 ? 1 : 0 }),
-  }));
-}
+// --- III. down. up, like a hero. -------------------------------------------------
+// The game's own knocked-flat pose, held for a bar and a half; then let go
+// of, at a third of speed, and the game rolls it back onto its feet. Then
+// it shakes it off - a wiggle the game does not have, done to its yaw.
+const LIE1 = bars(1.5), UP1 = LIE1 + 1.9;
+await shoot(S({
+  name: 'down1', dur: bars(3), 
+  scale: (info, st, t) => (t < LIE1 ? 1 : t < UP1 ? .32 : 1),
+  guard: (t) => (t < LIE1 ? { lie: 1 } : t < UP1 ? { pin: 0 } : { pin: 0, yaw: Math.sin((t - UP1) * 26) * .26 * fout(t, UP1 + .1, .7) }),
+  cam: { subj: 0, orbit: { a0: 2.55, a1: 2.15, r0: 4.8, r1: 3.7, h0: .5, h1: .85 }, l0: [0, 0, .6], l1: [0, 0, 1.15], fov0: .68, ease: 'io' },
+}));
 
-// --- III. step one ---------------------------------------------------------
-await shoot(S(cardShot('cardHerd', 'they gave me a herd.', bars(1))));
+// --- IV. sets off again ---------------------------------------------------------
+// The same shot, the same walk, the same hope. A rainbow this time.
+const HIT2 = bars(2.25) - 1.1;
+await shoot(S({
+  name: 'walk2', dur: bars(2.25), scale: 1, cam: WALK,
+  stage: () => { const P = window.FB.leaders[0]; P.yaw = 0; P.up = 0; P.st = 0; P.y = 0; },
+  guard: (t) => (t < HIT2 - 1.0 ? { pin: 5.5, yaw: 0 } : { mortal: 1, pin: 5.5, drive: [{ i: 2, spd: 30 }] }),
+  beats: [
+    { at: HIT2 - 1.0, send: () => crossHerd(2, -1, true, 5.5) },
+    { at: HIT2 + .55, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 6; } }, arg: [3, 11, 12] },
+  ],
+}));
+// --- V. kaput. the crane. ---------------------------------------------------------
+// When the explosions go off, in seconds from the top of the shot. The
+// score gets these, so each one has a sound.
+const CRANE_BOOMS = [.7, 2.2, 3.5, 4.6, 5.7, 6.6, 7.4];
+// Flat, and staying flat. The lens goes straight up off it, turning, and
+// the fog is pushed out so the top of the move sees the whole plain: two
+// pairs of rainbows meeting, two herds trampling across, and explosions.
+await shoot(S({
+  name: 'crane', dur: bars(4.5), scale: 1,
+  guard: { lie: 1, wide: 1, pairs: [[1, 2], [3, 4]], drive: [{ i: 5, spd: 17, charge: .8 }, { i: 6, spd: 17, charge: .8 }] },
+  stage: () => {
+    const { units, leaders } = window.FB, P = leaders[0];
+    window.FBGL({ fog: [60, 700], glow: 1.7 });
+    const put = (i, x, z, yaw, n, lit) => {
+      const L = leaders[i];
+      L.x = P.x + x; L.z = P.z + z; L.yaw = yaw; L.st = 0; L.stun = 0; L.hearts = 3; L.cool = 0; L.y = 0; L.spd = 12;
+      let k = 0;
+      for (const u of units) {
+        if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
+        if (k >= n) break;
+        u.lead = i; u.col = L.col; u.st = 0; u.daze = 0; u.x = L.x + (Math.random() - .5) * 7; u.z = L.z + (Math.random() - .5) * 7; k++;
+      }
+      L.n = k;
+      if (lit) { L.charge = 1; L.chg = 1; L.wave = 1 + k; L.burn = 9; L.spent = 0; } else { L.charge = .8; L.chg = 1; L.wave = 0; }
+    };
+    for (const u of units) if (u.lead >= 0 && !leaders.includes(u)) u.lead = -1;
+    put(1, -46, 24, 0, 10, 1); put(2, 6, 24, Math.PI, 10, 1);
+    put(3, -8, -34, 0, 9, 1); put(4, 44, -34, Math.PI, 9, 1);
+    put(5, -70, 14, 0, 14, 0); put(6, 62, -16, Math.PI, 14, 0);
+  },
+  beats: CRANE_BOOMS.map((at, i) => ({ at, fn: ([dx, dz, pw]) => { const P = window.FB.leaders[0]; window.FB.boom(P.x + dx, P.z + dz, pw); },
+    arg: [[-34, -18, 24], [40, 30, 30], [-20, 48, 26], [22, -52, 34], [-50, -40, 28], [58, 8, 30], [-6, 60, 36]][i] })),
+  cam: { subj: 0, orbit: { a0: 2.3, a1: 2.3 + 2.7, r0: 3.4, r1: 16, h0: .8, h1: 86 }, l0: [0, 0, .3], l1: [0, 0, 0], fov0: .68, fov1: 1.0, ease: 'in' },
+}));
+
+// --- VI. how ------------------------------------------------------------------
+await stage(() => window.FBGL({ fog: [30, 220], glow: 1.35 }));
+await shoot(S(cardShot('cardGather', 'gather your herd.', bars(.75))));
 await place(-30, 20, .4);
 await clearTheField(64);
-await seedPath(5, 6, 30, 7);
+await giveHerd(3, 4);
+await seedPath(6, 6, 30, 8);
 await shoot(S({
-  name: 'gatherA', dur: bars(1.5), scale: 1, keys: [['ArrowUp', true]],
-  cam: { subj: 0, e0: [2.5, 7.5, 1.6], e1: [-1.5, 7.5, 1.9], l0: [.5, 0, 1.0], fov0: .82, ease: 'lin' },
-  overlay: (t) => ({ count: fin(t, .3, .5) }),
+  name: 'gatherA', dur: bars(1.25), scale: 1, keys: [['ArrowUp', true]],
+  cam: { subj: 'herd', follow: true, e0: [-10, 4, 5.5], e1: [-13, 5.5, 7], l0: [4, 0, .8], fov0: .9, ease: 'lin' },
+  overlay: (t) => ({ count: fin(t, .2, .4) }),
 }));
-await giveHerd(6, 6);
+await giveHerd(9, 8);
 await seedPath(5, 8, 26, 9);
 await shoot(S({
   name: 'gatherB', dur: bars(1.25), scale: 1,
-  cam: { subj: 'herd', follow: true, e0: [-10, 4, 5.5], e1: [-13, 5.5, 7], l0: [4, 0, .8], fov0: .9, ease: 'lin' },
+  cam: { subj: 'herd', plant: true, e0: [26, 3, 1.0], l0: [0, 0, 1.2], fov0: .85, ease: 'lin' },
   overlay: () => ({ count: 1 }),
 }));
 await giveHerd(8, 8);
-// Planted low in the herd's path, so the punchline arrives at the lens.
+
+await shoot(S(cardShot('cardTrample', 'trample the rest.', bars(.75))));
+// Charge held short of ignition, so the herd runs hard and its horns count,
+// into a herd parked in its way. Side on, framed on the ones about to be hit.
 await shoot(S({
-  name: 'gatherC', dur: bars(1.25), scale: 1,
-  cam: { subj: 'herd', plant: true, e0: [26, 3, 1.0], l0: [0, 0, 1.2], fov0: .85, ease: 'lin' },
-  note: 'it kept getting bigger.',
-  overlay: (t) => ({ count: 1, note: fin(t, .35, .3) }),
+  name: 'trample', dur: bars(1.5), scale: 1, guard: { charge: .75 },
+  stage: () => {
+    const { units, leaders } = window.FB, P = leaders[0], R = leaders[3];
+    P.x = -22; P.z = 0; P.yaw = 0;
+    for (const u of units) if (u.lead === 0 && u !== P) { u.x = P.x - 4 + (Math.random() - .5) * 8; u.z = P.z + (Math.random() - .5) * 8; }
+    R.x = 12; R.z = 1; R.yaw = Math.PI / 2; R.st = 0; R.stun = 0; R.wave = 0; R.charge = 0; R.chg = 0;
+    let n = 0;
+    for (const u of units) {
+      if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
+      if (n >= 11) break;
+      u.lead = 3; u.col = R.col; u.st = 0; u.daze = 0;
+      u.x = R.x + (Math.random() - .5) * 8; u.z = R.z + (Math.random() - .5) * 8; n++;
+    }
+    R.n = n;
+  },
+  cam: { world: true, e0: [16, 4.5, 24], e1: [13, 3.8, 19], l0: [11, 1.5, 1], fov0: .9, ease: 'lin' },
 }));
 
-// --- IV. step two ----------------------------------------------------------
-await shoot(S(cardShot('cardButton', 'then somebody showed me the button.', bars(1))));
-// The charge folds the herd tight and fades the unicorns out as it tops,
-// and the clock slows with it. Ignition is placed on the FIRST frame of the
-// next shot - charge is set to 1 there - so this one is given the head
-// start that ends it at .97: the fold complete, the light not yet on.
-const HOLD = bars(2.25), HOLD_SCALE = [1, .35];
+await shoot(S(cardShot('cardRainbow', 'become the rainbow.', bars(.75))));
+const HOLD = bars(2), HOLD_SCALE = [1, .35];
 const holdGame = HOLD * (HOLD_SCALE[0] + HOLD_SCALE[1]) / 2;
 await clearTheField(66);
 await shoot(S({
@@ -480,59 +642,30 @@ await shoot(S({
     P.charge = Math.max(0, 0.97 - g / chargeTime);
     P.cool = 0;
   }, arg: holdGame,
-  cam: { subj: 'herd', orbit: { a0: 2.3, a1: 3.7, r0: 15, r1: 9, h0: 12, h1: 7.5 }, l0: [0, 0, .6], fov0: .95, fov1: .85, ease: 'io' },
-  overlay: (t) => ({ count: fout(t, HOLD - .5, .4) }),
+  cam: { subj: 'herd', follow: true, e0: [-13, 0, 3.2], e1: [-9, 0, 2.2], l0: [6, 0, 1.2], fov0: .85, fov1: .8, ease: 'io' },
 }));
+// Ignition on the first frame, at a fifth of speed, the lens low behind
+// and pulling back into the arch as it opens.
 await shoot(S({
   name: 'ignite', dur: bars(1), scale: .22, guard: { hold: 1 },
   stage: () => { const P = window.FB.leaders[0]; P.charge = 1; P.cool = 0; },
-  cam: { subj: 'herd', e0: [-7, 4, 1.2], e1: [-17, 9, 4.8], l0: [5, 0, 1.6], l1: [3, 0, 2.4], fov0: .85, fov1: 1.05, ease: 'out' },
+  cam: { subj: 'herd', e0: [-7, 3, 1.2], e1: [-17, 7, 4.8], l0: [5, 0, 1.6], l1: [3, 0, 2.4], fov0: .85, fov1: 1.05, ease: 'out' },
 }));
 await shoot(S({
-  name: 'rideA', dur: bars(1), scale: 1, guard: { hold: 1, pin: 26 },
+  name: 'ride', dur: bars(1), scale: 1, guard: { hold: 1, pin: 26 },
   cam: { subj: 'herd', follow: true, e0: [-26, -8, 12], e1: [-30, -10, 14], l0: [8, 0, 2.5], fov0: 1.0, ease: 'lin' },
 }));
-// A rival herd between the band and the lens. The line goes over it.
-await shoot(S({
-  name: 'rideB', dur: bars(1.5), scale: 1, guard: { hold: 1, pin: 26 },
-  stage: () => {
-    const { units, leaders } = window.FB, P = leaders[0], R = leaders[3];
-    P.x = -20; P.z = 0; P.yaw = 0;
-    R.x = 12; R.z = 1; R.yaw = Math.PI / 2; R.st = 0; R.stun = 0;
-    let n = 0;
-    for (const u of units) {
-      if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
-      if (n >= 9) break;
-      u.lead = 3; u.col = R.col; u.st = 0; u.daze = 0;
-      u.x = R.x + (Math.random() - .5) * 8; u.z = R.z + (Math.random() - .5) * 8; n++;
-    }
-  },
-  // Side on, in world coordinates, framed on the herd that is about to be
-  // hit rather than on the band that is about to do it. Planted in the
-  // band's own path the shot is over in a third of a second: it arrives at
-  // twenty-six units a second, fills the lens, and is behind you - and the
-  // line lands on an empty horizon.
-  cam: { world: true, e0: [16, 5, 26], e1: [13, 4.2, 21], l0: [11, 1.6, 1], fov0: .9, ease: 'lin' },
-  // The line, over the shot it belongs to: a rainbow ploughing through
-  // somebody else's herd.
-  note: 'i love the smell of rainbows in the morning.',
-  overlay: (t) => ({ note: Math.min(fin(t, .5, .35), fout(t, bars(1.5) - .45, .35)) }),
-}));
-await shoot(S({
-  name: 'rideC', dur: bars(.75), scale: 1, guard: { hold: 1, pin: 30 },
-  cam: { subj: 'herd', e0: [2, 22, 5], e1: [-6, 22, 5.5], l0: [0, 0, 2.5], fov0: .95, ease: 'lin' },
-}));
 
-// --- V. step three ---------------------------------------------------------
-// The card sets it up and the picture is the punchline.
-await shoot(S(cardShot('cardOther', 'somebody else had a herd.', bars(1))));
+// --- VII. two rainbows ---------------------------------------------------------
+// From behind our own band, looking down the plain: the other one comes
+// on. A fifth of speed from twenty-five out, and on the hit, white - and
+// the white is what the end card dissolves out of.
+let boomT = null;
 await shoot(S({
-  name: 'approach', until: (info, st, t) => (st.boomAt !== undefined && t - st.boomAt > .9) || t > 7,
+  name: 'approach', until: (info, st, t) => (st.boomAt !== undefined && t - st.boomAt > 1.0) || t > 7.5,
   scale: (info, st, t) => {
     if (info && info.boom) st.boomAt = t;
     if (st.boomAt !== undefined) return .18;
-    // A fifth of speed from twenty-five units out: about two and a half
-    // seconds of two lights closing before they touch.
     return info && info.wave && info.dCent < 25 ? .18 : 1;
   },
   slowCue: 'slowmo',
@@ -550,48 +683,20 @@ await shoot(S({
       u.x = R.x + 3 + (Math.random() - .5) * 7; u.z = R.z + (Math.random() - .5) * 7; given++;
     }
     R.n = given; R.charge = 1; R.chg = 1; R.wave = 1 + given; R.burn = 6; R.spent = 0;
-    // The other five go to the far side of the plain: the camera is on +z,
-    // and a herd of set dressing in its foreground is a herd in the shot.
     for (let i = 2; i < leaders.length; i++) {
       const L = leaders[i], a = Math.PI + ((i - 2) / 4 - 0.5) * 1.6;
       L.x = Math.cos(a + Math.PI / 2) * 64; L.z = -Math.abs(Math.sin(a + Math.PI / 2) * 64) - 20;
       for (const u of units) if (u.lead === i && u !== L) { u.x = L.x + (Math.random() - .5) * 7; u.z = L.z + (Math.random() - .5) * 7; }
     }
   },
-  cam: { world: true, e0: [0, 15, 38], e1: [0, 9, 22], l0: [0, 2, 0], l1: [0, 1.5, 0], fov0: 1.0, fov1: .9, ease: 'in' },
-  overlay: () => ({}),
-}));
-// Back to speed on the hit: the ring goes out across the plain and the
-// camera goes up with it.
-await shoot(S({
-  name: 'boom', dur: bars(1.5), scale: 1, keys: [[' ', false], ['ArrowUp', false]],
-  cam: { world: true, e0: [0, 5, 24], e1: [0, 22, 40], l0: [0, 1, 0], l1: [0, 0, 0], fov0: .95, fov1: 1.05, ease: 'out' },
-  note: 'the horror.',
-  overlay: (t) => ({ note: Math.min(fin(t, .7, .4), fout(t, bars(1.5) - .5, .35)) }),
-}));
-
-// --- coda: the one unicorn, and now a herd round it --------------------------
-// A herd is a ring around its leader - the game re-forms it on the next
-// step, so 'leader in front, herd behind' cannot be staged and a camera
-// inside the ring sees flanks. From outside, pushing in slowly, it is the
-// opening shot answered: the same animal, no longer alone.
-await shoot(S({
-  name: 'after', dur: bars(2), scale: 1, guard: { pin: 0 },
-  stage: () => {
-    const { units, leaders } = window.FB, P = leaders[0];
-    P.x = 0; P.z = 0; P.yaw = 0; P.spd = 0; P.vx = P.vz = 0;
-    for (const u of units) if (u.lead === 0 && u !== P) {
-      const a = Math.random() * Math.PI * 2, r = 2.5 + Math.random() * 6;
-      u.x = P.x + Math.cos(a) * r; u.z = P.z + Math.sin(a) * r; u.st = 0; u.vx = u.vz = 0; u.daze = 0;
-    }
-  },
-  cam: { subj: 0, orbit: { a0: .7, a1: .35, r0: 17, r1: 11.5, h0: 3.4, h1: 2.1 }, l0: [0, 0, 1.2], fov0: .8, ease: 'io' },
-  note: "someday this plain's gonna end.",
-  overlay: (t) => ({ note: Math.min(fin(t, .9, .45), fout(t, bars(2) - .5, .35)) }),
+  cam: { subj: 'herd', follow: true, e0: [-34, 0, 15], e1: [-22, 0, 9.5], l0: [22, 0, 2.5], l1: [14, 0, 2], fov0: .95, fov1: .88, ease: 'in' },
+  overlay: (t, u, info) => { if (info && info.boom && boomT === null) boomT = t; return { white: boomT === null ? 0 : fin(t, boomT, .32) }; },
 }));
 
 await browser.close();
 cues.end = +vt.toFixed(4);
+cues.hits = ['walk1Hit', 'walk2Hit'].map((k) => cues[k]).filter((v) => v !== undefined);
+cues.craneBooms = CRANE_BOOMS.map((a) => +(cues.crane + a).toFixed(3));
 writeFileSync(path.join(outDir, 'beats.json'), JSON.stringify({ fps: FPS, bpm: BPM, cues, duration: frame / FPS }, null, 2));
 console.log(`  ignite ${cues.ignite?.toFixed(2)}s  slow-mo ${cues.slowmo?.toFixed(2)}s  clash ${cues.clash?.toFixed(2)}s`);
 console.log(`wrote ${frame} frames to ${path.relative(root, framesDir)} @ ${FPS}fps (${(frame / FPS).toFixed(2)}s)`);

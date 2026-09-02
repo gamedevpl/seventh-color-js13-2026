@@ -754,4 +754,7 @@ function frame(now_) {
 }
 requestAnimationFrame(frame);
 
-if (DEV) window.FB = { units, leaders, events, net, spy, netOpen, goOnline, goHome, get victory() { return victory; }, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; }, get flash() { return flash; }, get shake() { return shake; } };
+if (DEV) window.FB = { units, leaders, events, net, spy, netOpen, goOnline, goHome, get victory() { return victory; }, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; }, get flash() { return flash; }, get shake() { return shake; },
+  // The trailer's pyrotechnics: the boom event's own effects at a point,
+  // sized by `pw` the way a clash sizes them, without a clash.
+  boom: (x, z, pw) => { BOOMS.push({ x, z, t: 0, pw }); boomCloud(x, z, pw); burst([x, 1.5, z], 120, 9 + pw * .4); shake = Math.max(shake, 1); flash = Math.max(flash, .4); } };

@@ -724,9 +724,9 @@ anything.
 
 ## The wall
 
-F7a: **13,203 bytes** packed worst-of-5 at O1, limit 13,312, and **109
-remain** - the best-time save bought the tiles and more. F7 stood at
-13,285 with 27 to spare. F6 stood at 13,239; presence cost about 190 and paid back about
+F8: **13,277 bytes** packed worst-of-5 at O1, limit 13,312, and **35
+remain**. F7a stood at 13,203; nine notes cost 74 net, because five were
+free and two paid for themselves. F6 stood at 13,239; presence cost about 190 and paid back about
 140 out of things that were no longer earning their place. Every change from here has to pay for itself out of something
 already in the build - the stand, the pips and the respawn were paid for
 by a radar that said less, and by four lines of title prose becoming
@@ -783,6 +783,7 @@ written again in every party game.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F8 nine notes | 13,312 | 13,277 (O1 worst-of-5) | harder charge, no shrinking, followers a beat behind, bigger blast, bolder brains with a final; the edge as a frame; grazing rainbows deflect, head-on explodes; shadows; stagger before the knock |
 | F7a the black sectors | 13,312 | 13,203 (O1 worst-of-5) | the ground slab tiled so per-vertex fog no longer paints the whole plain fog-coloured; mottling down to a few percent; end-screen time line and best-time save removed |
 | F7 is anybody there? | 13,312 | 13,285 (O1 worst-of-5) | the title listens quietly and counts the riders before O is pressed; RIDER JOINED / LEFT said once in the herd's colour; hellos on a wall clock; one room, always; the whoosh, the re-announce and join() gone |
 | F6 nobody waits for a round | 13,312 | 13,239 (O1 worst-of-5) | the shared plain never ends: five seconds after a leader falls it rises at its meadow with its colour called home, and a seat just taken is dealt the same fresh herd; a stand to watch from with left and right walking the herds and a real countdown; a white pip on every herd a person is riding, on the list and on a radar rebuilt to say less |

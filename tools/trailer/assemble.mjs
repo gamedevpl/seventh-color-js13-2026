@@ -72,11 +72,16 @@ for (const [what, p] of [['frames', framesDir], ['end card', endcard], ['music',
 const frameCount = readdirSync(framesDir).filter((f) => f.endsWith('.png')).length;
 const gameplay = path.join(build, 'gameplay.mp4');
 console.log(`${which}: encoding ${frameCount} frames (${(frameCount / FPS).toFixed(2)}s)`);
+// The pixel format is pinned on both sides of the blend, and the blend's
+// output is forced back to PACKED rgb24 before the YUV conversion. Left to
+// negotiate, blend emits planar GBR, and the planar-to-yuv420p step reads
+// its planes in the wrong order: the first bloomed mux was magenta from end
+// to end, a thing the PNG-to-PNG prototype of this chain never showed.
 const bloom = game.bloom ? ['-filter_complex',
-  `[0]split[a][b];[b]lutrgb=r='clip((val-${game.bloom.thresh})*${game.bloom.gain},0,255)'`
+  `[0]format=rgb24,split[a][b];[b]lutrgb=r='clip((val-${game.bloom.thresh})*${game.bloom.gain},0,255)'`
   + `:g='clip((val-${game.bloom.thresh})*${game.bloom.gain},0,255)'`
   + `:b='clip((val-${game.bloom.thresh})*${game.bloom.gain},0,255)',gblur=sigma=${game.bloom.sigma}[g];`
-  + `[a][g]blend=all_mode=addition:all_opacity=${game.bloom.opacity}`] : [];
+  + `[a][g]blend=all_mode=addition:all_opacity=${game.bloom.opacity},format=rgb24,format=yuv420p`] : [];
 sh('ffmpeg', [
   '-y', '-framerate', String(FPS), '-i', path.join(framesDir, 'f%06d.png'), ...bloom,
   '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', gameplay,

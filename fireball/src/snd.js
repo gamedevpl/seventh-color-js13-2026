@@ -110,11 +110,6 @@ export function riseOff() {
   riser.o.stop(t0() + .3);
   riser = null;
 }
-// The fireball leaving: a whoosh - noise swept up and away.
-export function whoosh() {
-  if (!ac) return;
-  hit(t0(), .5, .25, 900, .7); tone(220, .5, 'sawtooth', .08, t0(), 880);
-}
 // The explosion. A sub boom, a wide noise burst, then the rainbow: seven
 // notes fanning up, one per colour, because a rainbow must be heard too.
 export function boom(pw) {

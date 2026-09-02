@@ -23,7 +23,7 @@ const TAU = Math.PI * 2;
 const ROOM = 'wss://relay.js13kgames.com/unicorn-fireball';
 const SEATS = 7;
 const JOINING = 'JOINING THE PLAIN';
-const ALONE = 'NO PLAIN HERE - PLAYING ALONE';
+const ALONE = 'OFFLINE - RIDING ALONE';
 const SNAP = 1 / 12;                      // the plain, twelve times a second
 const IN = 1 / 20;                        // input, a little faster
 const HELLO = 1;                          // and a name once a second
@@ -38,6 +38,10 @@ export const net = {
   me: -1,
   seats: 1,                               // people on the plain
   said: '',                               // a line for the HUD
+  quiet: 0,                               // listening only, from the title
+  around: 0,                              // riders heard while listening
+  news: null,                             // {k, i}: a seat taken or given up
+  room: '',                               // a room other than the default
 };
 
 let ws = null, id = '', tag = 0;
@@ -46,13 +50,14 @@ let roster = [];                          // seat -> id, '' for a free one
 let t = 0, tHello = 0, tSnap = 0, tIn = 0, tSeen = 0, tHeard = -99, joined = 0;
 let netIn = [];                           // seat -> the input it last sent
 let held = [];                            // seat -> was somebody on it last frame
-let bump = 0;                             // re-announce soon, someone is new
+let lastR = '';                           // the seating as last announced
 
-export function open(room) {
+export function open(room, quiet) {
   if (ws) return;
   tag = (Math.random() * 65536) | 0;
-  net.said = JOINING;
-  try { ws = new WebSocket(room || ROOM); } catch { net.said = 'NO PLAIN FOUND'; return; }
+  net.quiet = quiet ? 1 : 0; net.around = 0;
+  if (!quiet) net.said = JOINING;
+  try { ws = new WebSocket(room || net.room || ROOM); } catch { net.said = 'NO PLAIN FOUND'; return; }
   ws.binaryType = 'arraybuffer';
   ws.onopen = () => { net.on = 1; t = 0; tHeard = -99; joined = 0; };
   // A socket that is refused says so; a socket that is merely blocked can
@@ -63,7 +68,13 @@ export function open(room) {
   ws.onerror = () => { net.said = ALONE; net.on = 0; };
   ws.onmessage = (e) => hear(e.data);
 }
-export function close() { if (ws) { const w = ws; ws = null; net.on = net.host = 0; net.me = -1; w.close(); } }
+// A socket closes asynchronously, so its handlers must be taken off before
+// a new one is opened - or the old one's onclose lands on the new one.
+export function close() {
+  if (!ws) return;
+  const w = ws; ws = null; w.onclose = w.onmessage = w.onerror = w.onopen = null;
+  net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; w.close();
+}
 
 function hear(d) {
   if (typeof d !== 'string') {
@@ -74,10 +85,8 @@ function hear(d) {
   const k = d[0], rest = d.slice(1);
   // Our own name, handed to us the moment we connect.
   if (k === '@') { id = rest; seen.set(id, t); return; }
-  // Someone announcing themselves. A name we have not heard before is
-  // worth answering at once, so joining feels immediate rather than
-  // taking the full second until our next turn to speak.
-  if (k === 'h') { if (!seen.has(rest)) bump = .1 + Math.random() * .2; seen.set(rest, t); return; }
+  // Someone announcing themselves.
+  if (k === 'h') { seen.set(rest, t); return; }
   if (k === '-') { seen.delete(rest); return; }
   // The seating, which only the host writes. We keep it even when we are
   // not host: if the host leaves, whoever takes over carries on from it
@@ -85,7 +94,15 @@ function hear(d) {
   if (k === 'r') { roster = rest.split('|'); reseat(); }
 }
 
+// Who came and who went, as the seating changes. Not on the first roster
+// we ever see - that would read the whole room out to a newcomer - and
+// never about ourselves.
+let was = null;
 function reseat() {
+  if (was) for (let i = 0; i < SEATS; i++) {
+    if (!!roster[i] !== !!was[i] && roster[i] !== id && was[i] !== id) net.news = { k: roster[i] ? 1 : 0, i };
+  }
+  was = roster.slice();
   const i = roster.indexOf(id);
   net.me = i;
   net.seats = roster.filter((x) => x).length || 1;
@@ -132,7 +149,8 @@ function packet(v) {
   // smaller tag keeps the plain; the other one stands down mid-packet.
   if (net.host) { if (theirs >= tag) return; net.host = 0; }
   tHeard = t;
-  net.seats = v.getUint8(4);
+  net.around = net.seats = v.getUint8(4);
+  if (net.quiet) return;
   let o = 5;
   for (const u of units) {
     u.tx = v.getInt16(o) / 128; o += 2;
@@ -194,10 +212,9 @@ export function ghost(dt) {
 // plain that somebody else is running.
 export const spy = () => ({ id, t, tHeard, joined, names: [...seen.keys()].sort(), roster });
 export function tick(dt, local) {
-  if (!net.on) return 1;
+  if (!net.on || net.quiet) return 1;
   t += dt;
 
-  if (bump > 0) { bump -= dt; if (bump <= 0) { say('h' + id); tHello = t; } }
   if (t - tHello > HELLO && id) { say('h' + id); tHello = t; }
 
   // Names go quiet when a tab dies without closing its socket.
@@ -256,7 +273,6 @@ function start() {
 
 // The host deals the seats and only says so when they change. Nobody who
 // already has a colour ever loses it to somebody else arriving.
-let lastR = '';
 function seat(names) {
   for (let i = 0; i < SEATS; i++) if (roster[i] && !seen.has(roster[i])) roster[i] = '';
   for (const n of names) {

@@ -115,6 +115,22 @@ check('...and the guest sees its own herd light up', lit.charge > .2 || lit.wave
 
 await guest.screenshot({ path: path.join(root, 'build/fireball/probe-online.png') });
 
+// The title should already know how many are riding, before O is ever
+// pressed: a page that only sits on the title listens without joining.
+const D = await browser.newPage({ viewport: { width: 640, height: 400 } });
+D.on('pageerror', (e) => problems.push(e.message));
+await D.goto(pathToFileURL(pagePath).href);
+await D.evaluate((r) => { FB.net.room = r; }, room);
+await D.keyboard.press('Space');
+await new Promise((r) => setTimeout(r, 2500));
+const title = await D.evaluate(() => ({ quiet: FB.net.quiet, on: FB.net.on, around: FB.net.around, mode: FB.mode, seats: FB.net.seats }));
+check('the title listens without joining', title.mode === 'title' && title.quiet === 1 && title.on === 1, JSON.stringify(title));
+check('...and counts the riders already there', title.around === 2, `${title.around} heard, 2 riding`);
+const hostSeats = await hostPage.evaluate(() => FB.net.seats);
+check('...without taking a seat itself', hostSeats === 2, `${hostSeats} seats on the host`);
+await D.close();
+await new Promise((r) => setTimeout(r, 600));
+
 // The list has to say which herds are people, so a rider can go and find
 // the fight rather than farm the brains.
 const marks = await guest.evaluate((s) => FB.leaders.map((L, i) => (L.man ? 1 : 0) + (i === s ? 9 : 0)), seat);

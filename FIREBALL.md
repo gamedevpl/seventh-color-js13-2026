@@ -588,6 +588,41 @@ The whole of it, plus the ground for it: 13,239 packed worst-of-5 at O1
 against a 13,312 ceiling. The radar rebuild and a shorter title paid for
 most of it.
 
+## F7 — is anybody there?
+
+The pips said *which* herd was a person. They did not answer the question
+you actually have, which comes before that one: *is anybody here at all?*
+And the answer had to arrive on its own, not be hunted for on a list.
+
+- **The title listens.** Once the first gesture has woken the page, the
+  title opens the socket in a quiet mode - never announcing, never hosting,
+  never touching the plain on screen - and reads the seat count out of the
+  host's packets. So before O is ever pressed the title says `2 riding
+  online now - press O`, or `nobody riding online yet - press O`. Pressing
+  O closes that socket and opens a real one; the reconnect is a hundred
+  milliseconds, and cheaper than teaching a listener to become a rider.
+- **Somebody came, somebody went.** The seating is diffed as it changes,
+  and `RIDER JOINED` / `RIDER LEFT` is said once, in that herd's colour -
+  the message wears the colour rather than naming it, which is both
+  shorter and quicker to read. Not on the first roster a newcomer sees,
+  which would read the whole room out to them, and never about yourself.
+
+Two of the owner's calls shaped this. *One room, always* - there will
+never be many players, and a second room or an overflow is code nobody
+will ever run. And *a socket that hangs* had to stop saying it was
+joining, which is the six-second give-up from F5, kept.
+
+### Paid for with
+
+A `whoosh` that was still playing under every ignition - the sound of a
+fireball leaving, from a game that no longer has one. The re-announce on
+hearing a new name, which bought nothing once the host stopped changing on
+arrival. A `join()` that turned a listener into a rider, replaced by close
+and open. Two title lines becoming one. And a bug found on the way: a
+socket closes asynchronously, so its handlers must be taken off before a
+new one opens, or the old one's `onclose` lands on the new one and zeroes
+it.
+
 ## The wall
 
 F6: **13,239 bytes** packed worst-of-5 at O1, limit 13,312, and **73

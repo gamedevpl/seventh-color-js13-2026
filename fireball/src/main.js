@@ -11,7 +11,7 @@ import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, 
 import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
 import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, footprint, burnTime, nearEdge, ARENA, EDGE, WILD, now } from './herd.js';
 import { net, open as netOpen, close as netClose, tick as netTick, ghost, spy } from './net.js';
-import { wake, awake, music, join as sJoin, clang, thud, rise, riseOff, whoosh, ignite as sIgnite, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
+import { wake, awake, music, join as sJoin, clang, thud, rise, riseOff, ignite as sIgnite, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
 
 const VW = 640, VH = 360;
 const FOG = [.07, .05, .13];
@@ -365,20 +365,22 @@ let best = 0, isBest = false, victory = false;
 try { best = +localStorage.fbBest || 0; } catch {}
 const BOOMS = [], TRAIL = new Map(), ARCS = [];
 let eye = null, look = null, camYaw = 0;
-const say = (t, d = 2) => { msg = t; msgT = d; };
+let msgCol = '#fff4d6';
+const say = (t, d = 2, c = '#fff4d6') => { msg = t; msgT = d; msgCol = c; };
 
+let listened = 0;
 function goOnline(room) {
-  if (net.on) return;
+  if (net.on && !net.quiet) return;
   if (!awake()) wake();
   newRun(); mode = 'run'; say('', 0);
-  netOpen(room);
+  netClose(); netOpen(room);
 }
-function goHome() { netClose(); newRun(1); mode = 'title'; }
+function goHome() { netClose(); listened = 0; newRun(1); mode = 'title'; }
 
 let watch = 0;
-const watching = () => net.on && (net.me < 0 || leaders[net.me].st === 3);
+const watching = () => net.on && !net.quiet && (net.me < 0 || leaders[net.me].st === 3);
 function who() {
-  if (!net.on) return leaders[0];
+  if (!net.on || net.quiet) return leaders[0];
   const m = net.me >= 0 ? leaders[net.me] : null;
   if (m && m.st !== 3) return m;
   // Watching. Left and right walk the herds still standing, so being out
@@ -408,12 +410,7 @@ function ghostSound(P) {
   for (let i = 0; i < 7; i++) {
     const L = leaders[i], near = Math.hypot(L.cx - P.cx, L.cz - P.cz) < 70;
     if (L.wave && !pw[i] && near) { sIgnite(); if (L === P) say('RAINBOW', 1.5); }
-    if (ph[i] !== undefined && L.hearts < ph[i]) {
-      // A rainbow that goes out on the same packet that costs a heart is
-      // a clash; anything else is a horn.
-      if (pw[i] && !L.wave) { sBoom(pw[i]); shake = 1; flash = .5; boomCloud(L.cx, L.cz, pw[i]); } else if (near) ouch();
-      if (L === P) say(L.hearts ? 'HEART LOST' : 'THE HERD IS GONE', 2);
-    }
+    if (pw[i] && !L.wave && L.hearts < ph[i]) { sBoom(pw[i]); shake = 1; flash = .5; boomCloud(L.cx, L.cz, pw[i]); }
     pw[i] = L.wave; ph[i] = L.hearts;
   }
 }
@@ -429,11 +426,11 @@ function frame(now_) {
 
   const P = who();
   if (mode === 'title') {
-    if (awake()) music(.2, 1);
+    if (awake()) { music(.2, 1); if (!listened) { listened = 1; netOpen(); } }
     step(dt, { over: 1 });
     if (doAct) {
       if (!awake()) wake();
-      else { newRun(); mode = 'run'; say('GATHER YOUR COLOUR', 3); }
+      else { netClose(); newRun(); mode = 'run'; say('GATHER YOUR COLOUR', 3); }
     }
   } else if (mode === 'run') {
     const heat = Math.min(1, P.n / 12);
@@ -445,10 +442,11 @@ function frame(now_) {
     // Offline this is always ours. Online it is ours only while we host;
     // otherwise the plain arrives in packets and we animate what we are told.
     const mine = netTick(dt, local);
+    if (net.news) { say(net.news.k ? 'RIDER JOINED' : 'RIDER LEFT', 2.5, css(COL[leaders[net.news.i].col])); net.news = null; }
     if (net.said !== lastSaid) { lastSaid = net.said; if (net.said && !net.on) say(net.said, 3); }
     if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
     if (mine) {
-      if (!net.on) { P.in = local; charge(P, local.c); }
+      if (!net.on || net.quiet) { P.in = local; charge(P, local.c); }
       step(dt, { arena: net.on });
     } else { ghost(dt); ghostSound(P); }
     if (!net.on && (won(0) || lost(0))) {
@@ -468,7 +466,7 @@ function frame(now_) {
     endT += dt;
     music(.2, 1);
     step(dt, { over: 1 });
-    if (doAct && endT > 1) { newRun(1); mode = 'title'; }
+    if (doAct && endT > 1) { newRun(1); mode = 'title'; listened = 0; }
   }
   msgT = Math.max(0, msgT - dt);
   shake = Math.max(0, shake - dt * 2.5);
@@ -483,7 +481,7 @@ function frame(now_) {
     else if (e.k === 'ignite') {
       // The band lights: a flash, a fan of sparks the size of the herd, and
       // the riser resolving into a chord.
-      whoosh(); sIgnite();
+      sIgnite();
       burst([e.L.cx, 1.2, e.L.cz], 40 + e.L.n * 6, 5 + e.L.r);
       if (e.L === P) { say('RAINBOW!', 1.5); flash = Math.max(flash, .35); }
     }
@@ -492,12 +490,12 @@ function frame(now_) {
     else if (e.k === 'lost') { thud(); burst([e.u.x, .8, e.u.z], 8, 5, COL[WILD]); }
     else if (e.k === 'fell') {
       sBoom(3); shake = 1;
-      if (e.L === P) say('OFF THE PLAIN', 3); else say('A RIVAL RUNS OFF THE PLAIN', 2.5);
+      say(e.L === P ? 'OFF THE PLAIN' : 'A RIVAL FALLS OFF', 2.5);
     }
     else if (e.k === 'blast') { burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
     else if (e.k === 'boom') { sBoom(e.pw); BOOMS.push({ x: e.x, z: e.z, t: 0, pw: e.pw }); boomCloud(e.x, e.z, e.pw); burst([e.x, 1.5, e.z], 120, 9 + e.pw * .4); shake = 1; flash = .4; }
     else if (e.k === 'hurt') { if (e.L === P) { ouch(); say(P.hearts ? 'HEART LOST' : 'THE HERD IS GONE', 2); } }
-    else if (e.k === 'dead') { if (e.L !== P) say(alive().length > 1 ? 'A RIVAL FALLS' : 'THE PLAIN IS YOURS', 2.5); }
+    else if (e.k === 'dead') { if (e.L !== P) say('A RIVAL FALLS', 2.5); }
   }
   events.length = 0;
   for (const b of BOOMS) b.t += dt;
@@ -656,10 +654,9 @@ function frame(now_) {
     ctx.fillStyle = '#f3ead6'; ctx.fillText('UNICORN FIREBALL', VW / 2, 70);
     ctx.font = '15px system-ui';
     ctx.fillStyle = '#d8d0ea';
-    ctx.fillText('gather every unicorn of your colour, and fight horn to horn', VW / 2, 126);
-    ctx.fillText('hold SPACE to charge: the herd gathers speed and lights up', VW / 2, 150);
+    ctx.fillText('gather your colour into a herd, fight horn to horn', VW / 2, 132);
     ctx.fillStyle = '#ffb0b8';
-    ctx.fillText('held long enough the herd BECOMES the rainbow - and burns itself', VW / 2, 174);
+    ctx.fillText('hold SPACE to charge: held long enough, the herd BECOMES the rainbow', VW / 2, 160);
     ctx.fillStyle = '#d8d0ea';
     ctx.font = 'bold 15px system-ui';
     ctx.fillStyle = pc;
@@ -671,9 +668,8 @@ function frame(now_) {
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
     ctx.fillText(awake() ? 'press SPACE to run' : 'press SPACE', VW / 2, VH - 42);
     ctx.font = 'bold 14px system-ui'; ctx.fillStyle = '#8fe3c8';
-    ctx.fillText('press O to share the plain with everyone else playing it', VW / 2, VH - 62);
+    ctx.fillText((net.on ? net.around ? net.around + ' riding online now' : 'nobody riding online yet' : 'ride online') + ' - press O', VW / 2, VH - 62);
     ctx.font = '12px system-ui'; ctx.fillStyle = '#9a90b8';
-    ctx.fillText('arrows steer  -  up sprints  -  touch: sides steer, top strip charges', VW / 2, VH - 18);
     ctx.fillText('@gtanczyk | gamedev.pl | 2026', VW / 2, VH - 4);
   } else {
     // Your herd: a dot in your colour, the count, the hearts.
@@ -732,22 +728,20 @@ function frame(now_) {
       ctx.fillText('THE EDGE - TURN BACK', VW / 2, VH * .18);
     }
     if (msgT) {
-      ctx.font = 'bold 26px system-ui'; ctx.fillStyle = `rgba(255,244,214,${Math.min(1, msgT)})`;
-      ctx.fillText(msg, VW / 2, VH * .3);
+      ctx.font = 'bold 26px system-ui'; ctx.globalAlpha = Math.min(1, msgT); ctx.fillStyle = msgCol;
+      ctx.fillText(msg, VW / 2, VH * .3); ctx.globalAlpha = 1;
     }
     ctx.font = '13px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.6)';
     ctx.fillText(Math.floor(timer / 60) + ':' + String(Math.floor(timer % 60)).padStart(2, '0'), VW / 2, 16);
     if (net.on) {
       ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#8fe3c8';
-      ctx.fillText(net.seats + (net.seats > 1 ? ' riders' : ' rider') + ' - ESC leaves', VW / 2, 34);
+      ctx.fillText(net.seats + ' riding - ESC leaves', VW / 2, 34);
       if (net.said) { ctx.font = 'bold 20px system-ui'; ctx.fillStyle = '#f3ead6'; ctx.fillText(net.said, VW / 2, VH * .38); }
       if (watching()) {
         const mine = net.me >= 0 ? leaders[net.me] : null;
         ctx.font = 'bold 17px system-ui'; ctx.fillStyle = '#ffb0b8';
         // A stone leader's burn byte carries the seconds until it rises.
-        ctx.fillText(mine ? 'DOWN - RIDING AGAIN IN ' + Math.max(1, Math.ceil(5 - mine.burn)) : 'NO SEAT - WATCHING', VW / 2, VH * .28);
-        ctx.font = '13px system-ui'; ctx.fillStyle = '#d8d0ea';
-        ctx.fillText('left / right to look around', VW / 2, VH * .34);
+        ctx.fillText(mine ? 'DOWN - BACK IN ' + Math.max(1, Math.ceil(5 - mine.burn)) : 'NO SEAT - WATCHING', VW / 2, VH * .28);
       }
     }
     if (mode === 'end') {
@@ -756,7 +750,7 @@ function frame(now_) {
       ctx.fillText(victory ? 'THE PLAIN IS YOURS' : 'THE PLAIN FORGETS YOU', VW / 2, VH * .44);
       ctx.font = '17px system-ui'; ctx.fillStyle = '#d8d0ea';
       if (victory) ctx.fillText((isBest ? 'best time  ' : 'time  ') + timer.toFixed(1) + 's' + (best && !isBest ? '   best ' + best.toFixed(1) + 's' : ''), VW / 2, VH * .56);
-      else ctx.fillText('every unicorn you gathered has gone wild', VW / 2, VH * .56);
+      else ctx.fillText('your herd has gone wild', VW / 2, VH * .56);
       if (endT > 1) ctx.fillText('press SPACE', VW / 2, VH * .66);
     }
   }

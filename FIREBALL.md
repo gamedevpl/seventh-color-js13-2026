@@ -742,6 +742,40 @@ drawn after it in the HUD - the radar's one-pixel frame in your colour
 first of all - came out as a fat orange band. A canvas context is shared
 state; whatever you set, you reset.
 
+## F9 — the brains go for the player
+
+"The AI is still too weak." True, and the autopilot numbers could not
+have said so: the autopilot plays the player with the same brain, so
+every balance figure in this log measured brain against brain. A person
+beats the brains for reasons a brain never exposes:
+
+- **they never hunted the player.** A hunter took whichever herd was
+  nearest and smaller, which was usually another brain, while the player
+  swept meadows in peace;
+- **they ran from the player**, because a person gathers faster than a
+  brain, is soon the biggest herd on the plain, and a brain fled anything
+  1.5 times its size. So the mid-game was chasing herds that would not
+  fight;
+- **they answered late**, seeing a rainbow coming from 60 units and
+  aiming a quarter-second behind it.
+
+Three changes, all in `think`, paid for by two messages nobody needed
+(`CHARGE!` on every press, and a line for a rival falling off the plain
+that the sound already told you):
+
+- **a herd a person is riding counts as nearer than it is** - its distance
+  is scaled by 0.6 in the hunt - so the brains gravitate toward people,
+  online as well as solo;
+- **the biggest herd on the plain is everybody's problem**: a hunter will
+  go for it at up to 1.8 times its own size, where any other herd has to
+  be smaller than it. A player who grows big now gets ganged up on
+  instead of avoided;
+- **only a herd 2.2 times your size is worth running from**, threats are
+  seen from 80 units, and the answer aims further ahead.
+
+The autopilot matches went from 129 seconds to 93. Whether that is now
+"enough" only a person can say, and this log will keep saying so.
+
 ## The wall
 
 F8a: **13,293 bytes** packed worst-of-5 at O1, limit 13,312, and **19

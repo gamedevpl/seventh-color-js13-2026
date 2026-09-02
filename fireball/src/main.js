@@ -479,7 +479,6 @@ function frame(now_) {
     else if (e.k === 'knock') { thud(); burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
     else if (e.k === 'horn') { clang(); burst([e.x, 1, e.z], 5, 3, [1, .9, .6]); }
     else if (e.k === 'graze') { clang(); burst([e.x, 1.5, e.z], 40, 7); }
-    else if (e.k === 'chg') { if (e.L === P) say('CHARGE!', 1); }
     else if (e.k === 'ignite') {
       // The band lights: a flash, a fan of sparks the size of the herd, and
       // the riser resolving into a chord.
@@ -492,7 +491,7 @@ function frame(now_) {
     else if (e.k === 'lost') { thud(); burst([e.u.x, .8, e.u.z], 8, 5, COL[WILD]); }
     else if (e.k === 'fell') {
       sBoom(3); shake = 1;
-      say(e.L === P ? 'OFF THE PLAIN' : 'A RIVAL FALLS OFF', 2.5);
+      if (e.L === P) say('OFF THE PLAIN', 2.5);
     }
     else if (e.k === 'blast') { burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
     else if (e.k === 'boom') { sBoom(e.pw); BOOMS.push({ x: e.x, z: e.z, t: 0, pw: e.pw }); boomCloud(e.x, e.z, e.pw); burst([e.x, 1.5, e.z], 120, 9 + e.pw * .4); shake = 1; flash = .4; }

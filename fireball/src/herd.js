@@ -95,7 +95,7 @@ function threatened(L) {
   for (const R of leaders) {
     if (R === L || R.st === 3 || !(R.wave || R.charge > .4)) continue;
     const dx = L.x - R.x, dz = L.z - R.z, d = Math.hypot(dx, dz);
-    if (d < 60 && (dx * Math.cos(R.yaw) + dz * Math.sin(R.yaw)) / (d || 1) > .75) return R;
+    if (d < 80 && (dx * Math.cos(R.yaw) + dz * Math.sin(R.yaw)) / (d || 1) > .75) return R;
   }
   return null;
 }
@@ -224,17 +224,24 @@ function think(L, dt) {
     // two thoughts, so aiming at the attacker's current position steers
     // for a point it has already left - which is why two lit herds could
     // share the plain for seconds and never touch.
-    const t = d / 60;
+    const t = d / 45;
     if (L.n >= 2 && (size >= .9 || (d < 40 && size >= .55))) { run = true; want = [R.x + R.vx * t, R.z + R.vz * t]; }
     else { want = [L.x - (L.z - R.z) * 2, L.z + (L.x - R.x) * 2]; sprint = true; }   // step aside, fast
   }
   if (!want) {
     let hunt = null, hd = 1e9, flee = null, fd = 1e9;
+    // The biggest herd on the plain is everybody's problem, and a herd a
+    // person is riding counts as nearer than it is: the brains used to
+    // hunt whichever brain was handy while the player grew in peace, and
+    // then ran from the player because it had grown. Now the player IS
+    // the target, and only a herd twice your size is worth running from.
+    const top = Math.max(...leaders.map((R) => R.st === 3 ? 0 : R.n));
     for (const R of leaders) {
       if (R === L || R.st === 3) continue;
-      const d = Math.hypot(R.x - L.x, R.z - L.z);
-      if (time > 15 && R.n + 1 <= (L.n + 1) * (.7 + .6 * bold) && d < 30 + 90 * bold && d < hd && L.n >= 3) { hunt = R; hd = d; }
-      if (R.n > (L.n + 1) * 1.5 && d < 22 && d < fd) { flee = R; fd = d; }
+      const d = Math.hypot(R.x - L.x, R.z - L.z) * (R.ai ? 1 : .6);
+      const k = R.n === top && R.n > 6 ? 1.8 : .7 + .6 * bold;
+      if (time > 15 && R.n + 1 <= (L.n + 1) * k && d < 30 + 90 * bold && d < hd && L.n >= 3) { hunt = R; hd = d; }
+      if (R.n > (L.n + 1) * 2.2 && d < 22 && d < fd) { flee = R; fd = d; }
     }
     if (flee && !hunt) { want = [L.x + (L.x - flee.x), L.z + (L.z - flee.z)]; sprint = true; }
     else if (hunt) {

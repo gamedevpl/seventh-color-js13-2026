@@ -630,6 +630,14 @@ it took to go stale: nobody hosted, nobody was seated, and the probe saw a
 plain that never started. The lesson is the one every reconnect teaches -
 a socket's memory belongs to the socket, and goes with it.
 
+And a third, from the probe starving its third browser: the once-a-second
+hello ran on the frame clock, so a tab drawing slowly announced itself
+slowly, and a tab in the background - where the browser stops the frame
+loop altogether - would have stopped announcing itself at all, been pruned
+by everyone else after three and a half seconds, and lost its seat while
+still connected. Hellos now run on a wall clock, and the first goes out
+the moment the relay hands over a name.
+
 ## The wall
 
 F6: **13,239 bytes** packed worst-of-5 at O1, limit 13,312, and **73

@@ -26,7 +26,6 @@ const JOINING = 'JOINING THE PLAIN';
 const ALONE = 'OFFLINE - RIDING ALONE';
 const SNAP = 1 / 12;                      // the plain, twelve times a second
 const IN = 1 / 20;                        // input, a little faster
-const HELLO = 1;                          // and a name once a second
 const GONE = 3.5;                         // silence this long and you are out
 
 export const net = {
@@ -44,10 +43,10 @@ export const net = {
   room: '',                               // a room other than the default
 };
 
-let ws = null, id = '', tag = 0;
+let ws = null, id = '', tag = 0, hello = 0;
 let seen = new Map();                     // id -> when we last heard it
 let roster = [];                          // seat -> id, '' for a free one
-let t = 0, tHello = 0, tSnap = 0, tIn = 0, tSeen = 0, tHeard = -99, joined = 0;
+let t = 0, tSnap = 0, tIn = 0, tSeen = 0, tHeard = -99, joined = 0;
 let netIn = [];                           // seat -> the input it last sent
 let held = [];                            // seat -> was somebody on it last frame
 let lastR = '';                           // the seating as last announced
@@ -67,6 +66,7 @@ export function open(room, quiet) {
   ws.onclose = () => { net.on = net.host = 0; net.me = -1; ws = null; if (!net.said) net.said = ALONE; };
   ws.onerror = () => { net.said = ALONE; net.on = 0; };
   ws.onmessage = (e) => hear(e.data);
+  hello = setInterval(() => { if (id && !net.quiet) say('h' + id); }, 1000);
 }
 // A socket closes asynchronously, so its handlers must be taken off before
 // a new one is opened - or the old one's onclose lands on the new one. And
@@ -74,7 +74,7 @@ export function open(room, quiet) {
 // smallest and blocked the election for as long as it took to go stale.
 export function close() {
   if (!ws) return;
-  const w = ws; ws = null; w.onclose = w.onmessage = w.onerror = w.onopen = null;
+  const w = ws; ws = null; w.onclose = w.onmessage = w.onerror = w.onopen = null; clearInterval(hello); id = '';
   net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; seen.clear();
   // Closing a socket that is still connecting makes the browser complain
   // in the console; let it arrive first, then leave.
@@ -89,7 +89,7 @@ function hear(d) {
   }
   const k = d[0], rest = d.slice(1);
   // Our own name, handed to us the moment we connect.
-  if (k === '@') { id = rest; seen.set(id, t); return; }
+  if (k === '@') { id = rest; seen.set(id, t); if (!net.quiet) say('h' + id); return; }
   // Someone announcing themselves.
   if (k === 'h') { seen.set(rest, t); return; }
   if (k === '-') { seen.delete(rest); return; }
@@ -220,7 +220,6 @@ export function tick(dt, local) {
   if (!net.on || net.quiet) return 1;
   t += dt;
 
-  if (t - tHello > HELLO && id) { say('h' + id); tHello = t; }
 
   // Names go quiet when a tab dies without closing its socket.
   if (t - tSeen > 1) {

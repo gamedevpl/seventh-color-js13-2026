@@ -61,12 +61,13 @@ const look = (p) => p.evaluate(() => ({
 const A = await rider();
 await new Promise((r) => setTimeout(r, 400));
 const B = await rider();
-await new Promise((r) => setTimeout(r, 3000));
+await new Promise((r) => setTimeout(r, 4500));
 
 let a = await look(A), b = await look(B);
 check('both sockets are up', a.on === 1 && b.on === 1);
 check('exactly one of them runs the plain', a.host + b.host === 1, `A host ${a.host}, B host ${b.host}`);
 check('they take different herds', a.me !== b.me && a.me >= 0 && b.me >= 0, `seats ${a.me} and ${b.me}`);
+if (a.me < 0 || b.me < 0) console.log('  A spy', JSON.stringify(await A.evaluate(() => FB.spy())), '\n  B spy', JSON.stringify(await B.evaluate(() => FB.spy())));
 check('both count two riders', a.seats === 2 && b.seats === 2, `${a.seats} / ${b.seats}`);
 
 // The client is drawing the host's plain, not one of its own.
@@ -161,7 +162,7 @@ check('...and rises again without waiting for a round', back.st === 0 && back.he
 // a smaller name took the plain off whoever already had it.
 const beforeJoin = await look(hostPage);
 const C = await rider();
-await new Promise((r) => setTimeout(r, 4000));
+await new Promise((r) => setTimeout(r, 6000));
 const afterJoin = await look(hostPage);
 const c = await look(C);
 check('an arrival does not stop the plain', Math.abs(afterJoin.sum - beforeJoin.sum) > 40,

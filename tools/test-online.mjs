@@ -36,6 +36,8 @@ async function rider() {
   page.on('console', (m) => { if (m.type() === 'error' && !/GL Driver/.test(m.text())) problems.push(m.text()); });
   page.on('pageerror', (e) => problems.push(e.message));
   await page.goto(pathToFileURL(pagePath).href);
+  // The title listens to the same room O will join, as it does for real.
+  await page.evaluate((r) => { FB.net.room = r; }, room);
   await page.waitForTimeout(500);
   await page.keyboard.press('Space');
   await page.waitForTimeout(200);
@@ -166,6 +168,7 @@ check('an arrival does not stop the plain', Math.abs(afterJoin.sum - beforeJoin.
   `the plain moved ${Math.abs(afterJoin.sum - beforeJoin.sum).toFixed(0)} unit-sums while somebody joined`);
 check('...and does not take it over', afterJoin.host === 1 && c.host === 0);
 check('...and the newcomer gets its own herd', c.me >= 0 && c.me !== seat && c.me !== other, `seat ${c.me}`);
+if (c.me < 0) console.log('  host spy', JSON.stringify(await hostPage.evaluate(() => FB.spy())), '\n  C spy', JSON.stringify(await C.evaluate(() => FB.spy())));
 check('three riders, three counts agree', c.seats === 3 && afterJoin.seats === 3, `${afterJoin.seats} / ${c.seats}`);
 // Taking a seat must not hand somebody a stone, or a leader on its last
 // heart with nothing behind it: the herd is dealt fresh at its meadow.

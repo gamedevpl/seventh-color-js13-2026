@@ -69,11 +69,13 @@ export function open(room, quiet) {
   ws.onmessage = (e) => hear(e.data);
 }
 // A socket closes asynchronously, so its handlers must be taken off before
-// a new one is opened - or the old one's onclose lands on the new one.
+// a new one is opened - or the old one's onclose lands on the new one. And
+// the names it heard go with it: our own old name, left behind, sorted
+// smallest and blocked the election for as long as it took to go stale.
 export function close() {
   if (!ws) return;
   const w = ws; ws = null; w.onclose = w.onmessage = w.onerror = w.onopen = null;
-  net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; w.close();
+  net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; seen.clear(); w.close();
 }
 
 function hear(d) {

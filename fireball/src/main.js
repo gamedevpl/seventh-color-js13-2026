@@ -426,7 +426,7 @@ function frame(now_) {
 
   const P = who();
   if (mode === 'title') {
-    if (awake()) { music(.2, 1); if (!listened) { listened = 1; netOpen(); } }
+    if (awake()) { music(.2, 1); if (!listened) { listened = 1; netOpen(0, 1); } }
     step(dt, { over: 1 });
     if (doAct) {
       if (!awake()) wake();

@@ -623,6 +623,13 @@ socket closes asynchronously, so its handlers must be taken off before a
 new one opens, or the old one's `onclose` lands on the new one and zeroes
 it.
 
+The reconnect found a second one, subtler. The names a socket heard were
+kept across `close()`, so the listener's own old name stayed in the set,
+sorted smallest, and blocked the election for the three and a half seconds
+it took to go stale: nobody hosted, nobody was seated, and the probe saw a
+plain that never started. The lesson is the one every reconnect teaches -
+a socket's memory belongs to the socket, and goes with it.
+
 ## The wall
 
 F6: **13,239 bytes** packed worst-of-5 at O1, limit 13,312, and **73

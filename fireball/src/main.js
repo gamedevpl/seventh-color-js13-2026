@@ -96,16 +96,21 @@ let groundM, tuftM, starM, postM;
 function partM() { return createMesh(new Float32Array(0), true); }
 function buildPlain() {
   const g = [];
-  pushBox(g, 0, -.5, 0, 600, 1, 600, .13, .16, .15);
-  // Patches. A single flat slab is a colour, not a ground: with nothing on
-  // it the eye has nothing to measure speed against, which is why the
-  // plain read as a void. These are large, low-contrast and laid flat over
-  // the slab - dark enough that the light in this game is still the only
-  // bright thing, varied enough that the ground moves under you.
-  for (let i = 0; i < 260; i++) {
+  // The slab is tiled, not one box: fog is worked out per vertex, and a
+  // single 600-unit quad has every vertex deep in it, so the whole plain
+  // drew in fog colour even under your hooves while anything small drew
+  // true - which is what made the mottling read as black sectors.
+  for (let i = -12; i < 12; i++) for (let j = -12; j < 12; j++) pushBox(g, i * 25 + 12.5, -.5, j * 25 + 12.5, 25, 1, 25, .13, .16, .15);
+  // Mottling. A single flat slab is a colour, not a ground: with nothing
+  // on it the eye has nothing to measure speed against. The first pass
+  // laid down large patches a fifth darker or lighter, which on a real
+  // monitor read as black sectors with hard edges - a dark tone has no
+  // room for a fifth. These are small, many and within a few percent of
+  // the slab: texture, not geography.
+  for (let i = 0; i < 420; i++) {
     const x = (Math.random() - .5) * ARENA * 2.1, z = (Math.random() - .5) * ARENA * 2.1;
-    const w = 5 + Math.random() * 11, v = .88 + Math.random() * .26;
-    pushBox(g, x, .02, z, w, .04, w * (.6 + Math.random()), .125 * v, .15 * v, .152 * v);
+    const w = 2 + Math.random() * 5, v = .95 + Math.random() * .1;
+    pushBox(g, x, .02, z, w, .04, w * (.6 + Math.random()), .13 * v, .16 * v, .15 * v);
   }
   groundM = createMesh(g);
   // Each meadow glows faintly in its own colour: the map tells you where a
@@ -359,10 +364,7 @@ const WILDC = COL[WILD];
 // --- state ----------------------------------------------------------------
 let mode = 'title', timer = 0, msg = '', msgT = 0, shake = 0, flash = 0, endT = 0;
 // A private window throws on the FIRST TOUCH of localStorage - the read as
-// much as the write - and a best time is a nicety, never a reason for the
-// game to fail to boot. Both ends are guarded.
-let best = 0, isBest = false, victory = false;
-try { best = +localStorage.fbBest || 0; } catch {}
+let victory = false;
 const BOOMS = [], TRAIL = new Map(), ARCS = [];
 let eye = null, look = null, camYaw = 0;
 let msgCol = '#fff4d6';
@@ -397,7 +399,7 @@ function newRun(attract) {
   buildPlain();
   particleM = partM(); arcM = partM(); trailM = partM();
   PART.length = 0; pcur = 0; BOOMS.length = 0; PUFF.length = 0; TRAIL.clear(); ARCS.length = 0;
-  timer = 0; msgT = 0; shake = 0; flash = 0; endT = 0; isBest = false; victory = false;
+  timer = 0; msgT = 0; shake = 0; flash = 0; endT = 0; victory = false;
   eye = null; camYaw = who().yaw;
 }
 newRun(1);
@@ -460,7 +462,6 @@ function frame(now_) {
       // And the rainbows go out with the run, so nothing is still being
       // ridden by nobody.
       for (const L of leaders) { L.wave = 0; L.chg = 0; L.charge = 0; }
-      if (victory) { isBest = !best || timer < best; if (isBest) { best = timer; try { localStorage.fbBest = timer; } catch {} } }
     }
   } else {
     endT += dt;
@@ -748,8 +749,7 @@ function frame(now_) {
       ctx.font = 'bold 40px system-ui'; ctx.fillStyle = '#f3ead6';
       ctx.fillText(victory ? 'THE PLAIN IS YOURS' : 'THE PLAIN FORGETS YOU', VW / 2, VH * .44);
       ctx.font = '17px system-ui'; ctx.fillStyle = '#d8d0ea';
-      if (victory) ctx.fillText('time ' + timer.toFixed(1) + 's' + (isBest ? ' - your best' : ''), VW / 2, VH * .56);
-      else ctx.fillText('your herd has gone wild', VW / 2, VH * .56);
+      if (!victory) ctx.fillText('your herd has gone wild', VW / 2, VH * .56);
       if (endT > 1) ctx.fillText('press SPACE', VW / 2, VH * .66);
     }
   }

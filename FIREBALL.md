@@ -638,6 +638,31 @@ by everyone else after three and a half seconds, and lost its seat while
 still connected. Hellos now run on a wall clock, and the first goes out
 the moment the relay hands over a name.
 
+## F7a — the black sectors
+
+Played on a real monitor, the plain had black rectangles on it: hard-edged
+sectors, as if the ground were missing in places. They were the F4 ground
+patches, meant to be a fifth darker or lighter than the slab so the eye
+had something to measure speed against - and on a dark tone a fifth is
+not subtle, it is a different colour.
+
+But the patches were not the cause, only the witness. **Fog is worked out
+per vertex, and the slab was one 600-unit box**: every vertex of it sat
+deep in the fog, so the whole plain drew in fog colour even under your
+hooves, while anything small - a patch, a unicorn - had its vertices near
+and drew true. The plain was never dark; it was fogged from underneath.
+Which is also, in hindsight, why it read as a void in F4 and why the
+patches seemed to fix it: they were the only part of the ground drawn at
+its real colour.
+
+The slab is now a grid of 25-unit tiles, so fog runs across it as a
+gradient toward the horizon like it does across everything else, and the
+mottling is back to a few percent, where it was always meant to be:
+texture, not geography.
+
+The end screen also lost its time line and the best-time save behind it.
+A detail nobody asked for, and forty bytes.
+
 ## The wall
 
 F7: **13,285 bytes** packed worst-of-5 at O1, limit 13,312, and **27

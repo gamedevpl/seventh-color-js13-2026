@@ -75,7 +75,10 @@ export function open(room, quiet) {
 export function close() {
   if (!ws) return;
   const w = ws; ws = null; w.onclose = w.onmessage = w.onerror = w.onopen = null;
-  net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; seen.clear(); w.close();
+  net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; seen.clear();
+  // Closing a socket that is still connecting makes the browser complain
+  // in the console; let it arrive first, then leave.
+  if (w.readyState) w.close(); else w.onopen = () => w.close();
 }
 
 function hear(d) {

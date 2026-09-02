@@ -45,6 +45,10 @@ page.on('console', (message) => {
   // screenshotting itself). That is the harness observing, not the game
   // failing - filter exactly that class and nothing else.
   if (/GL Driver Message \(OpenGL, Performance/.test(message.text())) return;
+  // The title listens to the competition relay for a rider count, and this
+  // sandbox has no route to it. The game's behaviour on a relay it cannot
+  // reach is tested on its own (tools/test-online.mjs); here it is weather.
+  if (/WebSocket connection to 'wss:\/\/relay\.js13kgames\.com/.test(message.text())) return;
   if (message.type() === 'error' || message.type() === 'warning') problems.push(`${message.type()}: ${message.text()}`);
 });
 page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));

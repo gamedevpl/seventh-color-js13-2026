@@ -200,7 +200,9 @@ check('the run makes sound after the gesture', oscs > 20, `${oscs} oscillators s
 // A clash, for looking at: step the sim until two fireballs meet, then
 // let the frame draw it.
 const clashAt = await page.evaluate(async () => {
-  for (let seed = 0; seed < 12; seed++) {
+  // Meetings are rarer since glancing became the common case: 0.4 a
+  // match, so twelve seeds could all miss. Forty do not.
+  for (let seed = 0; seed < 40; seed++) {
     FB.reset(seed, true);
     for (let i = 0; i < 30 * 400; i++) {
       FB.step(1 / 30, { turn: 0 });

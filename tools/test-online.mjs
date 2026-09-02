@@ -189,10 +189,13 @@ await hostPage.close();
 await new Promise((r) => setTimeout(r, 4000));
 const now = await look(guest);
 check('the survivor takes over the plain', now.host === 1, `host ${now.host}, said "${now.said}"`);
-// The plain has no rounds online: nobody is dealt a new one, so the herd
-// counts either side of the handover have to be recognisably the same.
-const drift = Math.max(...now.n.map((v, i) => Math.abs(v - lastSeen.n[i])));
-check('...and the plain is the same plain', drift < 12, `worst herd changed by ${drift}`);
+// Neither position nor herd size is a signal here: a leader that lost its
+// last heart rises at its own meadow, and the brains take herds off each
+// other fast. What a RESET does is unmistakable though - newWorld puts
+// all seven leaders on the meadow ring at 56, and a running plain never
+// has all of them there at once.
+const home = await guest.evaluate(() => FB.leaders.filter((L) => Math.abs(Math.hypot(L.x, L.z) - 56) < 4).length);
+check('...and the plain is the same plain', home < 7, `${home} of 7 leaders on the meadow ring`);
 // Position is no longer a signal here: a leader that lost its last heart
 // during the handover rises at its own meadow, which is a long way from
 // wherever it fell. Herd sizes are what a reset would flatten.

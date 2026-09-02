@@ -86,7 +86,9 @@ await page.screenshot({ path: path.join(root, 'build/fireball/probe-herd.png') }
 // measured below, in the sim, where the rest of the plain can be held
 // still - a live charge through six rival herds loses hearts to horns and
 // reads every one of them as the rainbow burning the herd.
-await page.evaluate(() => { FB.leaders[0].yaw = -Math.PI / 2; });
+// The rivals stand still for this: a rival charging into the player's
+// lane knocks the charge back to zero, which is a fight, not the button.
+await page.evaluate(() => { FB.leaders[0].yaw = -Math.PI / 2; for (const L of FB.leaders.slice(1)) L.stun = 99; });
 await page.waitForTimeout(400);
 const spd0 = (await st()).spd;
 await page.keyboard.down('Space');

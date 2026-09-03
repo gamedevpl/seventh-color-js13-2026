@@ -738,7 +738,13 @@ const victims = (i, x, z, n, from) => stage(({ i, x, z, n, from }) => {
   for (const u of units) {
     if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
     if (k2 >= n) break;
-    u.lead = i; u.col = R.col; u.st = 0; u.daze = 0; u.y = 0;
+    // Dazed on purpose. The fight loop staggers on the first horn and only
+    // THROWS on the second, while the first is still reeling - so a herd
+    // run down at twenty-six loses a couple of units into the air and the
+    // rest just merge, which is what made the trampling read as a crowd.
+    // Nine tenths of a second of daze is spent by the time they are
+    // reached, and every horn that lands is the second one.
+    u.lead = i; u.col = R.col; u.st = 0; u.daze = .85; u.y = 0;
     u.x = R.x + (Math.random() - .5) * 8; u.z = R.z + (Math.random() - .5) * 8; k2++;
   }
   R.n = k2;
@@ -755,16 +761,20 @@ await shoot(S({
 // ground on their own arcs, and at full speed it was over before it read.
 await victims(4, 8, 0, 15, -13);
 await shoot(S({
-  name: 'trampleB', dur: bars(1.75), scale: (info, st, t) => (t < .72 ? 1 : .22), guard: { charge: .75, pin: 26 },
-  // Back and up a little from the first framing: at grass height inside a
+  // The clock drops at four tenths, not seven: the centroids close in
+  // under half a second and the old threshold caught the aftermath, which
+  // is why a hit between two herds played as a crowd standing still.
+  name: 'trampleB', dur: bars(1.75), scale: (info, st, t) => (t < .40 ? 1 : .22), guard: { charge: .75, pin: 26 },
+  // And up onto a rise, off the shoulder: at grass height inside a
   // fifty-strong herd the lens saw nothing but flanks, and the unicorn
-  // actually leaving the ground was behind three that were not.
-  cam: { world: true, e0: [14.5, 2.4, 9.5], e1: [12.5, 1.9, 7.6], l0: [4, 1.2, 0], fov0: .9, ease: 'lin' },
+  // actually leaving the ground was behind three that were not. From eight
+  // up the wave of them going over reads as a wave.
+  cam: { world: true, e0: [14, 5.2, 11.5], e1: [12.4, 4.6, 10.2], l0: [7.5, 1.6, 0], fov0: .95, ease: 'lin' },
 }));
 await victims(5, 9, 1, 15, -12);
 await shoot(S({
   name: 'trampleC', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26 },
-  cam: { world: true, e0: [4, 3.4, 21], l0: [3, 1.3, 0], fov0: .95, ease: 'lin' },
+  cam: { world: true, e0: [14, 4.6, 10], e1: [13, 4.2, 9.2], l0: [8.5, 1.4, 0], fov0: .95, ease: 'lin' },
 }));
 // And once more from where the player sits: the game's own third person,
 // wide, ploughing straight through a herd that does not move.

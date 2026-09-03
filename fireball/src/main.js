@@ -243,7 +243,7 @@ function particleVerts(dt) {
 // stripes across its width, the width of the herd, rising off the ground -
 // which is the rainbow you see coming from the other side of the plain.
 const ARCMAX = 60, ABUF = new Float32Array(ARCMAX * 6 * 6 * 10);
-const TBUF = new Float32Array(200000);
+const TBUF = new Float32Array(DEV ? 700000 : 200000);
 let arcM, trailM;
 function drawCharge(L, T, dt) {
   const k = L.charge, wave = L.wave > 0;
@@ -316,7 +316,7 @@ function trailVerts(T, dt, eye) {
     for (const s of tr.s) s.t += dt;
     while (tr.s.length && tr.s[0].t > .9) tr.s.shift();
     if (!tr.s.length) { TRAIL.delete(L); continue; }
-    for (let i = 0; i + 1 < tr.s.length && n < TBUF.length - 8000; i++) {
+    for (let i = 0; i + 1 < tr.s.length && n < TBUF.length - (DEV ? 16000 : 8000); i++) {
       const s0 = tr.s[i], s1 = tr.s[i + 1];
       // Fade with age, and fade out again where the tunnel runs past the
       // camera - being inside your own rainbow is the point, being blinded
@@ -327,6 +327,31 @@ function trailVerts(T, dt, eye) {
       for (let c = 0; c < 7; c++) {
         for (let k = 0; k < ARCH; k++) {
           quad(pt(s0, c, k, 0, T), pt(s0, c, k + 1, 0, T), pt(s1, c, k + 1, 0, T), pt(s1, c, k, 0, T), RAINBOW[c], .26 * f);
+        }
+      }
+      // The trailer's rainbow, and only the trailer's - compiled out of the
+      // shipping build. Seven thin shells with a hole down the middle read
+      // as a croissant from every angle a film uses, so this fills the
+      // tunnel: more shells inside the innermost colour, running to white,
+      // additive, so a line of sight down the axis crosses all of them and
+      // the middle is the brightest part. The newest samples get it hardest
+      // and whitest - that is the fist on the front of the thing.
+      if (DEV && window.FBFX) {
+        const F = window.FBFX, SH = F.shells || 6;
+        const hn = tr.s.length > 2 ? i / (tr.s.length - 2) : 1, fist = Math.pow(hn, F.fistN || 7);
+        const P0 = (s, rf, j) => {
+          const th = j / ARCH * Math.PI, R = s.r * rf * (1 + fist * (F.bulge ?? .12));
+          const sx = -Math.sin(s.yaw), sz = Math.cos(s.yaw);
+          return [s.x + sx * Math.cos(th) * R, .15 + Math.sin(th) * R * .85, s.z + sz * Math.cos(th) * R];
+        };
+        for (let c = 0; c < SH; c++) {
+          const u = (c + 1) / SH, rf = .66 * (1 - u) + .05;
+          const w = Math.min(1, .3 + u * .55 + fist * .7);
+          const col = [RAINBOW[6][0] * (1 - w) + w, RAINBOW[6][1] * (1 - w) + w, RAINBOW[6][2] * (1 - w) + w];
+          const a = (F.core ?? .5) * (.13 + u * u * .5) * (1 + fist * (F.fist ?? 3)) * f;
+          for (let k = 0; k < ARCH; k++) {
+            quad(P0(s0, rf, k), P0(s0, rf, k + 1), P0(s1, rf, k + 1), P0(s1, rf, k), col, a);
+          }
         }
       }
     }

@@ -209,7 +209,7 @@ await page.evaluate(([RAINBOW]) => {
   // two where the hero gets run down, and there the guard keeps the hearts
   // topped up so the throw happens and the death does not.
   const guard = (g, dtGame) => {
-    const { leaders } = window.FB;
+    const { leaders, units } = window.FB;
     const P = leaders[0];
     P.hearts = 3; P.stun = 0;
     // `horns` lets a horn land on the hero; `mortal` lets rivals keep a
@@ -293,6 +293,33 @@ await page.evaluate(([RAINBOW]) => {
       if (P.st === 1) { P.vy = 0; P.y = Math.min(P.y, .1); }
     }
     if (g.hold && P.wave) { P.burn = Math.max(P.burn, 1.5); P.cool = 0; }
+    // KEGLE. Waiting on the game's own fight loop to do this does not work:
+    // the same pass that trades horns first pushes overlapping unicorns
+    // apart, and between that, the four-tenths hit cooldown and a contact
+    // box of one and a bit, three of fifteen victims ever left their feet -
+    // the rest slid past each other. So the trailer throws them itself. A
+    // tagged victim goes over the frame any charging unit comes within
+    // reach, once, thrown along the charge and splayed out from whatever
+    // reached it: the whole rank goes down, and it goes down like pins.
+    if (g.pins) {
+      const P0 = leaders[0], cx = Math.cos(P0.yaw), cz = Math.sin(P0.yaw), R2 = g.pins.reach * g.pins.reach;
+      for (const u of units) {
+        if (!u.pin || u.pinned || u.st !== 0) continue;
+        let by = null;
+        for (const o of units) {
+          if (o.st !== 0 || (o.lead !== 0 && o !== P0)) continue;
+          const ax = u.x - o.x, az = u.z - o.z;
+          if (ax * ax + az * az < R2) { by = o; break; }
+        }
+        if (!by) continue;
+        u.pinned = 1; u.st = 1; u.lead = -1; u.daze = 2;
+        const dx = u.x - by.x, dz = u.z - by.z, d = Math.hypot(dx, dz) || 1;
+        const ox = dx / d * .6 + cx, oz = dz / d * .6 + cz, on = Math.hypot(ox, oz) || 1;
+        const sp = g.pins.out * (.75 + Math.random() * .5);
+        u.vx = ox / on * sp; u.vz = oz / on * sp; u.vy = g.pins.up * (.75 + Math.random() * .5);
+        u.y = Math.max(u.y, .25); u.spin = 12 + Math.random() * 16; u.roll = Math.random() * 6;
+      }
+    }
     // `pin: 0` is as near to standing as the game allows - the step still
     // eases toward eleven, so it creeps, which reads as an animal shifting
     // its weight rather than one frozen in place.
@@ -522,6 +549,15 @@ await stage((c) => {
   // gather can add them.
   for (const L of window.FB.leaders) if (L.ai) L.ai = null;
 }, PLAYER);
+// The rainbow, dressed for the camera. The game's arch is seven thin
+// shells with a hole down the middle, which is right at a hundred and
+// twenty frames a second on a phone and reads as a croissant on a fifty
+// inch screen. FBFX fills it: `shells` more of them inside the innermost
+// colour running to white, `core` how much, `fist` how much harder the
+// newest samples get it - the white plasma punch on the front of the band
+// - and `bulge` how much wider the head is than the tail.
+await stage((fx) => { window.FBFX = fx; }, process.env.FB_NOFX ? null : { shells: 7, core: .55, fist: 3.4, fistN: 6, bulge: .14 });
+
 let id = 0;
 const S = (o) => ({ id: id++, ...o });
 
@@ -759,7 +795,7 @@ const victims = (i, x, z, n, from) => stage(({ i, x, z, n, from }) => {
   const { units, leaders } = window.FB, P = leaders[0], R = leaders[i];
   for (const u of units) {
     if (u === P || leaders.includes(u) || u.lead === 0) continue;
-    u.lead = -1; u.st = 0; u.daze = 0; u.y = 0; u.vx = u.vz = u.vy = 0; u.hit = 0;
+    u.lead = -1; u.st = 0; u.daze = 0; u.y = 0; u.vx = u.vz = u.vy = 0; u.hit = 0; u.pin = 0; u.pinned = 0;
     const a = Math.random() * Math.PI * 2;
     u.x = Math.cos(a) * 78; u.z = Math.sin(a) * 78;
   }
@@ -782,6 +818,10 @@ const victims = (i, x, z, n, from) => stage(({ i, x, z, n, from }) => {
     // Nine tenths of a second of daze is spent by the time they are
     // reached, and every horn that lands is the second one.
     u.lead = i; u.col = R.col; u.st = 0; u.daze = .85; u.y = 0;
+    // Tagged, because scatter() sets `lead` to -1 the moment one is hit and
+    // after that there is no way to tell a victim from any other loose
+    // unicorn on the plain.
+    u.pin = 1; u.pinned = 0;
     u.x = R.x + (Math.random() - .5) * 8; u.z = R.z + (Math.random() - .5) * 8; k2++;
   }
   R.n = k2;
@@ -790,7 +830,7 @@ const victims = (i, x, z, n, from) => stage(({ i, x, z, n, from }) => {
 
 await victims(3, 10, 1, 15, -16);
 await shoot(S({
-  name: 'trampleA', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26 },
+  name: 'trampleA', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26, pins: { out: 15, up: 11, reach: 2.4 } },
   cam: { subj: 'herd', follow: true, smooth: .12, e0: [-13, 0, 4.5], e1: [-11, 0, 4.0], l0: [9, 0, 1.4], fov0: .95, ease: 'lin' },
 }));
 // BULLET TIME. Down among them, and the clock drops to a quarter just as
@@ -801,7 +841,7 @@ await shoot(S({
   // The clock drops at four tenths, not seven: the centroids close in
   // under half a second and the old threshold caught the aftermath, which
   // is why a hit between two herds played as a crowd standing still.
-  name: 'trampleB', dur: bars(1.75), scale: (info, st, t) => (t < .40 ? 1 : .22), guard: { charge: .75, pin: 26 },
+  name: 'trampleB', dur: bars(1.75), scale: (info, st, t) => (t < .40 ? 1 : .22), guard: { charge: .75, pin: 26, pins: { out: 17, up: 13, reach: 2.6 } },
   // And up onto a rise, off the shoulder: at grass height inside a
   // fifty-strong herd the lens saw nothing but flanks, and the unicorn
   // actually leaving the ground was behind three that were not. From eight
@@ -810,14 +850,14 @@ await shoot(S({
 }));
 await victims(5, 9, 1, 15, -12);
 await shoot(S({
-  name: 'trampleC', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26 },
+  name: 'trampleC', dur: bars(.75), scale: 1, guard: { charge: .75, pin: 26, pins: { out: 15, up: 11, reach: 2.4 } },
   cam: { world: true, e0: [14, 4.6, 10], e1: [13, 4.2, 9.2], l0: [8.5, 1.4, 0], fov0: .95, ease: 'lin' },
 }));
 // And once more from where the player sits: the game's own third person,
 // wide, ploughing straight through a herd that does not move.
 await victims(6, 12, 0, 13, -20);
 await shoot(S({
-  name: 'plough', dur: bars(1.25), scale: 1, guard: { charge: .8, pin: 28 },
+  name: 'plough', dur: bars(1.25), scale: 1, guard: { charge: .8, pin: 28, pins: { out: 15, up: 11, reach: 2.4 } },
   cam: { subj: 'herd', follow: true, smooth: .12, e0: [-15, 0, 5.5], e1: [-17, 0, 6.2], l0: [11, 0, 1.6], fov0: 1.0, ease: 'lin' },
 }));
 
@@ -978,7 +1018,10 @@ await shoot(S({
 // between them, because an `until` shot has no `u` to ease along.
 const meetCam = (d) => {
   const k = Math.min(1, Math.max(0, (52 - d) / 26));
-  return { e0: [0, 20 - 14 * k, 44 - 27 * k], l0: [0, 3 + 2 * k, 0], fov0: 1.0 + .2 * k };
+  // Nine up at the closest, not six: at six the lens grazes the plain's own
+  // relief and the tiles cut a hard black staircase out of the bottom of
+  // both arches - invisible until the cores went bright.
+  return { e0: [0, 20 - 11 * k, 44 - 24 * k], l0: [0, 3 + 2 * k, 0], fov0: 1.0 + .2 * k };
 };
 let boomT = null;
 await stageDuel(26, 30);

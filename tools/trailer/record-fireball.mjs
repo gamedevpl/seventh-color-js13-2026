@@ -283,11 +283,18 @@ await page.evaluate(([RAINBOW]) => {
     if (g.charge !== undefined) { P.charge = g.charge; P.chg = 1; P.cool = 0; }
     if (g.aim) {
       const R = leaders[1];
-      if (P.wave && R.wave) {
-        P.burn = Math.max(P.burn, 1.5); R.burn = Math.max(R.burn, 1.5); P.cool = 0; R.cool = 0;
-        P.yaw = Math.atan2(R.z - P.z, R.x - P.x); R.yaw = Math.atan2(P.z - R.z, P.x - R.x);
-        P.spd = g.aim; R.spd = g.aim;
+      // Both lit, and KEPT lit. Whatever puts one of them out on the way in
+      // - a cooldown left over from the cutaway before, a heart lost - the
+      // shot is two rainbows meeting, so either one that is dark and able
+      // to light is lit again. The first take of this detected its clash on
+      // frame one, because one band went out the instant the shot began.
+      for (const L of [P, R]) {
+        if (!L.wave && L.st === 0) { L.cool = 0; L.charge = 1; L.chg = 1; L.wave = 1 + L.n; L.burn = 9; L.spent = 0; }
+        if (L.wave) { L.burn = Math.max(L.burn, 1.5); L.cool = 0; }
+        L.stun = 0;
       }
+      P.yaw = Math.atan2(R.z - P.z, R.x - P.x); R.yaw = Math.atan2(P.z - R.z, P.x - R.x);
+      P.spd = g.aim; R.spd = g.aim;
     }
   };
 
@@ -324,8 +331,14 @@ await page.evaluate(([RAINBOW]) => {
       : `radial-gradient(circle at 50% 52%, #fff ${wr.toFixed(1)}%, rgba(255,255,255,0) ${(wr * 1.7 + 6).toFixed(1)}%)`;
     white.style.opacity = wk;
     const dCent = Math.hypot(R.cx - P.cx, R.cz - P.cz);
+    // A clash is only believed once both bands have burned together for a
+    // few frames AND they are actually near each other: on the first frame
+    // of a staged shot the two are eighty units apart and anything that
+    // reads as a boom there is a staging artefact, not a collision.
+    if (P.wave && R.wave) window.__arm = (window.__arm || 0) + 1;
+    const armed = (window.__arm || 0) > 5 && dCent < 60;
     return {
-      ignited: !wasLit && !!P.wave, boom: bothLit && !(P.wave && R.wave), dCent, wave: P.wave, n: P.n, charge: P.charge, mode: window.FB.mode,
+      ignited: !wasLit && !!P.wave, boom: armed && bothLit && !(P.wave && R.wave), dCent, wave: P.wave, n: P.n, charge: P.charge, mode: window.FB.mode,
       // For the take-failed report below: where the player was and what it had.
       st: P.st, hearts: P.hearts, at: [Math.round(P.x), Math.round(P.z)], alive: leaders.filter((L) => L.st !== 3).length,
       thrown: wasUp && P.st === 1,
@@ -815,16 +828,55 @@ const bandVictims = (i, ahead, side, n) => stage(({ i, ahead, side, n }) => {
     u.x = R.x + (Math.random() - .5) * 11; u.z = R.z + (Math.random() - .5) * 11; g++;
   }
   R.n = g;
+  // Back to the recorder: where they ended up, and which way the band is
+  // pointed. A ringside tripod has to be nailed to THEM - a shot that
+  // tracks the player's centroid aims itself past the impact as the band
+  // runs on through, which is how three cuts came out looking like an
+  // empty plain with a herd on the horizon.
+  return { x: R.x, z: R.z, yaw: P.yaw };
 }, { i, ahead, side, n });
 
-const BAND_CAM = { subj: 'herd', follow: true, smooth: .12, l0: [13, 0, 2.2], fov0: 1.0, ease: 'lin' };
-for (const [k, [i, ahead, side]] of [[1, [2, 30, 0]], [2, [3, 32, -7]], [3, [4, 30, 6]]].entries()) {
-  await bandVictims(i, ahead, side, 14);
+// Lit, the band is a dome of white a dozen units across, and everything it
+// runs over is INSIDE that dome - so from behind, from the game's own
+// shoulder, the trampling is a glow with a shape in it. The three cuts go
+// ringside instead: the tripod is planted beside, in front of and above
+// the path, the herd stands clear of the arc until the arc arrives, and
+// the glow comes off so the animals read against it.
+await stage(() => window.FBGL({ fog: [30, 300], glow: 1.0 }));
+// The band's own radius is twelve units and its arch reads twice that, so
+// a herd put twenty ahead is already inside the white when the cut opens.
+// Twenty-six clears the leading edge: they stand there for a third of a
+// second, and then they do not.
+// Offsets below are [along, side, height] about the VICTIMS, with `along`
+// running the way the band is coming - so every tripod goes at POSITIVE
+// along, past them, looking back down the barrel. Put one at negative
+// along and the wall spends the cut behind the lens.
+//
+// `ahead` is measured from the LEADER but the burn is measured from the
+// CENTROID, which at thirty a second trails him by fourteen: eighteen
+// ahead is a thirty-two unit close, two thirds of a second, and the cut is
+// three quarters of a bar so the scatter gets the back half of it.
+const BANDS = [
+  // grass height, alongside the impact: the wall arrives through frame left
+  { i: 2, ahead: 18, e: [9, 14, 2.6], l: [0, 0, 2.2], fov: .95 },
+  // head on, twenty past them: they are in the foreground and it is behind.
+  // Three units off the axis, no more - much more and it reads as the band
+  // running past them rather than into them.
+  { i: 3, ahead: 19, e: [20, 3, 2.6], l: [0, 0, 3.2], fov: 1.0 },
+  // over the far shoulder, looking down into the moment of contact
+  { i: 4, ahead: 18, e: [8, -13, 8], l: [0, 0, 1.4], fov: .9 },
+];
+for (let k = 0; k < BANDS.length; k++) {
+  const b = BANDS[k];
+  const V = await bandVictims(b.i, b.ahead, 0, 22);
+  const c = Math.cos(V.yaw), sn = Math.sin(V.yaw);
+  const W = (o) => [V.x + c * o[0] + sn * o[1], o[2], V.z + sn * o[0] - c * o[1]];
   await shoot(S({
-    name: `band${k + 1}`, dur: bars(.5), scale: 1, guard: { hold: 1, pin: 30 },
-    cam: { ...BAND_CAM, e0: [-30 - k * 2, k === 1 ? -9 : 0, 12 + k], e1: [-33 - k * 2, k === 1 ? -10 : 0, 13 + k] },
+    name: `band${k + 1}`, dur: bars(.75), scale: 1, guard: { hold: 1, pin: 30 },
+    cam: { world: true, fov0: b.fov, ease: 'lin', e0: W(b.e), l0: W(b.l) },
   }));
 }
+await stage(() => window.FBGL({ fog: [30, 220], glow: 1.35 }));
 
 // --- VII. two rainbows ---------------------------------------------------------
 // From behind our own band, looking down the plain: the other one comes

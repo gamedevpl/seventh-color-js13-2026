@@ -137,6 +137,9 @@ MOVEMENT = {
     'cardGather': 'gather', 'gatherA': 'gather', 'gatherB': 'gather', 'gatherC': 'gather',
     'cardTrample': 'groove', 'trampleA': 'groove', 'trampleB': 'groove',
     'trampleC': 'groove', 'plough': 'groove',
+    # The three gameplay cutaways ride inside the drop - the band is lit
+    # through all of them, so the music never leaves it.
+    'band1': 'drop', 'band2': 'drop', 'band3': 'drop',
     'cardRainbow': 'break', 'hold': 'break',
     'ignite': 'drop', 'ride': 'drop',
     'approach': 'half', 'slowmo': 'still', 'clash': 'hit',

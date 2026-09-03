@@ -598,7 +598,10 @@ await shoot(S({
   overlay: (t) => ({ shake: tremor(t, HITW) }),
   beats: [
     { at: HITW - 1.0, send: () => crossHerd(2, -1, true, 8) },
-    { at: HITW + .95, hit: 1, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .15; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 6; } }, arg: [3, 11, 12] },
+    // Flattened and rolled along the ground under the band, not punted into
+    // the sky: barely any lift, most of the speed along the way the rainbow
+    // is going, and a fast tumble. Twelve of vertical made it a kick.
+    { at: HITW + .95, hit: 1, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .12; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 9; } }, arg: [6, 13, 2.2] },
   ],
 }));
 
@@ -639,7 +642,7 @@ await shoot(S({
 
 // --- VI. how ------------------------------------------------------------------
 await stage(() => window.FBGL({ fog: [30, 220], glow: 1.35 }));
-await shoot(S(cardShot('cardGather', 'gather your herd.', bars(.75))));
+await shoot(S(cardShot('cardGather', 'gather your herd.', bars(1))));
 
 // Loose unicorns of the hero's colour, sown in a band down its nose. They
 // are taken off whatever herd holds them, which is the only way to get
@@ -693,22 +696,40 @@ await shoot(S({
   overlay: () => ({ count: 1 }),
 }));
 
-await shoot(S(cardShot('cardTrample', 'trample the rest.', bars(.75))));
+await shoot(S(cardShot('cardTrample', 'trample the rest.', bars(1))));
 // Four looks at the same thing. The charge is held short of ignition
 // throughout, so the herd runs hard and its horns count and nothing lights.
+// A CLEAN STAGE each time. The first pass never put the last shot's
+// victims away, so by the third there were forty-five unicorns from three
+// dead herds standing in the same spot and a fifty-strong herd ploughed
+// into a mush of them - which is why the trampling read as running over
+// loose wildlife. Everything that is not ours goes to the far ring first,
+// then one herd is built where the lens can see it get hit.
 const victims = (i, x, z, n, from) => stage(({ i, x, z, n, from }) => {
   const { units, leaders } = window.FB, P = leaders[0], R = leaders[i];
-  P.x = from; P.z = 0; P.yaw = 0; P.spd = 26;
-  for (const u of units) if (u.lead === 0 && u !== P) { u.x = P.x - 4 + (Math.random() - .5) * 9; u.z = P.z + (Math.random() - .5) * 9; }
-  R.x = x; R.z = z; R.yaw = Math.PI / 2; R.st = 0; R.stun = 0; R.hearts = 3; R.wave = 0; R.charge = 0; R.chg = 0; R.y = 0;
-  let k = 0;
+  for (const u of units) {
+    if (u === P || leaders.includes(u) || u.lead === 0) continue;
+    u.lead = -1; u.st = 0; u.daze = 0; u.y = 0; u.vx = u.vz = u.vy = 0; u.hit = 0;
+    const a = Math.random() * Math.PI * 2;
+    u.x = Math.cos(a) * 78; u.z = Math.sin(a) * 78;
+  }
+  for (let k = 1; k < leaders.length; k++) {
+    const L = leaders[k];
+    L.wave = 0; L.charge = 0; L.chg = 0; L.cool = 0; L.st = 0; L.stun = 0; L.hearts = 3; L.y = 0; L.n = 0;
+    if (k !== i) { const a = k / 7 * Math.PI * 2; L.x = Math.cos(a) * 76; L.z = Math.sin(a) * 76; }
+  }
+  P.x = from; P.z = 0; P.yaw = 0; P.spd = 26; P.st = 0; P.y = 0;
+  for (const u of units) if (u.lead === 0 && u !== P) { u.x = P.x - 4 + (Math.random() - .5) * 10; u.z = P.z + (Math.random() - .5) * 10; u.st = 0; u.y = 0; u.hit = 0; }
+  R.x = x; R.z = z; R.yaw = Math.PI / 2;
+  let k2 = 0;
   for (const u of units) {
     if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
-    if (k >= n) break;
-    u.lead = i; u.col = R.col; u.st = 0; u.daze = 0;
-    u.x = R.x + (Math.random() - .5) * 9; u.z = R.z + (Math.random() - .5) * 9; k++;
+    if (k2 >= n) break;
+    u.lead = i; u.col = R.col; u.st = 0; u.daze = 0; u.y = 0;
+    u.x = R.x + (Math.random() - .5) * 8; u.z = R.z + (Math.random() - .5) * 8; k2++;
   }
-  R.n = k;
+  R.n = k2;
+  return k2;
 }, { i, x, z, n, from });
 
 await victims(3, 10, 1, 15, -16);
@@ -740,7 +761,7 @@ await shoot(S({
   cam: { subj: 'herd', follow: true, smooth: .12, e0: [-15, 0, 5.5], e1: [-17, 0, 6.2], l0: [11, 0, 1.6], fov0: 1.0, ease: 'lin' },
 }));
 
-await shoot(S(cardShot('cardRainbow', 'become the rainbow.', bars(.75))));
+await shoot(S(cardShot('cardRainbow', 'become the rainbow.', bars(1))));
 const HOLD = bars(2), HOLD_SCALE = [1, .35];
 const holdGame = HOLD * (HOLD_SCALE[0] + HOLD_SCALE[1]) / 2;
 await clearTheField(66);
@@ -765,6 +786,45 @@ await shoot(S({
   name: 'ride', dur: bars(1), scale: 1, guard: { hold: 1, pin: 26 },
   cam: { subj: 'herd', follow: true, smooth: .1, e0: [-26, -8, 12], e1: [-30, -10, 14], l0: [8, 0, 2.5], fov0: 1.0, ease: 'lin' },
 }));
+
+// Three quick ones from where the player sits, with the band lit: this is
+// the thing the game is, and until now the trailer only showed a rainbow
+// running at another rainbow. A herd is put in its path, the field is
+// cleared of everything else, and the game's own chase view watches it go
+// through - one herd per cut, half a bar each.
+const bandVictims = (i, ahead, side, n) => stage(({ i, ahead, side, n }) => {
+  const { units, leaders } = window.FB, P = leaders[0], R = leaders[i];
+  for (const u of units) {
+    if (u === P || leaders.includes(u) || u.lead === 0) continue;
+    u.lead = -1; u.st = 0; u.daze = 0; u.y = 0; u.vx = u.vz = u.vy = 0; u.hit = 0;
+    const a = Math.random() * Math.PI * 2;
+    u.x = Math.cos(a) * 80; u.z = Math.sin(a) * 80;
+  }
+  for (let k = 1; k < leaders.length; k++) {
+    const L = leaders[k];
+    L.wave = 0; L.charge = 0; L.chg = 0; L.cool = 0; L.st = 0; L.stun = 0; L.hearts = 3; L.y = 0; L.n = 0;
+    if (k !== i) { const a = k / 7 * Math.PI * 2; L.x = Math.cos(a) * 78; L.z = Math.sin(a) * 78; }
+  }
+  const c = Math.cos(P.yaw), s2 = Math.sin(P.yaw);
+  R.x = P.x + c * ahead + s2 * side; R.z = P.z + s2 * ahead - c * side; R.yaw = P.yaw + Math.PI / 2;
+  let g = 0;
+  for (const u of units) {
+    if (u.lead >= 0 || leaders.includes(u) || u.st === 3) continue;
+    if (g >= n) break;
+    u.lead = i; u.col = R.col; u.st = 0; u.daze = 0; u.y = 0;
+    u.x = R.x + (Math.random() - .5) * 11; u.z = R.z + (Math.random() - .5) * 11; g++;
+  }
+  R.n = g;
+}, { i, ahead, side, n });
+
+const BAND_CAM = { subj: 'herd', follow: true, smooth: .12, l0: [13, 0, 2.2], fov0: 1.0, ease: 'lin' };
+for (const [k, [i, ahead, side]] of [[1, [2, 30, 0]], [2, [3, 32, -7]], [3, [4, 30, 6]]].entries()) {
+  await bandVictims(i, ahead, side, 14);
+  await shoot(S({
+    name: `band${k + 1}`, dur: bars(.5), scale: 1, guard: { hold: 1, pin: 30 },
+    cam: { ...BAND_CAM, e0: [-30 - k * 2, k === 1 ? -9 : 0, 12 + k], e1: [-33 - k * 2, k === 1 ? -10 : 0, 13 + k] },
+  }));
+}
 
 // --- VII. two rainbows ---------------------------------------------------------
 // From behind our own band, looking down the plain: the other one comes

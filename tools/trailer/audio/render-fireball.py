@@ -142,7 +142,7 @@ MOVEMENT = {
     'band1': 'drop', 'band2': 'drop', 'band3': 'drop',
     'cardRainbow': 'break', 'hold': 'break',
     'ignite': 'drop', 'ride': 'drop',
-    'approach': 'half', 'slowmo': 'still', 'clash': 'hit',
+    'duel': 'half', 'approach': 'half', 'slowmo': 'still', 'clash': 'hit',
 }
 timeline = sorted((t, n) for n, t in C.items() if n in MOVEMENT and isinstance(t, (int, float)))
 T_CODA = BAR * (int(C['clash'] / BAR) + 1) if 'clash' in C else None

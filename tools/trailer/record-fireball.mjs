@@ -272,6 +272,26 @@ await page.evaluate(([RAINBOW]) => {
     }
     // Down: the game's own knocked-flat pose, held.
     if (g.lie) { P.st = 0; P.y = 0; P.vy = 0; P.vx = P.vz = 0; P.up = .55; P.spd = 0; P.chg = 0; P.charge = 0; }
+    // RUN OVER, not punted. The game's own answer to a rainbow landing on a
+    // leader is hurt(), and hurt() is seven of vertical - so every take of
+    // this had the hero leave the ground BEFORE the wall reached him and
+    // sail off ahead of it, which is a kick, not a trampling. A throw fired
+    // off a stopwatch could not beat it; this fires off the geometry, the
+    // frame the arch actually covers him, and then holds him down: no lift,
+    // ever, and his speed dragged toward the wall's own.
+    if (!g.run) window.__ran = 0;
+    else {
+      const R = leaders[g.run.i];
+      if (P.st === 0 && Math.hypot(P.x - R.cx, P.z - R.cz) < R.r * .92) {
+        // ONE shove, then friction. Held at the wall's own speed he stays
+        // inside it and the shot is a white screen; shoved once he falls
+        // behind it, and the band clears frame off a unicorn lying flat -
+        // which is the whole point of the beat.
+        P.st = 1; P.roll = 0; P.spin = 12; P.up = 0; window.__ran = 1;
+        P.vx = Math.cos(R.yaw) * g.run.spd; P.vz = Math.sin(R.yaw) * g.run.spd;
+      }
+      if (P.st === 1) { P.vy = 0; P.y = Math.min(P.y, .1); }
+    }
     if (g.hold && P.wave) { P.burn = Math.max(P.burn, 1.5); P.cool = 0; }
     // `pin: 0` is as near to standing as the game allows - the step still
     // eases toward eleven, so it creeps, which reads as an animal shifting
@@ -337,11 +357,24 @@ await page.evaluate(([RAINBOW]) => {
     // reads as a boom there is a staging artefact, not a collision.
     if (P.wave && R.wave) window.__arm = (window.__arm || 0) + 1;
     const armed = (window.__arm || 0) > 5 && dCent < 60;
+    // The seam. Two rainbows meeting is, on its own, a ring on the ground
+    // and a spark in the gap between them - true to the game and much too
+    // small to end a film on. So the moment it happens the trailer lets off
+    // its own ordnance along the line where they touched.
+    if (armed && bothLit && !(P.wave && R.wave) && !window.__blew) {
+      window.__blew = 1;
+      const mx = (P.cx + R.cx) / 2, mz = (P.cz + R.cz) / 2;
+      const ax = -(R.cz - P.cz), az = R.cx - P.cx, an = Math.hypot(ax, az) || 1;
+      window.FB.boom(mx, mz, 34);
+      for (let i = 1; i <= 3; i++) for (const sgn of [-1, 1]) {
+        window.FB.boom(mx + ax / an * i * 9 * sgn, mz + az / an * i * 9 * sgn, 30 - i * 5);
+      }
+    }
     return {
       ignited: !wasLit && !!P.wave, boom: armed && bothLit && !(P.wave && R.wave), dCent, wave: P.wave, n: P.n, charge: P.charge, mode: window.FB.mode,
       // For the take-failed report below: where the player was and what it had.
       st: P.st, hearts: P.hearts, at: [Math.round(P.x), Math.round(P.z)], alive: leaders.filter((L) => L.st !== 3).length,
-      thrown: wasUp && P.st === 1,
+      thrown: (wasUp && P.st === 1) || window.__ran === 1,
     };
   };
 }, [RAINBOW]);
@@ -393,7 +426,11 @@ async function shoot(shot) {
     const g = typeof shot.guard === 'function' ? shot.guard(t, info, state) : (shot.guard || {});
     if (info && info.thrown && !cues[shot.name + 'Hit']) cues[shot.name + 'Hit'] = +vt.toFixed(4);
     info = await page.evaluate((s) => window.__tick(s), {
-      dtGame: DT * sc, cam: shot.cam ? { ...shot.cam, shake: ov.shake ?? shot.cam.shake } : null, shotId: shot.id, u, guard: g,
+      // An `until` shot has no `u` to ease along - it runs to an event, not
+      // to a length - so its camera can only move if the overlay moves it.
+      // The finale's lens sat sixty units out for the whole take because of
+      // this, and two rainbows meeting read as two white blobs.
+      dtGame: DT * sc, cam: shot.cam ? { ...shot.cam, ...(ov.cam || {}), shake: ov.shake ?? shot.cam.shake } : null, shotId: shot.id, u, guard: g,
       fx: ov.fx, flash: ov.flash, white: ov.white,
       black: ov.black ?? (shot.card ? 1 : 0), card: ov.card ?? 0, cardText: text(shot.card, t), cardColor: shot.cardColor,
       note: ov.note ?? (shot.note ? 1 : 0), noteText: text(shot.note, t),
@@ -602,20 +639,20 @@ await shoot(S({
 // the joke; a second identical walk is also two of the same shot.
 const HITW = bars(2.75) - 1.05;
 await shoot(S({
-  name: 'wait', dur: bars(2.75), scale: 1,
+  // Three and a quarter bars, not two and three quarters: the wall reaches
+  // him about four and a quarter in and then needs the better part of a
+  // second to clear him, and the old length cut while he was still under
+  // it.
+  name: 'wait', dur: bars(3.25), scale: 1,
   stage: () => { const P = window.FB.leaders[0]; P.yaw = 0; P.up = 0; P.st = 0; P.y = 0; P.spd = 0; },
-  guard: (t) => (t < HITW - 1.0 ? { pin: 0, yaw: 0 } : { mortal: 1, pin: 0, drive: [{ i: 2, spd: 30 }] }),
+  guard: (t) => (t < HITW - 1.0 ? { pin: 0, yaw: 0 } : { mortal: 1, pin: 0, drive: [{ i: 2, spd: 30 }], run: { i: 2, spd: 16 } }),
   // Out and up, decelerating: the camera runs out of interest before the
   // rainbow does.
   cam: { subj: 0, e0: [4.6, .6, 1.35], e1: [13, 2.6, 2.7], l0: [.7, 0, 1.2], fov0: .72, fov1: .95, ease: 'out' },
   overlay: (t) => ({ shake: tremor(t, HITW) }),
-  beats: [
-    { at: HITW - 1.0, send: () => crossHerd(2, -1, true, 8) },
-    // Flattened and rolled along the ground under the band, not punted into
-    // the sky: barely any lift, most of the speed along the way the rainbow
-    // is going, and a fast tumble. Twelve of vertical made it a kick.
-    { at: HITW + .95, hit: 1, fn: ([vx, vz, vy]) => { const P = window.FB.leaders[0]; if (P.st === 0) { P.st = 1; P.y = .12; P.vx = vx; P.vz = vz; P.vy = vy; P.roll = 0; P.spin = 9; } }, arg: [6, 13, 2.2] },
-  ],
+  // The fall itself is the guard's `run`, off the geometry - no beat here
+  // can be early or late, and none can out-race hurt().
+  beats: [{ at: HITW - 1.0, send: () => crossHerd(2, -1, true, 8) }],
 }));
 
 // --- V. kaput. the crane. ---------------------------------------------------------
@@ -889,10 +926,62 @@ for (let k = 0; k < BANDS.length; k++) {
 await stage(() => window.FBGL({ fog: [30, 220], glow: 1.35 }));
 
 // --- VII. two rainbows ---------------------------------------------------------
-// From behind our own band, looking down the plain: the other one comes
-// on. A fifth of speed from twenty-five out, and on the hit, white - and
-// the white is what the end card dissolves out of.
+// Two shots, because one was a riddle. The first is down the barrel from
+// behind our own band - our arch across the bottom of the frame, the OTHER
+// one coming on down the plain - and the second is the meeting itself.
+//
+// Both bands are built by the same hand so they are the same size. Every
+// loose unit goes back in the pot first: after three cutaways the free
+// ones are all spoken for, and a rival assembled out of what was left came
+// out a third of ours - two mismatched white blobs at sixty units, which
+// is what "you have to guess what is happening" looks like.
+const stageDuel = (sep, rivalN) => stage(({ sep, rivalN }) => {
+  const { units, leaders } = window.FB, P = leaders[0], R = leaders[1];
+  for (const u of units) {
+    if (u === P || u.lead === 0 || leaders.includes(u)) continue;
+    u.lead = -1; u.st = 0; u.daze = 0; u.y = 0; u.vx = u.vz = u.vy = 0; u.hit = 0;
+  }
+  P.x = -sep; P.z = 0; P.yaw = 0; P.charge = 1; P.chg = 1; P.wave = 1 + P.n; P.burn = 9; P.cool = 0; P.spent = 0; P.spd = 12; P.st = 0; P.y = 0;
+  for (const u of units) if (u.lead === 0 && u !== P) { u.x = P.x - 3 + (Math.random() - .5) * 8; u.z = P.z + (Math.random() - .5) * 8; u.st = 0; u.y = 0; }
+  R.x = sep; R.z = 0; R.yaw = Math.PI; R.st = 0; R.stun = 0; R.cool = 0; R.hearts = 3; R.spd = 12; R.y = 0;
+  let given = 0;
+  for (const u of units) {
+    if (u.lead >= 0 || leaders.includes(u)) continue;
+    if (given >= rivalN) break;
+    u.lead = 1; u.col = R.col; u.st = 0; u.daze = 0; u.y = 0;
+    u.x = R.x + 3 + (Math.random() - .5) * 7; u.z = R.z + (Math.random() - .5) * 7; given++;
+  }
+  R.n = given; R.charge = 1; R.chg = 1; R.wave = 1 + given; R.burn = 9; R.spent = 0;
+  for (let i = 2; i < leaders.length; i++) {
+    const L = leaders[i], a = Math.PI + ((i - 2) / 4 - 0.5) * 1.6;
+    L.wave = 0; L.charge = 0; L.chg = 0; L.st = 0; L.y = 0; L.n = 0;
+    L.x = Math.cos(a + Math.PI / 2) * 64; L.z = -Math.abs(Math.sin(a + Math.PI / 2) * 64) - 20;
+  }
+  window.__arm = 0; window.__blew = 0;
+  return { pn: P.n, rn: given };
+}, { sep, rivalN });
+
+// Close up, a rainbow at the glow the cutaways used is a white wall with a
+// coloured rim. The finale is the one place the colour has to survive.
+await stage(() => window.FBGL({ fog: [30, 260], glow: 1.1 }));
+await stageDuel(55, 30);
+await shoot(S({
+  name: 'duel', dur: bars(1.5), scale: 1, guard: { aim: 14 },
+  // Thirty-four back off our own leader - eight clear of our own arch, so
+  // it sits across the bottom of the frame instead of over the lens - and
+  // aimed forty ahead, where the other one is growing.
+  cam: { subj: 0, follow: true, smooth: .18, e0: [-34, 0, 4.2], e1: [-36, 0, 4.6], l0: [40, 0, 6], fov0: 1.0, ease: 'lin' },
+}));
+
+// And the meeting. The lens starts back and high, where both bands read as
+// bands, and comes down and in as they close - driven off the distance
+// between them, because an `until` shot has no `u` to ease along.
+const meetCam = (d) => {
+  const k = Math.min(1, Math.max(0, (52 - d) / 26));
+  return { e0: [0, 20 - 14 * k, 44 - 27 * k], l0: [0, 3 + 2 * k, 0], fov0: 1.0 + .2 * k };
+};
 let boomT = null;
+await stageDuel(26, 30);
 await shoot(S({
   name: 'approach', until: (info, st, t) => (st.boomAt !== undefined && t - st.boomAt > 2.6) || t > 9,
   scale: (info, st, t) => {
@@ -900,40 +989,25 @@ await shoot(S({
     // Slower still after the hit, and held: the last cut ran the blast off
     // in a third of a second and went to white before it had opened.
     if (st.boomAt !== undefined) return .12;
-    return info && info.wave && info.dCent < 25 ? .18 : 1;
+    // Thirty-four, not twenty-five: two bands of the same size touch at
+    // twenty-two, so the old threshold left four tenths of a second of slow
+    // motion before the hit.
+    return info && info.wave && info.dCent < 34 ? .18 : 1;
   },
   slowCue: 'slowmo',
   guard: { aim: 12 },
-  stage: () => {
-    const { units, leaders } = window.FB, P = leaders[0], R = leaders[1];
-    P.x = -40; P.z = 0; P.yaw = 0; P.charge = 1; P.chg = 1; P.wave = 1 + P.n; P.burn = 6; P.cool = 0; P.spent = 0; P.spd = 12;
-    for (const u of units) if (u.lead === 0 && u !== P) { u.x = P.x - 3 + (Math.random() - .5) * 8; u.z = P.z + (Math.random() - .5) * 8; }
-    R.x = 40; R.z = 0; R.yaw = Math.PI; R.st = 0; R.stun = 0; R.cool = 0; R.hearts = 3; R.spd = 12;
-    let given = 0;
-    for (const u of units) {
-      if (u.lead >= 0 || u.st === 3 || leaders.includes(u)) continue;
-      if (given >= 12) break;
-      u.lead = 1; u.col = R.col; u.st = 0; u.daze = 0;
-      u.x = R.x + 3 + (Math.random() - .5) * 7; u.z = R.z + (Math.random() - .5) * 7; given++;
-    }
-    R.n = given; R.charge = 1; R.chg = 1; R.wave = 1 + given; R.burn = 6; R.spent = 0;
-    for (let i = 2; i < leaders.length; i++) {
-      const L = leaders[i], a = Math.PI + ((i - 2) / 4 - 0.5) * 1.6;
-      L.x = Math.cos(a + Math.PI / 2) * 64; L.z = -Math.abs(Math.sin(a + Math.PI / 2) * 64) - 20;
-      for (const u of units) if (u.lead === i && u !== L) { u.x = L.x + (Math.random() - .5) * 7; u.z = L.z + (Math.random() - .5) * 7; }
-    }
-  },
-  // Side on and high, both bands in one frame and both already running -
-  // from behind our own we could only see the other one arrive.
-  cam: { world: true, e0: [0, 34, 60], e1: [0, 23, 42], l0: [0, 3, 0], l1: [0, 2, 0], fov0: 1.05, fov1: .95, ease: 'in' },
+  // Side on: both bands in one frame, both already running. The eye is
+  // placed by the overlay, frame by frame, off how far apart they are.
+  cam: { world: true, ...meetCam(52), ease: 'lin' },
   overlay: (t, u, info) => {
     if (info && info.boom && boomT === null) boomT = t;
+    const cam = meetCam(info ? info.dCent : 52);
     // The white comes late, and then SPREADS: a disc opening from the
     // blast, past the corners, over a second and a half. Cutting to a
     // white card in a third of a second is a cut, not a flash.
-    if (boomT === null) return { white: 0 };
+    if (boomT === null) return { cam, white: 0 };
     const k = fin(t, boomT + 1.1, 1.5);
-    return { white: Math.min(1, k * 1.6), whiteR: k * k };
+    return { cam, white: Math.min(1, k * 1.6), whiteR: k * k };
   },
 }));
 

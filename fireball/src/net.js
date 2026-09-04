@@ -17,13 +17,13 @@
 // second, so everyone knows the same set of names, and the smallest name
 // hosts. When it leaves, the next smallest simply starts writing packets.
 
-import { units, leaders, newWorld, charge, footprint, revive } from './herd.js';
+import { units, leaders, newWorld, charge, footprint, revive, lerp, wrapA } from './herd.js';
 
 const TAU = Math.PI * 2;
 const ROOM = 'wss://relay.js13kgames.com/unicorn-fireball';
 const SEATS = 7;
-const JOINING = 'JOINING THE PLAIN';
-const ALONE = 'OFFLINE - RIDING ALONE';
+const JOINING = 'CONNECTING';
+const ALONE = 'OFFLINE';
 const SNAP = 1 / 12;                      // the plain, twelve times a second
 const IN = 1 / 20;                        // input, a little faster
 const GONE = 3.5;                         // silence this long and you are out
@@ -56,7 +56,7 @@ export function open(room, quiet) {
   tag = (Math.random() * 65536) | 0;
   net.quiet = quiet ? 1 : 0; net.around = 0;
   if (!quiet) net.said = JOINING;
-  try { ws = new WebSocket(room || net.room || ROOM); } catch { net.said = 'NO PLAIN FOUND'; return; }
+  try { ws = new WebSocket(room || net.room || ROOM); } catch { net.said = ALONE; return; }
   ws.binaryType = 'arraybuffer';
   ws.onopen = () => { net.on = 1; t = 0; tHeard = -99; joined = 0; };
   // A socket that is refused says so; a socket that is merely blocked can
@@ -76,6 +76,7 @@ export function close() {
   if (!ws) return;
   const w = ws; ws = null; w.onclose = w.onmessage = w.onerror = w.onopen = null; clearInterval(hello); id = '';
   net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; seen.clear();
+  held = []; netIn = [];
   // Closing a socket that is still connecting makes the browser complain
   // in the console; let it arrive first, then leave.
   if (w.readyState) w.close(); else w.onopen = () => w.close();
@@ -173,14 +174,13 @@ function packet(v) {
     L.burn = v.getUint8(o++) / 20;
     const f = v.getUint8(o++);
     L.hearts = f & 3; L.st = (f >> 2) & 3; L.cool = f & 16 ? 1 : 0; L.chg = f & 32 ? 1 : 0; L.man = f & 64 ? 1 : 0;
+    if (L.st === 3) L.gone = L.burn;
   }
 }
 
 // --- the client's own frame ----------------------------------------------
 // Legs, tumbles and the herd's footprint are worked out here rather than
 // sent: they are the parts nobody can tell apart from the real thing.
-const lerp = (a, b, k) => a + (b - a) * k;
-const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export function ghost(dt) {
   for (const L of leaders) { L.n = 0; L.cx = L.x; L.cz = L.z; }
   for (const u of units) if (u.lead >= 0 && u !== leaders[u.lead] && u.st !== 3) {
@@ -195,6 +195,7 @@ export function ghost(dt) {
     u.recoil = Math.max(0, u.recoil - dt * 3);
     if (u.tx === undefined) continue;
     const dx = (u.tx - u.x) * k, dz = (u.tz - u.z) * k;
+    u.vx = dx / (dt || .016); u.vz = dz / (dt || .016);
     u.x += dx; u.z += dz;
     u.y += (u.ty - u.y) * k;
     u.yaw += wrapA(u.tyaw - u.yaw) * k;
@@ -203,7 +204,7 @@ export function ghost(dt) {
     // divided by it is an infinity that reaches the oscillators as a NaN
     // and takes the whole loop down. Found on the real relay, where three
     // tabs make the frame clock jump about.
-    const sp = Math.hypot(dx, dz) / (dt || .016);
+    const sp = Math.hypot(u.vx, u.vz);
     u.sp = lerp(u.sp, sp, dt * 6);
     u.ph += sp * dt * 1.7 * u.gait;
   }
@@ -272,6 +273,7 @@ function start() {
   // Taking over from a host that left keeps the plain exactly as it was -
   // we have been drawing it all along. Only an empty room gets a new one.
   if (tHeard < 0) newWorld(0);
+  else held = roster.slice(); // Existing riders must not revive on host migration.
 }
 
 

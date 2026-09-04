@@ -776,10 +776,35 @@ that the sound already told you):
 The autopilot matches went from 129 seconds to 93. Whether that is now
 "enough" only a person can say, and this log will keep saying so.
 
+## F10 — predictable fights and recovery
+
+Equal head-on rainbows now cost both leaders a heart. The tie is recorded
+before either herd is broken, and current herd size decides the winner.
+Glancing contact has its own collision timer: it neither cancels the charge
+nor lets the ordinary blast pass damage an opponent that is still lit.
+
+The edge warning looks two seconds along the herd's current velocity and
+tells the player to release and turn. The title explains the controls and
+the cost of a rainbow; the HUD shows recharging, and the radar includes
+unclaimed unicorns the player can gather. Losing window focus clears input.
+
+Host migration preserves existing seats instead of treating every rider as
+a new arrival and reviving them. Clients retain horizontal velocity and the
+respawn timer for takeover. Regression probes cover equal and unequal
+clashes, grazing, release, advance edge warnings, and a migrating rider
+keeping one heart without teleporting home. The online respawn probe reads
+the first revived state instead of health after several more seconds of combat.
+
+The space comes from shared math, font and vertex writers, shorter messages,
+and removing the unused glass shader and WebGL buffer options. The five O1
+packs measured **13,304 / 13,283 / 13,270 / 13,286 / 13,307 bytes**.
+
 ## The wall
 
-F9: **13,286 bytes** packed worst-of-5 at O1, limit 13,312, and **26
-remain**. The brains going for the player put it three bytes OVER, and it
+F10: **13,307 bytes** worst-of-5 at O1, with **5 bytes remaining**.
+
+F9 measured **13,286 bytes** packed worst-of-5 at O1, limit 13,312, with **26
+remaining**. The brains going for the player put it three bytes OVER, and it
 came back under on six ring meshes nothing had drawn since the second
 shockwave ring went, a billboard helper with no callers left, and the
 SPENT message. The ring was free; the shadow's own pass cost what the second
@@ -841,6 +866,7 @@ written again in every party game.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F10 predictable fights and recovery | 13,312 | 13,307 (O1 worst-of-5) | fair ties, current herd power, safe glancing contact, host migration, predictive edge warning, recovery radar and controls; shared helpers and unused glass removed |
 | F9 the brains go for the player | 13,312 | 13,286 (O1 worst-of-5) | brains hunt people and the leader, flee only from 2.2x; six unused ring meshes and a dead helper cut to pay for it |
 | F8a the ring and the shadow | 13,312 | 13,293 (O1 worst-of-5) | the herd around its leader; the shadow drawn flat in its own pass |
 | F8 nine notes | 13,312 | 13,277 (O1 worst-of-5) | harder charge, no shrinking, followers a beat behind, bigger blast, bolder brains with a final; the edge as a frame; grazing rainbows deflect, head-on explodes; shadows; stagger before the knock |

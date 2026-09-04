@@ -153,7 +153,9 @@ await guest.keyboard.press('ArrowRight');
 await new Promise((r) => setTimeout(r, 900));
 const cam1 = await guest.evaluate(() => FB.units.length && [Math.round(FB.leaders[0].x)] && window.__cam);
 await guest.screenshot({ path: path.join(root, 'build/fireball/probe-spectate.png') });
-await new Promise((r) => setTimeout(r, 9000));
+// Inspect the first revived state. Waiting nine seconds lets combat take
+// another heart and falsely reports a broken respawn.
+await guest.waitForFunction(() => FB.leaders[FB.net.me].st === 0, undefined, { timeout: 9000 });
 const back = await guest.evaluate(() => { const L = FB.leaders[FB.net.me]; return { st: L.st, hearts: L.hearts }; });
 check('...and rises again without waiting for a round', back.st === 0 && back.hearts === 3, `st ${back.st}, hearts ${back.hearts}`);
 
@@ -162,6 +164,13 @@ check('...and rises again without waiting for a round', back.st === 0 && back.he
 // a smaller name took the plain off whoever already had it.
 const beforeJoin = await look(hostPage);
 const C = await rider();
+// Capture the first occupied-seat packet, before this new rider can fight.
+const freshState = await C.waitForFunction(() => {
+  const L = FB.leaders[FB.net.me];
+  return L?.man ? { hearts: L.hearts, st: L.st, home: Math.hypot(L.x, L.z) } : null;
+}, undefined, { timeout: 6000 });
+const fresh = await freshState.jsonValue();
+await freshState.dispose();
 await new Promise((r) => setTimeout(r, 6000));
 const afterJoin = await look(hostPage);
 const c = await look(C);
@@ -173,10 +182,6 @@ if (c.me < 0) console.log('  host spy', JSON.stringify(await hostPage.evaluate((
 check('three riders, three counts agree', c.seats === 3 && afterJoin.seats === 3, `${afterJoin.seats} / ${c.seats}`);
 // Taking a seat must not hand somebody a stone, or a leader on its last
 // heart with nothing behind it: the herd is dealt fresh at its meadow.
-const fresh = await C.evaluate((m) => {
-  const L = FB.leaders[m];
-  return { hearts: L.hearts, st: L.st, home: Math.hypot(L.x, L.z) };
-}, c.me);
 check('a new rider gets a herd worth riding', fresh.hearts === 3 && fresh.st === 0,
   `${fresh.hearts} hearts, st ${fresh.st}, ${fresh.home.toFixed(0)} from the middle`);
 await C.close();
@@ -184,11 +189,25 @@ await new Promise((r) => setTimeout(r, 1500));
 
 // The host walks out. The plain must not blink: whoever is left picks it
 // up from the state they were already drawing.
+// Isolate migration from combat. An established rider with one heart must
+// not be mistaken for a new arrival and revived when its browser takes over.
+await hostPage.evaluate((seat) => {
+  for (const L of FB.leaders) { L.wave = L.chg = L.charge = 0; L.stun = 99; }
+  const L = FB.leaders[seat];
+  Object.assign(L, { hearts: 1, st: 0, x: 0, z: 0, vx: 0, vz: 0, spd: 0 });
+}, seat);
+await new Promise((r) => setTimeout(r, 500));
+check('the guest receives the wounded state before migration',
+  await guest.evaluate((s) => FB.leaders[s].hearts === 1, seat));
 const lastSeen = await look(guest);
 await hostPage.close();
 await new Promise((r) => setTimeout(r, 4000));
 const now = await look(guest);
 check('the survivor takes over the plain', now.host === 1, `host ${now.host}, said "${now.said}"`);
+const migrated = await guest.evaluate((s) => ({ hearts: FB.leaders[s].hearts, x: FB.leaders[s].x, z: FB.leaders[s].z }), seat);
+check('migration preserves the rider\'s hearts', migrated.hearts === 1, `${migrated.hearts} hearts`);
+check('migration does not teleport the rider home', Math.hypot(migrated.x, migrated.z) < 30,
+  `${Math.hypot(migrated.x, migrated.z).toFixed(1)} from the middle`);
 // Neither position nor herd size is a signal here: a leader that lost its
 // last heart rises at its own meadow, and the brains take herds off each
 // other fast. What a RESET does is unmistakable though - newWorld puts

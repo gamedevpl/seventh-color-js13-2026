@@ -37,7 +37,7 @@
     "fireball": "node tools/native.mjs --game=fireball",
     "fireball:dev": "node tools/native.mjs --game=fireball --no-roadroller --cheats",
     "fireball:verify": "node tools/verify-native.mjs 3 --game=fireball --keys=space,space,up:3000,left:600,space:2500,up:3000",
-    "fireball:test": "node --test tools/test-fireball-rules.mjs && npm run fireball:dev && node tools/test-herd.mjs && node tools/test-online.mjs && node tools/test-fireball-qa.mjs",
+    "fireball:test": "node --test tools/test-fireball-rules.mjs && npm run fireball:dev && node tools/test-herd.mjs && node tools/test-online.mjs && node tools/test-fireball-qa.mjs && node tools/test-fireball-audio.mjs",
     "fireball:gate": "npm run fireball:test && node tools/native.mjs --game=fireball --O1 --rolls=5 && npm run fireball:verify",
     "fireball:ship": "node tools/native.mjs --game=fireball --O2 && npm run fireball:verify",
     "fireball:online": "npm run fireball:dev && node tools/test-online.mjs",

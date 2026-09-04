@@ -144,3 +144,45 @@ test('a 35+ herd self-ignites, stays lit after spending followers, and can brake
   assert.equal(A.wave, 0);
   assert.equal(A.heat, 0);
 });
+
+
+test('a grazing unit overlapping a rival stays finite and can separate', () => {
+  newWorld(0);
+  const L = leaders[0], u = units.find(u => u.lead < 0 && u.col !== L.col);
+  u.x = L.x; u.z = L.z;
+  for (let i = 0; i < 120; i++) step(1 / 30, {});
+  assert.ok(units.every(u => Number.isFinite(u.x + u.z + u.vx + u.vz)));
+  assert.ok(Math.hypot(u.x - L.x, u.z - L.z) > 0);
+});
+
+test('seed 42 mutual pursuit resolves through ordinary combat', () => {
+  const random = Math.random;
+  let seed = 42, blows = 0;
+  Math.random = () => (seed = Math.imul(seed, 1664525) + 1013904223 >>> 0) / 4294967296;
+  try {
+    newWorld(0); leaders[0].ai = {t: 0, goal: null};
+    for (let i = 0; i < 420 * 30 && leaders.filter(L => L.st !== 3).length > 1; i++) {
+      step(1 / 30, {});
+      blows += events.filter(e => e.k === 'hurt').length;
+      assert.equal(events.some(e => e.k === 'fell'), false);
+      events.length = 0;
+    }
+    assert.ok(leaders.filter(L => L.st !== 3).length <= 1);
+    assert.ok(blows > 0);
+    assert.equal(units.length, 77);
+  } finally { Math.random = random; }
+});
+
+test('eliminating a leader releases adopted wild followers too', () => {
+  for (const cause of ['edge', 'horn']) {
+    const [A, B] = duel();
+    Object.assign(A, {hearts: 1, x: cause === 'edge' ? 96 : -.3, wave: 0, chg: 0, charge: 0});
+    Object.assign(B, {x: .3, wave: 0, charge: .8, sp: 37});
+    const follower = units.find(u => !leaders.includes(u));
+    Object.assign(follower, {st: 0, col: 7, lead: A.lead, x: 50, z: 30});
+    step(0, {});
+    assert.equal(A.st, 3, cause);
+    assert.equal(follower.lead, -1, cause + ' must not leave a herd following a statue');
+    assert.equal(follower.col, 7);
+  }
+});

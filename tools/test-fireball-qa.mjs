@@ -35,6 +35,12 @@ try {
   await p.waitForFunction(() => FB.leaders[0].in.t === -1);
   await p.keyboard.up('A'); await p.keyboard.up('Shift');
   console.log('PASS outside-canvas release and uppercase WASD');
+  await p.evaluate(() => FB.events.push({k: 'boom', x: FB.leaders[0].x + 70, z: FB.leaders[0].z, pw: 72}));
+  await p.waitForFunction(() => !FB.events.length);
+  assert.equal(await p.evaluate(() => FB.impact), null);
+  await p.evaluate(() => FB.events.push({k: 'boom', x: FB.leaders[0].x, z: FB.leaders[0].z, pw: 72}));
+  await p.waitForFunction(() => FB.impact !== null);
+  console.log('PASS distant bot clash keeps the player camera; nearby impact still works');
   await p.evaluate(() => {
     FB.leaders[0].st = 3; FB.leaders[0].hearts = 0;
     FB.events.push({k: 'boom', x: 0, z: 0, pw: 72});

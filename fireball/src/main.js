@@ -308,7 +308,7 @@ function trailVerts(T, dt, eye) {
       if (f <= 0) continue;
       for (let c = 0; c < 7; c++) {
         for (let k = 0; k < ARCH; k++) {
-          quad(pt(s0, c, k, 0, T), pt(s0, c, k + 1, 0, T), pt(s1, c, k + 1, 0, T), pt(s1, c, k, 0, T), RAINBOW[c], .26 * f);
+          quad(pt(s0, c, k, 0, T), pt(s0, c, k + 1, 0, T), pt(s1, c, k + 1, 0, T), pt(s1, c, k, 0, T), RAINBOW[c], .38 * f);
         }
       }
     }
@@ -394,7 +394,7 @@ function ghostSound(P) {
 }
 
 function explode(x, z, pw) {
-  if (pw >= 62 && (mode !== 'end' || victory)) impact = { x, z, t: 2 };
+  if (pw >= 62 && Math.hypot(x - who().x, z - who().z) < 35 && (mode !== 'end' || victory)) impact = { x, z, t: 2 };
   sBoom(pw); BOOMS.push({ x, z, t: 0, pw }); boomCloud(x, z, pw);
   burst([x, 1.5, z], 120, 9 + pw * .4); shake = 1; flash = .4;
 }
@@ -696,7 +696,10 @@ function frame(now_) {
       const x = RX + (L.cx / ARENA + 1) * RS / 2, y = RY + (L.cz / ARENA + 1) * RS / 2;
       ctx.fillStyle = css(COL[L.col]);
       ctx.beginPath(); ctx.arc(x, y, 1.6 + Math.sqrt(L.n) * .8, 0, TAU); ctx.fill();
-      if (L.man) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 1.3, 0, TAU); ctx.fill(); }
+      if (L === P) {
+        ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 3 + Math.sqrt(L.n), 0, TAU);
+        ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(L.yaw) * 9, y + Math.sin(L.yaw) * 9); ctx.stroke();
+      } else if (L.man) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 1.3, 0, TAU); ctx.fill(); }
       if (L.wave) { ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 2 + L.r * .4, 0, TAU); ctx.stroke(); }
     }
     ctx.strokeStyle = css(pc); ctx.strokeRect(RX + .5, RY + .5, RS - 1, RS - 1);

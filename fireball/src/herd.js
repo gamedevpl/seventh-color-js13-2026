@@ -116,7 +116,7 @@ function scatter(u, fx, fz, s) {
 // about it in `think` - an edge that only kills the player is a trap.
 function fell(L) {
   L.hearts = 0; L.chg = 0; L.charge = 0; L.wave = 0; L.spd = 0; L.st = 3; L.gone = 0;
-  for (const u of units) if (u !== L && u.col === L.col) { u.col = WILD; if (u.lead === L.lead) u.lead = -1; }
+  for (const u of units) if (u !== L) { if (u.col === L.col) u.col = WILD; if (u.lead === L.lead) u.lead = -1; }
   events.push({ k: 'fell', L });
   events.push({ k: 'dead', L });
 }
@@ -128,7 +128,7 @@ function hurt(L, fx, fz) {
     // A leader with no hearts turns to stone where it stands, and its
     // colour is nobody's: every unicorn that wore it goes wild.
     L.st = 3; L.gone = 0;
-    for (const u of units) if (u !== L && u.col === L.col) { u.col = WILD; if (u.lead === L.lead) u.lead = -1; }
+    for (const u of units) if (u !== L) { if (u.col === L.col) u.col = WILD; if (u.lead === L.lead) u.lead = -1; }
     events.push({ k: 'dead', L });
   } else {
     // Knocked flat rather than thrown - a leader is never lost, only stunned.
@@ -230,7 +230,8 @@ function think(L, dt) {
     const lead = Math.min(.8, d / 45);
     want = [target.x + target.vx * lead, target.z + target.vz * lead];
     const err = Math.abs(wrapA(Math.atan2(want[1] - L.z, want[0] - L.x) - L.yaw));
-    run = d < 18 || d < 70 && (L.charge ? err < 1.5 : err < .35 && d < 45);
+    // Start the close-range answer before mutual pursuit settles into an orbit.
+    run = d < 30 || d < 70 && (L.charge ? err < 1.5 : err < .35 && d < 45);
     // A hopelessly outnumbered herd dodges an incoming rainbow.
     if (target === L.threat && target.n > (L.n + 1) * 2 && d > 30) {
       want = [L.x - (L.z - target.z) * 2, L.z + (L.x - target.x) * 2]; run = false;
@@ -388,7 +389,7 @@ export function step(dt, input) {
       if (hd > 18) { tx += hx / hd * 4; tz += hz / hd * 4; }
       for (const L2 of leaders) {
         if (L2.st === 3 || L2.col === u.col || u.col === WILD) continue;
-        const fx = u.x - L2.x, fz = u.z - L2.z, fd = Math.hypot(fx, fz);
+        const fx = u.x - L2.x, fz = u.z - L2.z, fd = Math.hypot(fx, fz) || 1;
         if (fd < 8) { tx += fx / fd * 8; tz += fz / fd * 8; }
       }
       // Joining: your colour's leader, or one of its followers, walking past.

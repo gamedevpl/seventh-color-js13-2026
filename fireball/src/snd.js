@@ -11,7 +11,7 @@
 export const BPM = 132;
 export const STEP = 15 / BPM;             // a sixteenth
 
-let ac = null, noise = null, nextT = 0, step = 0, riser = null;
+let ac = null, master, noise = null, nextT = 0, step = 0, riser = null;
 export let beat = 0;
 
 const NOTE = (s) => 110 * 2 ** (s / 12);
@@ -33,7 +33,7 @@ function tone(f, dur, type, gain, t0, f2) {
   o.frequency.setValueAtTime(f, t0);
   if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
   env(g, gain, t0, dur);
-  o.connect(g); g.connect(ac.destination);
+  o.connect(g); g.connect(master);
   o.start(t0); o.stop(t0 + dur);
 }
 // Filtered noise: hooves, thuds and the boom are all this with a
@@ -43,13 +43,17 @@ function hit(t0, dur, gain, freq, q) {
   s.buffer = noise; s.loop = true;
   f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
   env(g, gain, t0, dur);
-  s.connect(f); f.connect(g); g.connect(ac.destination);
+  s.connect(f); f.connect(g); g.connect(master);
   s.start(t0); s.stop(t0 + dur);
 }
 
 export function wake() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
   ac = new (window.AudioContext || window.webkitAudioContext)();
+  // One shared compressor catches overlapping impacts without flattening quiet play.
+  master = ac.createDynamicsCompressor();
+  master.threshold.value = -8; master.ratio.value = 12;
+  master.connect(ac.destination);
   const n = (ac.sampleRate * .4) | 0;
   noise = ac.createBuffer(1, n, ac.sampleRate);
   const d = noise.getChannelData(0);
@@ -97,7 +101,7 @@ export function rise(k) {
   if (!ac) return;
   if (!riser) {
     const o = ac.createOscillator(), g = ac.createGain();
-    o.type = 'sawtooth'; o.connect(g); g.connect(ac.destination);
+    o.type = 'sawtooth'; o.connect(g); g.connect(master);
     g.gain.value = .04; o.start();
     riser = { o, g };
   }

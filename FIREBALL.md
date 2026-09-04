@@ -1,6 +1,6 @@
 # UNICORN FIREBALL — the fourth entry
 
-## F12 — current rules (2026-09-05)
+## F13 — current rules (2026-09-05)
 
 Large clashes emerge from normal play. The last two leaders keep their
 positions and followers: there is no regrouping, countdown, forced charge,
@@ -19,6 +19,14 @@ shockwave and extended bass/noise tail; solo impacts also slow time briefly
 and move the camera to show both armies. Defeat always takes precedence
 over that cinematic effect.
 
+Close-range rivals begin charging from 30 units instead of 18, breaking a
+reproducible mutual-pursuit orbit through normal combat. Overlapping grazing
+units cannot divide by zero while fleeing. Every follower, including adopted
+wild unicorns, becomes available for collection when its leader dies. The player's radar marker has a
+white ring and heading line. Rainbow trails have stronger colour, using the
+same geometry. A shared compressor contains overlapping combat sounds.
+Only impacts within 35 units can take over the camera.
+
 The game starts with one Space/Enter press or tap. Pointer capture prevents
 stuck turns after releasing outside the canvas. Uppercase WASD works. Online
 and Exit have touch targets. Portrait mode displays a rotation prompt and
@@ -36,12 +44,12 @@ background detail. Stars, decorative ground patches and the overlapping
 white haze are removed; meadow colours, edge markers and the rainbow trails
 remain. Restarted worlds release their old GPU buffers.
 
-Package: **13,081 bytes**, **13,101 worst-of-five** at O1, ceiling **13,312**.
+Package: **13,172 bytes**, **13,195 worst-of-five** at O1, ceiling **13,312**.
 Validation and limitations are recorded in [FIREBALL-QA.md](FIREBALL-QA.md).
 
 ## Historical design notes (F1–F10)
 
-The text below records earlier iterations; F12 above defines current play.
+The text below records earlier iterations; F13 above defines current play.
 
 Run the plain as a unicorn of one colour. Gather every unicorn that shares
 it into a herd. When the herd is big enough, hold the button: the herd

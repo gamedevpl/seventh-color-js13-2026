@@ -23,6 +23,9 @@ export const EDGE = 14;                   // the warning band inside it
 const OUT = (x, z) => Math.max(Math.abs(x), Math.abs(z)) > ARENA;
 const nearEdge = (x, z) => Math.max(Math.abs(x), Math.abs(z)) > ARENA - EDGE;
 export { nearEdge };
+// Warn before a fast herd reaches the narrow boundary band. Releasing the
+// charge restores steering; a warning at the posts is already too late.
+export const edgeDanger = (L) => nearEdge(L.x, L.z) || nearEdge(L.x + L.vx * 2, L.z + L.vz * 2);
 export const PER = 10;                    // grazing unicorns per colour
 export const WILD = 7;                    // the eighth colour: anyone's
 export const units = [], leaders = [], events = [];
@@ -30,9 +33,9 @@ export const meadows = [];                // [x, z] home of each colour
 let time = 0;
 export const now = () => time;
 
-const rnd = (a = 1) => Math.random() * a;
-const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-const lerp = (a, b, k) => a + (b - a) * k;
+export const rnd = (a = 1) => Math.random() * a;
+export const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+export const lerp = (a, b, k) => a + (b - a) * k;
 
 function unit(x, z, col) {
   return {
@@ -72,7 +75,7 @@ export function newWorld(playerCol) {
     // spd is the run speed the charge builds; wave is the rainbow, 0 or
     // its power; burn is how long it has left; cx/cz/r is the herd's
     // footprint, kept because the rainbow is the size of the band.
-    L.spd = 11; L.wave = 0; L.burn = 0; L.n = 0; L.cx = mx; L.cz = mz; L.r = 2; L.threat = null; L.spent = 0;
+    L.spd = 11; L.wave = 0; L.burn = 0; L.n = 0; L.cx = mx; L.cz = mz; L.r = 2; L.threat = null; L.spent = 0; L.glance = 0;
     L.ai = i ? { t: rnd(.3), goal: null } : null; L.in = null;
     leaders.push(L); units.push(L);
     for (let k = 0; k < PER; k++) {
@@ -149,7 +152,7 @@ function breakHerd(L, cx, cz, s) {
 export function revive(L) {
   const [mx, mz] = meadows[L.col];
   L.st = 0; L.hearts = 3; L.chg = 0; L.charge = 0; L.wave = 0; L.burn = 0;
-  L.spd = 11; L.cool = 0; L.stun = 0; L.spent = 0; L.daze = 0; L.gone = 0;
+  L.spd = 11; L.cool = 0; L.stun = 0; L.spent = 0; L.daze = 0; L.gone = 0; L.glance = 0;
   L.x = mx; L.z = mz; L.y = 0; L.vx = L.vz = L.vy = 0;
   L.yaw = Math.atan2(-mz, -mx);
   let n = PER;
@@ -179,19 +182,20 @@ function clash(A, B) {
   const cx = (A.cx + B.cx) / 2, cz = (A.cz + B.cz) / 2;
   // Only a head-on meeting explodes. Two rainbows crossing at an angle
   // glance off each other: both are thrown off their line, both keep
-  // burning, and the fight goes on. `cool` keeps them from grazing again
-  // every frame while they still overlap; a lit herd has no other use for it.
+  // burning, and the fight goes on. Collision immunity must not share the
+  // charge cooldown: that would extinguish both rainbows on the next input.
   if (Math.cos(A.yaw - B.yaw) > -.4) {
     const side = Math.sign(Math.sin(B.yaw - A.yaw)) || 1;
     A.yaw -= side * .7; B.yaw += side * .7;
-    A.cool = B.cool = .6;
+    A.glance = B.glance = .6;
     events.push({ k: 'graze', x: cx, z: cz });
     return;
   }
-  const [W, Lo] = A.wave >= B.wave ? [A, B] : [B, A];
+  const tied = A.n === B.n;
+  const [W, Lo] = A.n >= B.n ? [A, B] : [B, A];
   events.push({ k: 'boom', x: cx, z: cz, pw: A.wave + B.wave });
   breakHerd(Lo, cx, cz, 16);
-  if (A.wave === B.wave) { breakHerd(W, cx, cz, 16); return; }
+  if (tied) { breakHerd(W, cx, cz, 16); return; }
   W.wave = 0; W.charge = 0; W.chg = 0; W.cool = 3; W.burn = 0;
 }
 
@@ -308,6 +312,7 @@ export function step(dt, input) {
       continue;
     }
     L.cool = Math.max(0, L.cool - dt);
+    L.glance = Math.max(0, L.glance - dt);
     L.threat = threatened(L);
     if (L.ai) think(L, dt);
     if (L.st !== 0) { L.spd = 0; continue; }
@@ -336,6 +341,7 @@ export function step(dt, input) {
       if (L.wave) { L.wave = 0; L.cool = 3; events.push({ k: 'fizzle', L }); }
     }
     if (L.wave) {
+      L.wave = L.n + 1;
       L.burn -= dt;
       // The rainbow BURNS THE HERD. About a third of it over a full burn,
       // so a rainbow thrown at nothing is paid for: the spent ones drop
@@ -496,11 +502,13 @@ export function step(dt, input) {
   for (const L of leaders) {
     if (!L.wave || L.st !== 0) continue;
     for (const R of leaders) {
-      if (R !== L && R.wave && R.st === 0 && !L.cool && Math.hypot(R.cx - L.cx, R.cz - L.cz) < R.r + L.r) { clash(L, R); break; }
+      if (R !== L && R.wave && R.st === 0 && !L.glance && !R.glance && Math.hypot(R.cx - L.cx, R.cz - L.cz) < R.r + L.r) { clash(L, R); break; }
     }
     if (!L.wave) continue;
     for (const u of units) {
       if (u.st !== 0 || u.lead === L.lead || Math.hypot(u.x - L.cx, u.z - L.cz) > L.r) continue;
+      // Lit opponents are resolved only by clash(), including their followers.
+      if (u.lead >= 0 && leaders[u.lead].wave) continue;
       const kin = u.col === L.col || u.col === WILD;
       if (u.lead < 0 && kin) {
         // Swept up: our colour, or a wild one, caught in the light.

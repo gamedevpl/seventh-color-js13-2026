@@ -15,31 +15,23 @@ export let gl, canvas;
 // float precision is highp in the vertex shader and mediump in the fragment
 // one, and a uniform whose precision disagrees across stages is a link error.
 const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
-uniform mediump float add,dim,gls;varying vec3 vc;varying float vf,va;
+uniform mediump float add,dim;varying vec3 vc;varying float vf,va;
 void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
 float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
-vc=c*mix(l,1.,add);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
-// Glass does NOT fog toward the fog colour - it fades its ALPHA instead.
-// It writes no depth, so a far piece of deck composites over a near one in
-// mesh order rather than depth order; fogged, that far sliver is close to
-// the background colour and therefore DARKER than the road it lands on, and
-// it paints a thin black curve across it. Keeping its colour means the
-// overlap is deck-over-deck - the same hue, so the seam disappears - while
-// the alpha fade still lets it die away with distance.
+vc=c*mix(l,1.,add);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,add),0.,1.);}`;
+// Fireball draws solids and additive glow; the surfer's glass material is
+// unused here. Keeping only these two paths leaves room for the game rules.
 const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
-uniform vec3 fog;uniform float add,gls;
+uniform vec3 fog;uniform float add;
 void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
-else if(gls>.5)gl_FragColor=vec4(vc,va*(1.-vf));
 else gl_FragColor=vec4(mix(vc,fog,vf),va);}`;
 
 let prog, loc = {};
 
 export function initGL(c) {
   canvas = c;
-  // preserveDrawingBuffer, because the HUD samples this canvas back with
-  // drawImage to build the radial blur. Without it the buffer is undefined
-  // by the time the 2D pass reads it.
-  gl = c.getContext('webgl', { antialias: true, preserveDrawingBuffer: true, stencil: true });
+  // The HUD is a separate overlay; it never reads the WebGL buffer back.
+  gl = c.getContext('webgl');
   const sh = (type, src) => {
     const s = gl.createShader(type);
     gl.shaderSource(s, src);
@@ -51,7 +43,7 @@ export function initGL(c) {
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls']) loc[u] = gl.getUniformLocation(prog, u);
+  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim']) loc[u] = gl.getUniformLocation(prog, u);
   gl.uniform1f(loc.dim, 1);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
@@ -61,27 +53,23 @@ export function frameGL(vp, cam, fog) {
   mode(0);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(fog[0], fog[1], fog[2], 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.uniformMatrix4fv(loc.vp, false, vp);
   gl.uniform3fv(loc.cam, cam);
   gl.uniform3fv(loc.fog, fog);
 }
 
-// Three materials, one program.
+// Two materials, one program.
 //   0 SOLID  lambert + fog, opaque, writes depth.
 //   1 GLOW   emissive, additive, depth TEST but no depth WRITE - glow layers
 //            still hide behind solid things but never occlude each other,
 //            they sum, and that summing is the bloom.
-//   2 GLASS  lambert + fog like solid, but alpha-blended and writing no
-//            depth, so overlapping pieces of track stack up and you can see
-//            the rest of the net through the deck you are riding.
 export function mode(m) {
   gl.uniform1f(loc.add, m === 1 ? 1 : 0);
-  gl.uniform1f(loc.gls, m === 2 ? 1 : 0);
   if (!m) { gl.disable(gl.BLEND); gl.depthMask(true); return; }
   gl.enable(gl.BLEND);
   gl.depthMask(false);
-  gl.blendFunc(gl.SRC_ALPHA, m === 1 ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 }
 
 // A blanket multiplier on every vertex alpha, so one mesh can be drawn a

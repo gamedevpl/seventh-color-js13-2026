@@ -9,15 +9,13 @@
 
 import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox, setDim } from './gl.js';
 import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
-import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, footprint, burnTime, nearEdge, ARENA, EDGE, WILD, now } from './herd.js';
+import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, rnd, lerp, wrapA, edgeDanger, ARENA, EDGE, WILD, now } from './herd.js';
 import { net, open as netOpen, close as netClose, tick as netTick, ghost, spy } from './net.js';
 import { wake, awake, music, join as sJoin, clang, thud, rise, riseOff, ignite as sIgnite, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
 
 const VW = 640, VH = 360;
 const FOG = [.07, .05, .13];
 const TAU = Math.PI * 2;
-const lerp = (a, b, k) => a + (b - a) * k;
-const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const css = (c, a = 1) => `rgba(${c[0] * 255 | 0},${c[1] * 255 | 0},${c[2] * 255 | 0},${a})`;
 
 const glc = document.getElementById('c');
@@ -32,6 +30,7 @@ hud.width = VW; hud.height = VH;
 hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none';
 wrap.appendChild(hud);
 const ctx = hud.getContext('2d');
+const font = (size, bold) => { ctx.font = (bold ? 'bold ' : '') + size + 'px system-ui'; };
 function resize() {
   const sc = Math.min(innerWidth / VW, innerHeight / VH);
   glc.style.width = VW * sc + 'px';
@@ -41,9 +40,8 @@ addEventListener('resize', resize);
 resize();
 
 // --- input ----------------------------------------------------------------
-// Keyboard: arrows or WASD steer and sprint, SPACE (held) charges, released
-// fires. Touch: the lower left and right thirds steer, the top strip is the
-// button - hold it to fold the herd in, lift the thumb to fire.
+// Keyboard: arrows or WASD steer and sprint; hold SPACE to charge and burn,
+// release to cancel. Touch: bottom halves steer, both sprint, top charges.
 const held = {};
 let acted = false, pick = 0;
 addEventListener('keydown', (e) => {
@@ -83,6 +81,7 @@ hud.addEventListener('pointermove', (e) => { if (pts.has(e.pointerId)) { pts.set
 const drop = (e) => { pts.delete(e.pointerId); scan(); };
 hud.addEventListener('pointerup', drop);
 hud.addEventListener('pointercancel', drop);
+addEventListener('blur', () => { for (const k in held) held[k] = false; pts.clear(); scan(); });
 // Yaw grows toward +z, and +z is the RIGHT of a camera looking along +x -
 // so LEFT lowers the yaw. The first build had this backwards, and the probe
 // happily asserted the backwards version, because it only checked that a
@@ -108,9 +107,9 @@ function buildPlain() {
   // room for a fifth. These are small, many and within a few percent of
   // the slab: texture, not geography.
   for (let i = 0; i < 420; i++) {
-    const x = (Math.random() - .5) * ARENA * 2.1, z = (Math.random() - .5) * ARENA * 2.1;
-    const w = 2 + Math.random() * 5, v = .95 + Math.random() * .1;
-    pushBox(g, x, .02, z, w, .04, w * (.6 + Math.random()), .13 * v, .16 * v, .15 * v);
+    const x = (rnd() - .5) * ARENA * 2.1, z = (rnd() - .5) * ARENA * 2.1;
+    const w = 2 + rnd(5), v = .95 + rnd(.1);
+    pushBox(g, x, .02, z, w, .04, w * (.6 + rnd()), .13 * v, .16 * v, .15 * v);
   }
   groundM = createMesh(g);
   // Each meadow glows faintly in its own colour: the map tells you where a
@@ -118,15 +117,15 @@ function buildPlain() {
   const t = [];
   meadows.forEach((m, c) => {
     for (let i = 0; i < 90; i++) {
-      const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * 22;
-      const x = m[0] + Math.cos(a) * d, z = m[1] + Math.sin(a) * d, h = .3 + Math.random() * .6;
+      const a = rnd(TAU), d = Math.sqrt(rnd()) * 22;
+      const x = m[0] + Math.cos(a) * d, z = m[1] + Math.sin(a) * d, h = .3 + rnd(.6);
       const k = COL[c];
       pushBox(t, x, h / 2, z, .12, h, .12, k[0], k[1], k[2], .5);
     }
   });
   // And a scatter of pale grass everywhere else, so the ground moves.
   for (let i = 0; i < 500; i++) {
-    const x = (Math.random() - .5) * ARENA * 2.2, z = (Math.random() - .5) * ARENA * 2.2;
+    const x = (rnd() - .5) * ARENA * 2.2, z = (rnd() - .5) * ARENA * 2.2;
     pushBox(t, x, .2, z, .1, .4, .1, .5, .55, .5, .3);
   }
   tuftM = createMesh(t);
@@ -139,9 +138,9 @@ function buildPlain() {
   // Stars.
   const s = [];
   for (let i = 0; i < 260; i++) {
-    const a = Math.random() * TAU, e = .05 + Math.random() * .9, r = 900;
+    const a = rnd(TAU), e = .05 + rnd(.9), r = 900;
     const x = Math.cos(a) * Math.cos(e) * r, y = Math.sin(e) * r, z = Math.sin(a) * Math.cos(e) * r;
-    const q = 1.5 + Math.random() * 3, b = .4 + Math.random() * .6;
+    const q = 1.5 + rnd(3), b = .4 + rnd(.6);
     pushBox(s, x, y, z, q, q, q, b, b, b * 1.1, .6);
   }
   pushBox(s, -500, 260, -700, 26, 26, 26, .9, .85, .7, .5);
@@ -190,17 +189,17 @@ function boomCloud(x, z, pw) {
     // place makes one saturated blob with a fringe; started a couple of
     // metres out along its own direction, the lobes stay separable and the
     // ball reads as a ball.
-    const a = Math.random() * TAU, e = Math.random() * 1.15;
-    const sp = (3 + Math.random() * 8) * (1 + pw * .05), d = 1.4 + Math.random() * (2 + pw * .16);
+    const a = rnd(TAU), e = rnd(1.15);
+    const sp = (3 + rnd(8)) * (1 + pw * .05), d = 1.4 + rnd() * (2 + pw * .16);
     const dx = Math.cos(a) * Math.cos(e), dy = Math.sin(e), dz = Math.sin(a) * Math.cos(e);
     PUFF.push({
       x: x + dx * d, y: .7 + dy * d * .8, z: z + dz * d,
       vx: dx * sp, vy: dy * sp * .6 + .8, vz: dz * sp,
       // A wide spread of sizes: a few slow boulders among a lot of small
       // fast ones is what a cloud looks like from outside.
-      r0: (1.4 + Math.random() * Math.random() * 5) + pw * .12,
-      t: -Math.random() * .3, life: 1.4 + Math.random() * 1.2,
-      col: Math.random() < .18 ? WILD : (Math.random() * 7) | 0,
+      r0: (1.4 + rnd() * rnd(5)) + pw * .12,
+      t: -rnd(.3), life: 1.4 + rnd(1.2),
+      col: rnd() < .18 ? WILD : rnd(7) | 0,
     });
   }
 }
@@ -209,18 +208,26 @@ let pcur = 0;
 function spawnP(p, v, col, life) { PART[pcur++ % PMAX] = { p: [...p], v, col, life, max: life }; }
 function burst(p, n, sp, col) {
   for (let i = 0; i < n; i++) {
-    const a = Math.random() * TAU, b = Math.random() * Math.PI - Math.PI / 2;
-    spawnP(p, [Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 3, Math.sin(a) * Math.cos(b) * sp], col || RAINBOW[(Math.random() * 7) | 0], .6 + Math.random() * .6);
+    const a = rnd(TAU), b = rnd(Math.PI) - Math.PI / 2;
+    spawnP(p, [Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 3, Math.sin(a) * Math.cos(b) * sp], col || RAINBOW[rnd(7) | 0], .6 + rnd(.6));
   }
 }
 const PBUF = new Float32Array(PMAX * 120);
 let particleM;
-function particleVerts(dt) {
-  let n = 0;
+// All three effects use the same vertex layout, with different light levels.
+// Keep one writer, without allocating a temporary array for each vertex.
+function vertexWriter(buf, light, bias = 0) {
   const put = (x, y, z, c, a) => {
-    PBUF[n] = x; PBUF[n + 1] = y; PBUF[n + 2] = z; PBUF[n + 3] = 0; PBUF[n + 4] = 1; PBUF[n + 5] = 0;
-    PBUF[n + 6] = c[0] * 1.8; PBUF[n + 7] = c[1] * 1.8; PBUF[n + 8] = c[2] * 1.8; PBUF[n + 9] = a; n += 10;
+    const n = put.n;
+    buf[n] = x; buf[n + 1] = y; buf[n + 2] = z; buf[n + 3] = 0; buf[n + 4] = 1; buf[n + 5] = 0;
+    buf[n + 6] = c[0] * light + bias; buf[n + 7] = c[1] * light + bias; buf[n + 8] = c[2] * light + bias; buf[n + 9] = a;
+    put.n += 10;
   };
+  put.n = 0;
+  return put;
+}
+function particleVerts(dt) {
+  const put = vertexWriter(PBUF, 1.8);
   for (const pt of PART) {
     if (!pt || pt.life <= 0) continue;
     pt.life -= dt; pt.v[1] -= 9 * dt;
@@ -232,7 +239,7 @@ function particleVerts(dt) {
     put(x, y - sz, z, pt.col, a); put(x, y + sz, z, pt.col, a); put(x + sz * 2.6, y, z, pt.col, 0);
     put(x, y - sz, z, pt.col, a); put(x, y + sz, z, pt.col, a); put(x - sz * 2.6, y, z, pt.col, 0);
   }
-  return n;
+  return put.n;
 }
 
 // --- the charge, the arcs, and the rainbow's wake -------------------------
@@ -255,17 +262,17 @@ function drawCharge(L, T, dt) {
   const herd = [];
   for (const u of units) if (u.st === 0 && (u === L || u.lead === L.lead)) herd.push(u);
   // Arcs. Rare and thin at first, a storm at the top of the charge.
-  if (herd.length > 1 && k > .1 && Math.random() < dt * (k * k * k * 150 + (wave ? 30 : 0)) && ARCS.length < ARCMAX) {
-    const a = herd[(Math.random() * herd.length) | 0];
+  if (herd.length > 1 && k > .1 && rnd() < dt * (k * k * k * 150 + (wave ? 30 : 0)) && ARCS.length < ARCMAX) {
+    const a = herd[(rnd(herd.length)) | 0];
     let b = null, bd = 9;
     for (let i = 0; i < 4; i++) {
-      const c = herd[(Math.random() * herd.length) | 0], d = Math.hypot(c.x - a.x, c.z - a.z);
+      const c = herd[(rnd(herd.length)) | 0], d = Math.hypot(c.x - a.x, c.z - a.z);
       if (c !== a && d < bd) { b = c; bd = d; }
     }
-    const col = RAINBOW[(Math.random() * 7) | 0];
+    const col = RAINBOW[rnd(7) | 0];
     // Past two thirds the bolts also reach UP, to a point hanging over the
     // band - the energy gathering above the herd before it lights.
-    if (b && (k < .66 || Math.random() < .5)) ARCS.push({ a: [a.x, .9, a.z], b: [b.x, .9, b.z], col, t: .15, w: .14 + .3 * k });
+    if (b && (k < .66 || rnd() < .5)) ARCS.push({ a: [a.x, .9, a.z], b: [b.x, .9, b.z], col, t: .15, w: .14 + .3 * k });
     else ARCS.push({ a: [a.x, .9, a.z], b: [L.cx, 1.2 + L.r * .8, L.cz], col, t: .15, w: .1 + .24 * k });
     spawnP([a.x, 1, a.z], [0, 2, 0], col, .3);
   }
@@ -280,7 +287,7 @@ function drawCharge(L, T, dt) {
   for (let i = 0; i < 3; i++) disc(((T * 3 + i * 2) | 0) % 7, L.cx, 1 + i * .6 + L.r * .15, L.cz, L.r * (1.05 - i * .28));
   setDim(1);
   // Motes lifting off the band.
-  if (Math.random() < .6) { const u = herd[(Math.random() * herd.length) | 0]; spawnP([u.x, 1, u.z], [0, 2.5, 0], RAINBOW[(Math.random() * 7) | 0], .6); }
+  if (rnd() < .6) { const u = herd[(rnd(herd.length)) | 0]; spawnP([u.x, 1, u.z], [0, 2.5, 0], RAINBOW[rnd(7) | 0], .6); }
   // Sample the wake.
   // Sample the wake. The LAST sample is the herd's position this frame,
   // rewritten every frame: pushing one every ninth of a second and leaving
@@ -299,11 +306,7 @@ function drawCharge(L, T, dt) {
 // is Rainbow Surfer's braid with the herd where the rider was.
 const ARCH = 9;                                   // segments per half-circle
 function trailVerts(T, dt, eye) {
-  let n = 0;
-  const put = (x, y, z, c, a) => {
-    TBUF[n] = x; TBUF[n + 1] = y; TBUF[n + 2] = z; TBUF[n + 3] = 0; TBUF[n + 4] = 1; TBUF[n + 5] = 0;
-    TBUF[n + 6] = c[0] * 1.4; TBUF[n + 7] = c[1] * 1.4; TBUF[n + 8] = c[2] * 1.4; TBUF[n + 9] = a; n += 10;
-  };
+  const put = vertexWriter(TBUF, 1.4);
   const quad = (p0, p1, p2, p3, c, a) => { put(...p0, c, a); put(...p1, c, a); put(...p2, c, a); put(...p0, c, a); put(...p2, c, a); put(...p3, c, a); };
   // A point on the arch of sample s: colour band c, angle index i, at the
   // band's inner (e=0) or outer (e=1) edge.
@@ -316,7 +319,7 @@ function trailVerts(T, dt, eye) {
     for (const s of tr.s) s.t += dt;
     while (tr.s.length && tr.s[0].t > .9) tr.s.shift();
     if (!tr.s.length) { TRAIL.delete(L); continue; }
-    for (let i = 0; i + 1 < tr.s.length && n < TBUF.length - 8000; i++) {
+    for (let i = 0; i + 1 < tr.s.length && put.n < TBUF.length - 8000; i++) {
       const s0 = tr.s[i], s1 = tr.s[i + 1];
       // Fade with age, and fade out again where the tunnel runs past the
       // camera - being inside your own rainbow is the point, being blinded
@@ -331,16 +334,12 @@ function trailVerts(T, dt, eye) {
       }
     }
   }
-  return n;
+  return put.n;
 }
 // The arcs: jagged bolts, each a ribbon facing the camera, alive for a
 // few frames and gone.
 function arcVerts(dt) {
-  let n = 0;
-  const put = (x, y, z, c, a) => {
-    ABUF[n] = x; ABUF[n + 1] = y; ABUF[n + 2] = z; ABUF[n + 3] = 0; ABUF[n + 4] = 1; ABUF[n + 5] = 0;
-    ABUF[n + 6] = c[0] * 1.2 + .7; ABUF[n + 7] = c[1] * 1.2 + .7; ABUF[n + 8] = c[2] * 1.2 + .7; ABUF[n + 9] = a; n += 10;
-  };
+  const put = vertexWriter(ABUF, 1.2, .7);
   for (let i = ARCS.length - 1; i >= 0; i--) {
     const A = ARCS[i];
     A.t -= dt;
@@ -349,14 +348,14 @@ function arcVerts(dt) {
     let px = A.a[0], py = A.a[1], pz = A.a[2];
     for (let s = 1; s <= S; s++) {
       const f = s / S, j = s < S ? (1 - Math.abs(2 * f - 1)) * .45 : 0;
-      const x = A.a[0] + (A.b[0] - A.a[0]) * f + (Math.random() - .5) * j, y = A.a[1] + (Math.random() - .3) * j * 1.6, z = A.a[2] + (A.b[2] - A.a[2]) * f + (Math.random() - .5) * j;
+      const x = A.a[0] + (A.b[0] - A.a[0]) * f + (rnd() - .5) * j, y = A.a[1] + (rnd() - .3) * j * 1.6, z = A.a[2] + (A.b[2] - A.a[2]) * f + (rnd() - .5) * j;
       const w = A.w, ux = camU[0] * w, uy = camU[1] * w, uz = camU[2] * w;
       put(px - ux, py - uy, pz - uz, A.col, a); put(px + ux, py + uy, pz + uz, A.col, a); put(x + ux, y + uy, z + uz, A.col, a);
       put(px - ux, py - uy, pz - uz, A.col, a); put(x + ux, y + uy, z + uz, A.col, a); put(x - ux, y - uy, z - uz, A.col, a);
       px = x; py = y; pz = z;
     }
   }
-  return n;
+  return put.n;
 }
 const WILDC = COL[WILD];
 
@@ -528,7 +527,7 @@ function frame(now_) {
   eye[0] = lerp(eye[0], ex, k); eye[1] = lerp(eye[1], ey, k); eye[2] = lerp(eye[2], ez, k);
   look[0] = lerp(look[0], lx, k); look[1] = lerp(look[1], ly, k); look[2] = lerp(look[2], lz, k);
   const sh = shake * shake * .5;
-  const e2 = [eye[0] + (Math.random() - .5) * sh, eye[1] + (Math.random() - .5) * sh, eye[2] + (Math.random() - .5) * sh];
+  const e2 = [eye[0] + (rnd() - .5) * sh, eye[1] + (rnd() - .5) * sh, eye[2] + (rnd() - .5) * sh];
   const view = lookAt(e2, look);
   camR = [view[0], view[4], view[8]]; camU = [view[1], view[5], view[9]];
   const vp = mul(perspective(mode === 'title' ? .8 : 1.0, VW / VH, .1, 1500), view);
@@ -632,10 +631,13 @@ function frame(now_) {
   if (flash) { ctx.fillStyle = `rgba(255,255,255,${flash * .6})`; ctx.fillRect(0, 0, VW, VH); }
   // The edge: a red frame closing in from the screen's rim, under the
   // HUD so it never covers the radar - which is what you need most there.
-  if (mode === 'run' && nearEdge(P.x, P.z) && P.st !== 3) {
-    const w = (Math.max(Math.abs(P.x), Math.abs(P.z)) - (ARENA - EDGE)) / EDGE;
+  if (mode === 'run' && edgeDanger(P) && P.st !== 3) {
+    const w = Math.max(0, (Math.max(Math.abs(P.x), Math.abs(P.z)) - (ARENA - EDGE)) / EDGE);
     ctx.strokeStyle = `rgba(255,40,60,${.25 + .35 * w * (.7 + .3 * Math.sin(timer * 12))})`; ctx.lineWidth = 14 + 40 * w;
     ctx.strokeRect(0, 0, VW, VH); ctx.lineWidth = 1;
+    font(20, 1);
+    ctx.fillStyle = (timer * 5 | 0) % 2 ? '#ff5f6e' : '#ffb0b8';
+    ctx.fillText('THE EDGE - RELEASE & TURN', VW / 2, VH * .18);
   }
   const pc = COL[P.col];
   if (mode === 'title') {
@@ -643,37 +645,38 @@ function frame(now_) {
     sc.addColorStop(0, 'rgba(5,4,14,.7)'); sc.addColorStop(.55, 'rgba(5,4,14,.25)'); sc.addColorStop(1, 'rgba(5,4,14,0)');
     ctx.fillStyle = sc; ctx.fillRect(0, 0, VW, VH);
     // The title, once per colour, stacked: a rainbow made of the word.
-    ctx.font = 'bold 44px system-ui';
+    font(44, 1);
     RAINBOW.forEach((c, i) => { ctx.fillStyle = css(c, .9); ctx.fillText('UNICORN FIREBALL', VW / 2 + (3 - i) * 1.5 - beat * (3 - i), 70 + (i - 3) * 2.5); });
     ctx.fillStyle = '#f3ead6'; ctx.fillText('UNICORN FIREBALL', VW / 2, 70);
-    ctx.font = '15px system-ui';
+    font(15);
     ctx.fillStyle = '#d8d0ea';
-    ctx.fillText('gather your colour into a herd, fight horn to horn', VW / 2, 132);
+    ctx.fillText('gather your colour - last herd wins', VW / 2, 132);
     ctx.fillStyle = '#ffb0b8';
-    ctx.fillText('hold SPACE to charge: held long enough, the herd BECOMES the rainbow', VW / 2, 160);
-    ctx.fillStyle = '#d8d0ea';
-    ctx.font = 'bold 15px system-ui';
-    ctx.fillStyle = pc;
+    ctx.fillText('hold SPACE / touch top: rainbow | release: turn', VW / 2, 160);
+    font(12);
+    ctx.fillText('arrows / WASD | touch sides: turn, both: sprint', VW / 2, 182);
+    ctx.fillText('bigger herd wins | rainbow burns herd', VW / 2, 200);
+    font(15, 1);
     ctx.fillStyle = css(pc);
     ctx.beginPath(); ctx.arc(VW / 2, VH * .65, 14, 0, TAU); ctx.fill();
     ctx.fillStyle = '#f3ead6';
     ctx.fillText('<   your colour   >', VW / 2, VH * .65 + 34);
-    ctx.font = 'bold 18px system-ui';
+    font(18, 1);
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
     ctx.fillText(awake() ? 'press SPACE to run' : 'press SPACE', VW / 2, VH - 42);
-    ctx.font = 'bold 14px system-ui'; ctx.fillStyle = '#8fe3c8';
+    font(14, 1); ctx.fillStyle = '#8fe3c8';
     ctx.fillText((net.on ? net.around ? net.around + ' online now' : 'nobody online yet' : 'go online') + ' - press O', VW / 2, VH - 62);
-    ctx.font = '12px system-ui'; ctx.fillStyle = '#9a90b8';
+    font(12); ctx.fillStyle = '#9a90b8';
     ctx.fillText('@gtanczyk | gamedev.pl | 2026', VW / 2, VH - 4);
   } else {
     // Your herd: a dot in your colour, the count, the hearts.
     ctx.textAlign = 'left';
     ctx.fillStyle = css(pc); ctx.beginPath(); ctx.arc(24, 24, 11, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#f3ead6'; ctx.font = 'bold 26px system-ui'; ctx.fillText(P.n, 44, 24);
-    ctx.font = '18px system-ui'; ctx.fillStyle = '#ff6b8a';
+    ctx.fillStyle = '#f3ead6'; font(26, 1); ctx.fillText(P.n, 44, 24);
+    font(18); ctx.fillStyle = '#ff6b8a';
     ctx.fillText('♥'.repeat(P.hearts), 90, 23);
     // The rivals, biggest first, so the threat is at the top.
-    ctx.textAlign = 'right'; ctx.font = 'bold 14px system-ui';
+    ctx.textAlign = 'right'; font(14, 1);
     leaders.filter((L) => L !== P).sort((a, b) => b.n - a.n).forEach((L, i) => {
       const y = 22 + i * 20, dead = L.st === 3;
       ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); ctx.beginPath(); ctx.arc(VW - 100, y, 6, 0, TAU); ctx.fill();
@@ -684,7 +687,7 @@ function frame(now_) {
       // every rival is a wall of pink that says nothing; the row you want
       // to find is the one that is DOWN to one, and it only reads as an
       // alarm if the quiet rows next to it are quiet.
-      if (!dead && L.hearts < 3) { ctx.fillStyle = '#ff6b8a'; ctx.font = '10px system-ui'; ctx.fillText('♥'.repeat(L.hearts), VW - 150, y); ctx.font = 'bold 14px system-ui'; }
+      if (!dead && L.hearts < 3) { ctx.fillStyle = '#ff6b8a'; font(10); ctx.fillText('♥'.repeat(L.hearts), VW - 150, y); font(14, 1); }
     });
     // The radar: the whole plain in a square, one dot a herd, sized by it,
     // ringed when it is lit and pipped when a person is riding it. It used
@@ -692,6 +695,11 @@ function frame(now_) {
     // rather than information - what you need to find is a herd behind you.
     const RX = VW - 78, RY = 10, RS = 68;
     ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(RX, RY, RS, RS);
+    // Recovery targets: only unclaimed kin, kept smaller than herd markers.
+    for (const u of units) if (u.st === 0 && u.lead < 0 && (u.col === P.col || u.col === WILD)) {
+      ctx.fillStyle = css(COL[u.col]);
+      ctx.fillRect(RX + (u.x / ARENA + 1) * RS / 2, RY + (u.z / ARENA + 1) * RS / 2, 1, 1);
+    }
     for (const L of leaders) {
       if (L.st === 3) continue;
       const x = RX + (L.cx / ARENA + 1) * RS / 2, y = RY + (L.cz / ARENA + 1) * RS / 2;
@@ -710,38 +718,33 @@ function frame(now_) {
       const g = ctx.createLinearGradient(VW / 2 - 80, 0, VW / 2 + 80, 0);
       RAINBOW.forEach((c, i) => g.addColorStop(i / 6, css(c)));
       ctx.fillStyle = g; ctx.fillRect(VW / 2 - 80, VH - 30, 160 * k, 10);
-      ctx.font = 'bold 12px system-ui'; ctx.fillStyle = '#fff';
+      font(12, 1); ctx.fillStyle = '#fff';
       ctx.fillText(P.wave ? 'RAINBOW - herd ' + P.n : 'CHARGE ' + Math.round(P.charge * 100) + '%', VW / 2, VH - 42);
-    } else if (P.st === 0 && P.n >= 2 && timer < 40 && !P.cool) {
-      ctx.font = '12px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.5)';
-      ctx.fillText('hold SPACE to charge', VW / 2, VH - 26);
-    }
-    if (nearEdge(P.x, P.z) && P.st !== 3 && mode === 'run') {
-      ctx.font = 'bold 20px system-ui';
-      ctx.fillStyle = (timer * 5 | 0) % 2 ? '#ff5f6e' : '#ffb0b8';
-      ctx.fillText('THE EDGE - TURN BACK', VW / 2, VH * .18);
+    } else if (P.st === 0 && (P.cool || P.n >= 2 && timer < 40)) {
+      font(12); ctx.fillStyle = '#fff';
+      ctx.fillText(P.cool ? 'RECHARGING' : 'hold SPACE to charge', VW / 2, VH - 26);
     }
     if (msgT) {
-      ctx.font = 'bold 26px system-ui'; ctx.globalAlpha = Math.min(1, msgT); ctx.fillStyle = msgCol;
+      font(26, 1); ctx.globalAlpha = Math.min(1, msgT); ctx.fillStyle = msgCol;
       ctx.fillText(msg, VW / 2, VH * .3); ctx.globalAlpha = 1;
     }
-    ctx.font = '13px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.6)';
+    font(13); ctx.fillStyle = 'rgba(255,255,255,.6)';
     ctx.fillText(Math.floor(timer / 60) + ':' + String(Math.floor(timer % 60)).padStart(2, '0'), VW / 2, 16);
     if (net.on) {
-      ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#8fe3c8';
+      font(13, 1); ctx.fillStyle = '#8fe3c8';
       ctx.fillText(net.seats + ' riding - ESC leaves', VW / 2, 34);
       if (watching()) {
         const mine = net.me >= 0 ? leaders[net.me] : null;
-        ctx.font = 'bold 17px system-ui'; ctx.fillStyle = '#ffb0b8';
+        font(17, 1); ctx.fillStyle = '#ffb0b8';
         // A stone leader's burn byte carries the seconds until it rises.
         ctx.fillText(mine ? 'DOWN - BACK IN ' + Math.max(1, Math.ceil(5 - mine.burn)) : 'NO SEAT - WATCHING', VW / 2, VH * .28);
       }
     }
     if (mode === 'end') {
       ctx.fillStyle = 'rgba(5,4,14,.6)'; ctx.fillRect(0, VH * .3, VW, VH * .42);
-      ctx.font = 'bold 40px system-ui'; ctx.fillStyle = '#f3ead6';
+      font(40, 1); ctx.fillStyle = '#f3ead6';
       ctx.fillText(victory ? 'THE PLAIN IS YOURS' : 'THE PLAIN FORGETS YOU', VW / 2, VH * .44);
-      ctx.font = '17px system-ui'; ctx.fillStyle = '#d8d0ea';
+      font(17); ctx.fillStyle = '#d8d0ea';
       if (!victory) ctx.fillText('your herd has gone wild', VW / 2, VH * .56);
       if (endT > 1) ctx.fillText('press SPACE', VW / 2, VH * .66);
     }

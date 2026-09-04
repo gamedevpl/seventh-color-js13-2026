@@ -124,14 +124,10 @@ export function updateMesh(m, arr, count) {
 
 export function drawMesh(m, model) {
   gl.bindBuffer(gl.ARRAY_BUFFER, m.b);
-  gl.vertexAttribPointer(loc.p, 3, gl.FLOAT, false, 40, 0);
-  gl.vertexAttribPointer(loc.n, 3, gl.FLOAT, false, 40, 12);
-  gl.vertexAttribPointer(loc.c, 3, gl.FLOAT, false, 40, 24);
-  gl.vertexAttribPointer(loc.a, 1, gl.FLOAT, false, 40, 36);
-  gl.enableVertexAttribArray(loc.p);
-  gl.enableVertexAttribArray(loc.n);
-  gl.enableVertexAttribArray(loc.c);
-  gl.enableVertexAttribArray(loc.a);
+  ['p', 'n', 'c', 'a'].forEach((key, i) => {
+    gl.vertexAttribPointer(loc[key], i === 3 ? 1 : 3, gl.FLOAT, false, 40, i * 12);
+    gl.enableVertexAttribArray(loc[key]);
+  });
   gl.uniformMatrix4fv(loc.md, false, model);
   gl.drawArrays(gl.TRIANGLES, 0, m.n);
 }
@@ -146,11 +142,11 @@ export function perspective(fov, aspect, near, far) {
 
 // General up vector, because the camera rolls with the track now - a
 // corkscrew is only a corkscrew if the horizon turns with you.
-export function lookAt(eye, at, up = [0, 1, 0]) {
+export function lookAt(eye, at) {
   let zx = eye[0] - at[0], zy = eye[1] - at[1], zz = eye[2] - at[2];
   const zl = Math.hypot(zx, zy, zz);
   zx /= zl; zy /= zl; zz /= zl;
-  let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx;
+  let xx = zz, xy = 0, xz = -zx;
   const xl = Math.hypot(xx, xy, xz) || 1;
   xx /= xl; xy /= xl; xz /= xl;
   const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
@@ -204,7 +200,7 @@ export function pushBox(v, cx, cy, cz, sx, sy, sz, r, g, b, a = 1) {
   ];
   for (const [n, q] of F) {
     for (const i of [0, 1, 2, 0, 2, 3]) {
-      v.push(cx + q[i * 3], cy + q[i * 3 + 1], cz + q[i * 3 + 2], n[0], n[1], n[2], r, g, b, a);
+      v.push(cx + q[i * 3], cy + q[i * 3 + 1], cz + q[i * 3 + 2], ...n, r, g, b, a);
     }
   }
 }

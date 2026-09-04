@@ -48,7 +48,7 @@ const result = await build({
 const raw = result.outputFiles[0].text;
 console.log(`  esbuild bundle           ${num(raw.length)}${cheats ? '   (+dev cheats)' : ''}`);
 
-const { js: minified, stages } = await minifyJs(raw, { mangleProps: true });
+const { js: minified, stages } = await minifyJs(raw, { mangleProps: !cheats && entry.privateProps ? new RegExp('^(' + entry.privateProps.join('|') + ')$') : true });
 console.log(`  terser + mangle          ${num(minified.length)}`);
 
 // The dev skip must never reach a shipped build. Checked here, on the
@@ -70,9 +70,9 @@ const markup = '<canvas id=c></canvas>';
 const MOBILE = '<meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">';
 const TOUCHCSS = 'html,body{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;'
   + '-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}';
-const head = entry.mobile ? MOBILE : '';
+const head = entry.mobile ? entry.canvasOnly ? MOBILE.replace(',maximum-scale=1,user-scalable=no', '') : MOBILE : '';
 const css = 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center}'
-  + (entry.mobile ? TOUCHCSS : '');
+  + (entry.mobile ? entry.canvasOnly ? 'html,body{touch-action:none;overscroll-behavior:none}' : TOUCHCSS : '');
 
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {

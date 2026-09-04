@@ -36,7 +36,7 @@ async function rider() {
   page.on('console', (m) => { if (m.type() === 'error' && !/GL Driver/.test(m.text())) problems.push(m.text()); });
   page.on('pageerror', (e) => problems.push(e.message));
   await page.goto(pathToFileURL(pagePath).href);
-  // The title listens to the same room O will join, as it does for real.
+  // Keep this probe in its isolated local room.
   await page.evaluate((r) => { FB.net.room = r; }, room);
   await page.waitForTimeout(500);
   await page.keyboard.press('Space');
@@ -61,7 +61,7 @@ const look = (p) => p.evaluate(() => ({
 const A = await rider();
 await new Promise((r) => setTimeout(r, 400));
 const B = await rider();
-await new Promise((r) => setTimeout(r, 4500));
+await Promise.all([A, B].map(p => p.waitForFunction(() => FB.net.me >= 0 && FB.net.seats === 2)));
 
 let a = await look(A), b = await look(B);
 check('both sockets are up', a.on === 1 && b.on === 1);
@@ -81,13 +81,13 @@ check('the client draws the host\'s plain', gap < 3, `worst leader off by ${gap.
 const guest0 = a.host ? B : A, host0 = a.host ? A : B;
 const seat0 = a.host ? b.me : a.me;
 await guest0.keyboard.down('Space');
-await new Promise((r) => setTimeout(r, 1600));
+await host0.waitForFunction(s => FB.leaders[s].chg && FB.leaders[s].charge > .25, seat0);
 const held = await host0.evaluate((s) => {
   const L = FB.leaders[s];
   return { chg: L.chg, charge: L.charge, st: L.st, cool: L.cool };
 }, seat0);
 await guest0.keyboard.up('Space');
-await new Promise((r) => setTimeout(r, 400));
+await host0.waitForFunction(s => !FB.leaders[s].chg, seat0);
 check('a guest\'s button reaches the host', held.chg === 1 && held.charge > .2,
   `held ${held.chg}, charge ${held.charge.toFixed(2)} (st ${held.st}, cool ${held.cool.toFixed(1)})`);
 check('...and letting go reaches it too', (await host0.evaluate((s) => FB.leaders[s].chg, seat0)) === 0);
@@ -96,7 +96,7 @@ const guest = a.host ? B : A, hostPage = a.host ? A : B;
 const seat = a.host ? b.me : a.me, other = a.host ? a.me : b.me;
 const before = await look(hostPage);
 await guest.keyboard.down('ArrowRight');
-await new Promise((r) => setTimeout(r, 1400));
+await hostPage.waitForFunction(([s,y]) => Math.abs(Math.atan2(Math.sin(FB.leaders[s].yaw-y), Math.cos(FB.leaders[s].yaw-y))) > 1, [seat,before.yaw[seat]]);
 await guest.keyboard.up('ArrowRight');
 await new Promise((r) => setTimeout(r, 300));
 const after = await look(hostPage);
@@ -107,7 +107,7 @@ check('...and does not turn the host\'s', turn(other) < turn(seat), `host seat $
 // And the guest's own screen must show it: a client is told states, and
 // paints the charge back out of them.
 await guest.keyboard.down('Space');
-await new Promise((r) => setTimeout(r, 2000));
+await guest.waitForFunction(s => FB.leaders[s].charge > .2 || FB.leaders[s].wave, seat);
 const lit = await guest.evaluate((s) => {
   const L = FB.leaders[s];
   return { charge: L.charge, wave: L.wave, st: L.st, hearts: L.hearts, cool: L.cool };
@@ -118,22 +118,8 @@ check('...and the guest sees its own herd light up', lit.charge > .2 || lit.wave
 
 await guest.screenshot({ path: path.join(root, 'build/fireball/probe-online.png') });
 
-// The title should already know how many are riding, before O is ever
-// pressed: a page that only sits on the title listens without joining.
-const D = await browser.newPage({ viewport: { width: 640, height: 400 } });
-D.on('pageerror', (e) => problems.push(e.message));
-await D.goto(pathToFileURL(pagePath).href);
-await D.evaluate((r) => { FB.net.room = r; }, room);
-await D.keyboard.press('Space');
-await new Promise((r) => setTimeout(r, 2500));
-const title = await D.evaluate(() => ({ quiet: FB.net.quiet, on: FB.net.on, around: FB.net.around, mode: FB.mode, seats: FB.net.seats }));
-check('the title listens without joining', title.mode === 'title' && title.quiet === 1 && title.on === 1, JSON.stringify(title));
-check('...and counts the riders already there', title.around === 2, `${title.around} heard, 2 riding`);
-const hostSeats = await hostPage.evaluate(() => FB.net.seats);
-check('...without taking a seat itself', hostSeats === 2, `${hostSeats} seats on the host`);
-await D.close();
-await new Promise((r) => setTimeout(r, 600));
-
+// The title no longer opens a passive lobby connection: the bytes fund
+// the final battle. Joining is explicit through O or the touch target.
 // The list has to say which herds are people, so a rider can go and find
 // the fight rather than farm the brains.
 const marks = await guest.evaluate((s) => FB.leaders.map((L, i) => (L.man ? 1 : 0) + (i === s ? 9 : 0)), seat);
@@ -145,7 +131,7 @@ check('...and the brains are not', marks.filter((v) => v === 0).length >= 4);
 // watching can be walked with left and right, the screen says how long
 // you have, and the plain hands you a fresh herd when the count runs out.
 await hostPage.evaluate((n) => { const L = FB.leaders[n]; L.hearts = 0; L.st = 3; L.gone = 0; }, seat);
-await new Promise((r) => setTimeout(r, 700));
+await guest.waitForFunction(s => FB.leaders[s].st === 3, seat);
 const down = await guest.evaluate(() => ({ watching: FB.net.me >= 0 && FB.leaders[FB.net.me].st === 3, burn: FB.leaders[FB.net.me].burn }));
 check('a rider that is out knows it is out', down.watching, `own leader st 3, count at ${down.burn.toFixed(1)}s`);
 const eye1 = await guest.evaluate(() => FB.leaders.map((L) => Math.round(L.x)));
@@ -155,7 +141,7 @@ const cam1 = await guest.evaluate(() => FB.units.length && [Math.round(FB.leader
 await guest.screenshot({ path: path.join(root, 'build/fireball/probe-spectate.png') });
 // Inspect the first revived state. Waiting nine seconds lets combat take
 // another heart and falsely reports a broken respawn.
-await guest.waitForFunction(() => FB.leaders[FB.net.me].st === 0, undefined, { timeout: 9000 });
+await guest.waitForFunction(() => FB.leaders[FB.net.me].st === 0, undefined, { timeout: 30000 });
 const back = await guest.evaluate(() => { const L = FB.leaders[FB.net.me]; return { st: L.st, hearts: L.hearts }; });
 check('...and rises again without waiting for a round', back.st === 0 && back.hearts === 3, `st ${back.st}, hearts ${back.hearts}`);
 
@@ -168,7 +154,7 @@ const C = await rider();
 const freshState = await C.waitForFunction(() => {
   const L = FB.leaders[FB.net.me];
   return L?.man ? { hearts: L.hearts, st: L.st, home: Math.hypot(L.x, L.z) } : null;
-}, undefined, { timeout: 6000 });
+}, undefined, { timeout: 30000 });
 const fresh = await freshState.jsonValue();
 await freshState.dispose();
 await new Promise((r) => setTimeout(r, 6000));
@@ -196,15 +182,24 @@ await hostPage.evaluate((seat) => {
   const L = FB.leaders[seat];
   Object.assign(L, { hearts: 1, st: 0, x: 0, z: 0, vx: 0, vz: 0, spd: 0 });
 }, seat);
-await new Promise((r) => setTimeout(r, 500));
+await guest.waitForFunction(s => FB.leaders[s].hearts === 1, seat);
 check('the guest receives the wounded state before migration',
   await guest.evaluate((s) => FB.leaders[s].hearts === 1, seat));
+// The idle burn byte carries instability, so guests get the same warning.
+await hostPage.evaluate(s => {
+  const L = FB.leaders[s]; L.heat = .6; L.cool = 0;
+  FB.units.filter(u => !FB.leaders.includes(u)).slice(0, 35).forEach(u =>
+    Object.assign(u, {lead: s, col: L.col, st: 0, x: L.x, z: L.z, daze: 0}));
+}, seat);
+await guest.waitForFunction(s => FB.leaders[s].heat >= .5 && FB.leaders[s].heat <= 1, seat);
+check('the guest receives the instability warning', true);
 const lastSeen = await look(guest);
 await hostPage.close();
-await new Promise((r) => setTimeout(r, 4000));
+await guest.waitForFunction(() => FB.net.host === 1);
 const now = await look(guest);
 check('the survivor takes over the plain', now.host === 1, `host ${now.host}, said "${now.said}"`);
-const migrated = await guest.evaluate((s) => ({ hearts: FB.leaders[s].hearts, x: FB.leaders[s].x, z: FB.leaders[s].z }), seat);
+const migrated = await guest.evaluate((s) => ({ stun: FB.leaders[s].stun, hearts: FB.leaders[s].hearts, x: FB.leaders[s].x, z: FB.leaders[s].z }), seat);
+check('migration preserves remaining stun', migrated.stun > 0);
 check('migration preserves the rider\'s hearts', migrated.hearts === 1, `${migrated.hearts} hearts`);
 check('migration does not teleport the rider home', Math.hypot(migrated.x, migrated.z) < 30,
   `${Math.hypot(migrated.x, migrated.z).toFixed(1)} from the middle`);

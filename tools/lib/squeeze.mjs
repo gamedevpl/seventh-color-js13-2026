@@ -10,12 +10,12 @@ import { zipSingleFile } from './zip.mjs';
 
 export async function minifyJs(js, { mangleProps = false } = {}) {
   const stages = {};
-  let out = (await transform(js, { loader: 'js', minify: true, target: 'es2020', legalComments: 'none' })).code;
+  let out = (await transform(js, { loader: 'js', minify: true, target: 'es2020', legalComments: 'none', mangleProps: mangleProps instanceof RegExp ? mangleProps : undefined })).code;
   stages.esbuild = out.length;
   const tersed = await terserMinify(out, {
     ecma: 2020,
-    compress: { passes: 3, unsafe: true, unsafe_arrows: true, unsafe_math: true, pure_getters: true },
-    mangle: mangleProps ? { properties: { regex: /^_/ } } : true,
+    compress: { booleans_as_integers: mangleProps instanceof RegExp, passes: 3, unsafe: true, unsafe_arrows: true, unsafe_math: true, pure_getters: true },
+    mangle: mangleProps === true ? { properties: { regex: /^_/ } } : true,
     format: { comments: false },
   });
   if (tersed.code && tersed.code.length < out.length) {

@@ -40,7 +40,7 @@ function tone(f, dur, type, gain, t0, f2) {
 // different band.
 function hit(t0, dur, gain, freq, q) {
   const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-  s.buffer = noise;
+  s.buffer = noise; s.loop = true;
   f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
   env(g, gain, t0, dur);
   s.connect(f); f.connect(g); g.connect(ac.destination);
@@ -115,7 +115,8 @@ export function riseOff() {
 export function boom(pw) {
   if (!ac) return;
   const t = t0(), g = Math.min(1, .5 + pw * .04);
-  tone(90, .8, 'triangle', .5 * g, t, 30);
+  tone(90, pw >= 62 ? 2 : .8, 'triangle', .5 * g, t, 25);
+  if (pw >= 62) { hit(t + .2, 2, .3, 900, .3); tone(180, 1.6, 'sawtooth', .08, t + .1, 35); }
   hit(t, .7, .5 * g, 500, .4);
   hit(t + .05, 1.2, .25 * g, 150, .6);
   [0, 2, 4, 5, 7, 9, 11].forEach((n, i) => tone(NOTE(24 + n), .5, 'triangle', .07, t + .12 + i * .06));

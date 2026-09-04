@@ -56,10 +56,10 @@ check('boots to the title', (await st()).mode === 'title');
 check('silent before any gesture', (await page.evaluate(() => window.__oscs)) === 0);
 await page.keyboard.press('Space');
 await page.waitForTimeout(300);
-check('one press wakes the title and stays', (await st()).mode === 'title');
+check('one gesture starts the run', (await st()).mode === 'run');
 await page.keyboard.press('Space');
 await page.waitForTimeout(300);
-check('second press starts the run', (await st()).mode === 'run');
+check('SPACE in a running game stays in the run', (await st()).mode === 'run');
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-start.png') });
 
 // Gathering: walk the meadow for a few seconds.
@@ -158,7 +158,7 @@ const edge = await page.evaluate(async () => {
   out.fellCount = fellCount; out.deaths = deaths;
   return out;
 });
-check('running off the plain ends the run', edge.playerDied, `at ${edge.x},${edge.z}`);
+check('running off the plain eliminates the rider', edge.playerDied, `at ${edge.x},${edge.z}`);
 check('the brains keep off the edge', edge.fellCount <= edge.deaths * .25, `${edge.fellCount} of ${edge.deaths} deaths were falls`);
 
 // Touch. The lower halves steer, the top strip is the button: a pointer

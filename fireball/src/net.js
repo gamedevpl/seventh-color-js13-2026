@@ -17,10 +17,10 @@
 // second, so everyone knows the same set of names, and the smallest name
 // hosts. When it leaves, the next smallest simply starts writing packets.
 
-import { units, leaders, newWorld, charge, footprint, revive, lerp, wrapA } from './herd.js';
+import { units, leaders, newWorld, charge, recount, revive, lerp, wrapA } from './herd.js';
 
 const TAU = Math.PI * 2;
-const ROOM = 'wss://relay.js13kgames.com/unicorn-fireball';
+const ROOM = 'wss://relay.js13kgames.com/unicorn-fireball-v2';
 const SEATS = 7;
 const JOINING = 'CONNECTING';
 const ALONE = 'OFFLINE';
@@ -37,8 +37,6 @@ export const net = {
   me: -1,
   seats: 1,                               // people on the plain
   said: '',                               // a line for the HUD
-  quiet: 0,                               // listening only, from the title
-  around: 0,                              // riders heard while listening
   news: null,                             // {k, i}: a seat taken or given up
   room: '',                               // a room other than the default
 };
@@ -51,46 +49,51 @@ let netIn = [];                           // seat -> the input it last sent
 let held = [];                            // seat -> was somebody on it last frame
 let lastR = '';                           // the seating as last announced
 
-export function open(room, quiet) {
+export function open(room) {
   if (ws) return;
+  close();
   tag = (Math.random() * 65536) | 0;
-  net.quiet = quiet ? 1 : 0; net.around = 0;
-  if (!quiet) net.said = JOINING;
+  net.said = JOINING;
   try { ws = new WebSocket(room || net.room || ROOM); } catch { net.said = ALONE; return; }
+  const socket = ws;
   ws.binaryType = 'arraybuffer';
   ws.onopen = () => { net.on = 1; t = 0; tHeard = -99; joined = 0; };
   // A socket that is refused says so; a socket that is merely blocked can
   // hang forever, and the message must not go on claiming we are joining
   // something while the plain runs on underneath it.
-  setTimeout(() => { if (ws && !net.on) { net.said = ALONE; close(); } }, 6000);
-  ws.onclose = () => { net.on = net.host = 0; net.me = -1; ws = null; if (!net.said) net.said = ALONE; };
+  setTimeout(() => { if (ws === socket && !net.on) { net.said = ALONE; close(); } }, 6000);
+  ws.onclose = () => { close(); net.dropped = 1; net.said = ALONE; };
   ws.onerror = () => { net.said = ALONE; net.on = 0; };
   ws.onmessage = (e) => hear(e.data);
-  hello = setInterval(() => { if (id && !net.quiet) say('h' + id); }, 1000);
+  hello = setInterval(() => { if (id) say('h' + id); }, 1000);
 }
 // A socket closes asynchronously, so its handlers must be taken off before
 // a new one is opened - or the old one's onclose lands on the new one. And
 // the names it heard go with it: our own old name, left behind, sorted
 // smallest and blocked the election for as long as it took to go stale.
 export function close() {
-  if (!ws) return;
-  const w = ws; ws = null; w.onclose = w.onmessage = w.onerror = w.onopen = null; clearInterval(hello); id = '';
+  const w = ws; ws = null; clearInterval(hello); id = '';
+  t = tSnap = tIn = tSeen = joined = 0; tHeard = -99;
+  net.dropped = 0; net.news = null; net.seats = 1;
   net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; seen.clear();
   held = []; netIn = [];
   // Closing a socket that is still connecting makes the browser complain
   // in the console; let it arrive first, then leave.
+  if (!w) return;
+  w.onclose = w.onmessage = w.onerror = w.onopen = null;
   if (w.readyState) w.close(); else w.onopen = () => w.close();
 }
 
 function hear(d) {
   if (typeof d !== 'string') {
+    if (d.byteLength !== 3 && d.byteLength !== 5 + units.length * 7 + SEATS * 6) return;
     const v = new DataView(d);
     if (v.getUint8(0) === 1) packet(v); else input(v);
     return;
   }
   const k = d[0], rest = d.slice(1);
   // Our own name, handed to us the moment we connect.
-  if (k === '@') { id = rest; seen.set(id, t); if (!net.quiet) say('h' + id); return; }
+  if (k === '@') { id = rest; seen.set(id, t); say('h' + id); return; }
   // Someone announcing themselves.
   if (k === 'h') { seen.set(rest, t); return; }
   if (k === '-') { seen.delete(rest); return; }
@@ -119,7 +122,7 @@ function reseat() {
 // holding its state, its herd and its colour. Three bytes a leader on top.
 let buf = null, dv = null;
 function room() {
-  const n = 5 + units.length * 7 + SEATS * 4;
+  const n = 5 + units.length * 7 + SEATS * 6;
   if (!buf || buf.byteLength !== n) { buf = new ArrayBuffer(n); dv = new DataView(buf); }
   return dv;
 }
@@ -138,9 +141,7 @@ function write() {
   }
   for (let i = 0; i < leaders.length; i++) {
     const L = leaders[i];
-    v.setUint8(o++, L.charge * 255);
-    v.setUint8(o++, Math.min(255, L.wave));
-    v.setUint8(o++, Math.min(255, (L.st === 3 ? L.gone || 0 : L.burn) * 20));
+    for (const n of [L.stun * 20, L.cool * 20, L.charge * 255, L.wave, (L.st === 3 ? L.gone || 0 : L.wave ? L.burn : L.heat || 0) * 20]) v.setUint8(o++, Math.min(255, n));
     v.setUint8(o++, (L.hearts & 3) | ((L.st & 3) << 2) | (L.cool > 0 ? 16 : 0) | (L.chg ? 32 : 0) | (roster[i] ? 64 : 0));
   }
   ws.send(buf);
@@ -155,8 +156,7 @@ function packet(v) {
   // smaller tag keeps the plain; the other one stands down mid-packet.
   if (net.host) { if (theirs >= tag) return; net.host = 0; }
   tHeard = t;
-  net.around = net.seats = v.getUint8(4);
-  if (net.quiet) return;
+  net.seats = v.getUint8(4);
   let o = 5;
   for (const u of units) {
     u.tx = v.getInt16(o) / 128; o += 2;
@@ -169,12 +169,15 @@ function packet(v) {
     u.ty = v.getUint8(o++) / 16;
   }
   for (const L of leaders) {
+    L.stun = v.getUint8(o++) / 20;
+    L.cool = v.getUint8(o++) / 20;
     L.charge = v.getUint8(o++) / 255;
     L.wave = v.getUint8(o++);
     L.burn = v.getUint8(o++) / 20;
     const f = v.getUint8(o++);
-    L.hearts = f & 3; L.st = (f >> 2) & 3; L.cool = f & 16 ? 1 : 0; L.chg = f & 32 ? 1 : 0; L.man = f & 64 ? 1 : 0;
+    L.hearts = f & 3; L.st = (f >> 2) & 3; L.chg = f & 32 ? 1 : 0; L.man = f & 64 ? 1 : 0;
     if (L.st === 3) L.gone = L.burn;
+    else if (!L.wave) L.heat = L.burn;
   }
 }
 
@@ -182,11 +185,7 @@ function packet(v) {
 // Legs, tumbles and the herd's footprint are worked out here rather than
 // sent: they are the parts nobody can tell apart from the real thing.
 export function ghost(dt) {
-  for (const L of leaders) { L.n = 0; L.cx = L.x; L.cz = L.z; }
-  for (const u of units) if (u.lead >= 0 && u !== leaders[u.lead] && u.st !== 3) {
-    const L = leaders[u.lead]; L.n++; L.cx += u.x; L.cz += u.z;
-  }
-  for (const L of leaders) { L.cx /= L.n + 1; L.cz /= L.n + 1; L.r = footprint(L.n); L.spd = 0; }
+  recount();
   const k = Math.min(1, dt * 14);
   for (const u of units) {
     u.daze = Math.max(0, u.daze - dt); u.hit = Math.max(0, u.hit - dt);
@@ -218,7 +217,7 @@ export function ghost(dt) {
 // plain that somebody else is running.
 export const spy = () => ({ id, t, tHeard, joined, names: [...seen.keys()].sort(), roster });
 export function tick(dt, local) {
-  if (!net.on || net.quiet) return 1;
+  if (!net.on) return 1;
   t += dt;
 
 

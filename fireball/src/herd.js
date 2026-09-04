@@ -153,7 +153,7 @@ export function revive(L) {
   const [mx, mz] = meadows[L.col];
   L.st = 0; L.hearts = 3; L.chg = 0; L.charge = 0; L.wave = 0; L.burn = 0;
   L.spd = 11; L.cool = 0; L.stun = 0; L.spent = 0; L.daze = 0; L.gone = 0; L.glance = 0;
-  L.x = mx; L.z = mz; L.y = 0; L.vx = L.vz = L.vy = 0;
+  L.x = mx; L.z = mz; L.y = 0; L.heat = 0; L.vx = L.vz = L.vy = 0;
   L.yaw = Math.atan2(-mz, -mx);
   let n = PER;
   for (const u of units) {
@@ -191,8 +191,11 @@ function clash(A, B) {
     events.push({ k: 'graze', x: cx, z: cz });
     return;
   }
-  const tied = A.n === B.n;
-  const [W, Lo] = A.n >= B.n ? [A, B] : [B, A];
+  const mega = A.n >= 30 && B.n >= 30;
+  const power = L => (L.n + 1) * (mega ? Math.max(11, L.spd) : 1);
+  const tied = Math.abs(power(A) - power(B)) < .01;
+  const [W, Lo] = power(A) >= power(B) ? [A, B] : [B, A];
+  if (mega) { Lo.hearts = 1; if (tied) W.hearts = 1; }
   events.push({ k: 'boom', x: cx, z: cz, pw: A.wave + B.wave });
   breakHerd(Lo, cx, cz, 16);
   if (tied) { breakHerd(W, cx, cz, 16); return; }
@@ -211,79 +214,42 @@ function think(L, dt) {
   ai.t -= dt;
   if (ai.t > 0) return;
   ai.t = .25;
-  const bold = alive().length < 3 ? 1 : Math.min(1, time / 70);
-  let want = null, run = false;
-  // A rainbow, or a charge about to become one, heading our way? Near
-  // enough in size, it is met - a clash is a coin worth flipping, and a
-  // herd that only ever sidesteps never wins the plain.
-  // Dodging is only better if it works, and inside forty units it mostly
-  // does not - so close in, anyone with a herd worth the name turns and
-  // meets it, and takes the coin flip over the certain trampling.
-  const R = L.threat;
-  let sprint = false;
-  if (R) {
-    const d = Math.hypot(R.x - L.x, R.z - L.z), size = (L.n + 1) / (R.n + 1);
-    // Aim where it WILL be, not where it is. Two rainbows closing at
-    // thirty a second cover fifteen units in the quarter second between
-    // two thoughts, so aiming at the attacker's current position steers
-    // for a point it has already left - which is why two lit herds could
-    // share the plain for seconds and never touch.
-    const t = d / 45;
-    if (L.n >= 2 && (size >= .9 || (d < 40 && size >= .55))) { run = true; want = [R.x + R.vx * t, R.z + R.vz * t]; }
-    else { want = [L.x - (L.z - R.z) * 2, L.z + (L.x - R.x) * 2]; sprint = true; }   // step aside, fast
-  }
-  if (!want) {
-    let hunt = null, hd = 1e9, flee = null, fd = 1e9;
-    // The biggest herd on the plain is everybody's problem, and a herd a
-    // person is riding counts as nearer than it is: the brains used to
-    // hunt whichever brain was handy while the player grew in peace, and
-    // then ran from the player because it had grown. Now the player IS
-    // the target, and only a herd twice your size is worth running from.
-    const top = Math.max(...leaders.map((R) => R.st === 3 ? 0 : R.n));
-    for (const R of leaders) {
-      if (R === L || R.st === 3) continue;
+  let target = L.threat;
+  let want, run = false;
+  // Gather first, then challenge nearby armies. As the round ages even
+  // a smaller band takes the fight; no special phase changes its decisions.
+  if (!target && time > 15 && (L.n >= 3 || time > 90)) {
+    let best = 100;
+    for (const R of alive()) {
       const d = Math.hypot(R.x - L.x, R.z - L.z) * (R.ai ? 1 : .6);
-      const k = R.n === top && R.n > 6 ? 1.8 : .7 + .6 * bold;
-      if (time > 15 && R.n + 1 <= (L.n + 1) * k && d < 30 + 90 * bold && d < hd && L.n >= 3) { hunt = R; hd = d; }
-      if (R.n > (L.n + 1) * 2.2 && d < 22 && d < fd) { flee = R; fd = d; }
-    }
-    if (flee && !hunt) { want = [L.x + (L.x - flee.x), L.z + (L.z - flee.z)]; sprint = true; }
-    else if (hunt) {
-      // Lead the target a little. Close in, and charge once lined up with
-      // room to build speed - a charge that ignites on top of them is the
-      // whole point; one that ignites past them is a waste of a cooldown.
-      want = [hunt.x + hunt.vx * .8, hunt.z + hunt.vz * .8];
-      const err = Math.abs(wrapA(Math.atan2(want[1] - L.z, want[0] - L.x) - L.yaw));
-      // Start the run lined up and inside forty-five units; once it is
-      // running, hold it as long as the target is anywhere ahead. A brain
-      // that re-aimed every tick dropped every charge at the first swerve.
-      const lit = L.charge > 0 || L.wave;
-      run = L.cool <= 0 && hd < 70 && (lit ? err < 1.5 : err < .35 && hd < 45);
-      sprint = true;
-    } else {
-      let best = null, bd = 1e9;
-      for (const u of units) {
-        if (u.lead >= 0 || u.st !== 0 || (u.col !== L.col && u.col !== WILD)) continue;
-        const d = Math.hypot(u.x - L.x, u.z - L.z) - (u.col === WILD ? 6 : 0);
-        if (d < bd) { bd = d; best = u; }
-      }
-      want = best ? [best.x, best.z] : [meadows[L.col][0] * .5, meadows[L.col][1] * .5];
+      if (R !== L && d < best && R.n + 1 < (L.n + 1) * (1 + Math.min(1, time / 90))) { target = R; best = d; }
     }
   }
-  // The edge is death, and a brain that did not know it would win the
-  // plain by accident. It looks along its own nose - further the faster it
-  // is going, and much further when lit, because a lit herd turns like a
-  // barge - and when the edge is out there, everything else is dropped:
-  // aim at the middle, and LET THE RAINBOW GO. Holding it while pointed
-  // off the plain is how a brain kills itself at full speed.
-  const look = L.wave ? 55 + L.n * 2 : 14 + L.spd * 1.4;
-  const ax = L.x + Math.cos(L.yaw) * look, az = L.z + Math.sin(L.yaw) * look;
-  const edgeAhead = nearEdge(ax, az) || nearEdge(L.x, L.z);
-  if (edgeAhead) { want = [0, 0]; sprint = !L.wave; }
-  ai.goal = want; ai.sprint = sprint;
-  // Hold the charge to the end once lit; a brain that lets go every tick
-  // would never get past the crackle.
-  charge(L, !edgeAhead && (run || L.wave > 0));
+  if (target) {
+    const d = Math.hypot(target.x - L.x, target.z - L.z);
+    const lead = Math.min(.8, d / 45);
+    want = [target.x + target.vx * lead, target.z + target.vz * lead];
+    const err = Math.abs(wrapA(Math.atan2(want[1] - L.z, want[0] - L.x) - L.yaw));
+    run = d < 18 || d < 70 && (L.charge ? err < 1.5 : err < .35 && d < 45);
+    // A hopelessly outnumbered herd dodges an incoming rainbow.
+    if (target === L.threat && target.n > (L.n + 1) * 2 && d > 30) {
+      want = [L.x - (L.z - target.z) * 2, L.z + (L.x - target.x) * 2]; run = false;
+    }
+  } else {
+    let best = 1e9;
+    want = [meadows[L.col][0] * .5, meadows[L.col][1] * .5];
+    for (const u of units) {
+      if (u.lead >= 0 || u.st !== 0 || u.col !== L.col && u.col !== WILD) continue;
+      const d = Math.hypot(u.x - L.x, u.z - L.z) - (u.col === WILD ? 6 : 0);
+      if (d < best) { best = d; want = [u.x, u.z]; }
+    }
+  }
+  // A size-scaled but bounded lookahead leaves big armies room to ignite.
+  const look = L.wave ? 30 + Math.sqrt(L.n) * 3 : 14 + L.spd * 1.4;
+  const edge = nearEdge(L.x + Math.cos(L.yaw) * look, L.z + Math.sin(L.yaw) * look) || nearEdge(L.x, L.z);
+  ai.goal = edge ? [0, 0] : want;
+  ai.sprint = !!target;
+  charge(L, !edge && (run || L.wave > 0));
 }
 
 // --- the step -------------------------------------------------------------
@@ -295,15 +261,19 @@ function clamp(u) {
   u.vx = u.vz = 0; u.spd = 0;
 }
 
-export function step(dt, input) {
-  const over = input.over;
-  time += dt;
+export function recount() {
   for (const L of leaders) { L.n = 0; L.cx = L.x; L.cz = L.z; }
   for (const u of units) if (u.lead >= 0 && u !== leaders[u.lead] && u.st !== 3) {
     const L = leaders[u.lead];
     L.n++; L.cx += u.x; L.cz += u.z;
   }
   for (const L of leaders) { L.cx /= L.n + 1; L.cz /= L.n + 1; L.r = footprint(L.n); }
+}
+
+export function step(dt, input) {
+  const over = input.over;
+  time += dt;
+  recount();
 
   // Leaders steer; everyone else reacts.
   for (const L of leaders) {
@@ -324,6 +294,9 @@ export function step(dt, input) {
       // A rival hunting, fleeing or dodging sprints, as the player can.
       if (L.ai.sprint) want = 15;
     } else if (L.in) { turn = L.in.t; want = L.in.f ? 15 : L.in.b ? 5 : 11; }
+    const unstable = !over && (L.n >= 35 || L.wave && L.heat >= 1) && !edgeDanger(L) && !(L.in && L.in.b);
+    L.heat = unstable && !L.cool ? Math.min(1, (L.heat || 0) + dt / 6) : 0;
+    if (L.heat >= 1) charge(L, 1);
     if (L.stun > 0) { want = 0; turn = 0; }
     if (L.chg && L.stun <= 0) {
       // The charge builds, and the speed with it - slowly, so the run-up
@@ -361,7 +334,7 @@ export function step(dt, input) {
     // Heavy at speed: a charging herd turns like a herd, not a bicycle -
     // and a LIT herd is heavier again the bigger it is, so the biggest
     // rainbow on the plain is also the one that cannot correct its aim.
-    L.yaw += turn * dt * 2.6 * (1 - .6 * L.charge) / (L.wave ? 1 + L.n * .07 : 1);
+    L.yaw += turn * dt * 2.6 * (1 - .6 * L.charge) / (L.wave ? 1 + Math.sqrt(L.n) * .12 : 1);
     L.spd = lerp(L.spd, want, dt * (want > L.spd ? 1.7 : 4));
     const tx = Math.cos(L.yaw) * L.spd, tz = Math.sin(L.yaw) * L.spd;
     L.vx = lerp(L.vx, tx, dt * 6); L.vz = lerp(L.vz, tz, dt * 6);
@@ -388,7 +361,7 @@ export function step(dt, input) {
     const L = u.lead >= 0 ? leaders[u.lead] : null;
     let tx = 0, tz = 0;
     if (L) {
-      // A slot in the herd's wake, in the leader's own frame. sqrt(n) wide
+      // A slot in the herd's wake, in the leader's own frame. Math.sqrt(n) wide
       // so a big herd is a broad wedge, not a queue - and a charging herd
       // pulls that wedge tight, shoulder to shoulder.
       const n = Math.sqrt(L.n + 1), tight = 1 - .45 * L.charge;
@@ -486,9 +459,7 @@ export function step(dt, input) {
       if (u.hearts) { if (u.st === 0 && !over) fell(u); else clamp(u); }
       else {
         u.lead = -1; u.daze = 2; u.col = WILD;
-        u.x = Math.max(-ARENA + 2, Math.min(ARENA - 2, u.x));
-        u.z = Math.max(-ARENA + 2, Math.min(ARENA - 2, u.z));
-        u.vx = u.vz = 0;
+        clamp(u);
         events.push({ k: 'lost', u });
       }
     }

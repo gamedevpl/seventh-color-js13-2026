@@ -1,6 +1,15 @@
 # UNICORN FIREBALL — the fourth entry
 
-## F15 — current rules (2026-09-05)
+## F16 — plasma wisps and current rules (2026-09-05)
+
+Ignition turns each active unicorn into a low plasma wisp at its own simulated
+position: a bright centre, its herd-coloured glow and a short trailing tail.
+Overlapping glows merge visually where the herd gathers; there is no separate
+core. The ground clips the lower glow, anchoring the plasma to the meadow.
+An upward ZIIIING replaces the ignition arpeggio. Burnout restores ordinary
+unicorns at their current positions. Knocked-down followers stay visible as
+solid bodies. Rainbow trails, following and collision rules are unchanged.
+This is additive overlap, not a thresholded metaball shader; no new meshes.
 
 Large clashes emerge from normal play. The last two leaders keep their
 positions and followers. There is no regrouping, countdown, reinforcement
@@ -66,12 +75,12 @@ background detail. Stars, decorative ground patches and the overlapping
 white haze are removed; meadow colours, edge markers and the rainbow trails
 remain. Restarted worlds release their old GPU buffers.
 
-Package: **13,282 bytes**, **13,298 worst-of-five** at O2, ceiling **13,312**.
+Package: **13,280 bytes**, **13,291 worst-of-five** at O2, ceiling **13,312**.
 Validation and limitations are recorded in [FIREBALL-QA.md](FIREBALL-QA.md).
 
 ## Historical design notes (F1–F10)
 
-The text below records earlier iterations; F15 above defines current play.
+The text below records earlier iterations; F16 above defines current play.
 
 Run the plain as a unicorn of one colour. Gather every unicorn that shares
 it into a herd. When the herd is big enough, hold the button: the herd

@@ -1,5 +1,5 @@
 {
-  "name": "F15 local hits and committed rainbows",
-  "description": "Local trample damage, mass-weighted side impulses, contact-aware frontal clashes and committed ignition",
+  "name": "F16 merging plasma wisps",
+  "description": "Unicorn plasma wisps merge visually, with grounded glow, trailing tails and an upward ignition zing",
   "ceilingBytes": 13312
 }

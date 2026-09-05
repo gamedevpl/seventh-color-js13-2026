@@ -234,8 +234,7 @@ function particleVerts(dt) {
 // --- the charge, the arcs, and the rainbow's wake -------------------------
 // A charging herd crackles: bolts jump between its unicorns, more of them
 // and brighter as the charge fills, and the ground under the band lights
-// up. When it ignites, every unicorn carries a disc of its own colour, a
-// haze hangs over the centre of the band, and the band drags a WAKE - seven
+// up. Ignition turns the herd into merging plasma wisps and drags a WAKE - seven
 // stripes across its width, the width of the herd, rising off the ground -
 // which is the rainbow you see coming from the other side of the plain.
 const ARCMAX = 60, ABUF = new Float32Array(ARCMAX * 6 * 6 * 10);
@@ -262,16 +261,16 @@ function drawCharge(L, T, dt) {
     spawnP([a.x, 1, a.z], [0, 2, 0], col, .3);
   }
   if (!wave) return;
-  // Lit: each unicorn a lamp of its own colour, the band under a haze.
-  // The lamps ARE the herd now that its unicorns are not drawn, so they
-  // are small and dim: a line of coloured lights inside the tunnel, not a
-  // white wall at the head of it.
-  setDim(.13);
-  herd.forEach((u, i) => disc(i % 7, u.x, .8, u.z, 1.25));
+  // Every lit unicorn becomes a low plasma wisp. Overlap forms the core
+  // wherever the herd gathers; the ground clips the lower half of the glow.
+  setDim(2);
+  for (const u of herd) {
+    const y = .5 + Math.sin(T * 8 + u.seed) * .15;
+    disc(u.col, u.x, y, u.z, 2);
+    disc(WILD, u.x, y, u.z, .7);
+    disc(u.col, u.x - Math.cos(u.yaw) * 1.5, .3, u.z - Math.sin(u.yaw) * 1.5, 1);
+  }
   setDim(1);
-  // Motes lifting off the band.
-  if (rnd() < .6) { const u = herd[(rnd(herd.length)) | 0]; spawnP([u.x, 1, u.z], [0, 2.5, 0], RAINBOW[rnd(7) | 0], .6); }
-  // Sample the wake.
   // Sample the wake. The LAST sample is the herd's position this frame,
   // rewritten every frame: pushing one every ninth of a second and leaving
   // it there made the front of the tunnel jump forward three units at a
@@ -473,7 +472,7 @@ function frame(now_) {
     else if (e.k === 'graze') { clang(); burst([e.x, 1.5, e.z], 40, 7); }
     else if (e.k === 'ignite') {
       // The band lights: a flash, a fan of sparks the size of the herd, and
-      // the riser resolving into a chord.
+      // the upward plasma zing.
       sIgnite();
       burst([e.L.cx, 1.2, e.L.cz], 40 + e.L.n * 6, 5 + e.L.r);
       if (e.L === P) { say('RAINBOW!', 1.5); flash = Math.max(flash, .35); }
@@ -532,12 +531,10 @@ function frame(now_) {
   drawMesh(groundM, IDENT);
   const T = now();
   for (const u of units) {
-    // A lit herd IS the rainbow: its unicorns are not drawn at all while
-    // it burns. They fade out as the charge tops out and fade back in when
-    // it goes out, so the change of state is a dissolve, not a cut.
+    // Lit unicorns render as plasma wisps in drawCharge; burnout restores
+    // their solid bodies at the same simulated positions.
     const L0 = u.lead >= 0 ? leaders[u.lead] : null;
-    const gone = L0 && L0.wave ? 1 : 0;
-    if (gone >= 1) continue;
+    if (L0 && L0.wave && u.st === 0) continue;
     const set = U[u.st === 3 ? WILD : u.col];
     const x = u.x, y = u.y, z = u.z, s = (u.hearts ? 1.25 : 1) * u.size, yaw = u.yaw;
     const bob = u.st ? 0 : Math.sin(u.ph * 2) * .05 * Math.min(1, u.sp / 5);

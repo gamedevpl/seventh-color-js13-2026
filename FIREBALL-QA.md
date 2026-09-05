@@ -1,4 +1,47 @@
-# Unicorn Fireball — QA F15, 2026-09-05
+# Unicorn Fireball — QA F16, 2026-09-05
+
+## Plazmowe duszki zamiast osobnego jądra
+
+Zapłon zamienia każdego aktywnego unicorna w duszka w jego rzeczywistej
+pozycji: poświata w kolorze bandy, jasny środek i krótki ogon za kierunkiem
+ruchu. Nakładające się poświaty tworzą skupiska plazmy. Osobnego jądra nie ma.
+Duszki unoszą się nisko (0,35–0,65 nad ziemią); dolną część ucina podłoże.
+Efekt przypomina łączenie metaballi, ale nie używa progowania pola ani
+nowego shadera. To nakładanie światła; z bliska duże skupiska nasycają biel.
+
+Duszki korzystają z dotychczasowej symulacji podążania za liderem. Wypalenie
+przywraca modele w aktualnych pozycjach. Wywrócone unicorny nie znikają:
+ukrywane są tylko aktywne jednostki, które dostają plazmową reprezentację.
+Sprawdzono sceny 35+ z przodu, z boku i zza gracza, również w ruchu,
+w Chromium/SwiftShader. Brak błędów JavaScript. Bez zmian reguł walki.
+Dodatkowo wykonano screenshoty w zwykłym oknie Google Chrome, z rendererem
+`ANGLE Metal Renderer: Apple M4`, bez SwiftShader. Kontrolowane stado 33–35
+leciało z prędkością 37; sprawdzono kamerę gracza, bok i przód. Brak błędów JS.
+Pozostały problem wizualny: w pełnym ruchu nakładanie tęczowych pasów mocno
+nasyca biel i zasłania duszki również na GPU. Duszki mają krótkie ogonki,
+nie indywidualne smugi zapamiętujące tor lotu; długi ślad należy do tęczy.
+
+Test pierwszej rozgrywki przeszedł: zapłon po 5,17 s z czterema
+podwładnymi i pełnym zdrowiem; sterowanie aż do naturalnego wypalenia.
+
+Zapłon dostał narastający sweep 180 → 3200 Hz przez 0,45 s oraz krótki szum.
+Offline test miksu walki: peak 0,438, RMS 0,053, zero przesterowanych próbek.
+Test nie zastępuje odsłuchu na rzeczywistych głośnikach.
+Wyniki szerokiego QA i balansu F15 poniżej pozostają historyczne.
+
+## Paczka F16
+
+`npm run fireball:verify`: PASS — trzy uruchomienia końcowego ZIP-a.
+
+ZIP **13 280 / 13 312 bajtów**, zapas **32**. Pięć kompresji O2:
+13 287, 13 289, 13 280, 13 291, 13 283. Wszystkie mieszczą się w limicie.
+HTML w ZIP-ie jest identyczny z `build/fireball/index.html` i
+`play/unicorn-fireball.html`.
+
+SHA-256 ZIP: `2881ed1d47b57e9b9aa4d734e258a23436e79a756fb53385d99bc38b283a7768`.
+
+## Poprzednia runda QA — F15
+
 
 ## Zmieniona mechanika
 
@@ -86,7 +129,7 @@ wygrywającej taktyki ludzi. Duże clashe nadal są rzadkie; nie są wymuszane.
 Chromium/SwiftShader i lokalny relay, bez fizycznego telefonu, Safari,
 Firefoxa i publicznego relaya. Stan solo po śmierci nadal zatrzymuje grę.
 
-## Paczka
+## Paczka F15 (historyczna)
 
 `npm run fireball:verify`: PASS — trzy uruchomienia końcowego ZIP-a.
 

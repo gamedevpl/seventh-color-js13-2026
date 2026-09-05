@@ -1,15 +1,28 @@
 # UNICORN FIREBALL — the fourth entry
 
-## F13 — current rules (2026-09-05)
+## F15 — current rules (2026-09-05)
 
 Large clashes emerge from normal play. The last two leaders keep their
-positions and followers: there is no regrouping, countdown, forced charge,
-reinforcement or special finale AI. Normal charging and follower expenditure
-continue. A head-on collision between two 30+ armies is decisive:
-`(followers + 1) * max(11, speed)` determines the winner; equal impact power
-annihilates both. Smaller clashes still cost one heart, and glancing rainbows
-still deflect. Solo player death immediately displays the result and freezes
-the battle, including when death coincides with a large explosion.
+positions and followers. There is no regrouping, countdown, reinforcement
+or forced finale. Solo player death immediately ends the run.
+
+Ordinary rainbow hits affect only unicorns inside the impact footprint:
+hitting a leader costs it a heart without scattering distant followers.
+Two approaching rainbows explode only when both fronts face their contact.
+Offset and side contacts exchange an impulse along the contact normal,
+weighted by mass (followers + leader) and relative closing speed, with
+restitution 0.5. Both remain lit and get 0.6 seconds of collision immunity.
+A smaller rainbow can redirect a larger one towards the edge.
+
+Head-on clashes keep the previous outcomes: below two 30+ armies, greater
+numbers win and the loser scatters and loses a heart. Two 30+ armies compare
+`(followers + 1) * max(11, speed)` and the loser is eliminated; equal power
+eliminates both. A frontal explosion can scatter a whole losing herd.
+
+Ignition commits the rainbow until burnout, a frontal clash or elimination.
+Release and braking cancel only the unlit run-up. Steering remains active;
+charged steering is stronger and AI predicts the boundary earlier, so the
+commitment is survivable. The title and HUD explicitly say NO BRAKES.
 
 At 10+ followers arcs jump spontaneously. At 35+ a six-second instability
 meter starts building while safely away from the edge; a full meter begins
@@ -19,15 +32,24 @@ shockwave and extended bass/noise tail; solo impacts also slow time briefly
 and move the camera to show both armies. Defeat always takes precedence
 over that cinematic effect.
 
-Close-range rivals begin charging from 30 units instead of 18, breaking a
-reproducible mutual-pursuit orbit through normal combat. Overlapping grazing
+Rivals gather collectable kin and wild unicorns within 28 units before
+hunting, until their herd reaches 35. Incoming attacks and active rainbows
+still take priority. Aligned rivals start charging up to 70 units away;
+close-range charging still breaks the mutual-pursuit orbit. Above 20
+followers, accumulated energy shortens ignition: 35 followers light in
+about 2.08 seconds rather than 5.2; ten followers still need 3.2 seconds.
+Follower expenditure is unchanged. Overlapping grazing
 units cannot divide by zero while fleeing. Every follower, including adopted
 wild unicorns, becomes available for collection when its leader dies. The player's radar marker has a
 white ring and heading line. Rainbow trails have stronger colour, using the
 same geometry. A shared compressor contains overlapping combat sounds.
 Only impacts within 35 units can take over the camera.
 
-The game starts with one Space/Enter press or tap. Pointer capture prevents
+The game starts with one Space/Enter press or tap. The title explicitly
+explains auto-run, hold-to-ignite and commitment after ignition. Down/S or bottom
+centre brakes to a full stop before ignition and overrides sprint and the
+unlit charge. It cannot cancel an ignited rainbow.
+The fatal boundary has a continuous red ground line as well as posts. Pointer capture prevents
 stuck turns after releasing outside the canvas. Uppercase WASD works. Online
 and Exit have touch targets. Portrait mode displays a rotation prompt and
 pauses solo play; an online host keeps simulating behind that prompt.
@@ -44,12 +66,12 @@ background detail. Stars, decorative ground patches and the overlapping
 white haze are removed; meadow colours, edge markers and the rainbow trails
 remain. Restarted worlds release their old GPU buffers.
 
-Package: **13,172 bytes**, **13,195 worst-of-five** at O1, ceiling **13,312**.
+Package: **13,282 bytes**, **13,298 worst-of-five** at O2, ceiling **13,312**.
 Validation and limitations are recorded in [FIREBALL-QA.md](FIREBALL-QA.md).
 
 ## Historical design notes (F1–F10)
 
-The text below records earlier iterations; F13 above defines current play.
+The text below records earlier iterations; F15 above defines current play.
 
 Run the plain as a unicorn of one colour. Gather every unicorn that shares
 it into a herd. When the herd is big enough, hold the button: the herd

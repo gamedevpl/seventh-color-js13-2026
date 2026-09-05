@@ -62,9 +62,12 @@ try {
   await p.setViewportSize({ width: 844, height: 390 });
   console.log('PASS portrait prompt pauses the round');
   await p.evaluate(r => { FB.goHome(); FB.net.room = r; }, room);
+  // Orientation changes deliver resize asynchronously; click the settled layout.
+  await p.waitForFunction(() => Math.abs(document.querySelector('canvas').getBoundingClientRect().width - Math.min(innerWidth, innerHeight * 640 / 360)) < 1);
   let b = await p.locator('canvas').last().boundingBox();
   await p.mouse.click(b.x + b.width / 2, b.y + b.height * 298 / 360);
   await p.waitForFunction(() => FB.net.host && FB.net.me >= 0);
+  b = await p.locator('canvas').last().boundingBox();
   await p.mouse.click(b.x + b.width / 2, b.y + b.height * 34 / 360);
   await p.waitForFunction(() => FB.mode === 'title');
   console.log('PASS pointer-accessible online and exit');

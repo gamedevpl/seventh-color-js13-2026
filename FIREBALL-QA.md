@@ -1,83 +1,100 @@
-# Unicorn Fireball — QA F13, 2026-09-05
+# Unicorn Fireball — QA F15, 2026-09-05
 
-Obecna wersja zachowuje organiczny endgame. Nie ma przegrupowania, posiłków,
-teleportowania, odliczania ani obowiązkowego finału. Śmierć solo natychmiast
-pokazuje wynik i zatrzymuje walkę botów.
+## Zmieniona mechanika
 
-## Znalezione i poprawione
+Zwykłe taranowanie działa lokalnie: upadają unicorny w obszarze tęczy.
+Trafienie lidera zabiera mu serce, ale nie rozrzuca odległych podwładnych.
+Czołowa eksplozja nadal może rozbić całe przegrane stado.
 
-| Problem | Poprawka i dowód |
-|---|---|
-| Neutralny unicorn dokładnie na pozycji obcego lidera dostawał NaN w prędkości i pozycji | Zabezpieczenie dzielenia przez zerową odległość. Test odtwarza nakładanie i sprawdza skończone współrzędne całego świata. |
-| Przygarnięte neutralne jednostki zostawały przypisane do martwego lidera | Eliminacja zwalnia wszystkich jego podwładnych, niezależnie od koloru. Regresja obejmuje śmierć na krawędzi i od rogu. |
-| Dwie bandy potrafiły krążyć w nieskończonym pościgu | AI zaczyna bliskie ładowanie z 30 zamiast 18 jednostek dystansu. Seed 42 kończy się zwykłą walką, bez teleportów i ofiar na krawędzi. |
-| Odległy clash botów przejmował kamerę gracza | Filmowa kamera tylko dla uderzeń w promieniu 35. Test sprawdza odległą i bliską eksplozję oraz śmierć w tej samej klatce. |
-| Na radarze solo trudno było rozpoznać własną bandę i kierunek jazdy | Biały pierścień i kreska kierunku; sprawdzone wizualnie przy 10/35 unicornach i podczas tęczy. |
-| Tęcza dużej bandy była blada na oddalonej kamerze | Mocniejszy kolor istniejącej smugi: alpha 0,26 → 0,38. Bez nowej geometrii ani dodatkowych draw calli. |
-| Nakładające się dźwięki przekraczały maksymalny poziom sygnału | Wspólny kompresor dla muzyki, uderzeń i ładowania. W deterministycznym miksie peak 1,098 → 0,494; próbki ponad pełną skalą 3 → 0. |
+Kolizja dwóch tęcz używa kierunku od środka jednej bandy do drugiej oraz
+rzeczywistej prędkości zbliżania. Rozchodzące się bandy nie dostają kolejnego
+impulsu. Eksplozja wymaga, by obie bandy były zwrócone przodem do miejsca
+kontaktu (iloczyny kierunku i normalnej kontaktu co najmniej 0,65).
+Samo przeciwne ustawienie kierunków przy bocznym otarciu nie wystarcza.
 
-## Grywalność — porównanie
+Przy bocznym kontakcie impuls wynosi:
+`1.5 * closingSpeed / (1/massA + 1/massB)`, gdzie masa to podwładni + lider.
+To odpowiednik zderzenia ze współczynnikiem restytucji 0,5: pęd wzdłuż
+normalnej jest wymieniany, mniejsza banda reaguje mocniej. Zmieniane są
+prędkości i kierunki obu tęcz; obie nadal płoną, bez utraty serc. Zachowano
+0,6 s ochrony przed ponownym kontaktem. To model zręcznościowy dla okrągłych
+obszarów kolizji, a nie dokładna fizyka brył każdego unicorna.
 
-`node tools/probe-fireball-balance.mjs`: 48 identycznie zasianych rund,
-30 kroków/s, limit siedmiu minut, wszyscy liderzy sterowani przez AI.
+Zapalonej tęczy nie można anulować puszczeniem przycisku ani hamulcem.
+Można skręcać. Tęcza kończy się po wypaleniu, czołowym clashu lub eliminacji.
+Przed zapłonem puszczenie przerywa ładowanie, a hamulec nadal zatrzymuje bandę.
+Niestabilność dużej bandy też prowadzi do nieanulowalnego zapłonu — trzeba
+ją chłodzić wcześniej. Menu i pasek tęczy pokazują NO BRAKES; przy krawędzi
+płonący gracz dostaje STEER NOW, a zwykły BRAKE & TURN.
 
-| Pomiar | Przed F13 | Końcowa F13 |
+Aby blokada nie oznaczała nieuniknionej śmierci, zwiększono sterowność przy
+wysokim ładowaniu (mnożnik 1 - 0,4*charge zamiast 1 - 0,6*charge), pozostawiając
+bezwładność zależną od liczebności. AI przewiduje granicę wcześniej podczas
+płonięcia. Nie dodano automatycznej ochrony przed wypadnięciem.
+
+## Dowody z testów reguł
+
+22 testy obejmują między innymi:
+
+- trafienie lidera i bliskiego podwładnego bez wywrócenia odległego;
+- zachowanie pędu przy kontakcie bocznym oraz brak obrażeń i eksplozji;
+- silniejsze odchylenie dla szybszego lub cięższego napastnika;
+- przeciwne kierunki z kontaktem bocznym jako otarcie, nie eksplozję;
+- brak ponownego impulsu dla rozchodzących się tęcz;
+- nieanulowalny zapłon, naturalne wypalenie i późniejszy cooldown;
+- bandę 10 uderzającą z boku w bandę 35 przy granicy: większa wypada mimo
+  hamowania; w kontrolnym przebiegu bez uderzenia jej równoległa trasa jest bezpieczna;
+- poprzednie regresje zbierania, NaN, pościgu, wyniku i uwalniania podwładnych.
+
+## Balans
+
+Walidacja końcowej fizyki, seedy 33–96, 64 rundy AI przy 30 krokach/s,
+limit 420 s. Porównanie z F14 z poprzedniej rundy:
+
+| Pomiar | F14 | F15 |
 |---|---:|---:|
-| Zakończone rundy | 47/48 | 48/48 |
-| Średni czas zakończonych rund | 65,2 s | 69,5 s |
-| Wszystkie czołowe clashe | 47 | 60 |
-| Największe stado | 47 | 53 |
-| Clashe dwóch band 30+ | 0 | 0 |
-| Śmierci na krawędzi | 0 | 0 |
-| NaN w zwykłych rundach | 0 | 0 |
+| Zakończone rundy | 64/64 | 64/64 |
+| Średni czas | 84,9 s | 91,9 s |
+| Mega clashe dwóch band 30+ | 1 | 2 |
+| Wszystkie czołowe clashe | 77 | 97 |
+| Największe stado | 57 | 55 |
+| Wygrane mniej licznej bandy w ostatnim nierównym pojedynku | 6/61 | 9/63 |
+| Śmierci na krawędzi / NaN | 0 / 0 | 0 / 0 |
 
-Osobny losowy test przeglądarkowy: 24/24 zakończenia, 3 wygrane pierwszego
-bota, średnio 65 s, 11,9 zapłonu i 1,3 clashu na rundę; największe stado 46.
-To próby symulacji, nie gwarancja zakończenia każdej gry ani badanie balansu
-z ludźmi. Regresję pościgu sprawdza również osobny deterministyczny test.
+`node tools/probe-fireball-balance.mjs --start=33 --count=64` odtwarza wynik.
+Mega clashe: seedy 68 i 73. Małe różnice arytmetyki zmiennoprzecinkowej
+mogą zmieniać przebieg długiej symulacji; tabela dotyczy końcowej wersji.
 
-## Weryfikacja
-
-`npm run fireball:test`: PASS.
-`npm run fireball:verify`: PASS — trzy uruchomienia końcowego ZIP-a.
-
-- 13/13 testów reguł: kolizje, impet, chłodzenie i spalanie, krawędzie,
-  brak specjalnej fazy finału, pościg, NaN i zwalnianie podwładnych.
-- Przeglądarka: start, zbieranie, klawiatura, wskaźnik i dotyk, dźwięk,
-  utrwalenie wyniku, natychmiastowa porażka, orientacja ekranu, kamera.
-- Multiplayer: dołączanie, sterowanie gościem, odrodzenia, rozłączenie,
-  świeża elekcja i migracja hosta z pozycją, zdrowiem, stunem i niestabilnością.
-- OfflineAudioContext: czterosekundowy miks muzyki, mega eksplozji, zapłonu
-  i ośmiu uderzeń w tej samej chwili; bez przekroczenia pełnej skali.
-- Zrzuty 10/35 jednostek oraz płonącej tęczy sprawdzone wizualnie.
-
-## Dalsze możliwości
-
-1. **Naturalny clash 30+ kontra 30+ wciąż jest rzadki — w próbie nie wystąpił.**
-   Na mapie jest 70 podwładnych, więc takie starcie wymaga jednoczesnego
-   skupienia co najmniej 60 z nich w dwóch stadach, które dodatkowo spalają
-   jednostki podczas szarży. Następny eksperyment powinien porównać koszt
-   spalania i decyzje AI o zbieraniu neutralnych przed kolejnym atakiem.
-   Same zmiany stałych są tanie w bajtach, ale wymagają pomiaru balansu;
-   nie wprowadzono darmowych posiłków ani wymuszonego spotkania.
-2. **Dźwięk zależny od dystansu.** Kamera jest już lokalna, ale część odgłosów
-   i błysków nadal reaguje na walki w całym świecie. Ograniczenie odległych
-   uderzeń poprawiłoby orientację; trzeba sprawdzić koszt filtrowania zdarzeń.
-3. **Lepsza czytelność gruntu.** Kontrast smugi i radar poprawiono bez nowych
-   obiektów. Kolejne próby mogą zmienić parametry mgły i światła, lecz należy
-   porównać wszystkie kolory oraz widoczność krawędzi na małym ekranie.
+Wstępny zestaw 32 rund prototypu zakończył wszystkie rundy, z jednym upadkiem
+na krawędzi. W losowym teście przeglądarkowym 24/24 rund się zakończyło, ale
+pierwszy bot nie wygrał żadnej. Test dystrybucji korzystał z losowości także
+zużywanej przez wcześniejsze renderowanie; ustalono seedy regresji zamiast
+powtarzać losowania do uzyskania sukcesu. To nie zastępuje oceny balansu:
+końcowa próba 64 seedów daje pierwszemu botowi 6 zwycięstw.
+Ustalony zestaw przeglądarkowy zakończył 24/24 rund, z 4 wygranymi pierwszego
+bota i średnim czasem 97 s. Testy sterowania, multiplayera, końca gry, audio
+i pierwszej rozgrywki przeszły. Przy pierwszym zapłonie po około 5 s gracz
+miał pełne zdrowie i przetrwał prowadzenie tęczy do wypalenia.
 
 ## Ograniczenia
 
-Lokalny Chromium ze SwiftShaderem i lokalny relay; bez fizycznego telefonu,
-Safari, Firefoxa i publicznego relaya. Dźwięk oceniono pomiarem sygnału, nie
-odsłuchem na docelowych głośnikach. Wyniki nie są pomiarem wydajności GPU.
+Model nagradza celowanie w lidera, ataki boczne i przygotowanie toru szarży.
+Nie dowiedziono jeszcze, że początkujący gracze odczytają te możliwości.
+Wypychanie poza granicę sprawdzono w kontrolowanej scenie, nie jako częstość
+wygrywającej taktyki ludzi. Duże clashe nadal są rzadkie; nie są wymuszane.
+
+Chromium/SwiftShader i lokalny relay, bez fizycznego telefonu, Safari,
+Firefoxa i publicznego relaya. Stan solo po śmierci nadal zatrzymuje grę.
 
 ## Paczka
 
-ZIP: **13 172 / 13 312 bajtów**, zapas **140 bajtów**.
-Pięć kompresji O1: 13 187, 13 195, 13 172, 13 195, 13 178.
-Najgorsza próba także mieści się w limicie. HTML w ZIP-ie jest identyczny
-z `build/fireball/index.html` i `play/unicorn-fireball.html`.
+`npm run fireball:verify`: PASS — trzy uruchomienia końcowego ZIP-a.
 
-SHA-256: `728df277e475b8e23c8ca3f980f5893604f674e8c398a96dc66e83049f66e780`.
+ZIP **13 282 / 13 312 bajtów**, zapas **30**. Pięć kompresji O2:
+13 282, 13 289, 13 289, 13 298, 13 297. Wszystkie mieszczą się w limicie.
+O1 nie wystarczało; skrypty Fireball używają teraz O2. Oprócz kompresji
+usunięto redundantne sprawdzanie trybu obserwatora w warunkach online HUD-u.
+HTML w ZIP-ie jest identyczny z `build/fireball/index.html` i
+`play/unicorn-fireball.html`.
+
+SHA-256: `487c5bee59c274e54166d0705d5b9f04517ecd79b0a0c397587aaac65479197e`.

@@ -104,11 +104,10 @@ await page.waitForTimeout(2600);
 s = await st();
 check('held long enough, the charge ignites', s.wave > 0, `rainbow ${s.wave} at charge ${s.charge.toFixed(2)}`);
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-wave.png') });
-await page.waitForTimeout(600);
 await page.keyboard.up('Space');
-await page.waitForTimeout(700);
+await page.waitForTimeout(100);
 s = await st();
-check('letting go puts the rainbow out', s.wave === 0 && !s.chg, `rainbow ${s.wave}`);
+check('letting go keeps an ignited rainbow running', s.wave > 0 && !!s.chg, `rainbow ${s.wave}`);
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-land.png') });
 
 // What the rainbow costs, on an empty plain: the rivals are frozen at
@@ -250,12 +249,16 @@ await page.keyboard.up('ArrowUp');
 vic = await page.evaluate(() => ({ victory: FB.victory, st: FB.leaders[0].st, x: Math.round(FB.leaders[0].x) }));
 check('...and running on afterwards cannot undo it', vic.victory === true && vic.st !== 3, `victory ${vic.victory}, leader st ${vic.st} at x ${vic.x}`);
 
-// Balance: run whole matches through the sim with the player on autopilot.
+// Balance: fixed seeds keep the regression independent of prior render RNG.
+// Run whole matches through the sim with the player on autopilot.
 // The player brain is the rival brain, so this measures whether the rules
 // converge, not whether a human can win them.
 const raw = await page.evaluate(async (matches) => {
-  const out = [];
+  const out = [], random = Math.random;
+  try {
   for (let m = 0; m < matches; m++) {
+    let seed = m + 1;
+    Math.random = () => (seed = Math.imul(seed, 1664525) + 1013904223 >>> 0) / 4294967296;
     FB.reset(m % 7, true);
     let t = 0, ignitions = 0, answers = 0, litPairs = 0, clashes = 0, grazes = 0, maxHerd = 0;
     while (t < 420) {
@@ -273,6 +276,7 @@ const raw = await page.evaluate(async (matches) => {
     if (alive.length > 1) out.push({ stall: alive.map((L) => ({ col: L.col, n: L.n, hearts: L.hearts, chg: L.chg, charge: +L.charge.toFixed(2), cool: +L.cool.toFixed(1), stun: +L.stun.toFixed(1), st: L.st, d: Math.round(Math.hypot(L.x - alive[0].x, L.z - alive[0].z)) })) });
     out.push({ t: Math.round(t), ended: alive.length <= 1, playerWon: alive.length === 1 && alive[0] === FB.leaders[0], playerAlive: FB.leaders[0].st !== 3, ignitions, answers, litPairs, clashes, grazes, maxHerd });
   }
+  } finally { Math.random = random; }
   return out;
 }, matches);
 const results = raw.filter((r) => !r.stall);

@@ -1,5 +1,5 @@
 {
-  "name": "F13 pursuit, radar and audio QA",
-  "description": "Organic endgame, finite overlap physics, pursuit recovery, local impact camera, readable radar and compressed audio mix",
+  "name": "F15 local hits and committed rainbows",
+  "description": "Local trample damage, mass-weighted side impulses, contact-aware frontal clashes and committed ignition",
   "ceilingBytes": 13312
 }

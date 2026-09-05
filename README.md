@@ -10,7 +10,7 @@ written to the 2026 theme, *rainbows and unicorns*.
 | **The Seventh Color** — a twelve-beat story game with four playable mechanics | `native/src` (9 files) | **12,160** | 13,312 | [`NATIVE.md`](./NATIVE.md) |
 | **Rainbow Surfer** — a 3D coaster chase where speed is a resource | `strands/src` (6 files) | **13,247** | 13,312 | [`RAINBOW-SURFER.md`](./RAINBOW-SURFER.md) |
 | **Unicorn Snap** — photograph a unicorn that knows how good it looks | `snap/src` (10 files) | **12,936** | 13,312 | [`SNAP.md`](./SNAP.md) |
-| **Unicorn Fireball** — gather your colour into a herd, charge, and become the rainbow | `fireball/src` (6 files) | **13,172** | 13,312 | [`FIREBALL.md`](./FIREBALL.md) |
+| **Unicorn Fireball** — gather your colour into a herd, charge, and become the rainbow | `fireball/src` (6 files) | **13,282** | 13,312 | [`FIREBALL.md`](./FIREBALL.md) |
 
 Rainbow Surfer: <https://js13kgames.com/2026/games/rainbow-surfer>
 

@@ -54,7 +54,7 @@ addEventListener('keydown', (e) => {
   }
   held[key] = true;
   if (key === 'o') goOnline();
-  if (key === 'escape' && (net.on || watching())) goHome();
+  if (key === 'escape' && net.on) goHome();
   if (key === ' ' || key === 'enter') acted = true;
   if (key === ' ') e.preventDefault();
 });
@@ -78,7 +78,7 @@ hud.addEventListener('pointerdown', (e) => {
   const [x, y] = at(e);
   hud.setPointerCapture(e.pointerId);
   if (mode === 'title' && y > 280 && y < 310) { goOnline(); return; }
-  if ((net.on || watching()) && mode === 'run' && y < 48 && x > 200 && x < 440) { goHome(); return; }
+  if (net.on && mode === 'run' && y < 48 && x > 200 && x < 440) { goHome(); return; }
   pts.set(e.pointerId, [x, y]); scan();
   if (mode === 'title') { if (y > VH * .58 && y < VH * .72) { pick += x < VW / 2 ? -1 : 1; return; } }
   if (watching()) { watch += x < VW / 2 ? -1 : 1; return; }
@@ -128,6 +128,10 @@ function buildPlain() {
   const p = [];
   for (let i = -ARENA; i <= ARENA; i += 14) for (const [x, z] of [[i, -ARENA], [i, ARENA], [-ARENA, i], [ARENA, i]]) {
     pushBox(p, x, 3, z, .3, 6, .3, .7, .6, 1, .35);
+  }
+  for (const a of [-ARENA, ARENA]) {
+    pushBox(p, a, .1, 0, .6, .2, ARENA * 2, 1, .2, .3, .6);
+    pushBox(p, 0, .1, a, ARENA * 2, .2, .6, 1, .2, .3, .6);
   }
   postM = createMesh(p);
 
@@ -423,7 +427,7 @@ function frame(now_) {
     music(.2, 1);
     step(dt, { over: 1 });
     if (doAct) {
-      wake(); netClose(); newRun(); mode = 'run'; say('GATHER YOUR COLOUR', 3);
+      wake(); netClose(); newRun(); mode = 'run'; say('AUTO-RUN: steer / DOWN: brake', 4);
     }
   } else if (mode === 'run') {
     const heat = Math.min(1, P.n / 12);
@@ -439,7 +443,7 @@ function frame(now_) {
     if (net.said !== lastSaid) { lastSaid = net.said; if (net.said) say(net.said, 3); }
     if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
     if (mine) {
-      if (!net.on && !watching()) { P.in = local; charge(P, local.c); }
+      if (!net.on) { P.in = local; charge(P, local.c); }
       step(dt, { arena: net.on });
     } else { ghost(dt); ghostSound(P); }
     if (!net.on && (lost(0) || won(0))) {
@@ -628,12 +632,12 @@ function frame(now_) {
     ctx.strokeRect(0, 0, VW, VH); ctx.lineWidth = 1;
     font(20, 1);
     ctx.fillStyle = (timer * 5 | 0) % 2 ? '#ff5f6e' : '#ffb0b8';
-    label('EDGE! RELEASE & TURN', VH * .18);
+    label(P.wave ? 'EDGE! STEER NOW' : 'EDGE! BRAKE & TURN', VH * .18);
   }
   const pc = COL[P.col];
   if (mode === 'title') {
     const sc = ctx.createLinearGradient(0, 0, 0, VH);
-    sc.addColorStop(0, 'rgba(5,4,14,.7)'); sc.addColorStop(.55, 'rgba(5,4,14,.25)'); sc.addColorStop(1, 'rgba(5,4,14,0)');
+    sc.addColorStop(0, 'rgba(5,4,14,.7)'); sc.addColorStop(.55, 'rgba(5,4,14,.65)'); sc.addColorStop(1, 'rgba(5,4,14,0)');
     ctx.fillStyle = sc; ctx.fillRect(0, 0, VW, VH);
     // The title, once per colour, stacked: a rainbow made of the word.
     font(44, 1);
@@ -643,10 +647,10 @@ function frame(now_) {
     ctx.fillStyle = '#d8d0ea';
     label('gather your colour - last herd wins', 132);
     ctx.fillStyle = '#ffb0b8';
-    label('SPACE / top: charge. Release to turn', 160);
+    label('HOLD SPACE / top: charge; LIT = NO BRAKES', 160);
     font(12);
-    label('WASD / sides: steer. Both sides: sprint', 182);
-    label('10+: sparks | 35+: unstable | clash = mass x speed', 200);
+    label('AUTO-RUN | WASD / sides: steer | both: sprint', 182);
+    label('DOWN / bottom: brake | red edge = death', 200);
     font(15, 1);
     ctx.fillStyle = css(pc);
     ctx.beginPath(); ctx.arc(VW / 2, VH * .65, 14, 0, TAU); ctx.fill();
@@ -713,10 +717,10 @@ function frame(now_) {
       RAINBOW.forEach((c, i) => g.addColorStop(i / 6, css(c)));
       ctx.fillStyle = g; ctx.fillRect(VW / 2 - 80, VH - 30, 160 * k, 10);
       font(12, 1); ctx.fillStyle = '#fff';
-      label(P.wave ? 'RAINBOW - herd ' + P.n : 'CHARGE ' + (P.charge * 100 | 0) + '%', VH - 42);
+      label(P.wave ? 'NO BRAKES - herd ' + P.n : 'CHARGE ' + (P.charge * 100 | 0) + '%', VH - 42);
     } else if (P.st === 0 && (P.cool || P.n >= 2 && timer < 40)) {
       font(12); ctx.fillStyle = '#fff';
-      label(P.cool ? 'COOLDOWN' : 'hold SPACE to charge', VH - 26);
+      label(P.cool ? 'COOLDOWN' : 'HOLD SPACE / top: charge; LIT = NO BRAKES', VH - 26);
     }
     if (P.heat > 0 && !P.wave && mode === 'run') { font(15, 1); ctx.fillStyle = '#ffb0b8'; label('UNSTABLE ' + (P.heat * 100 | 0) + '% - DOWN / bottom centre: cool', VH - 62); }
     if (msgT && !impact) {
@@ -725,10 +729,10 @@ function frame(now_) {
     }
     font(13); ctx.fillStyle = 'rgba(255,255,255,.6)';
     label((timer / 60 | 0) + ':' + String((timer % 60 | 0)).padStart(2, '0'), 16);
-    if (net.on || watching()) {
+    if (net.on) {
       font(13, 1); ctx.fillStyle = '#8fe3c8';
-      label((net.on ? net.seats + ' riding' : 'WATCHING') + ' - tap here / ESC: exit', 34);
-      if (watching() && net.on) {
+      label((net.seats + ' riding') + ' - tap here / ESC: exit', 34);
+      if (watching()) {
         const mine = net.me >= 0 ? leaders[net.me] : null;
         font(17, 1); ctx.fillStyle = '#ffb0b8';
         // A stone leader's burn byte carries the seconds until it rises.

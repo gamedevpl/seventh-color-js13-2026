@@ -1,4 +1,100 @@
-# Unicorn Fireball — QA F16, 2026-09-05
+# Unicorn Fireball — QA F19, 2026-09-06
+
+## Żywa plazma
+
+Duszki mają pulsujący środek i cztery kolorowe płaty światła; tylne płaty
+falują z przesunięciem fazy, dając ogon o długości do trzech jednostek.
+Pozycja rdzenia X/Z nadal odpowiada unicornowi. Łuki elektryczne podczas
+zapłonu łączą członków bandy. Promień tęczy oddycha o 6%, a lokalne krótkie
+rozjaśnienia przemieszczają się po jej pasach. Zachowano półczubek przy
+liderze i światło rozlane po podłożu. Nie dodano tekstur ani osobnego jądra.
+
+## Kilka źródeł światła
+
+Każda pobliska zapalona tęcza wnosi wagę `max(0, 1 - dystans/(4*promień))`.
+Wektory kierunków sumują się; wynik normalizuje `1 + suma wag`. Tą samą
+wartością dzielona jest alpha cienia. Dwa przeciwne równe światła skracają
+wydłużenie do zera i rozjaśniają cień. Przy wygaśnięciu źródeł wraca zwykły
+cień kontaktowy. Nie ma wybierania pierwszej tęczy ani przeskoku przy
+przestawieniu listy świateł.
+
+To jeden płynny, uproszczony cień, nie kilka fizycznych cieni ani shadow map.
+Bryły unicornów wciąż mają bazowe oświetlenie; dynamiczna poświata oświetla
+ziemię. Bardzo bliskie skupiska duszków mogą nadal nasycać biel.
+
+## Sprawdzenie
+
+- 22 testy reguł: PASS; symulacja herd.js i protokół net.js bez zmian.
+- Test rzeczywistego bloku cieni z renderera: kierunki, przeciwne światła,
+  kolejność źródeł i wygaśnięcie — PASS. Zapisany jako
+  `tools/test-fireball-plasma.mjs`, dołączony do `fireball:test`.
+- Zwykły Chrome / Apple M4 / ANGLE Metal: shader linked, zero błędów JS,
+  szarża na zakręcie, trzy jednoczesne tęcze i powrót po wypaleniu.
+- Przy trzech tęczach i nagrywaniu wideo: mediana odstępu klatek 16,7 ms,
+  p95 17,6 ms, 119 próbek. To krótki pomiar na M4, nie benchmark telefonów.
+- Pakowanie: skrócone nazwy GLSL, krótszy układ strony dla canvas-only,
+  pomijanie meta charset tylko przy wyłącznie ASCII w całym dokumencie.
+  Test Unicode tytułu potwierdza zachowanie deklaracji UTF-8, gdy jest potrzebna.
+
+- Zmiana układu wykryła 4 px nadmiaru wysokości canvasu; `display:block`
+  usunęło odstęp linii. Granice canvasu i start dotykiem sprawdzono przy
+  960×540, 390×844 i 844×390 w Chrome. To emulacja rozmiarów, nie fizyczny telefon.
+
+## Paczka F19
+
+`npm run fireball:verify`: PASS — trzy uruchomienia końcowego ZIP-a.
+Dokładnie końcowy HTML przeszedł też test GPU, rozmiarów ekranu i startu
+dotykiem w Chrome, bez błędów JS.
+
+ZIP **13 295 / 13 312 bajtów**, zapas **17**. Pięć kompresji O2:
+13 305, 13 304, 13 295, 13 311, 13 308. Wszystkie mieszczą się w limicie,
+choć największa ma tylko 1 bajt zapasu. HTML w ZIP-ie jest identyczny z
+`build/fireball/index.html` i `play/unicorn-fireball.html`.
+
+SHA-256 ZIP: `e6f143f35e8b750a6a89d13235636e5430cef6eb112157d6afd150bc2c086117`.
+
+## Poprzednia runda — F18
+
+
+## Światło, cień i półczubek
+
+Ostatni aktywny segment tęczy zwęża się do łuku o promieniu bazowym 0,8
+przy duszku lidera. Historia śladu pozostaje na trasie środka bandy.
+Symulacja i pozycje duszków są identyczne z F16; lokalną zmianę podążania
+wycofano. To wyłącznie połączenie i zwężenie renderowanego efektu.
+
+Poświata jest rysowana poziomo nad ziemią, przed cieniami i unicornami.
+Zasięg wynosi czterokrotność promienia bandy, z miękkim zanikiem. W tym
+zasięgu płaski cień unicorna wydłuża się w kierunku od płonącej bandy.
+Ograniczenia: uproszczony prostokątny cień, bez shadow map i bez dynamicznego
+oświetlenia bryły unicorna. Przy wielu źródłach cień wybiera pierwszą
+pobliską płonącą bandę z listy. Nie symuluje cieni rzucanych przez samą tęczę.
+
+Zmniejszono alpha pasów z 0,38 do 0,16, by ograniczyć nasycanie bieli i
+pokazać zwężenie. Środek plazmy nadal może być biały. Budżet pochodzi ze
+skrócenia dodatkowych prywatnych nazw, usunięcia 3-procentowego falowania
+promienia łuku i jego nieużywanego parametru oraz uproszczenia uploadu
+trzech dynamicznych buforów: wszystkie są Float32Array i zawsze mają
+jawny count. Nie zmieniano protokołu sieciowego ani mechaniki walki.
+
+Widoki z przodu, z boku i zza gracza przy prędkości 37 sprawdzono w zwykłym
+Google Chrome na Apple M4 / ANGLE Metal, bez SwiftShader i bez błędów JS.
+
+Sprawdzono również wyłączenie zapłonu w tej samej scenie: poświata ziemi
+i kierunkowy cień znikają, pozostaje zwykły cień pod stopami oraz gasnący ślad.
+
+## Paczka F18
+
+`npm run fireball:verify`: PASS — trzy uruchomienia końcowego ZIP-a.
+
+ZIP **13 271 / 13 312 bajtów**, zapas **41**. Pięć kompresji O2:
+13 271, 13 274, 13 277, 13 275, 13 274. Wszystkie mieszczą się w limicie.
+HTML w ZIP-ie jest identyczny z `build/fireball/index.html` i
+`play/unicorn-fireball.html`.
+
+SHA-256 ZIP: `5fd5c35464255802a092b3a0972e691d1c5111da3856948e80715734d5f0e957`.
+
+## Poprzednia runda — F16
 
 ## Plazmowe duszki zamiast osobnego jądra
 

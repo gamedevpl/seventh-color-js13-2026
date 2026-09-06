@@ -1,6 +1,19 @@
 # UNICORN FIREBALL — the fourth entry
 
-## F16 — plasma wisps and current rules (2026-09-05)
+## F19 — living plasma and combined lighting (2026-09-06)
+
+Each wisp has a pulsing core and four coloured lobes: the rear lobes sway
+with staggered phases, forming a tapered, moving tail. Lightning bridges
+lit herd members. The rainbow breathes and carries narrow travelling waves
+of brightness across its colours, instead of staying uniformly white.
+The live nose tapers to the leader; the historical wake stays on the herd
+path. Unicorn positions, following and collision rules remain unchanged.
+
+Nearby rainbow lights contribute continuously to one approximate shadow:
+weighted directions combine and additional light reduces its opacity.
+Opposing equal lights cancel the directional extension. Light order no
+longer selects the shadow. This is stylized ground lighting and a blended
+slab shadow, not shadow mapping or lighting of the unicorn body.
 
 Ignition turns each active unicorn into a low plasma wisp at its own simulated
 position: a bright centre, its herd-coloured glow and a short trailing tail.
@@ -75,12 +88,12 @@ background detail. Stars, decorative ground patches and the overlapping
 white haze are removed; meadow colours, edge markers and the rainbow trails
 remain. Restarted worlds release their old GPU buffers.
 
-Package: **13,280 bytes**, **13,291 worst-of-five** at O2, ceiling **13,312**.
+Package: **13,295 bytes**, **13,311 worst-of-five** at O2, ceiling **13,312**.
 Validation and limitations are recorded in [FIREBALL-QA.md](FIREBALL-QA.md).
 
 ## Historical design notes (F1–F10)
 
-The text below records earlier iterations; F16 above defines current play.
+The text below records earlier iterations; F19 above defines current play.
 
 Run the plain as a unicorn of one colour. Gather every unicorn that shares
 it into a herd. When the herd is big enough, hold the button: the herd

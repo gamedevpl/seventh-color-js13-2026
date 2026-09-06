@@ -243,10 +243,6 @@ let arcM, trailM;
 function drawCharge(L, T, dt) {
   const k = Math.max(L.charge, L.n >= 10 ? Math.min(.8, .35 + L.n / 100) : 0), wave = L.wave > 0;
   if (k < .04 && !wave) return;
-  // The ground, lit from within the band.
-  setDim(wave ? .12 : k * .3);
-  disc(WILD, L.cx, .05, L.cz, L.r * 1.4);
-  setDim(1);
   const herd = [];
   for (const u of units) if (u.st === 0 && (u === L || u.lead === L.lead)) herd.push(u);
   // Arcs. Rare and thin at first, a storm at the top of the charge.
@@ -256,19 +252,22 @@ function drawCharge(L, T, dt) {
     const col = RAINBOW[rnd(7) | 0];
     // Past two thirds the bolts also reach UP, to a point hanging over the
     // band - the energy gathering above the herd before it lights.
-    if (b !== a && (k < .66 || rnd() < .5)) ARCS.push({ a: [a.x, .9, a.z], b: [b.x, .9, b.z], col, t: .15, w: .14 + .3 * k });
+    if (b !== a && (wave || k < .66 || rnd() < .5)) ARCS.push({ a: [a.x, .9, a.z], b: [b.x, .9, b.z], col, t: .15, w: .14 + .3 * k });
     else ARCS.push({ a: [a.x, .9, a.z], b: [L.cx, 1.2 + L.r * .8, L.cz], col, t: .15, w: .1 + .24 * k });
     spawnP([a.x, 1, a.z], [0, 2, 0], col, .3);
   }
   if (!wave) return;
   // Every lit unicorn becomes a low plasma wisp. Overlap forms the core
   // wherever the herd gathers; the ground clips the lower half of the glow.
-  setDim(2);
   for (const u of herd) {
-    const y = .5 + Math.sin(T * 8 + u.seed) * .15;
-    disc(u.col, u.x, y, u.z, 2);
-    disc(WILD, u.x, y, u.z, .7);
-    disc(u.col, u.x - Math.cos(u.yaw) * 1.5, .3, u.z - Math.sin(u.yaw) * 1.5, 1);
+    const phase = T * 8 + u.seed;
+    setDim(1 + Math.sin(phase) ** 2);
+    for (let j = 0; j < 5; j++) {
+      const d = j && j - 1, a = phase - j,
+        yaw = u.yaw + Math.sin(a) * d * .2;
+      disc(j ? u.col : WILD, u.x - Math.cos(yaw) * d,
+        .5 + Math.sin(a) * .2, u.z - Math.sin(yaw) * d, j ? 2.4 - j * .4 : .6);
+    }
   }
   setDim(1);
   // Sample the wake. The LAST sample is the herd's position this frame,
@@ -287,13 +286,13 @@ function drawCharge(L, T, dt) {
 // bands the herd runs inside, red outermost, that dissolves behind it. It
 // is Rainbow Surfer's braid with the herd where the rider was.
 const ARCH = 9;                                   // segments per half-circle
-function trailVerts(T, dt, eye) {
+function trailVerts(dt, eye) {
   const put = vertexWriter(TBUF, 1.4);
   const quad = (p0, p1, p2, p3, c, a) => { put(...p0, c, a); put(...p1, c, a); put(...p2, c, a); put(...p0, c, a); put(...p2, c, a); put(...p3, c, a); };
   // A point on the arch of sample s: colour band c, angle index i, at the
-  // band's inner (e=0) or outer (e=1) edge.
-  const pt = (s, c, i, e, T) => {
-    const th = i / ARCH * Math.PI, R = s.r * (1.05 - c * .075 + e * .07) * (1 + Math.sin(T * 5 + i) * .03);
+  // band's surface. The live nose shrinks to the leader's plasma wisp.
+  const pt = (s, c, i) => {
+    const th = i / ARCH * Math.PI, R = (s.wave ? .8 : s.r) * (1.05 - c * .075) * (1 + Math.sin(now() * 8 + i) * .06);
     const sx = -Math.sin(s.yaw), sz = Math.cos(s.yaw);
     return [s.x + sx * Math.cos(th) * R, .15 + Math.sin(th) * R * .85, s.z + sz * Math.cos(th) * R];
   };
@@ -302,16 +301,18 @@ function trailVerts(T, dt, eye) {
     while (tr.s.length && tr.s[0].t > .9) tr.s.shift();
     if (!tr.s.length) { TRAIL.delete(L); continue; }
     for (let i = 0; i + 1 < tr.s.length && put.n < TBUF.length - 8000; i++) {
-      const s0 = tr.s[i], s1 = tr.s[i + 1];
+      // Stretch only the live front to the leader; keep the wake on the herd path.
+      const s0 = tr.s[i], s1 = i + 2 === tr.s.length && L.wave
+        ? L : tr.s[i + 1];
       // Fade with age, and fade out again where the tunnel runs past the
       // camera - being inside your own rainbow is the point, being blinded
       // by it is not.
       const near = Math.min(1, Math.max(0, (Math.hypot(s1.x - eye[0], s1.z - eye[2]) - 5) / 9));
-      const f = (2 - s0.t / .9 - s1.t / .9) / 2 * near;
+      const f = (1 - s0.t / .9) * near;
       if (f <= 0) continue;
       for (let c = 0; c < 7; c++) {
         for (let k = 0; k < ARCH; k++) {
-          quad(pt(s0, c, k, 0, T), pt(s0, c, k + 1, 0, T), pt(s1, c, k + 1, 0, T), pt(s1, c, k, 0, T), RAINBOW[c], .38 * f);
+          quad(pt(s0, c, k), pt(s0, c, k + 1), pt(s1, c, k + 1), pt(s1, c, k), RAINBOW[c], (.06 + .1 * Math.sin(now() * 8 - s0.t * 18 + c + k) ** 8) * f);
         }
       }
     }
@@ -529,6 +530,15 @@ function frame(now_) {
   // --- draw ---------------------------------------------------------------
   frameGL(vp, e2, FOG);
   drawMesh(groundM, IDENT);
+  // Light lies on the meadow, before opaque shadows and unicorns.
+  glMode(1);
+  for (const L of leaders) {
+    const r = L.r * 4;
+    setDim(L.wave ? 1.4 : L.charge * .3);
+    drawMesh(DISC[WILD], [r,0,0,0, 0,0,r,0, 0,1,0,0, L.cx,.02,L.cz,1]);
+  }
+  setDim(1);
+  glMode(0);
   const T = now();
   for (const u of units) {
     // Lit unicorns render as plasma wisps in drawCharge; burnout restores
@@ -538,7 +548,17 @@ function frame(now_) {
     const set = U[u.st === 3 ? WILD : u.col];
     const x = u.x, y = u.y, z = u.z, s = (u.hearts ? 1.25 : 1) * u.size, yaw = u.yaw;
     const bob = u.st ? 0 : Math.sin(u.ph * 2) * .05 * Math.min(1, u.sp / 5);
-    drawMesh(set.shadow, modelTR(x, 0, z, -yaw + Math.PI / 2, s));
+    const shadow = modelTR(x, 0, z, -yaw + Math.PI / 2, s);
+    let dx = 0, dz = 0, light = 1;
+    for (const L of leaders) {
+      const k = L.wave ? Math.max(0, 1 - Math.hypot(x - L.cx, z - L.cz) / (L.r * 4)) : 0;
+      dx += (x - L.cx) * k; dz += (z - L.cz) * k; light += k;
+    }
+    shadow[8] += dx / light * .15; shadow[10] += dz / light * .15;
+    shadow[12] += dx / light * .1; shadow[14] += dz / light * .1;
+    setDim(1 / light);
+    drawMesh(set.shadow, shadow);
+    setDim(1);
     const M = modelTR(x, y + bob, z, -yaw + Math.PI / 2, s);
     // Thrown: it tumbles about its long axis, and lands on its side. `up`
     // is the second and a half it spends rolling back onto its feet -
@@ -605,7 +625,7 @@ function frame(now_) {
   }
   setDim(1);
 
-  const tn = trailVerts(T, dt, e2);
+  const tn = trailVerts(dt, e2);
   updateMesh(trailM, TBUF, tn);
   if (tn) drawMesh(trailM, IDENT);
   const an = arcVerts(dt);

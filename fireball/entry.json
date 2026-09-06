@@ -52,7 +52,22 @@
     "dropped",
     "tHeard",
     "joined",
-    "roster"
+    "roster",
+    "seed",
+    "pace",
+    "gait",
+    "roll",
+    "spin",
+    "size",
+    "up",
+    "life",
+    "since",
+    "head",
+    "body",
+    "crown",
+    "leg",
+    "shadow",
+    "r0"
   ],
   "canvasOnly": true
 }

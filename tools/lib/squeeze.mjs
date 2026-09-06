@@ -33,8 +33,11 @@ export async function roadroll(js, level = 0) {
 }
 
 export function shell({ title, css, markup, script, head = '' }) {
-  return `<!doctype html><meta charset=utf-8><title>${title}</title>${head}`
+  const body = `<title>${title}</title>${head}`
     + `<style>${css}</style>${markup}<script>${script}</script>`;
+  // ASCII bundles decode identically without a charset declaration. Keep it
+  // whenever a title, stylesheet or payload contains actual Unicode bytes.
+  return '<!doctype html>' + (/[^\x00-\x7f]/.test(body) ? '<meta charset=utf-8>' : '') + body;
 }
 
 /** Minified JS + page parts → the archive that would be submitted. */

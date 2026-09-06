@@ -11,20 +11,20 @@ export let gl, canvas;
 // toward nothing rather than toward fog, because additive blending adds -
 // mixing a distant glow toward the fog colour would brighten the horizon
 // instead of letting the light die away.
-// `add` lives in both stages, so it carries an explicit precision: default
+// The glow uniform `g` lives in both stages, with an explicit precision: default
 // float precision is highp in the vertex shader and mediump in the fragment
 // one, and a uniform whose precision disagrees across stages is a link error.
-const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
-uniform mediump float add,dim;varying vec3 vc;varying float vf,va;
-void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
-float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
-vc=c*mix(l,1.,add);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,add),0.,1.);}`;
+const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 V,M;uniform vec3 e;
+uniform mediump float g,d;varying vec3 C;varying float F,A;
+void main(){vec4 w=M*vec4(p,1.);gl_Position=V*w;
+float l=.55+.45*max(dot(normalize((M*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
+C=c*mix(l,1.,g);A=a*d;F=clamp((length(w.xyz-e)-12.)/mix(58.,150.,g),0.,1.);}`;
 // Fireball draws solids and additive glow; the surfer's glass material is
 // unused here. Keeping only these two paths leaves room for the game rules.
-const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
-uniform vec3 fog;uniform float add;
-void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
-else gl_FragColor=vec4(mix(vc,fog,vf),va);}`;
+const FS = `precision mediump float;varying vec3 C;varying float F,A;
+uniform vec3 f;uniform float g;
+void main(){if(g>.5)gl_FragColor=vec4(C,A*(1.-F*.92));
+else gl_FragColor=vec4(mix(C,f,F),A);}`;
 
 let prog, loc = {};
 
@@ -43,8 +43,8 @@ export function initGL(c) {
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim']) loc[u] = gl.getUniformLocation(prog, u);
-  gl.uniform1f(loc.dim, 1);
+  for (const u of ['V', 'M', 'e', 'f', 'g', 'd']) loc[u] = gl.getUniformLocation(prog, u);
+  gl.uniform1f(loc.d, 1);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
   gl.enable(gl.DEPTH_TEST);
 }
@@ -54,27 +54,26 @@ export function frameGL(vp, cam, fog) {
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(fog[0], fog[1], fog[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  gl.uniformMatrix4fv(loc.vp, false, vp);
-  gl.uniform3fv(loc.cam, cam);
-  gl.uniform3fv(loc.fog, fog);
+  gl.uniformMatrix4fv(loc.V, false, vp);
+  gl.uniform3fv(loc.e, cam);
+  gl.uniform3fv(loc.f, fog);
 }
 
 // Two materials, one program.
-//   0 SOLID  lambert + fog, opaque, writes depth.
+//   0 SOLID  lambert + fog, alpha blending, writes depth; dim softens shadows.
 //   1 GLOW   emissive, additive, depth TEST but no depth WRITE - glow layers
 //            still hide behind solid things but never occlude each other,
 //            they sum, and that summing is the bloom.
 export function mode(m) {
-  gl.uniform1f(loc.add, m === 1 ? 1 : 0);
-  if (!m) { gl.disable(gl.BLEND); gl.depthMask(true); return; }
+  gl.uniform1f(loc.g, m);
   gl.enable(gl.BLEND);
-  gl.depthMask(false);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.depthMask(!m);
+  gl.blendFunc(gl.SRC_ALPHA, m ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
 }
 
 // A blanket multiplier on every vertex alpha, so one mesh can be drawn a
 // second time as a faint ghost of itself - which is all a reflection is.
-export const setDim = (v) => gl.uniform1f(loc.dim, v);
+export const setDim = (v) => gl.uniform1f(loc.d, v);
 
 // A planar reflection needs a MASK. A mirror image floating beside the
 // track - out over a gap, past the edge, in the empty air - is worse than
@@ -109,7 +108,7 @@ export function createMesh(arr, dynamic) {
   const b = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, b);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
-  return { b, n: arr.length / 10, dynamic };
+  return { b, n: arr.length / 10 };
 }
 
 // Accepts a preallocated Float32Array plus a float count, so the per-frame
@@ -117,9 +116,9 @@ export function createMesh(arr, dynamic) {
 // hundred KB of fresh arrays every frame is a GC hitch waiting to happen.
 export function updateMesh(m, arr, count) {
   gl.bindBuffer(gl.ARRAY_BUFFER, m.b);
-  const n = count === undefined ? arr.length : count;
-  gl.bufferData(gl.ARRAY_BUFFER, ArrayBuffer.isView(arr) ? arr.subarray(0, n) : new Float32Array(arr), gl.DYNAMIC_DRAW);
-  m.n = n / 10;
+  // All three dynamic streams are preallocated Float32Arrays with an explicit count.
+  gl.bufferData(gl.ARRAY_BUFFER, arr.subarray(0, count), gl.DYNAMIC_DRAW);
+  m.n = count / 10;
 }
 
 export function drawMesh(m, model) {
@@ -128,7 +127,7 @@ export function drawMesh(m, model) {
     gl.vertexAttribPointer(loc[key], i === 3 ? 1 : 3, gl.FLOAT, false, 40, i * 12);
     gl.enableVertexAttribArray(loc[key]);
   });
-  gl.uniformMatrix4fv(loc.md, false, model);
+  gl.uniformMatrix4fv(loc.M, false, model);
   gl.drawArrays(gl.TRIANGLES, 0, m.n);
 }
 

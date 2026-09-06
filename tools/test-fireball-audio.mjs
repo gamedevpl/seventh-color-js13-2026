@@ -12,7 +12,7 @@ try {
     window.AudioContext = function () { return ctx; };
     let seed = 1;
     Math.random = () => (seed = Math.imul(seed, 1664525) + 1013904223 >>> 0) / 4294967296;
-    new Function(src + ';wake();music(1,0);boom(72);ignite();for(let i=0;i<8;i++)clang();')();
+    new Function(src + ';wake();music(1,0,1);boom(72);for(let i=0;i<8;i++){clang();thud(2);}')();
     const buffer = await ctx.startRendering(), d = buffer.getChannelData(0);
     let peak = 0, clipped = 0, sum = 0;
     for (const x of d) { peak = Math.max(peak, Math.abs(x)); clipped += Math.abs(x) > 1; sum += x * x; }

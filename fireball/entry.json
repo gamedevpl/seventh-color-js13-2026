@@ -67,7 +67,8 @@
     "crown",
     "leg",
     "shadow",
-    "r0"
+    "r0",
+    "hit"
   ],
   "canvasOnly": true
 }

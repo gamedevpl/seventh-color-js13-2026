@@ -11,7 +11,7 @@
 export const BPM = 132;
 export const STEP = 15 / BPM;             // a sixteenth
 
-let ac = null, master, noise = null, nextT = 0, step = 0, riser = null;
+let ac = null, master, space, noise = null, nextT = 0, step = 0;
 export let beat = 0;
 
 const NOTE = (s) => 110 * 2 ** (s / 12);
@@ -27,13 +27,14 @@ function env(g, gain, t0, dur) {
   g.gain.setValueAtTime(gain, t0);
   g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
 }
+// Negative target frequency selects the shared spatial melody bus.
 function tone(f, dur, type, gain, t0, f2) {
   const o = ac.createOscillator(), g = ac.createGain();
   o.type = type;
   o.frequency.setValueAtTime(f, t0);
-  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+  if (f2 > 0) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
   env(g, gain, t0, dur);
-  o.connect(g); g.connect(master);
+  o.connect(g); g.connect(f2 < 0 ? space : master);
   o.start(t0); o.stop(t0 + dur);
 }
 // Filtered noise: hooves, thuds and the boom are all this with a
@@ -52,8 +53,9 @@ export function wake() {
   ac = new (window.AudioContext || window.webkitAudioContext)();
   // One shared compressor catches overlapping impacts without flattening quiet play.
   master = ac.createDynamicsCompressor();
-  master.threshold.value = -8; master.ratio.value = 12;
+  master.threshold.value = -8; // Default compressor ratio is 12:1.
   master.connect(ac.destination);
+  space = ac.createStereoPanner(); space.connect(master);
   const n = (ac.sampleRate * .4) | 0;
   noise = ac.createBuffer(1, n, ac.sampleRate);
   const d = noise.getChannelData(0);
@@ -63,8 +65,9 @@ export const awake = () => !!ac;
 
 // `heat` 0..1 is how much herd you have; `bare` is the title's version -
 // just the hooves in the distance and the bass, so the run arrives.
-export function music(heat, bare) {
+export function music(heat, bare, magic = 0, pan = 0) {
   if (!ac) return;
+  space.pan.setTargetAtTime(pan, ac.currentTime, .1);
   if (nextT < ac.currentTime) nextT = ac.currentTime + .05;
   while (nextT < ac.currentTime + .16) {
     const s = step % 32, h = s % 16;
@@ -74,6 +77,7 @@ export function music(heat, bare) {
     if (!bare && h % 8 === 6) hit(nextT, .09, .06, 5000, 1);                   // an off-beat hat
     if (BASS[h] !== R) tone(NOTE(BASS[h] - 12), .2, 'square', .05, nextT);
     if (!bare && heat > .35 && LEAD[s] !== R) tone(NOTE(LEAD[s] + 12), .22, 'sawtooth', .01 + heat * .03, nextT);
+    if (!bare && magic && LEAD[s] !== R) tone(NOTE(LEAD[s] + 24), .22, 'triangle', magic * .04, nextT, -1);
     nextT += STEP; step++;
   }
 }
@@ -90,29 +94,10 @@ export function clang() {
   if (!ac) return;
   hit(t0(), .08, .18, 3200, 3); tone(2100, .12, 'square', .03, t0(), 1700);
 }
-// Someone thrown: a thud and a squeak going away.
-export function thud() {
+// Body impact: broadband crack and falling bass; rainbow hits use double gain.
+export function thud(power = 1) {
   if (!ac) return;
-  hit(t0(), .12, .15, 220, 1.2); tone(900, .25, 'triangle', .04, t0(), 300);
-}
-// The charge: one riser held as long as the herd folds in. Pitch tracks
-// the charge from outside, so releasing early sounds early.
-export function rise(k) {
-  if (!ac) return;
-  if (!riser) {
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.type = 'sawtooth'; o.connect(g); g.connect(master);
-    g.gain.value = .04; o.start();
-    riser = { o, g };
-  }
-  riser.o.frequency.setTargetAtTime(110 * 2 ** (k * 3), t0(), .05);
-  riser.g.gain.setTargetAtTime(.03 + k * .05, t0(), .05);
-}
-export function riseOff() {
-  if (!riser) return;
-  riser.g.gain.setTargetAtTime(0, t0(), .04);
-  riser.o.stop(t0() + .3);
-  riser = null;
+  hit(t0(), .18, .3 * power, 440, .8); tone(180, .2, 'triangle', .2 * power, t0(), 45);
 }
 // The explosion. A sub boom, a wide noise burst, then the rainbow: seven
 // notes fanning up, one per colour, because a rainbow must be heard too.
@@ -124,13 +109,6 @@ export function boom(pw) {
   hit(t, .7, .5 * g, 500, .4);
   hit(t + .05, 1.2, .25 * g, 150, .6);
   [0, 2, 4, 5, 7, 9, 11].forEach((n, i) => tone(NOTE(24 + n), .5, 'triangle', .07, t + .12 + i * .06));
-}
-// Ignition: a sharp upward ZIIING as the herd becomes plasma.
-export function ignite() {
-  if (!ac) return;
-  const t = t0();
-  hit(t, .15, .1, 1800, .8);
-  tone(180, .45, 'sawtooth', .1, t, 3200);
 }
 // A heart lost: a low, sour two-note.
 export function ouch() {

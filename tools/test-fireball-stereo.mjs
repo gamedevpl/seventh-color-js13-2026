@@ -1,0 +1,5 @@
+import {chromium} from 'playwright-core';import{readFileSync}from'node:fs';import assert from'node:assert/strict';
+const b=await chromium.launch();try{const p=await b.newPage(),src=readFileSync('fireball/src/snd.js','utf8').replace(/export /g,'').replace('ac.currentTime + .16','ac.currentTime + 2');
+const results=[];for(const [magic,pan,solo] of [[0,0,0],[1,0,0],[1,-.8,1],[1,.8,1]])results.push(await p.evaluate(async({src,magic,pan,solo})=>{const ac=new OfflineAudioContext(2,44100*3,44100);window.AudioContext=function(){return ac};let seed=1;Math.random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);new Function('magic','pan','solo',src+`;wake();if(solo){const t=tone;tone=(...a)=>{if(a[5]===-1)t(...a)};hit=()=>{}}music(.8,0,magic,pan);`)(magic,pan,solo);const out=await ac.startRendering();return [0,1].map(i=>{const d=out.getChannelData(i);return Math.sqrt(d.reduce((sum,v)=>sum+v*v,0)/d.length)})},{src,magic,pan,solo}));
+assert.ok(results[1][0]<results[0][0]*1.3);assert.ok(results[2][0]>results[2][1]*2);assert.ok(results[3][1]>results[3][0]*2);console.log('PASS music balance and stereo',results);
+}finally{await b.close()}

@@ -79,7 +79,7 @@ const css = (entry.canvasOnly
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {
   const out = await squeeze({
-    js: minified, css, markup, head, title: entry.title,
+    js: minified, css, markup, head, title: game === 'fireball' ? '' : entry.title,
     roadroller: !noRoadroller, level, zopfliIterations: rolls > 1 ? 15 : 200,
   });
   console.log(`  roll ${i + 1}/${rolls}: index.zip = ${num(out.archiveBytes)}`);

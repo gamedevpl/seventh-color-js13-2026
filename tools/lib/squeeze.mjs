@@ -33,7 +33,7 @@ export async function roadroll(js, level = 0) {
 }
 
 export function shell({ title, css, markup, script, head = '' }) {
-  const body = `<title>${title}</title>${head}`
+  const body = (title ? `<title>${title}</title>` : '') + head
     + `<style>${css}</style>${markup}<script>${script}</script>`;
   // ASCII bundles decode identically without a charset declaration. Keep it
   // whenever a title, stylesheet or payload contains actual Unicode bytes.

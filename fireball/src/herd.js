@@ -435,6 +435,7 @@ export function step(dt, input) {
       // Two lit herds do not trade horns; their rainbows settle it below.
       const A = leaders[a.lead], B = leaders[b.lead];
       if (A.wave && B.wave) continue;
+      events.push({ k: 'horn', x: a.x, z: a.z });
       if (lose.hearts) {
         // A leader takes a horn: knocked back, and if the horn came in on
         // a real charge - or the leader has no herd left to stand behind -
@@ -442,7 +443,6 @@ export function step(dt, input) {
         // and a hunter on top of it does not need a run-up to finish it.
         const W = leaders[win.lead];
         win.lunge = 1; lose.recoil = 1;
-        events.push({ k: 'horn', x: a.x, z: a.z });
         if ((W.charge > .5 || lose.n === 0) && lose.stun <= 0) hurt(lose, lose.x - win.x, lose.z - win.z);
         else { lose.vx += (lose.x - win.x) * 6; lose.vz += (lose.z - win.z) * 6; }
         continue;

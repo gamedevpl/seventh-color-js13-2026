@@ -4,6 +4,7 @@
 // distance fog. Same discipline as game one's draw.js: a thin layer the
 // call sites stay readable through, not an engine.
 
+// Standard WebGL enum values are numeric here to preserve the 13k budget.
 export let gl, canvas;
 
 // Two materials in one program. Solid geometry gets lambert + fog-toward-
@@ -23,8 +24,7 @@ C=c*mix(l,1.,g);A=a*d;F=clamp((length(w.xyz-e)-12.)/mix(58.,150.,g),0.,1.);}`;
 // unused here. Keeping only these two paths leaves room for the game rules.
 const FS = `precision mediump float;varying vec3 C;varying float F,A;
 uniform vec3 f;uniform float g;
-void main(){if(g>.5)gl_FragColor=vec4(C,A*(1.-F*.92));
-else gl_FragColor=vec4(mix(C,f,F),A);}`;
+void main(){gl_FragColor=vec4(mix(C,f,F*(1.-g)),A*(1.-F*.92*g));}`;
 
 let prog, loc = {};
 
@@ -39,21 +39,21 @@ export function initGL(c) {
     return s;
   };
   prog = gl.createProgram();
-  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
-  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+  gl.attachShader(prog, sh(35633, VS));
+  gl.attachShader(prog, sh(35632, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
   for (const u of ['V', 'M', 'e', 'f', 'g', 'd']) loc[u] = gl.getUniformLocation(prog, u);
   gl.uniform1f(loc.d, 1);
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
-  gl.enable(gl.DEPTH_TEST);
+  gl.enable(2929);
 }
 
 export function frameGL(vp, cam, fog) {
   mode(0);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(fog[0], fog[1], fog[2], 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.clear(16384 | 256);
   gl.uniformMatrix4fv(loc.V, false, vp);
   gl.uniform3fv(loc.e, cam);
   gl.uniform3fv(loc.f, fog);
@@ -66,9 +66,9 @@ export function frameGL(vp, cam, fog) {
 //            they sum, and that summing is the bloom.
 export function mode(m) {
   gl.uniform1f(loc.g, m);
-  gl.enable(gl.BLEND);
+  gl.enable(3042);
   gl.depthMask(!m);
-  gl.blendFunc(gl.SRC_ALPHA, m ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
+  gl.blendFunc(770, m ? 1 : 771);
 }
 
 // A blanket multiplier on every vertex alpha, so one mesh can be drawn a
@@ -83,10 +83,10 @@ export const setDim = (v) => gl.uniform1f(loc.d, v);
 // hidden behind the scenery marks nothing and reflects nothing.
 //   1 write the mask (the deck pass)   2 test it (the mirror pass)   0 off
 export function mask(m) {
-  if (!m) { gl.disable(gl.STENCIL_TEST); return; }
-  gl.enable(gl.STENCIL_TEST);
-  gl.stencilFunc(m === 1 ? gl.ALWAYS : gl.EQUAL, 1, 255);
-  gl.stencilOp(gl.KEEP, gl.KEEP, m === 1 ? gl.REPLACE : gl.KEEP);
+  if (!m) { gl.disable(2960); return; }
+  gl.enable(2960);
+  gl.stencilFunc(m === 1 ? 519 : 514, 1, 255);
+  gl.stencilOp(7680, 7680, m === 1 ? 7681 : 7680);
 }
 
 // Mirror through the plane (point q, unit normal n): x - 2(n.x - n.q)n.
@@ -106,8 +106,8 @@ export function reflector(q, n) {
 // frame (the braid); everything else is built once at round start.
 export function createMesh(arr, dynamic) {
   const b = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, b);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+  gl.bindBuffer(34962, b);
+  gl.bufferData(34962, new Float32Array(arr), dynamic ? 35048 : 35044);
   return { b, n: arr.length / 10 };
 }
 
@@ -115,20 +115,20 @@ export function createMesh(arr, dynamic) {
 // mesh (the rainbow) can be rebuilt with no allocation at all - a few
 // hundred KB of fresh arrays every frame is a GC hitch waiting to happen.
 export function updateMesh(m, arr, count) {
-  gl.bindBuffer(gl.ARRAY_BUFFER, m.b);
+  gl.bindBuffer(34962, m.b);
   // All three dynamic streams are preallocated Float32Arrays with an explicit count.
-  gl.bufferData(gl.ARRAY_BUFFER, arr.subarray(0, count), gl.DYNAMIC_DRAW);
+  gl.bufferData(34962, arr.subarray(0, count), 35048);
   m.n = count / 10;
 }
 
 export function drawMesh(m, model) {
-  gl.bindBuffer(gl.ARRAY_BUFFER, m.b);
+  gl.bindBuffer(34962, m.b);
   ['p', 'n', 'c', 'a'].forEach((key, i) => {
-    gl.vertexAttribPointer(loc[key], i === 3 ? 1 : 3, gl.FLOAT, false, 40, i * 12);
+    gl.vertexAttribPointer(loc[key], i === 3 ? 1 : 3, 5126, false, 40, i * 12);
     gl.enableVertexAttribArray(loc[key]);
   });
   gl.uniformMatrix4fv(loc.M, false, model);
-  gl.drawArrays(gl.TRIANGLES, 0, m.n);
+  gl.drawArrays(4, 0, m.n);
 }
 
 // --- the little linear algebra this game actually needs ------------------
@@ -145,15 +145,15 @@ export function lookAt(eye, at) {
   let zx = eye[0] - at[0], zy = eye[1] - at[1], zz = eye[2] - at[2];
   const zl = Math.hypot(zx, zy, zz);
   zx /= zl; zy /= zl; zz /= zl;
-  let xx = zz, xy = 0, xz = -zx;
-  const xl = Math.hypot(xx, xy, xz) || 1;
-  xx /= xl; xy /= xl; xz /= xl;
-  const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+  let xx = zz, xz = -zx;
+  const xl = Math.hypot(xx, xz) || 1;
+  xx /= xl; xz /= xl;
+  const yx = zy * xz, yy = zz * xx - zx * xz, yz = -zy * xx;
   return [
     xx, yx, zx, 0,
-    xy, yy, zy, 0,
+    0, yy, zy, 0,
     xz, yz, zz, 0,
-    -(xx * eye[0] + xy * eye[1] + xz * eye[2]),
+    -(xx * eye[0] + xz * eye[2]),
     -(yx * eye[0] + yy * eye[1] + yz * eye[2]),
     -(zx * eye[0] + zy * eye[1] + zz * eye[2]), 1,
   ];
@@ -188,18 +188,16 @@ export function modelFrame(p, X, Y, Z, s) {
 // `a` matters for additive boxes: front+back faces SUM, so alpha 1 clamps
 // any colour to white - a coloured glow box needs a low alpha.
 export function pushBox(v, cx, cy, cz, sx, sy, sz, r, g, b, a = 1) {
-  const x = sx / 2, y = sy / 2, z = sz / 2;
-  const F = [
-    [[1, 0, 0], [x, -y, -z, x, y, -z, x, y, z, x, -y, z]],
-    [[-1, 0, 0], [-x, -y, z, -x, y, z, -x, y, -z, -x, -y, -z]],
-    [[0, 1, 0], [-x, y, -z, -x, y, z, x, y, z, x, y, -z]],
-    [[0, -1, 0], [-x, -y, z, -x, -y, -z, x, -y, -z, x, -y, z]],
-    [[0, 0, 1], [-x, -y, z, x, -y, z, x, y, z, -x, y, z]],
-    [[0, 0, -1], [x, -y, -z, -x, -y, -z, -x, y, -z, x, y, -z]],
-  ];
-  for (const [n, q] of F) {
-    for (const i of [0, 1, 2, 0, 2, 3]) {
-      v.push(cx + q[i * 3], cy + q[i * 3 + 1], cz + q[i * 3 + 2], ...n, r, g, b, a);
+  const half = [sx / 2, sy / 2, sz / 2];
+  for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) {
+    for (const corner of [0, 1, 2, 0, 2, 3]) {
+      const p = [cx, cy, cz], n = [0, 0, 0];
+      n[axis] = sign;
+      for (let j = 0; j < 3; j++) {
+        const k = (axis + j) % 3;
+        p[k] += half[k] * (j ? j === 1 ? corner === 0 || corner === 3 ? -1 : 1 : corner < 2 ? -1 : 1 : sign);
+      }
+      v.push(...p, ...n, r, g, b, a);
     }
   }
 }

@@ -1,5 +1,78 @@
 # UNICORN FIREBALL — the fourth entry
 
+## F24 — high falling glitter (2026-09-06)
+
+9216 flakes replace 900. The looping falling field reaches about 64 units
+above the ground, beyond the normal camera frame; its nonlinear descent slows
+near the floor before recycling overhead. Small flakes retain directional
+flashes. A .025 world-size ceiling and horizontal camera-distance cap prevent
+large foreground diamonds. Hoof/rainbow lift is refreshed in eight staggered
+groups; motion and sparkle still render every frame. The viewed herd is read
+once per frame, avoiding repeated spectator lookups.
+
+The title is assigned in JavaScript to reuse its existing text in compression;
+other games keep their HTML titles. DOM before/append preserve the canvas
+wrapper layout. `node tools/refine-fireball.mjs` refines the selected ZIP with
+1000 Zopfli iterations without changing its HTML. The selected final archive
+is 13,310 bytes; ordinary builds can still exceed 13k.
+
+## F23 — denser glitter and restrained stereo (2026-09-06)
+
+900 flakes replace 400, retaining the small rotating shape and directional
+flashes. Rainbow melody gain drops from .13 to .04 (about -10.2 dB), with a
+shorter .22 s decay; the separate ignition fanfare is removed. Nearby charging
+and lit herds share a softly panned melody bus, positioned relative to the
+camera with 100 ms smoothing and 70-unit distance falloff. It is a weighted
+stereo image, not individual 3D voices for every herd. Music stays centered.
+
+The shader's solid/glow branches are algebraically combined for the existing
+0/1 modes. Dust lift no longer clamps twice; its retained lift is nonnegative.
+The compressor uses its existing default ratio of 12:1.
+
+## F22 — branching lightning workbench (2026-09-06)
+
+`npm run fireball:lightning` builds `build/lightning-workbench/index.html`:
+a standalone GPU workbench with unicorns, camera motion, pause, a frozen
+channel and flash-rate control. It shares `fireball/src/lightning.js` with
+the game. The workbench itself is excluded from the submission ZIP.
+
+Lightning uses twelve irregular segments, a thin white core and cool blue
+halo, plus three thinner side leaders. Each short-lived channel keeps its
+shape through the return-stroke brightness pulses instead of changing every
+frame. Endpoints stay at the sampled unicorn positions; no overhead attractor.
+The decorative spark emitted on each arc was removed to recover bytes.
+
+The selected ZIP fits at 13,305 bytes. O2 compression varies: only two of five
+rolls fit; the worst-of-five packaging guard fails at 13,331. Preserve and
+verify the selected artifact; a fresh single roll is not guaranteed to fit.
+
+## F21 — glitter and rainbow melody (2026-09-06)
+
+400 small rotating glitter flakes occupy a recycled 84×84 field around the
+viewed herd, clipped to the arena. Flakes settle, lift under running units,
+and swirl higher across a rainbow's wider footprint. Their narrow flashes
+vary with orientation relative to the camera. This is a stylized glint,
+not a physically traced reflection. The pool and draw-call count stay bounded.
+
+The continuous sawtooth charge/rainbow riser is replaced by a beat-synchronized
+triangle-wave version of the main motif, one octave above its normal lead.
+Nearby rival rainbows also raise this layer; distance fades it out at 70 units.
+One shared layer keeps simultaneous herds harmonically aligned. Ignition
+quotes the opening motif instead of sweeping pitch upward.
+
+Space comes from numeric WebGL enums, equivalent box/camera arithmetic,
+shared HUD circles and diamond particles with fewer vertices. No textures,
+combat-rule changes or network protocol changes were added.
+
+## F20 — charge arcs and impact feedback (2026-09-06)
+
+Charging lightning now bridges actual herd members at every charge level;
+the floating overhead endpoint is removed. Every hostile horn contact emits
+feedback, including the first follower stagger. Rainbow knockdowns trigger
+a stronger crack and falling bass. Knockdowns in one frame share one impact
+voice, with rainbow hits taking priority. Rainbow base alpha rises from .06
+to .1 while retaining travelling highlights and the camera proximity fade.
+
 ## F19 — living plasma and combined lighting (2026-09-06)
 
 Each wisp has a pulsing core and four coloured lobes: the rear lobes sway
@@ -88,7 +161,7 @@ background detail. Stars, decorative ground patches and the overlapping
 white haze are removed; meadow colours, edge markers and the rainbow trails
 remain. Restarted worlds release their old GPU buffers.
 
-Package: **13,295 bytes**, **13,311 worst-of-five** at O2, ceiling **13,312**.
+Package: **13,310 bytes** after ZIP refinement, **13,345 worst-of-five** before refinement at O2, ceiling **13,312**.
 Validation and limitations are recorded in [FIREBALL-QA.md](FIREBALL-QA.md).
 
 ## Historical design notes (F1–F10)

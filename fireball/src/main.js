@@ -1,3 +1,4 @@
+import { lightning } from './lightning.js';
 // UNICORN FIREBALL. Run the plain as a unicorn of one colour, gather every
 // unicorn that shares it into a herd, and fight the other herds horn to
 // horn. Hold the button and the herd CHARGES: it tightens into a wedge and
@@ -11,11 +12,13 @@ import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, 
 import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
 import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, rnd, lerp, wrapA, edgeDanger, ARENA, EDGE, WILD, now, burnTime } from './herd.js';
 import { net, open as netOpen, close as netClose, tick as netTick, ghost, spy } from './net.js';
-import { wake, music, join as sJoin, clang, thud, rise, riseOff, ignite as sIgnite, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
+import { wake, music, join as sJoin, clang, thud, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
 
+document.title = 'UNICORN FIREBALL';
 const VW = 640, VH = 360;
 const FOG = [.07, .05, .13];
 const TAU = Math.PI * 2;
+const dot = (x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); };
 const css = (c, a = 1) => `rgba(${c[0] * 255 | 0},${c[1] * 255 | 0},${c[2] * 255 | 0},${a})`;
 
 const glc = document.getElementById('c');
@@ -23,12 +26,12 @@ glc.width = VW; glc.height = VH;
 initGL(glc);
 const wrap = document.createElement('div');
 wrap.style.position = 'relative';
-glc.parentNode.insertBefore(wrap, glc);
-wrap.appendChild(glc);
+glc.before(wrap);
+wrap.append(glc);
 const hud = document.createElement('canvas');
 hud.width = VW; hud.height = VH;
-hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none';
-wrap.appendChild(hud);
+hud.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;touch-action:none';
+wrap.append(hud);
 const ctx = hud.getContext('2d');
 const label = (text, y, x = VW / 2) => ctx.fillText(text, x, y);
 const font = (size, bold) => { ctx.font = (bold ? 'bold ' : '') + size + 'px system-ui'; };
@@ -201,8 +204,8 @@ function burst(p, n, sp, col) {
     spawnP(p, [Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 3, Math.sin(a) * Math.cos(b) * sp], col || RAINBOW[rnd(7) | 0], .6 + rnd(.6));
   }
 }
-const PBUF = new Float32Array(PMAX * 120);
-let particleM;
+const PBUF = new Float32Array((PMAX + 9216) * 120);
+let particleM, glitterTick = 0;
 // All three effects use the same vertex layout, with different light levels.
 // Keep one writer, without allocating a temporary array for each vertex.
 function vertexWriter(buf, light, bias = 0) {
@@ -216,17 +219,38 @@ function vertexWriter(buf, light, bias = 0) {
   return put;
 }
 function particleVerts(dt) {
-  const put = vertexWriter(PBUF, 1.8);
-  for (const pt of PART) {
-    if (!pt || pt.life <= 0) continue;
-    pt.life -= dt; pt.v[1] -= 9 * dt;
-    pt.p[0] += pt.v[0] * dt; pt.p[1] += pt.v[1] * dt; pt.p[2] += pt.v[2] * dt;
-    if (pt.p[1] < 0) { pt.p[1] = 0; pt.v[1] *= -.4; }
-    const f = pt.life / pt.max, sz = .14 + f * .2, a = f * .8, [x, y, z] = pt.p;
-    put(x - sz, y, z, pt.col, a); put(x + sz, y, z, pt.col, a); put(x, y + sz * 2.6, z, pt.col, 0);
-    put(x - sz, y, z, pt.col, a); put(x + sz, y, z, pt.col, a); put(x, y - sz * 2.6, z, pt.col, 0);
-    put(x, y - sz, z, pt.col, a); put(x, y + sz, z, pt.col, a); put(x + sz * 2.6, y, z, pt.col, 0);
-    put(x, y - sz, z, pt.col, a); put(x, y + sz, z, pt.col, a); put(x - sz * 2.6, y, z, pt.col, 0);
+  glitterTick++;
+  const put = vertexWriter(PBUF, 1.8), view = who();
+  for (let i = 0; i < PMAX + 9216; i++) {
+    const dust = i >= PMAX;
+    let pt = PART[i];
+    if (dust) {
+      // A recycled world-space field: no new particles or draw calls per frame.
+      if (!pt) pt = PART[i] = { p: [i % 96 * .875 + Math.sin(i) * 2, 0, (i / 96 | 0) * .875 + Math.cos(i) * 2], life: 0, col: RAINBOW[i % 7] };
+      for (const j of [0, 2]) pt.p[j] -= Math.floor((pt.p[j] - view[j ? 'z' : 'x'] + 42) / 84) * 84;
+      pt.life *= Math.exp(-dt * 2);
+      if ((i + glitterTick) % 8 === 0) for (const u of units) if (u.st === 0) {
+        const r = u.wave ? u.r + 4 : 3;
+        pt.life = Math.max(pt.life, (1 - Math.hypot(u.x - pt.p[0], u.z - pt.p[2]) / r) * u.sp / 10);
+      }
+      pt.p[1] = .08 + Math.max(0, 8 - (now() * .3 + i * 1.7) % 10) ** 2 + pt.life;
+    } else {
+      if (!pt || pt.life <= 0) continue;
+      pt.life -= dt; pt.v[1] -= 9 * dt;
+      for (let j = 0; j < 3; j++) pt.p[j] += pt.v[j] * dt;
+      if (pt.p[1] < 0) { pt.p[1] = 0; pt.v[1] *= -.4; }
+    }
+    if (dust && Math.max(Math.abs(pt.p[0]), Math.abs(pt.p[2])) > ARENA) continue;
+    // Rotating flakes flash when their face turns towards the camera.
+    const turn = dust ? now() * 2 + i : 0, nx = Math.cos(turn), nz = Math.sin(turn),
+      f = dust ? .02 + (nx * camR[0] + nz * camR[2]) ** 16 * .8 : pt.life / pt.max,
+      sz = dust ? Math.min(.025, Math.hypot(pt.p[0] - eye[0], pt.p[2] - eye[2]) * .001) : .14 + f * .2, a = f * .8,
+      [px, y, pz] = pt.p, sway = dust ? pt.life : 0,
+      x = px + Math.sin(now() * 3 + i) * sway, z = pz + Math.cos(now() * 3 + i) * sway;
+    for (const sign of [-1, 1]) {
+      put(x - sz * nx, y, z - sz * nz, pt.col, a); put(x + sz * nx, y, z + sz * nz, pt.col, a); put(x, y + sign * sz * 2.6, z, pt.col, 0);
+    }
+
   }
   return put.n;
 }
@@ -237,7 +261,7 @@ function particleVerts(dt) {
 // up. Ignition turns the herd into merging plasma wisps and drags a WAKE - seven
 // stripes across its width, the width of the herd, rising off the ground -
 // which is the rainbow you see coming from the other side of the plain.
-const ARCMAX = 60, ABUF = new Float32Array(ARCMAX * 6 * 6 * 10);
+const ARCMAX = 60, ABUF = new Float32Array(ARCMAX * 16 * 12 * 10);
 const TBUF = new Float32Array(200000);
 let arcM, trailM;
 function drawCharge(L, T, dt) {
@@ -249,12 +273,8 @@ function drawCharge(L, T, dt) {
   if (herd.length > 1 && k > .1 && rnd() < dt * (k * k * k * 150 + (wave ? 30 : 0)) && ARCS.length < ARCMAX) {
     const a = herd[(rnd(herd.length)) | 0];
     const b = herd[rnd(herd.length) | 0];
-    const col = RAINBOW[rnd(7) | 0];
-    // Past two thirds the bolts also reach UP, to a point hanging over the
-    // band - the energy gathering above the herd before it lights.
-    if (b !== a && (wave || k < .66 || rnd() < .5)) ARCS.push({ a: [a.x, .9, a.z], b: [b.x, .9, b.z], col, t: .15, w: .14 + .3 * k });
-    else ARCS.push({ a: [a.x, .9, a.z], b: [L.cx, 1.2 + L.r * .8, L.cz], col, t: .15, w: .1 + .24 * k });
-    spawnP([a.x, 1, a.z], [0, 2, 0], col, .3);
+    // Both ends stay on herd members, including at full charge.
+    if (b !== a) ARCS.push({ a: [a.x, .9, a.z], b: [b.x, .9, b.z], t: .15 });
   }
   if (!wave) return;
   // Every lit unicorn becomes a low plasma wisp. Overlap forms the core
@@ -312,7 +332,7 @@ function trailVerts(dt, eye) {
       if (f <= 0) continue;
       for (let c = 0; c < 7; c++) {
         for (let k = 0; k < ARCH; k++) {
-          quad(pt(s0, c, k), pt(s0, c, k + 1), pt(s1, c, k + 1), pt(s1, c, k), RAINBOW[c], (.06 + .1 * Math.sin(now() * 8 - s0.t * 18 + c + k) ** 8) * f);
+          quad(pt(s0, c, k), pt(s0, c, k + 1), pt(s1, c, k + 1), pt(s1, c, k), RAINBOW[c], (.1 + .1 * Math.sin(now() * 8 - s0.t * 18 + c + k) ** 8) * f);
         }
       }
     }
@@ -322,24 +342,9 @@ function trailVerts(dt, eye) {
 // The arcs: jagged bolts, each a ribbon facing the camera, alive for a
 // few frames and gone.
 function arcVerts(dt) {
-  const put = vertexWriter(ABUF, 1.2, .7);
-  for (let i = ARCS.length - 1; i >= 0; i--) {
-    const A = ARCS[i];
-    A.t -= dt;
-    if (A.t <= 0) { ARCS.splice(i, 1); continue; }
-    const a = A.t / .15, S = 6;
-    let px = A.a[0], py = A.a[1], pz = A.a[2];
-    for (let s = 1; s <= S; s++) {
-      const f = s / S, j = s < S ? (1 - Math.abs(2 * f - 1)) * .45 : 0;
-      const x = A.a[0] + (A.b[0] - A.a[0]) * f + (rnd() - .5) * j, y = A.a[1] + (A.b[1] - A.a[1]) * f + (rnd() - .3) * j * 1.6, z = A.a[2] + (A.b[2] - A.a[2]) * f + (rnd() - .5) * j;
-      const w = A.w, ux = camU[0] * w, uy = camU[1] * w, uz = camU[2] * w;
-      put(px - ux, py - uy, pz - uz, A.col, a); put(px + ux, py + uy, pz + uz, A.col, a); put(x + ux, y + uy, z + uz, A.col, a);
-      put(px - ux, py - uy, pz - uz, A.col, a); put(x + ux, y + uy, z + uz, A.col, a); put(x - ux, y - uy, z - uz, A.col, a);
-      px = x; py = y; pz = z;
-    }
-  }
-  return put.n;
+  return lightning(ARCS, vertexWriter(ABUF, 1.2, .7), camU, dt);
 }
+
 const WILDC = COL[WILD];
 
 // --- state ----------------------------------------------------------------
@@ -389,8 +394,8 @@ const pw = [], ph = [];
 function ghostSound(P) {
   let boom;
   for (let i = 0; i < 7; i++) {
-    const L = leaders[i], near = Math.hypot(L.cx - P.cx, L.cz - P.cz) < 70;
-    if (L.wave && !pw[i] && near) { sIgnite(); if (L === P) say('RAINBOW', 1.5); }
+    const L = leaders[i];
+    if (L === P && L.wave && !pw[i]) say('RAINBOW!', 1.5);
     if (pw[i] && !L.wave && L.hearts < ph[i]) boom = [L.cx, L.cz, pw[i] * 2];
     pw[i] = L.wave; ph[i] = L.hearts;
   }
@@ -416,7 +421,7 @@ function frame(now_) {
   const dt = realDt * (impact && !net.on ? .3 : 1);
   last = now_;
   const portrait = innerHeight > innerWidth;
-  if (portrait && !net.on) { riseOff(); rotate(); requestAnimationFrame(frame); return; }
+  if (portrait && !net.on) { rotate(); requestAnimationFrame(frame); return; }
   const doAct = acted; acted = false;
   timer += dt;
   if (mode === 'title' && pick !== lastPick) { lastPick = pick; newRun(1); }
@@ -431,7 +436,13 @@ function frame(now_) {
     }
   } else if (mode === 'run') {
     const heat = Math.min(1, P.n / 12);
-    music(heat, 0);
+    let magic = 0, pan = 0;
+    for (const L of leaders) if (L.st === 0) {
+      const dx = L.cx - P.x, dz = L.cz - P.z,
+        k = (L.wave ? 1 : L.charge * .4) * Math.max(0, 1 - Math.hypot(dx, dz) / 70);
+      magic += k; pan += k * (dx * camR[0] + dz * camR[2]) / 30;
+    }
+    music(heat, 0, Math.min(1, magic), pan / (2 + magic));
     const local = {
       t: turnDir(), f: held.arrowup || held.w || (tL && tR) ? 1 : 0,
       b: held.arrowdown || held.s || tB ? 1 : 0, c: button() ? 1 : 0,
@@ -441,7 +452,6 @@ function frame(now_) {
     const mine = netTick(dt, local);
     if (net.news) { say(net.news.k ? 'RIDER JOINED' : 'RIDER LEFT', 2.5, css(COL[leaders[net.news.i].col])); net.news = null; }
     if (net.said !== lastSaid) { lastSaid = net.said; if (net.said) say(net.said, 3); }
-    if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
     if (mine) {
       if (!net.on) { P.in = local; charge(P, local.c); }
       step(dt, { arena: net.on });
@@ -449,7 +459,7 @@ function frame(now_) {
     if (!net.on && (lost(0) || won(0))) {
       // Latch the result before displaying the finished world.
       victory = won(0);
-      mode = 'end'; endT = 0; riseOff();
+      mode = 'end'; endT = 0;
       if (!victory) impact = null;
       // And the rainbows go out with the run, so nothing is still being
       // ridden by nobody.
@@ -466,15 +476,15 @@ function frame(now_) {
   flash = Math.max(0, flash - dt * 2);
 
   // Events into sound and sparks.
+  let impactSound = 0;
   for (const e of events) {
     if (e.k === 'join') { if (e.L === P) sJoin(P.n); burst([e.u.x, .8, e.u.z], 6, 2, COL[e.u.col]); }
-    else if (e.k === 'knock') { thud(); burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
+    else if (e.k === 'knock') { impactSound = Math.max(impactSound, 1); burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
     else if (e.k === 'horn') { clang(); burst([e.x, 1, e.z], 5, 3, [1, .9, .6]); }
     else if (e.k === 'graze') { clang(); burst([e.x, 1.5, e.z], 40, 7); }
     else if (e.k === 'ignite') {
       // The band lights: a flash, a fan of sparks the size of the herd, and
       // the upward plasma zing.
-      sIgnite();
       burst([e.L.cx, 1.2, e.L.cz], 40 + e.L.n * 6, 5 + e.L.r);
       if (e.L === P) { say('RAINBOW!', 1.5); flash = Math.max(flash, .35); }
     }
@@ -484,11 +494,12 @@ function frame(now_) {
       sBoom(3); shake = 1;
       if (e.L === P) say('OFF THE PLAIN', 2.5);
     }
-    else if (e.k === 'blast') { burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
+    else if (e.k === 'blast') { impactSound = 2; burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
     else if (e.k === 'boom') explode(e.x, e.z, e.pw);
     else if (e.k === 'hurt') { if (e.L === P) { ouch(); say(P.hearts ? 'HEART LOST' : 'HERD LOST', 2); } }
     else if (e.k === 'dead') { if (e.L !== P) say('A RIVAL FALLS', 2.5); }
   }
+  if (impactSound) thud(impactSound);
   events.length = 0;
   for (const b of BOOMS) b.t += dt;
   while (BOOMS.length && BOOMS[0].t > 1.6) BOOMS.shift();
@@ -670,7 +681,7 @@ function frame(now_) {
     label('DOWN / bottom: brake | red edge = death', 200);
     font(15, 1);
     ctx.fillStyle = css(pc);
-    ctx.beginPath(); ctx.arc(VW / 2, VH * .65, 14, 0, TAU); ctx.fill();
+    dot(VW / 2, VH * .65, 14);
     ctx.fillStyle = '#f3ead6';
     label('<   your colour   >', VH * .65 + 34);
     font(18, 1);
@@ -683,7 +694,7 @@ function frame(now_) {
   } else {
     // Your herd: a dot in your colour, the count, the hearts.
     ctx.textAlign = 'left';
-    ctx.fillStyle = css(pc); ctx.beginPath(); ctx.arc(24, 24, 11, 0, TAU); ctx.fill();
+    ctx.fillStyle = css(pc); dot(24, 24, 11);
     ctx.fillStyle = '#f3ead6'; font(26, 1); label(P.n, 24, 44);
     font(18); ctx.fillStyle = '#ff6b8a';
     label('♥'.repeat(P.hearts), 23, 90);
@@ -691,8 +702,8 @@ function frame(now_) {
     ctx.textAlign = 'right'; font(14, 1);
     leaders.filter((L) => L !== P).sort((a, b) => b.n - a.n).forEach((L, i) => {
       const y = 22 + i * 20, dead = L.st === 3;
-      ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); ctx.beginPath(); ctx.arc(VW - 100, y, 6, 0, TAU); ctx.fill();
-      if (L.man) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(VW - 100, y, 2.5, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); dot(VW - 100, y, 6);
+      if (L.man) { ctx.fillStyle = '#fff'; dot(VW - 100, y, 2.5); }
       ctx.fillStyle = dead ? '#666' : '#e8e0f4';
       label(dead ? '-' : L.n + (L.wave ? ' ~' : L.chg ? ' !' : ''), y, VW - 112);
       // Its hearts, but only once it has lost one. Three hearts beside
@@ -716,11 +727,11 @@ function frame(now_) {
       if (L.st === 3) continue;
       const x = RX + (L.cx / ARENA + 1) * RS / 2, y = RY + (L.cz / ARENA + 1) * RS / 2;
       ctx.fillStyle = css(COL[L.col]);
-      ctx.beginPath(); ctx.arc(x, y, 1.6 + Math.sqrt(L.n) * .8, 0, TAU); ctx.fill();
+      dot(x, y, 1.6 + Math.sqrt(L.n) * .8);
       if (L === P) {
         ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 3 + Math.sqrt(L.n), 0, TAU);
         ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(L.yaw) * 9, y + Math.sin(L.yaw) * 9); ctx.stroke();
-      } else if (L.man) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 1.3, 0, TAU); ctx.fill(); }
+      } else if (L.man) { ctx.fillStyle = '#fff'; dot(x, y, 1.3); }
       if (L.wave) { ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 2 + L.r * .4, 0, TAU); ctx.stroke(); }
     }
     ctx.strokeStyle = css(pc); ctx.strokeRect(RX + .5, RY + .5, RS - 1, RS - 1);
@@ -739,7 +750,7 @@ function frame(now_) {
       font(12); ctx.fillStyle = '#fff';
       label(P.cool ? 'COOLDOWN' : 'HOLD SPACE / top: charge; LIT = NO BRAKES', VH - 26);
     }
-    if (P.heat > 0 && !P.wave && mode === 'run') { font(15, 1); ctx.fillStyle = '#ffb0b8'; label('UNSTABLE ' + (P.heat * 100 | 0) + '% - DOWN / bottom centre: cool', VH - 62); }
+    if (P.heat > 0 && !P.wave && mode === 'run') { font(15, 1); ctx.fillStyle = '#ffb0b8'; label('UNSTABLE ' + (P.heat * 100 | 0) + '% - brake to cool', VH - 62); }
     if (msgT && !impact) {
       font(26, 1); ctx.globalAlpha = Math.min(1, msgT); ctx.fillStyle = msgCol;
       label(msg, VH * .3); ctx.globalAlpha = 1;
@@ -748,12 +759,12 @@ function frame(now_) {
     label((timer / 60 | 0) + ':' + String((timer % 60 | 0)).padStart(2, '0'), 16);
     if (net.on) {
       font(13, 1); ctx.fillStyle = '#8fe3c8';
-      label((net.seats + ' riding') + ' - tap here / ESC: exit', 34);
+      label((net.seats + ' riding') + ' - tap / ESC: exit', 34);
       if (watching()) {
         const mine = net.me >= 0 ? leaders[net.me] : null;
         font(17, 1); ctx.fillStyle = '#ffb0b8';
         // A stone leader's burn byte carries the seconds until it rises.
-        label(mine ? 'DOWN - BACK IN ' + Math.max(1, Math.ceil(5 - (mine.gone || 0))) : 'WATCHING', VH * .28);
+        label(mine ? 'BACK IN ' + Math.max(1, Math.ceil(5 - (mine.gone || 0))) : 'WATCHING', VH * .28);
       }
     }
     if (mode === 'end' && (!victory || !impact && endT > 1.6)) {
@@ -761,7 +772,7 @@ function frame(now_) {
       font(40, 1); ctx.fillStyle = '#f3ead6';
       label(victory ? 'VICTORY' : !alive().length ? 'DRAW' : 'DEFEAT', VH * .44);
       font(17); ctx.fillStyle = '#d8d0ea';
-      if (endT > 1) label('press SPACE', VH * .66);
+      if (endT > 1) label('SPACE / tap to run', VH * .66);
     }
   }
   if (portrait) rotate();

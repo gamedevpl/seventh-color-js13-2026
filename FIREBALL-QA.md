@@ -1,3 +1,233 @@
+# Unicorn Fireball — QA F24, 2026-09-06
+
+## Brokat od nieba po ziemię
+
+9216 drobinek zamiast 900. Zapętlone opadanie od wysokości około 64 jednostek,
+z wyhamowaniem przy podłożu i ponownym wejściem z góry; zwykła kamera nie widzi
+górnej płaszczyzny emisji. To recyklingowane pole 84×84 wokół obserwowanej bandy,
+nie nieskończona fizyczna symulacja. Zachowano ograniczenie do granic areny.
+
+Rozmiar bazowy ograniczony do .025, dodatkowo maleje proporcjonalnie do
+poziomego dystansu od kamery (współczynnik .001). Bliskie płatki nie wyrastają
+w duże romby. Dziewięć tysięcy drobinek ma osiem przeplatanych grup aktualizacji
+podrywania (około 133 ms przy 60 FPS); ruch i błyski aktualizują się co klatkę.
+
+## Sprawdzenie
+
+Test brokatu: 9436 miejsc łącznie z iskrami, recykling, bufor, opadanie,
+podrywanie, refleks, pełen ośmioklatkowy cykl grup, limit wielkości przy kamerze
+oraz drobinki powyżej 50 jednostek — PASS. Workload obejmuje 600 kroków.
+
+Chrome / Apple M4 / ANGLE Metal, 119 klatek z nagrywaniem: mediana 16,7 ms,
+p95 17,6 ms, zero błędów JS, shader linked. Obejrzano niebo i horyzont po
+wypaleniu tęcz; zapisano screenshot i film w .cache/f24. Film jest bez audio.
+Nie przeprowadzono pomiaru na fizycznym telefonie.
+
+Tytuł strony przeniesiony do JS, aby współdzielić tekst z HUD-em. Pozostałe
+wpisy zachowują tytuł HTML. before/append zastępują dłuższe odpowiedniki DOM.
+Nie zachowano eksperymentu z aliasami Math, bo pogarszał kompresję.
+
+## Paczka F24
+
+Finalny ZIP: `fireball:verify` PASS (trzy uruchomienia). Produkcyjny HTML
+przeszedł shader na GPU, desktop/pion/poziom i start dotykiem bez błędów JS.
+Test opcjonalnego tytułu oraz deklaracji UTF-8 w shellu również PASS.
+
+Pięć kompresji O2: 13 334, 13 313, 13 345, 13 318, 13 330 — guard FAIL.
+Wybrany HTML ponownie spakowano Zopfli 1000: **13 313 → 13 310 bajtów**,
+bez zmiany skryptu. Finalny ZIP: **13 310 / 13 312**, zapas **2**.
+Polecenie `node tools/refine-fireball.mjs` odtwarza dodatkowy etap.
+Świeża kompresja Roadroller nie gwarantuje zmieszczenia się w limicie.
+HTML w ZIP-ie, build i play jest identyczny.
+
+SHA-256 ZIP: `0774969825bbc3d5af4b4fc31449ffb4a5b56a579c0086cf8b4712ad26fa418a`.
+
+## Poprzednia runda — F23
+
+# Unicorn Fireball — QA F23, 2026-09-06
+
+## Gęstszy brokat i spokojniejszy miks
+
+900 zamiast 400 drobnych płatków. Zachowano obrót, kierunkowy refleks,
+opadanie i podrywanie przez unicorny/tęcze, bez zwiększania rozmiaru płatków.
+Pula ma osobne 220 miejsc na iskry walki.
+
+Gain warstwy tęczy .13 → .04 (−10,2 dB), czas nuty .30 → .22 s.
+Usunięto oddzielną fanfarę zapłonu, która nakładała się przy kilku bandach.
+Wspólny StereoPanner warstwy tęczy uwzględnia położenia band względem kamery,
+zanik do 70 jednostek i wygładzenie 100 ms. Kierunki sumowane z wagami;
+normalizacja przez 2+suma wag utrzymuje pan w zakresie przy siedmiu bandach.
+To wspólna panorama stereo, nie siedem niezależnych źródeł 3D. Muzyka bazowa
+pozostaje pośrodku. Najgłośniejsze tęcze nie zwiększają gain powyżej .04.
+
+## Testy
+
+Brokat: podrywanie, powrót, recykling 1120 miejsc, odbicia i brak przepełnienia
+bufora PASS. Testy cieni, łuków i kanału lightning PASS. Motyw melodii,
+dystans, kierunek panoramy i siedem nakładających się źródeł PASS.
+
+Offline stereo, stała scena z heat=.8, dwusekundowy fragment: RMS samej muzyki
+0,01894, z tęczą 0,01973 — wzrost o 4,2%. To kontrolowany pomiar, nie gwarancja
+percepcyjnej głośności na każdych głośnikach. Izolowana warstwa przy pan ±.8:
+RMS bliższego kanału 0,006259, dalszego 0,001158. Stress miks: peak 0,7746,
+zero przesterowanych próbek. Test utrwalony w test-fireball-stereo.mjs.
+
+Chrome / Apple M4 / ANGLE Metal: zero błędów JS, shader linked, 900 płatków,
+trzy tęcze i wypalenie. Z nagrywaniem: mediana 16,7 ms, p95 17,1 ms,
+119 próbek. Nie jest to pomiar na fizycznym telefonie.
+
+Oszczędności: domyślne ratio kompresora 12:1, algebraicznie równoważny shader
+solid/glow przy trybach 0/1, usunięty redundantny clamp brokatu, inset w HUD
+oraz krótszy komunikat chłodzenia (sterowanie hamowaniem nadal opisane).
+
+## Paczka F23
+
+Wybrany ZIP: `fireball:verify` PASS (trzy uruchomienia); produkcyjny HTML
+przeszedł też test shadera na GPU, desktop/pion/poziom i start dotykiem.
+
+Wybrany ZIP **13 309 / 13 312 bajtów**, zapas **3**. Próby O2:
+13 316, 13 312, 13 309, 13 321, 13 311. Wybrana paczka spełnia limit;
+guard worst-of-five nadal zwraca FAIL. Nowy pojedynczy build może go przekroczyć.
+HTML w ZIP-ie i play/unicorn-fireball.html są identyczne.
+
+SHA-256 ZIP: `b61d1e0a13b7358f1b08701e957f5c3d120ed0141b8468e077bc616145fbb6d5`.
+
+## Poprzednia runda — F22
+
+# Unicorn Fireball — QA F22, 2026-09-06
+
+## Workbench i port do gry
+
+Osobny workbench WebGL: `npm run fireball:lightning`, wynik
+`build/lightning-workbench/index.html`. Pauza, inny kanał, regulacja odstępu
+błysków oraz zatrzymany podgląd na dwóch unicornach. Workbench i gra importują
+ten sam moduł `fireball/src/lightning.js`; narzędzie nie wchodzi do ZIP-a.
+
+Kanał ma 12 nieregularnych segmentów, biały rdzeń, niebieską poświatę i trzy
+cienkie odnogi. Geometria pozostaje stała podczas 150 ms życia wyładowania;
+zmienia się jasność kolejnych błysków. Usunięto losowanie kształtu co klatkę
+oraz dodatkową dekoracyjną iskrę. To stylizacja pioruna, nie symulacja plazmy.
+Punkty końcowe są próbkowane przy powstaniu, nie podążają za unicornami przez
+te 150 ms. Nie ma przyciągania wyładowań nad stado.
+
+## Testy
+
+23 testy reguł PASS. Testy brokatu, kierunkowego refleksu, cieni, końców
+ładowania i grupowania trafień PASS. Nowy test modułu lightning: stałość
+geometrii, zmiana jasności bez zmiany kanału, końce, wygaśnięcie oraz
+60 jednoczesnych kanałów mieszczących się w powiększonym buforze — PASS.
+
+Workbench i gra w Chrome / Apple M4 / ANGLE Metal: zero błędów JS.
+Podgląd zatrzymany obejrzano na unicornach. Gra: zakręt, trzy tęcze i wypalenie;
+119 próbek z nagrywaniem, mediana 16,7 ms, p95 18,4 ms.
+
+## Paczka F22
+
+Wybrana paczka: `fireball:verify` PASS (trzy uruchomienia), a produkcyjny
+HTML przeszedł również shader na GPU, desktop/pion/poziom i start dotykiem.
+Zero błędów JS; rozmiary telefonu emulowane, bez fizycznego urządzenia.
+
+Wybrany ZIP **13 305 / 13 312 bajtów**, zapas **7**.
+Pięć kompresji O2: 13 305, 13 331, 13 306, 13 319, 13 331.
+Dwie mieszczą się w limicie. Guard worst-of-five zwrócił FAIL, mimo że
+zapisany najlepszy ZIP spełnia limit. Pojedynczy nowy build może go przekroczyć.
+HTML w wybranym ZIP-ie i play/unicorn-fireball.html są identyczne.
+
+SHA-256 ZIP: `752a98fa7885df6024414a76b0486cd43926289b20e9565b2f43d70eb9e96630`.
+
+## Poprzednia runda — F21
+
+# Unicorn Fireball — QA F21, 2026-09-06
+
+## Brokat i melodia tęczy
+
+400 płatków zamiast prototypowych 196, rozmiar bazowy .035 zamiast .07.
+Obracają się wokół osi pionowej; projekcja płatka i wąski błysk zależą od
+kąta względem kamery. Efekt odbicia jest stylizowany, bez ray tracingu.
+Drobinki opadają, okresowo wracają w powietrze, podrywają się pod kopytami
+i wirują mocniej po przejeździe tęczy. Pula recyklinguje pole 84×84 wokół
+obserwowanej bandy, pomijając pozycje poza areną; 220 miejsc na iskry walki
+pozostaje osobne. Nie dodano losowań do symulacji ani nowego draw calla.
+
+Usunięto ciągły sawtooth riser. Główny motyw otrzymał warstwę triangle oktawę
+wyżej, zsynchronizowaną z muzyką i reagującą na pobliskie ładowania/tęcze
+wszystkich band, z zanikiem do 70 jednostek. Najsilniejsze źródło ustala gain
+jednej wspólnej warstwy, więc kilka tęcz nie mnoży melodii. Zapłon gra fragment
+motywu zamiast ZIIIING. To nie jest osobny przestrzenny kanał każdej bandy.
+
+## Testy
+
+- 23 testy reguł PASS; testy łuków, cieni i grupowania trafień PASS.
+- Nowy test brokatu: podrywanie, większy zasięg tęczy, opadanie, 600 kroków
+  recyklingu, brak NaN i przekroczenia bufora; obrót kamery gasi refleks — PASS.
+- Nowy test melodii: motyw oktawę wyżej, pobliska tęcza rywala, zanik z dystansem
+  i słabsza warstwa ładowania — PASS.
+- Offline miks muzyki i warstwy tęczy, mega clasha, siedmiu zapłonów oraz ośmiu
+  par clang/thud(2): peak 0,9373, RMS 0,0926, zero przesterowanych próbek.
+- Chrome / Apple M4 / ANGLE Metal: shader linked, zero błędów JS, szarża,
+  trzy tęcze i wypalenie. Z nagrywaniem: mediana 16,7 ms, p95 17,4 ms,
+  119 próbek. Obejrzano widok po wypaleniu z drobnym brokatem.
+- Skrócona kamera daje te same macierze (tolerancja 1e-12); generator pudełek
+  zachowuje płaszczyzny, narożniki i normalne wszystkich sześciu ścian.
+  Winding może być inny; renderer nie włącza face culling.
+
+## Paczka F21
+
+`fireball:verify`: PASS, trzy uruchomienia końcowego ZIP-a. Produkcyjny HTML
+przeszedł też test GPU, desktop/pion/poziom i start dotykiem w Chrome.
+Bez błędów JS; rozmiary telefonu emulowane, bez fizycznego urządzenia.
+
+ZIP **13 275 / 13 312 bajtów**, zapas **37**. Pięć kompresji O2:
+13 294, 13 275, 13 300, 13 297, 13 294 — wszystkie mieszczą się w limicie.
+HTML w ZIP-ie i play/unicorn-fireball.html są identyczne.
+
+SHA-256 ZIP: `1c8a386a276c9ce809f21cf386ad1328efcf48fddb7505d41d78aeef9c1654f2`.
+
+## Poprzednia runda — F20
+
+# Unicorn Fireball — QA F20, 2026-09-06
+
+## Wyładowania, uderzenia i halo
+
+- Usunięto górny punkt wyładowań: przy każdym poziomie ładowania łuk łączy
+  dwa różne unicorny na wysokości 0,9, zamiast uciekać nad środek stada.
+- Zwykły pierwszy kontakt z podwładnym emituje teraz zdarzenie horn,
+  wcześniej odgłos dotyczył tylko liderów lub późniejszego wywrócenia.
+- Zdarzenie blast odtwarza mocniejszy szum uderzenia i opadający bas.
+  Wywrócenia w jednej klatce współdzielą jeden dźwięk; tęcza ma priorytet
+  i dwukrotny gain względem zwykłego wywrócenia.
+- Bazowa alpha halo wzrosła z .06 do .1; pulsowanie i zanik blisko kamery
+  pozostają. Nie zmieniono pozycji duszków ani reguł obrażeń.
+
+## Sprawdzenie
+
+23 testy reguł PASS, w tym pierwsze ogłuszenie podwładnego z feedbackiem.
+Testy rzeczywistych bloków renderera PASS: końce łuku przy pełnym ładowaniu,
+grupowanie 30 trafień tęczą do jednego mocniejszego dźwięku i cienie.
+OfflineAudioContext: miks muzyki, mega clasha, zapłonu oraz ośmiu par
+clang/thud(2): peak 0,7912, RMS 0,0650, zero próbek poza pełną skalą.
+To kontrola miksera, nie subiektywna ocena na głośnikach telefonu.
+
+Chrome / Apple M4 / ANGLE Metal: shader linked, zero błędów JS; szarża
+na zakręcie, trzy tęcze, wypalenie. Z nagrywaniem: mediana klatki 16,7 ms,
+p95 17,4 ms (119 próbek). Obejrzano obrazy szarży i trzech tęcz.
+Test przeglądarkowy wykrył i pozwolił usunąć konflikt nazwy lokalnego
+agregatora dźwięków ze stanem kamery mega clasha przed końcowym buildem.
+
+## Paczka F20
+
+`npm run fireball:verify`: PASS — trzy uruchomienia końcowego ZIP-a.
+Produkcyjny HTML: shader na GPU, desktop/pion/poziom i start dotykiem PASS,
+zero błędów JS. Rozmiary telefonu emulowane, bez fizycznego urządzenia.
+
+ZIP **13 273 / 13 312 bajtów**, zapas **39**. Pięć kompresji O2:
+13 273, 13 288, 13 281, 13 292, 13 275; wszystkie mieszczą się w limicie.
+HTML w ZIP-ie, build/fireball/index.html i play/unicorn-fireball.html są identyczne.
+
+SHA-256 ZIP: `9cc20cddd0798c7039c08153414be1b0ac4d01ee868b68747ee762418e83f608`.
+
+## Poprzednia runda — F19
+
 # Unicorn Fireball — QA F19, 2026-09-06
 
 ## Żywa plazma

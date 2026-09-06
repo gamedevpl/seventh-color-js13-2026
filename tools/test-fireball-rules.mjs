@@ -316,3 +316,18 @@ test('a smaller rainbow can redirect a larger one over the edge despite braking'
   assert.equal(run(false), 0, 'the parallel course is safe without contact');
   assert.equal(run(true), 3, 'the impact pushes the committed rainbow outside');
 });
+
+test('first follower horn contact emits feedback before knockdown', () => {
+  const [A, B] = duel();
+  for (const L of [A, B]) Object.assign(L, { wave: 0, charge: 0, chg: 0, x: L === A ? -20 : 20 });
+  followers(A, 1); followers(B, 1);
+  const a = units.find(u => u !== A && u.lead === A.lead);
+  const b = units.find(u => u !== B && u.lead === B.lead);
+  Object.assign(a, { x: 0, z: 0, daze: 0, hit: 0 });
+  Object.assign(b, { x: 1, z: 0, daze: 0, hit: 0 });
+  events.length = 0;
+  step(0, {});
+  assert.equal(events.filter(e => e.k === 'horn').length, 1);
+  assert.equal(events.filter(e => e.k === 'knock').length, 0);
+  assert.ok(a.daze || b.daze);
+});

@@ -1,5 +1,21 @@
 # UNICORN FIREBALL — the fourth entry
 
+## F25 — rainbow drive and arch (2026-09-06)
+
+Horn and body contacts share a softer A-octave impact instead of metallic
+squeals. Rising pentatonic bells restore charging feedback. Local charge
+progressively accelerates the existing motif from 132 to 155.76 BPM; the lit
+state adds stronger kick, bass and octave lead. Rival melody keeps its
+attenuated stereo bus. Charging bells stop at ignition.
+
+The rainbow arch is taller (vertical scale .85 → 1.1), with an age-tapered,
+rounded tail and the existing narrow leader tip. Unicorn positions are
+unchanged. To recover bytes the title uses a flat scrim, the footer omits
+the year, and the sound generator reuses a fixed-length noise buffer.
+
+Selected F25 ZIP: **13,307 / 13,312 bytes** (5 spare). The five-roll
+worst-case guard still fails: 13,322 bytes; a fresh build may exceed the limit.
+
 ## F24 — high falling glitter (2026-09-06)
 
 9216 flakes replace 900. The looping falling field reaches about 64 units

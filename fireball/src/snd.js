@@ -21,7 +21,7 @@ const BASS = [0, R, 0, 0, R, 0, 0, R, 0, 0, R, 0, 7, R, 7, 7];
 const LEAD = [12, R, 15, R, 19, R, 15, R, 12, R, 10, R, 12, R, R, R,
   17, R, 15, R, 12, R, 15, R, 19, R, 22, R, 19, R, R, R];
 // The gallop: three hits then a rest, hooves on turf.
-const GALLOP = [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0];
+
 
 function env(g, gain, t0, dur) {
   g.gain.setValueAtTime(gain, t0);
@@ -56,48 +56,45 @@ export function wake() {
   master.threshold.value = -8; // Default compressor ratio is 12:1.
   master.connect(ac.destination);
   space = ac.createStereoPanner(); space.connect(master);
-  const n = (ac.sampleRate * .4) | 0;
-  noise = ac.createBuffer(1, n, ac.sampleRate);
+  noise = ac.createBuffer(1, 16384, ac.sampleRate);
   const d = noise.getChannelData(0);
-  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 }
 export const awake = () => !!ac;
 
 // `heat` 0..1 is how much herd you have; `bare` is the title's version -
 // just the hooves in the distance and the bass, so the run arrives.
-export function music(heat, bare, magic = 0, pan = 0) {
+export function music(heat, bare, magic = 0, pan = 0, drive = 0) {
   if (!ac) return;
   space.pan.setTargetAtTime(pan, ac.currentTime, .1);
   if (nextT < ac.currentTime) nextT = ac.currentTime + .05;
   while (nextT < ac.currentTime + .16) {
     const s = step % 32, h = s % 16;
     if (h % 4 === 0) beat = 1;
-    if (GALLOP[h]) hit(nextT, .06, bare ? .05 : .09 + heat * .06, h % 4 === 2 ? 180 : 320, 1.5);
-    if (!bare && h % 4 === 2) tone(120, .12, 'triangle', .16, nextT, 40);      // the kick, on the DUM
+    if (h % 4 !== 3) hit(nextT, .06, bare ? .05 : .09 + heat * .06, h % 4 === 2 ? 180 : 320, 1.5);
+    if (!bare && h % 4 === 2) tone(120, .12, 'triangle', .16 + drive * .12, nextT, 40);      // the kick, on the DUM
     if (!bare && h % 8 === 6) hit(nextT, .09, .06, 5000, 1);                   // an off-beat hat
-    if (BASS[h] !== R) tone(NOTE(BASS[h] - 12), .2, 'square', .05, nextT);
+    if (BASS[h] !== R) tone(NOTE(BASS[h] - 12), .2, 'square', .05 + drive * .02, nextT);
     if (!bare && heat > .35 && LEAD[s] !== R) tone(NOTE(LEAD[s] + 12), .22, 'sawtooth', .01 + heat * .03, nextT);
-    if (!bare && magic && LEAD[s] !== R) tone(NOTE(LEAD[s] + 24), .22, 'triangle', magic * .04, nextT, -1);
-    nextT += STEP; step++;
+    if (!bare && magic && LEAD[s] !== R) tone(NOTE(LEAD[s] + 24), .22, 'triangle', magic * (.04 + drive * .03), nextT, -1);
+    if (drive && drive < 1) join(5 + (drive * 5 | 0), nextT);
+    nextT += STEP / (1 + drive * .18); step++;
   }
 }
 
 // --- the noises the game makes -------------------------------------------
 const t0 = () => ac.currentTime;
 // A unicorn joining: one bell, climbing the pentatonic with the herd.
-export function join(n) {
+export function join(n, time) {
   if (!ac) return;
-  tone(NOTE(12 + [0, 2, 4, 7, 9][n % 5] + 12 * ((n / 5) | 0 & 1)), .3, 'triangle', .06, t0());
+  tone(NOTE(12 + [0, 2, 4, 7, 9][n % 5] + 12 * ((n / 5) | 0 & 1)), .3, 'triangle', .06, time ?? t0());
 }
-// A horn clash: metal on metal, bright and short.
-export function clang() {
-  if (!ac) return;
-  hit(t0(), .08, .18, 3200, 3); tone(2100, .12, 'square', .03, t0(), 1700);
-}
+// Horns use a lighter version of the same tuned impact family.
+export function clang() { thud(.5); }
 // Body impact: broadband crack and falling bass; rainbow hits use double gain.
 export function thud(power = 1) {
   if (!ac) return;
-  hit(t0(), .18, .3 * power, 440, .8); tone(180, .2, 'triangle', .2 * power, t0(), 45);
+  hit(t0(), .12, .18 * power, 220, .8); tone(NOTE(12), .16, 'triangle', .1 * power, t0(), NOTE(0));
 }
 // The explosion. A sub boom, a wide noise burst, then the rainbow: seven
 // notes fanning up, one per colour, because a rainbow must be heard too.

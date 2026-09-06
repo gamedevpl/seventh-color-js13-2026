@@ -30,7 +30,7 @@ glc.before(wrap);
 wrap.append(glc);
 const hud = document.createElement('canvas');
 hud.width = VW; hud.height = VH;
-hud.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;touch-action:none';
+hud.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
 wrap.append(hud);
 const ctx = hud.getContext('2d');
 const label = (text, y, x = VW / 2) => ctx.fillText(text, x, y);
@@ -312,9 +312,9 @@ function trailVerts(dt, eye) {
   // A point on the arch of sample s: colour band c, angle index i, at the
   // band's surface. The live nose shrinks to the leader's plasma wisp.
   const pt = (s, c, i) => {
-    const th = i / ARCH * Math.PI, R = (s.wave ? .8 : s.r) * (1.05 - c * .075) * (1 + Math.sin(now() * 8 + i) * .06);
+    const th = i / ARCH * Math.PI, R = (s.wave ? .8 : s.r * Math.sqrt(1 - s.t / .9)) * (1.05 - c * .075) * (1 + Math.sin(now() * 8 + i) * .06);
     const sx = -Math.sin(s.yaw), sz = Math.cos(s.yaw);
-    return [s.x + sx * Math.cos(th) * R, .15 + Math.sin(th) * R * .85, s.z + sz * Math.cos(th) * R];
+    return [s.x + sx * Math.cos(th) * R, .15 + Math.sin(th) * R * 1.1, s.z + sz * Math.cos(th) * R];
   };
   for (const [L, tr] of TRAIL) {
     for (const s of tr.s) s.t += dt;
@@ -442,7 +442,7 @@ function frame(now_) {
         k = (L.wave ? 1 : L.charge * .4) * Math.max(0, 1 - Math.hypot(dx, dz) / 70);
       magic += k; pan += k * (dx * camR[0] + dz * camR[2]) / 30;
     }
-    music(heat, 0, Math.min(1, magic), pan / (2 + magic));
+    music(heat, 0, Math.min(1, magic), pan / (2 + magic), P.wave ? 1 : P.charge);
     const local = {
       t: turnDir(), f: held.arrowup || held.w || (tL && tR) ? 1 : 0,
       b: held.arrowdown || held.s || tB ? 1 : 0, c: button() ? 1 : 0,
@@ -664,9 +664,7 @@ function frame(now_) {
   }
   const pc = COL[P.col];
   if (mode === 'title') {
-    const sc = ctx.createLinearGradient(0, 0, 0, VH);
-    sc.addColorStop(0, 'rgba(5,4,14,.7)'); sc.addColorStop(.55, 'rgba(5,4,14,.65)'); sc.addColorStop(1, 'rgba(5,4,14,0)');
-    ctx.fillStyle = sc; ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = 'rgba(5,4,14,.6)'; ctx.fillRect(0, 0, VW, VH);
     // The title, once per colour, stacked: a rainbow made of the word.
     font(44, 1);
     RAINBOW.forEach((c, i) => { ctx.fillStyle = css(c, .9); label('UNICORN FIREBALL', 70 + (i - 3) * 2.5, VW / 2 + (3 - i) * 1.5 - beat * (3 - i)); });
@@ -690,7 +688,7 @@ function frame(now_) {
     font(14, 1); ctx.fillStyle = '#8fe3c8';
     label(net.said || 'ONLINE - tap / O', VH - 62);
     font(12); ctx.fillStyle = '#9a90b8';
-    label('@gtanczyk | gamedev.pl | 2026', VH - 4);
+    label('@gtanczyk | gamedev.pl', VH - 4);
   } else {
     // Your herd: a dot in your colour, the count, the hearts.
     ctx.textAlign = 'left';

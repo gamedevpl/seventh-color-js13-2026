@@ -1,4 +1,41 @@
-# Unicorn Fireball — QA F24, 2026-09-06
+# Unicorn Fireball — QA F25, 2026-09-06
+
+## Dźwięk i kształt tęczy
+
+Zderzenia rogów i ciał używają krótszego, łagodniejszego uderzenia w oktawie A.
+Ładowanie ma rosnące dzwonki pentatoniczne; kończą się przy zapłonie.
+Własna szarża przyspiesza istniejącą melodię z 132 do 155,76 BPM, wzmacnia
+stopę, bas i melodię oktawową. Odległe tęcze zachowują tłumienie i panoramę.
+
+Łuk tęczy podniesiono (.85 → 1.1), a stary ogon stopniowo zwężono zgodnie
+z wiekiem próbek. Czubek pozostaje przy liderze. Pozycje jednostek bez zmian.
+Oszczędności: płaskie przyciemnienie ekranu tytułowego, usunięty rok ze stopki,
+wspólny bufor szumu o stałej długości i usunięte powtórzone touch-action z HUD
+(gesty blokuje już nadrzędny body/html).
+
+## Sprawdzenie
+
+23 testy reguł gry PASS. Testy ładowania, tempa, melodii, geometrii łuku,
+cieni i plazmy PASS. Miks offline: peak 0,54087, zero obciętych próbek,
+RMS 0,05679 przy aktywnej tęczy, eksplozji i wielu zderzeniach.
+Sześciosekundowy odsłuch przejścia jazda/ładowanie/tęcza: peak 0,39758,
+zero przesterowania. Ocena charakteru brzmienia pozostaje subiektywna.
+
+Chrome / Apple M4 / ANGLE Metal: mediana 16,7 ms, p95 17,4 ms (119 klatek
+z nagrywaniem), zero błędów JS, shader linked. Obejrzano boczny profil,
+zakręt, trzy tęcze i wypalenie. Media w .cache/f25. Brak testu na fizycznym telefonie.
+
+## Paczka F25
+
+Pięć kompresji O2: 13 307, 13 314, 13 322, 13 316, 13 308.
+Guard worst-of-five FAIL; wybrany ZIP **13 307 / 13 312**, zapas **5**.
+Zopfli 1000 nie zmniejszył go dalej. Świeży build może przekroczyć limit.
+HTML w ZIP-ie, build i play identyczny. `fireball:verify` PASS (trzy
+uruchomienia ZIP). Produkcyjny Chrome / Apple M4: shader, rozmiary
+desktop/pion/poziom i start dotykiem PASS, zero błędów JS.
+SHA-256 ZIP: `564ef02079452596e61099bfbe791a682e7ded998e7dbd0193c77ecac2a03798`.
+
+## Poprzednia runda — F24
 
 ## Brokat od nieba po ziemię
 

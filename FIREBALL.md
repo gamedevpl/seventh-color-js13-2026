@@ -1,5 +1,65 @@
 # UNICORN FIREBALL — the fourth entry
 
+## F29 — approved point reflections (2026-09-06)
+
+The workbench variant is ported at its default strength of 8. Coloured
+flakes retain their size; independently phased, short reflections add a
+white point and faint halo. No star rays. Core and halo share their vertex
+writer. A regression checks parity with the workbench candidate source.
+
+Selected F29 ZIP: **13,309 / 13,312 bytes** (3 spare). Particle time is
+read once per frame; Fireball viewport uses width=device-width and omits
+the redundant explicit initial scale. Other game shells are unchanged.
+
+## Glitter workbench — reflection study (2026-09-06)
+
+`npm run fireball:glitter` builds `build/glitter-workbench/index.html`.
+Two synchronized fields compare coloured flakes and an experimental sparse
+reflection with a white point and soft halo. Controls pause, slow time,
+orbit the camera, lift flakes and adjust reflection strength. The workbench
+uses the game WebGL shader and particle field. The candidate lives in
+`tools/workbench/glitter-effect.txt`; the approved variant is included in F29. No star arms or larger underlying flakes.
+
+## F28 — rare glitter star glints (2026-09-06)
+
+Restore the coloured glitter and its broad subtle reflection. Only one in
+sixteen flakes can produce a brighter white four-point star, briefly at its
+reflection peak. The accent uses the existing particle buffer; the ordinary
+flake size and camera-distance cap stay unchanged. Rays are bounded by the
+same distance cap and reach at most .2 world units. No extra draw call.
+
+F28 selected ZIP: **13,309 / 13,312 bytes** (3 spare). The five-roll guard
+failed before CSS refinement. Fireball applies touch/overscroll suppression
+to the root html element; the repeated body selector is omitted.
+
+## F27 — crisp glitter sparkle (2026-09-06)
+
+Rotating glitter uses a narrower reflection lobe (power 16 → 64), a brighter
+peak and a lower background glow. Strong reflections turn white, then fade
+within about 200 ms at a fixed camera angle. Flake geometry, camera size cap,
+9216-particle count, falling field and lift remain unchanged.
+
+Selected F27 ZIP: **13,280 / 13,312 bytes**, 32 spare. Five-roll guard PASS.
+
+## F26 — rival recruitment and tactics (2026-09-06)
+
+Rivals prioritize available recruits within 45 units until 30 followers,
+skip dazed recruits, and brake tight collection turns instead of orbiting.
+They favor wounded opponents, stop preferentially targeting the human, and
+avoid voluntary attacks above 1.2× their size. Incoming rainbows above 1.6×
+trigger a sidestep even at close range. Physics, damage, starting populations
+and recruitment radii remain shared with the player.
+
+Across 24 fixed all-AI starts, bands reaching 20+ rose from 42 to 55; tiny
+ignitions (<5 followers) fell from 10 to 1. All matches resolved. Median
+first 20+ was 50.5 → 51.5 seconds; median match 91.5 → 128 seconds. This
+measures AI behavior, not human win rate. `tools/bench-fireball-ai.mjs`
+reproduces the current sample; optional arguments select a simulation module
+and JSON output file.
+
+F26 selected ZIP: **13,267 / 13,312 bytes** (45 spare); five-roll guard
+PASS, worst 13,296 bytes.
+
 ## F25 — rainbow drive and arch (2026-09-06)
 
 Horn and body contacts share a softer A-octave impact instead of metallic

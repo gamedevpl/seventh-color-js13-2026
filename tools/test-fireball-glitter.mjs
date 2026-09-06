@@ -2,6 +2,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 const source=readFileSync('fireball/src/main.js','utf8');
+assert.ok(source.includes(readFileSync('tools/workbench/glitter-effect.txt','utf8').trim()),'game and workbench share the approved effect');
 const start=source.indexOf('function vertexWriter('),end=source.indexOf('// --- the charge,',start);
 assert.ok(start>=0&&end>start);
 const ctx={PBUF:new Float32Array(9436*120),PMAX:220,glitterTick:0,PART:[],RAINBOW:Array(7).fill([1,1,1]),ARENA:95,units:[],time:0,eye:[0,4,-12],camR:[1,0,0],player:{x:0,z:0}};
@@ -32,7 +33,17 @@ ctx.time=0;ctx.player={x:0,z:0};
 ctx.camR=[Math.cos(220),0,Math.sin(220)];run(0);const facing=ctx.PBUF[9];
 ctx.camR=[-Math.sin(220),0,Math.cos(220)];run(0);const edgeOn=ctx.PBUF[9];
 assert.ok(facing>edgeOn*20,'rotating away from the camera extinguishes the glint');
-console.log('PASS view-dependent glitter reflections');
+ctx.camR=[Math.cos(220),0,Math.sin(220)];ctx.PART[220].col=[1,.1,0];
+let peak=0,peakTime=0;
+for(let i=0;i<360;i++){ctx.time=i/30;run(0);if(ctx.PBUF[9]>peak){peak=ctx.PBUF[9];peakTime=ctx.time;}}
+assert.ok(peak>1,'rare specular point becomes bright');
+ctx.time=peakTime;run(0);assert.ok(ctx.PBUF[7]>1,'reflection peak is white');
+const width=o=>Math.hypot(ctx.PBUF[o]-ctx.PBUF[o+10],ctx.PBUF[o+2]-ctx.PBUF[o+12]);
+assert.ok(Math.abs(width(60)/width(0)-3)<.01,'subtle halo surrounds the unchanged flake');
+assert.ok(ctx.PBUF[69]<ctx.PBUF[9]*.3,'halo stays much dimmer than point');
+ctx.time=peakTime+.4;run(0);assert.ok(ctx.PBUF[9]<peak*.5,'reflection quickly fades');
+ctx.time=0;run(0);assert.ok(ctx.PBUF[7]<.3,'ordinary glitter retains its colour');
+console.log('PASS coloured flakes, short white reflection and soft halo without star rays');
 ctx.units=[{x:0,z:0,sp:10,st:0}];ctx.player={x:0,z:0};ctx.glitterTick=0;
 for(const p of ctx.PART.slice(220,228)){p.p=[0,.08,0];p.life=0;}
 for(let i=0;i<8;i++)ctx.particleVerts(0);

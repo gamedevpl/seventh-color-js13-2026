@@ -70,11 +70,12 @@ const markup = '<canvas id=c></canvas>';
 const MOBILE = '<meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">';
 const TOUCHCSS = 'html,body{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;'
   + '-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}';
-const head = entry.mobile ? entry.canvasOnly ? MOBILE.replace(',maximum-scale=1,user-scalable=no', '').replace(',viewport-fit=cover', '') : MOBILE : '';
+let head = entry.mobile ? entry.canvasOnly ? MOBILE.replace(',maximum-scale=1,user-scalable=no', '').replace(',viewport-fit=cover', '') : MOBILE : '';
+if (game === 'fireball') head = head.replace(',initial-scale=1', '');
 const css = (entry.canvasOnly
   ? 'body{margin:0;background:#000;overflow:hidden;height:100vh;display:grid;place-items:center}canvas{display:block}'
   : 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center}')
-  + (entry.mobile ? entry.canvasOnly ? 'html,body{touch-action:none;overscroll-behavior:none}' : TOUCHCSS : '');
+  + (entry.mobile ? entry.canvasOnly ? `${game === 'fireball' ? 'html' : 'html,body'}{touch-action:none;overscroll-behavior:none}` : TOUCHCSS : '');
 
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {

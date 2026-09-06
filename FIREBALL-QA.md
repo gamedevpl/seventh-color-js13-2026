@@ -1,4 +1,105 @@
-# Unicorn Fireball — QA F25, 2026-09-06
+# Unicorn Fireball — QA F29, 2026-09-06
+
+Wariant zatwierdzony w workbenchu przeniesiony do gry z domyślną siłą 8.
+Kolorowe drobinki, nieregularny punktowy refleks i słaba poświata; brak
+ramion gwiazdek. Wspólny kod rysowania punktu i poświaty oszczędza miejsce.
+
+Test brokatu PASS: zgodność z workbenchem, krótki biały refleks, słabsza
+poświata, kolor poza błyskiem, wielkość przy kamerze, bufor, podrywanie,
+opad i recykling. Pole i liczba drobinek bez zmian.
+
+Chrome / Apple M4 / ANGLE Metal: mediana 16,7 ms, p95 17,6 ms podczas
+nagrywania gry, brak błędów JS, shader linked. Media w .cache/f30.
+
+5 prób O2 przed zmianą viewport: 13 327, 13 327, 13 339, 13 323, 13 322
+— guard FAIL. Czas cząstek odczytywany raz na klatkę. Viewport Fireball
+zostawia width=device-width, pomija jawne initial-scale=1; inne gry bez zmian.
+Po ponownym pakowaniu Zopfli: **13 309 / 13 312**, zapas 3.
+Finalny HTML ZIP/build/play identyczny. Świeży build może przekroczyć limit.
+`fireball:verify` PASS (3 uruchomienia). Produkcyjny Chrome / Apple M4:
+shader, desktop/pion/poziom i start dotykiem PASS, zero błędów JS.
+SHA-256: `4240293f9bc9b3d848ce2a5a46a48d77264b2a239387ec995c0633490e5f3390`.
+
+## Poprzednia runda — F28
+
+Przywrócony kolorowy brokat z łagodnym połyskiem; co szesnasta drobinka może
+krótko rozbłysnąć białą, czteroramienną gwiazdką. Zwykłe drobinki zachowują
+rozmiar. Promienie refleksu ogranicza ta sama odległość od kamery; maksimum
+.2 jednostki świata. Bez nowych draw calli, istniejący bufor mieści promienie.
+
+Testy brokatu: kolor zwykłej drobinki, biały refleks, promień gwiazdki,
+wygaszenie w 350 ms, recykling, opad, podrywanie, bufor i wielkość przy kamerze.
+Chrome / Apple M4 / ANGLE Metal: brak błędów JS, shader linked, mediana
+16,7 ms, p95 17,4 ms przy nagrywaniu. Obejrzano mniej białych refleksów na
+kolorowym tle. Media: .cache/f28.
+
+Paczka: 5 prób O2 przed uproszczeniem CSS: 13 325, 13 316, 13 320,
+13 326, 13 314 — guard FAIL. Zopfli: 13 313. Usunięty powtórzony selektor
+body przy touch-action/overscroll-behavior (pozostaje root html; inne gry
+bez zmian), ponowne pakowanie: **13 309 / 13 312**, zapas 3.
+Finalny HTML ZIP/build/play identyczny. Świeży build może przekroczyć limit.
+`fireball:verify` PASS (3 uruchomienia); produkcyjny Chrome / Apple M4:
+shader, desktop/pion/poziom i start dotykiem PASS, zero błędów JS.
+SHA-256: `c7a1a1fb9522dff2022fb536789a9ebe45f1365b73b98a05c9a05a11f8a88463`.
+
+## Poprzednia runda — F27
+
+Krótsze, jaśniejsze refleksy brokatu: potęga 64 zamiast 16, biały szczyt,
+niższa poświata między błyskami. Geometria, limit wielkości przy kamerze,
+9216 drobinek, opadanie i podrywanie bez zmian.
+
+Test brokatu obejmuje biały szczyt i spadek jasności poniżej 5% po 200 ms,
+obrót względem kamery, limit rozmiaru, wysoki opad, recykling i podrywanie.
+Chrome / Apple M4 / ANGLE Metal: shader linked, zero błędów JS, mediana
+16,7 ms, p95 17,2 ms podczas nagrywania. Media w .cache/f27.
+
+Paczka O2 ×5: 13 301, 13 280, 13 290, 13 295, 13 284 — guard PASS.
+Wybrany ZIP **13 280 / 13 312**, zapas 32; HTML w ZIP i play identyczny.
+`fireball:verify` PASS (3 uruchomienia), produkcyjny shader GPU, układy
+desktop/pion/poziom i start dotykiem PASS, zero błędów JS.
+SHA-256: `04fb185d51802b3ca980eb77cf0be83ffabbdac5dd211122814e569b83e5f21f`.
+
+## Poprzednia runda — F26
+
+## Rekrutacja i decyzje AI
+
+Większy obszar priorytetu zbierania (28 → 45), ignorowanie oszołomionych
+jednostek, hamowanie przy ciasnym skręcie podczas zbierania. Polowanie od
+8 zamiast 3 followersów (po 90 s możliwa desperacka walka), preferencja
+osłabionych rywali i brak mnożnika faworyzującego atak na człowieka.
+Dobrowolny atak najwyżej na 1,2× własnego stada; unik przed nadlatującą tęczą
+powyżej 1,6×, również blisko. Bez dodatkowych jednostek, życia i obrażeń AI.
+
+Test decyzji: odległy neutralny, pomijanie daze, wybór rannego przeciwnika,
+unikanie przewagi liczebnej i bliski unik — PASS. Sześć izolowanych układów
+rekrutów: każde AI zebrało 20+ w 45 s. 23 regresje reguł gry PASS.
+
+24 identyczne seedy, wszyscy gracze sterowani przez AI, limit 420 s:
+
+| Miara | Przed | Po |
+| --- | ---: | ---: |
+| Bandy osiągające 20+ | 42 | 55 |
+| Mecze z bandą 30+ | 23/24 | 24/24 |
+| Szarże z <5 followersów | 10 | 1 |
+| Mediana pierwszego 20+ | 50,5 s | 51,5 s |
+| Mediana długości meczu | 91,5 s | 128 s |
+| Rozstrzygnięte mecze | 24/24 | 24/24 |
+| Upadki liderów za arenę | 1 | 2 |
+
+Pierwszy wynik 20+ nie pojawia się szybciej, lecz więcej band go osiąga.
+Dłuższe rundy są kompromisem ostrożniejszej walki. To nie jest test win-rate
+człowieka. Wyniki w .cache/f26/{before24,final}.json; powtarzalny harness
+`node tools/bench-fireball-ai.mjs`. Początkowe zbyt pasywne warianty odrzucono.
+
+## Paczka F26
+
+Kompresja O2 ×5: 13 267, 13 268, 13 293, 13 296, 13 271 — guard PASS.
+Finalny ZIP: **13 267 / 13 312**, zapas **45**. HTML w ZIP i play identyczny.
+`fireball:verify` PASS (3 uruchomienia). Produkcyjny Chrome / Apple M4 /
+ANGLE Metal: shader, desktop/pion/poziom i start dotykiem PASS, zero błędów JS.
+SHA-256 ZIP: `a7ec52e30906fed363fef537b95883d8715125a1d4e33e0063814b58d745e539`.
+
+## Poprzednia runda — F25
 
 ## Dźwięk i kształt tęczy
 

@@ -215,8 +215,7 @@ function clash(A, B) {
 // on a weaker herd - horns first, and a long straight run at it is worth a
 // charge. FLEE runs from a stronger one. ANSWER is the reply to a rainbow
 // coming this way: charge to meet it if we would win, otherwise sidestep.
-// Everyone gets bolder as the match wears on, so a match cannot stall into
-// seven grazing herds.
+// Finish wounded rivals to free their followers; avoid feeding larger herds.
 function think(L, dt) {
   const ai = L.ai;
   ai.t -= dt;
@@ -224,14 +223,20 @@ function think(L, dt) {
   ai.t = .25;
   let target = L.threat;
   let want, run = false;
-  // Gather first, then challenge nearby armies. As the round ages even
-  // a smaller band takes the fight. Nearby collectable kin/wilds take priority
-  // until 35 followers, except while burning or answering an incoming attack.
-  if (!target && !(L.n < 35 && !L.wave && units.some(u => u.lead < 0 && u.st === 0 && !u.daze && (u.col === L.col || u.col === WILD) && Math.hypot(u.x - L.x, u.z - L.z) < 28)) && time > 15 && (L.n >= 3 || time > 90)) {
-    let best = 100;
+  // Pick a recruit once; dazed unicorns cannot join yet. Build a viable
+  // army before hunting, including wild survivors beyond the home meadow.
+  let best = 1e9;
+  want = [meadows[L.col][0] * .5, meadows[L.col][1] * .5];
+  for (const u of units) {
+    if (u.lead >= 0 || u.st !== 0 || u.daze || u.col !== L.col && u.col !== WILD) continue;
+    const d = Math.hypot(u.x - L.x, u.z - L.z);
+    if (d < best) { best = d; want = [u.x, u.z]; }
+  }
+  if (!target && !(L.n < 30 && !L.wave && best < 45) && time > 15 && (L.n >= 8 || time > 90)) {
+    best = 100;
     for (const R of alive()) {
-      const d = Math.hypot(R.x - L.x, R.z - L.z) * (R.ai ? 1 : .6);
-      if (R !== L && d < best && R.n + 1 < (L.n + 1) * (1 + Math.min(1, time / 90))) { target = R; best = d; }
+      const d = Math.hypot(R.x - L.x, R.z - L.z) * R.hearts / 3;
+      if (R !== L && d < best && R.n <= L.n * 1.2) { target = R; best = d; }
     }
   }
   if (target) {
@@ -241,17 +246,9 @@ function think(L, dt) {
     const err = Math.abs(wrapA(Math.atan2(want[1] - L.z, want[0] - L.x) - L.yaw));
     // Start the close-range answer before mutual pursuit settles into an orbit.
     run = d < 30 || d < 70 && (L.charge ? err < 1.5 : err < .35);
-    // A hopelessly outnumbered herd dodges an incoming rainbow.
-    if (target === L.threat && target.n > (L.n + 1) * 2 && d > 30) {
+    // An outnumbered herd dodges an incoming rainbow, even at close range.
+    if (target === L.threat && target.n > (L.n + 1) * 1.6) {
       want = [L.x - (L.z - target.z) * 2, L.z + (L.x - target.x) * 2]; run = false;
-    }
-  } else {
-    let best = 1e9;
-    want = [meadows[L.col][0] * .5, meadows[L.col][1] * .5];
-    for (const u of units) {
-      if (u.lead >= 0 || u.st !== 0 || u.col !== L.col && u.col !== WILD) continue;
-      const d = Math.hypot(u.x - L.x, u.z - L.z) - (u.col === WILD ? 6 : 0);
-      if (d < best) { best = d; want = [u.x, u.z]; }
     }
   }
   // A size-scaled but bounded lookahead leaves big armies room to ignite.
@@ -300,9 +297,12 @@ export function step(dt, input) {
     let turn = 0, want = 11;
     if (L.ai) {
       const g = L.ai.goal;
-      if (g) turn = Math.max(-1, Math.min(1, wrapA(Math.atan2(g[1] - L.z, g[0] - L.x) - L.yaw) * 3));
-      // A rival hunting, fleeing or dodging sprints, as the player can.
-      if (L.ai.sprint) want = 15;
+      if (g) {
+        const err = wrapA(Math.atan2(g[1] - L.z, g[0] - L.x) - L.yaw);
+        turn = Math.max(-1, Math.min(1, err * 3));
+        // Brake into tight turns instead of orbiting an uncollected recruit.
+        want = L.ai.sprint ? 15 : 11 * Math.max(.2, Math.cos(err));
+      }
     } else if (L.in) { turn = L.in.t; want = L.in.b ? 0 : L.in.f ? 15 : 11; }
     if (L.in && L.in.b) charge(L, 0);
     const unstable = !over && L.n >= 35 && !edgeDanger(L) && !(L.in && L.in.b);

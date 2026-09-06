@@ -705,39 +705,16 @@ function frame(now_) {
     ctx.textAlign = 'right'; font(14, 1);
     leaders.filter((L) => L !== P).sort((a, b) => b.n - a.n).forEach((L, i) => {
       const y = 22 + i * 20, dead = L.st === 3;
-      ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); dot(VW - 100, y, 6);
-      if (L.man) { ctx.fillStyle = '#fff'; dot(VW - 100, y, 2.5); }
+      ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); dot(VW - 18, y, 6);
+      if (L.man) { ctx.fillStyle = '#fff'; dot(VW - 18, y, 2.5); }
       ctx.fillStyle = dead ? '#666' : '#e8e0f4';
-      label(dead ? '-' : L.n + (L.wave ? ' ~' : L.chg ? ' !' : ''), y, VW - 112);
+      label(dead ? '-' : L.n + (L.wave ? ' ~' : L.chg ? ' !' : ''), y, VW - 30);
       // Its hearts, but only once it has lost one. Three hearts beside
       // every rival is a wall of pink that says nothing; the row you want
       // to find is the one that is DOWN to one, and it only reads as an
       // alarm if the quiet rows next to it are quiet.
-      if (!dead && L.hearts < 3) { ctx.fillStyle = '#ff6b8a'; font(10); label('♥'.repeat(L.hearts), y, VW - 150); font(14, 1); }
+      if (!dead && L.hearts < 3) { ctx.fillStyle = '#ff6b8a'; font(10); label('♥'.repeat(L.hearts), y, VW - 68); font(14, 1); }
     });
-    // The radar: the whole plain in a square, one dot a herd, sized by it,
-    // ringed when it is lit and pipped when a person is riding it. It used
-    // to plot all seventy-seven unicorns, which at this size is a texture
-    // rather than information - what you need to find is a herd behind you.
-    const RX = VW - 78, RY = 10, RS = 68;
-    ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(RX, RY, RS, RS);
-    // Recovery targets: only unclaimed kin, kept smaller than herd markers.
-    for (const u of units) if (u.st === 0 && u.lead < 0 && (u.col === P.col || u.col === WILD)) {
-      ctx.fillStyle = css(COL[u.col]);
-      ctx.fillRect(RX + (u.x / ARENA + 1) * RS / 2, RY + (u.z / ARENA + 1) * RS / 2, 1, 1);
-    }
-    for (const L of leaders) {
-      if (L.st === 3) continue;
-      const x = RX + (L.cx / ARENA + 1) * RS / 2, y = RY + (L.cz / ARENA + 1) * RS / 2;
-      ctx.fillStyle = css(COL[L.col]);
-      dot(x, y, 1.6 + Math.sqrt(L.n) * .8);
-      if (L === P) {
-        ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 3 + Math.sqrt(L.n), 0, TAU);
-        ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(L.yaw) * 9, y + Math.sin(L.yaw) * 9); ctx.stroke();
-      } else if (L.man) { ctx.fillStyle = '#fff'; dot(x, y, 1.3); }
-      if (L.wave) { ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 2 + L.r * .4, 0, TAU); ctx.stroke(); }
-    }
-    ctx.strokeStyle = css(pc); ctx.strokeRect(RX + .5, RY + .5, RS - 1, RS - 1);
     ctx.textAlign = 'center';
     // The charge bar: how far the charge is from igniting, then how much
     // rainbow is left to burn.

@@ -1,5 +1,11 @@
 # UNICORN FIREBALL — the fourth entry
 
+## F30 — arena focus (2026-09-06)
+
+Remove the minimap. The rival list moves 82 logical pixels to the right;
+colour markers leave a 12-pixel margin from the edge. Counts, online rider
+markers and damaged hearts move together. No replacement navigation HUD.
+
 ## F29 — approved point reflections (2026-09-06)
 
 The workbench variant is ported at its default strength of 8. Coloured

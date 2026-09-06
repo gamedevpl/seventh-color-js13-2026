@@ -1,4 +1,15 @@
-# Unicorn Fireball — QA F29, 2026-09-06
+# Unicorn Fireball — QA F30, 2026-09-06
+
+Minimapa usunięta; lista band, liczebności, oznaczenia graczy online i serca
+przesunięte razem o 82 piksele logiczne w prawo. Margines kolorowego punktu
+od prawej krawędzi: 12 pikseli. Bez nowych wskaźników kierunku.
+
+Pojedynczy build O2: **13 159 / 13 312 B**, zapas **153**. HTML w ZIP i play
+identyczny. To pojedynczy pomiar, nie pięciopróbowy guard.
+Chrome GPU: obejrzany HUD 1280×720, dopasowanie pion/poziom telefonu PASS,
+zero błędów JS. Screenshot: .cache/minimap/aligned.png.
+
+## Poprzednia runda — F29
 
 Wariant zatwierdzony w workbenchu przeniesiony do gry z domyślną siłą 8.
 Kolorowe drobinki, nieregularny punktowy refleks i słaba poświata; brak

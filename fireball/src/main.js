@@ -220,18 +220,20 @@ function vertexWriter(buf, light, bias = 0) {
 }
 function particleVerts(dt) {
   glitterTick++;
-  const put = vertexWriter(PBUF, 1.8), view = who(), t = now();
+  const put = vertexWriter(PBUF, 1.8), view = who(), t = now(), sources = units.concat(BOOMS);
   for (let i = 0; i < PMAX + 9216; i++) {
     const dust = i >= PMAX;
     let pt = PART[i];
     if (dust) {
       // A recycled world-space field: no new particles or draw calls per frame.
-      if (!pt) pt = PART[i] = { p: [i % 96 * .875 + Math.sin(i) * 2, 0, (i / 96 | 0) * .875 + Math.cos(i) * 2], life: 0, col: RAINBOW[i % 7] };
+      if (!pt) pt = PART[i] = { p: [i % 96 * .875 + Math.sin(i) * 2, 0, (i / 96 | 0) * .875 + Math.cos(i) * 2], life: 0, spin: i, col: RAINBOW[i % 7] };
       for (const j of [0, 2]) pt.p[j] -= Math.floor((pt.p[j] - view[j ? 'z' : 'x'] + 42) / 84) * 84;
       pt.life *= Math.exp(-dt * 2);
-      if ((i + glitterTick) % 8 === 0) for (const u of units) if (u.st === 0) {
-        const r = u.wave ? u.r + 4 : 3;
-        pt.life = Math.max(pt.life, (1 - Math.hypot(u.x - pt.p[0], u.z - pt.p[2]) / r) * u.sp / 10);
+      if ((i + glitterTick) % 8 === 0) for (const u of sources) if (u.st === 0 || u.pw) {
+        const r = u.pw ? 8 + Math.sqrt(u.pw) * 3 : u.wave ? u.r + 4 : 3,
+          dx = pt.p[0] - u.x, dz = pt.p[2] - u.z,
+          k = (1 - Math.hypot(dx, dz, pt.p[1]) / r) * (u.pw ? (1 - u.t / 1.6) * 6 : u.sp / 10);
+        if (k > pt.life) { pt.life = k; pt.spin = Math.atan2(dx, dz) - t * 3 + (u.pw ? 0 : Math.PI / 2); }
       }
       pt.p[1] = .08 + Math.max(0, 8 - (t * .3 + i * 1.7) % 10) ** 2 + pt.life;
     } else {
@@ -247,10 +249,10 @@ function particleVerts(dt) {
       flash = dust ? Math.max(0, Math.sin(turn * .7 + i)) ** 64 * f * 8 : 0,
       c = flash > .3 ? [1, 1, 1] : pt.col,
       sz = dust ? Math.min(.025, Math.hypot(pt.p[0] - eye[0], pt.p[2] - eye[2]) * .001) : .14 + f * .2, a = (f + flash) * .8,
-      [px, y, pz] = pt.p, sway = dust ? pt.life : 0,
-      x = px + Math.sin(t * 3 + i) * sway, z = pz + Math.cos(t * 3 + i) * sway;
+      [px, y, pz] = pt.p, sway = dust ? pt.life : 0, angle = dust ? t * 3 + pt.spin : 0,
+      x = px + Math.sin(angle) * sway, z = pz + Math.cos(angle) * sway;
     for (let glow = 0; glow < (flash > .1 ? 2 : 1); glow++) {
-      const r = sz * (glow ? 3 : 1), alpha = glow ? flash * .18 : a;
+      const r = sz * (glow ? 3 : 1), alpha = glow ? flash * .25 : a;
       for (const sign of [-1, 1]) {
         put(x - r * nx, y, z - r * nz, c, alpha); put(x + r * nx, y, z + r * nz, c, alpha); put(x, y + sign * sz * (glow ? 3 : 2.6), z, c, 0);
       }

@@ -1,5 +1,19 @@
 # UNICORN FIREBALL — the fourth entry
 
+## F31 — glitter vortices and glow (2026-09-06)
+
+Sparkle halo gain rises from .18 to .25; core geometry and flake size are
+unchanged. The strongest nearby moving unit sets a tangential swirl; lit
+herds affect a wider radius. Explosions push flakes radially outward before
+their displacement rotates and decays. Distance includes height, so hooves
+do not disturb high dust. This is a bounded visual displacement field, not
+fluid simulation; it reuses staggered updates, the particle pool and draw.
+
+The workbench includes an explosion button and the same vortex field.
+
+F31 selected ZIP: **13,225 / 13,312 bytes**, 87 spare. All five O2 builds
+fit; worst result 13,237 bytes.
+
 ## F30 — arena focus (2026-09-06)
 
 Remove the minimap. The rival list moves 82 logical pixels to the right;

@@ -1,4 +1,29 @@
-# Unicorn Fireball — QA F30, 2026-09-06
+# Unicorn Fireball — QA F31, 2026-09-06
+
+Poświata refleksu .18 → .25. Tangencjalne zawirowania przy biegnących
+unicornach, większy obszar dla tęcz. Eksplozje najpierw odsuwają brokat
+radialnie; pozostałe przesunięcie obraca się i zanika. Najsilniejszy lokalny
+wpływ wygrywa, bez sumowania nieograniczonych sił. Dystans uwzględnia wysokość.
+To efekt wizualny na istniejącym polu, nie symulacja płynu.
+
+Testy brokatu PASS: refleks, poświata, małe płatki przy kamerze, bufor,
+opad, recykling, pełny cykl grup aktualizacji, tangencjalny wir od kopyt,
+radialny impuls eksplozji i obrotowy zanik. Kopyta nie ruszają brokatu na wysokości 50
+jednostek świata. Kod refleksu zgodny z workbenchem.
+
+Chrome / Apple M4 / ANGLE Metal: zero błędów JS, shader linked, mediana
+16,7 ms, p95 17,6 ms podczas nagrywania przejazdu tęcz i eksplozji.
+Media: .cache/f31. Workbench zyskał przycisk Eksplozja.
+
+Kompresja O2 ×5: 13 227, 13 228, 13 237, 13 234, 13 225 — guard PASS.
+Finalny ZIP: **13 225 / 13 312**, zapas **87**.
+`fireball:verify` PASS (3 uruchomienia). Produkcyjny Chrome / Apple M4:
+shader, desktop/pion/poziom i start dotykiem PASS, zero błędów JS. HTML ZIP/build/play oraz
+.cache/minimap/without-map.html identyczny. Workbench: A/B, pauza, obrót,
+podrywanie i eksplozja przeszły test Chrome GPU bez błędów JS/GL.
+SHA-256: `b5b1c07f7bfc3dfac812028ff68edcee2a8c816a2a01fa86baeda8db3d804f74`.
+
+## Poprzednia runda — F30
 
 Minimapa usunięta; lista band, liczebności, oznaczenia graczy online i serca
 przesunięte razem o 82 piksele logiczne w prawo. Margines kolorowego punktu

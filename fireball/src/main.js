@@ -468,15 +468,15 @@ function frame(now_) {
       victory = won(0);
       mode = 'end'; endT = 0;
       if (!victory) impact = null;
-      // And the rainbows go out with the run, so nothing is still being
-      // ridden by nobody.
-      for (const L of leaders) { L.wave = 0; L.chg = 0; L.charge = 0; }
+      // Stop decisions, but let existing motion, rainbows and debris settle.
+      for (const L of leaders) { L.ai = null; L.in = { b: 1, t: 0 }; }
     }
   } else {
     endT += dt;
     music(.2, 1);
-    // Keep the finished world still; rivals do not play on after game over.
-    if (doAct && endT > 1) { newRun(1); mode = 'title'; }
+    // Continue the aftermath with combat disabled and the result latched.
+    step(dt, { over: 2 });
+    if (doAct && endT > 1.6) { newRun(1); mode = 'title'; }
   }
   msgT = Math.max(0, msgT - dt);
   shake = Math.max(0, shake - dt * 2.5);
@@ -749,7 +749,7 @@ function frame(now_) {
         label(mine ? 'BACK IN ' + Math.max(1, Math.ceil(5 - (mine.gone || 0))) : 'WATCHING', VH * .28);
       }
     }
-    if (mode === 'end' && (!victory || !impact && endT > 1.6)) {
+    if (mode === 'end' && !impact && endT > 1.6) {
       ctx.fillStyle = 'rgba(5,4,14,.6)'; ctx.fillRect(0, VH * .3, VW, VH * .42);
       font(40, 1); ctx.fillStyle = '#f3ead6';
       label(victory ? 'VICTORY' : !alive().length ? 'DRAW' : 'DEFEAT', VH * .44);

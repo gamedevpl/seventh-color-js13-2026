@@ -331,3 +331,18 @@ test('first follower horn contact emits feedback before knockdown', () => {
   assert.equal(events.filter(e => e.k === 'knock').length, 0);
   assert.ok(a.daze || b.daze);
 });
+
+test('aftermath advances motion and burnout without further combat', () => {
+  const [A,B]=duel();
+  for(const L of [A,B])L.in={b:1,t:0};
+  const q=units.find(u=>!u.hearts);
+  Object.assign(q,{st:1,lead:-1,x:0,z:5,y:2,vy:5,vx:3,vz:0,daze:5});
+  step(.1,{over:2});
+  assert.ok(q.y>2&&q.x>0,'last-hit debris continues moving');
+  assert.ok(A.wave&&B.wave,'existing rainbows are not extinguished at result');
+  assert.deepEqual([A.hearts,B.hearts],[3,3]);
+  assert.ok(!events.some(e=>e.k==='hurt'||e.k==='boom'));
+  for(let i=0;i<180;i++){step(1/30,{over:2});events.length=0;}
+  assert.equal(A.wave,0);assert.equal(B.wave,0);
+  assert.deepEqual([A.hearts,B.hearts],[3,3]);
+});

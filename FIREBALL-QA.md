@@ -1,4 +1,24 @@
-# Unicorn Fireball — QA F31, 2026-09-06
+# Unicorn Fireball — QA F32, 2026-09-06
+
+Po wyniku fizyka działa dalej w trybie over:2. AI wyłączone, zwykłe bandy
+hamują, aktywne tęcze wypalają się normalnie. Bez nowych obrażeń od rogów,
+zderzeń tęcz i wypadnięć za arenę. Wynik pozostaje zatrzaśnięty. Komunikat
+wygranej/porażki i możliwość restartu opóźnione o co najmniej 1,6 s symulacji;
+komunikat czeka też na koniec aktywnego impact-shotu.
+
+24 regresje symulacji PASS, w tym lot ostatnio trafionej jednostki, utrzymanie
+aktywnej tęczy, burnout i blokada dalszych obrażeń. Test Chrome końca rundy
+PASS: naturalne dobicie ostatniego lidera, ruch rozrzuconego unicorna po
+victory, restart guard, stabilny wynik po 6 s oraz porażka bez dalszej walki
+AI. Zero błędów JS. Film i obrazy: .cache/fireball-aftermath.
+
+Kompresja O2 ×5: 13 238, 13 234, 13 237, 13 235, 13 229 — guard PASS.
+Finalny ZIP **13 229 / 13 312**, zapas **83**. HTML w ZIP/build/play zgodny.
+`fireball:verify` PASS (3 uruchomienia); produkcyjny Chrome / Apple M4:
+shader, układy desktop/pion/poziom i start dotykiem PASS, zero błędów JS.
+SHA-256: `1b15965d27cad21a2b0d7322edb59645bb23237ff22d5e63eae7961cc154386a`.
+
+## Poprzednia runda — F31
 
 Poświata refleksu .18 → .25. Tangencjalne zawirowania przy biegnących
 unicornach, większy obszar dla tęcz. Eksplozje najpierw odsuwają brokat

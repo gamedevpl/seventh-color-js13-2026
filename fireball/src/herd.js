@@ -428,7 +428,7 @@ export function step(dt, input) {
       if (Math.abs(dx) > 1.3 || Math.abs(dz) > 1.3) continue;
       const d = Math.hypot(dx, dz) || .01, push = (1.3 - d) / d * 14 * dt;
       a.vx -= dx * push; a.vz -= dz * push; b.vx += dx * push; b.vz += dz * push;
-      if (a.lead < 0 || b.lead < 0 || a.lead === b.lead || a.hit || b.hit) continue;
+      if (over === 2 || a.lead < 0 || b.lead < 0 || a.lead === b.lead || a.hit || b.hit) continue;
       const ma = mom(a), mb = mom(b);
       const [win, lose] = ma === mb ? (rnd() < .5 ? [a, b] : [b, a]) : ma > mb ? [a, b] : [b, a];
       a.hit = b.hit = .4;
@@ -479,6 +479,7 @@ export function step(dt, input) {
     if (sp > .5 && !u.hearts) u.yaw = lerp(u.yaw, u.yaw + wrapA(Math.atan2(u.vz, u.vx) - u.yaw), dt * 8);
   }
 
+  if (over === 2) return; // The result is final; only existing motion plays out.
   // The rainbows. Everything under one is thrown; two that meet explode.
   for (const L of leaders) {
     if (!L.wave || L.st !== 0) continue;

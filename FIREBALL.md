@@ -1,5 +1,20 @@
 # UNICORN FIREBALL — the fourth entry
 
+## F32 — animated aftermath (2026-09-06)
+
+Victory/defeat latches the result, disables AI and applies braking. Existing
+rainbows retain momentum until natural burnout; tossed units, debris and
+ambient effects continue updating. The dedicated `over: 2` mode disables
+new horn/rainbow damage and edge deaths while preserving separation and
+motion. Title/online behavior keeps its previous simulation mode.
+
+Both result overlays wait at least 1.6 simulated seconds and until an active
+impact shot ends. Restart cannot interrupt the first 1.6 seconds. Defeat
+stays on the player's scene and does not start a spectator battle.
+
+F32 ZIP: **13,229 / 13,312 bytes**, 83 spare. Five O2 builds fit; worst
+13,238 bytes.
+
 ## F31 — glitter vortices and glow (2026-09-06)
 
 Sparkle halo gain rises from .18 to .25; core geometry and flake size are

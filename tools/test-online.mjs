@@ -107,11 +107,12 @@ check('...and does not turn the host\'s', turn(other) < turn(seat), `host seat $
 // And the guest's own screen must show it: a client is told states, and
 // paints the charge back out of them.
 await guest.keyboard.down('Space');
-await guest.waitForFunction(s => FB.leaders[s].charge > .2 || FB.leaders[s].wave, seat);
-const lit = await guest.evaluate((s) => {
+// Capture the qualifying frame itself: a following snapshot may reconcile
+// an optimistic charge before a separate evaluate call reads it.
+const lit = await (await guest.waitForFunction((s) => {
   const L = FB.leaders[s];
-  return { charge: L.charge, wave: L.wave, st: L.st, hearts: L.hearts, cool: L.cool };
-}, seat);
+  return (L.charge > .2 || L.wave) && { charge: L.charge, wave: L.wave, st: L.st, hearts: L.hearts, cool: L.cool };
+}, seat)).jsonValue();
 await guest.keyboard.up('Space');
 check('...and the guest sees its own herd light up', lit.charge > .2 || lit.wave > 0,
   `charge ${lit.charge.toFixed(2)} (st ${lit.st}, hearts ${lit.hearts}, cool ${lit.cool.toFixed(1)})`);

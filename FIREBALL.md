@@ -1141,6 +1141,21 @@ rule - a slot is a person once a phone lands on it or its keys are
 touched, and a keyboard seat left alone goes back to the bots - was being
 written again in every party game.
 
+## Client movement anticipation
+
+Guests apply their own steering, charge presentation and a short movement step
+immediately after snapshot reconciliation. The standing herd moves together,
+using the same `move` kinematics as the host, including rainbow turn inertia.
+Incoming positions and headings continuously correct that anticipation; host
+snapshots decide ignition, hits, herd ownership, stun and death. Anticipation
+stops after 0.5 seconds without a snapshot. The v2 packet layout is unchanged.
+
+`node tools/test-fireball-prediction.mjs` runs two browsers with 100 ms delay in
+each direction and checks input-to-visible-turn time, convergence after release
+and death overriding held input. Local measurements were about 14–17 ms running
+and 55–61 ms in a rainbow. `node --test tools/test-fireball-prediction-rules.mjs`
+checks state authority and stale-packet behavior without rendering.
+
 ## Milestone log
 
 Solo results now retain the fastest victory as `ufTime` in local storage.
@@ -1148,8 +1163,8 @@ The clock uses elapsed seconds and stops at the result; defeat and online play
 cannot improve the record. Blocked storage does not prevent playing.
 
 The production build uses the saved Roadroller 2.1 profile in `fireball/entry.json`
-instead of running stochastic optimization again. Five builds produced 13,268 B
-each, including the solo record (44 B below the limit). The profile's 256 MB
+instead of running stochastic optimization again. Five builds produced 13,309 B
+each, including the solo record and client anticipation (3 B below the limit). The profile's 256 MB
 budget yields about 195 MB of decoder arrays. `allowFreeVars` saves decoder bytes
 and is appropriate only for this standalone page: game code is bundled in an
 IIFE and accesses the canvas with `getElementById`, not the global `c` that the

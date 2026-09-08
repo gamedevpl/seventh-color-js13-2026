@@ -472,7 +472,7 @@ function frame(now_) {
       b: held.arrowdown || held.s || tB ? 1 : 0, c: button() ? 1 : 0,
     };
     // Offline this is always ours. Online it is ours only while we host;
-    // otherwise the plain arrives in packets and we animate what we are told.
+    // otherwise snapshots reconcile the world and we anticipate local movement.
     const mine = netTick(realDt, local);
     if (net.news) { say(net.news.k ? 'RIDER JOINED' : 'RIDER LEFT', 2.5, css(COL[leaders[net.news.i].col])); net.news = null; }
     if (net.said !== lastSaid) { lastSaid = net.said; if (net.said) say(net.said, 3); }
@@ -480,7 +480,7 @@ function frame(now_) {
       if (!net.on) { P.in = local; charge(P, local.c); }
       // Catch up slow hosts in bounded physics steps; never slow the network clock.
       for (let left = net.on ? Math.min(.25, realDt) : dt; left > 0; left -= .05) step(Math.min(.05, left), { arena: net.on });
-    } else { ghost(Math.min(.1, realDt)); ghostSound(P); }
+    } else { ghost(Math.min(.1, realDt), local); ghostSound(P); }
     if (!net.on && (lost(0) || won(0))) {
       // Latch the result before displaying the finished world.
       victory = won(0);
@@ -714,7 +714,7 @@ function frame(now_) {
     label('< colour >', VH * .65 + 34);
     font(18, 1);
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
-    label('SPACE / tap to run', VH - 42);
+    label('SPACE/tap', VH - 42);
     font(14, 1); ctx.fillStyle = '#8fe3c8';
     label(net.said || 'ONLINE - tap / O', VH - 62);
     font(12); ctx.fillStyle = '#9a90b8';
@@ -764,7 +764,7 @@ function frame(now_) {
     label(timer.toFixed(1) + 's', 16);
     if (net.on) {
       font(13, 1); ctx.fillStyle = '#8fe3c8';
-      label((net.seats + ' riding') + ' - tap / ESC: exit', 34);
+      label((net.seats + ' riding') + ' - tap/ESC: exit', 34);
       if (watching()) {
         const mine = net.me >= 0 ? leaders[net.me] : null;
         font(17, 1); ctx.fillStyle = '#ffb0b8';
@@ -778,7 +778,7 @@ function frame(now_) {
       label(victory ? 'VICTORY' : !alive().length ? 'DRAW' : 'DEFEAT', VH * .44);
       font(17); ctx.fillStyle = '#d8d0ea';
       label('BEST ' + (best ? best.toFixed(1) + 's' : '-'), VH * .54);
-      if (endT > 1) label('SPACE / tap to run', VH * .66);
+      if (endT > 1) label('SPACE/tap', VH * .66);
     }
   }
   clearBeat();

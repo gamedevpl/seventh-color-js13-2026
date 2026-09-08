@@ -10,19 +10,20 @@
 // One client is the HOST: it alone runs the herd, and twenty times a
 // second it writes the whole plain into a packet - every unicorn's place,
 // heading and state - which everyone else eases toward and animates
-// locally. Nobody replays the simulation, so nobody can drift out of it.
+// locally. Clients only anticipate their own movement; the host still
+// owns collision, ownership, ignition and life state.
 // The people who are not host send three bytes of input instead.
 //
 // Who hosts is not negotiated. Everyone announces themselves once a
 // second, so everyone knows the same set of names, and the smallest name
 // hosts. When it leaves, the next smallest simply starts writing packets.
 
-import { units, leaders, newWorld, charge, recount, revive, lerp, wrapA } from './herd.js';
+import { units, leaders, newWorld, charge, chargeTime, move, recount, revive, lerp, wrapA } from './herd.js';
 
 const TAU = Math.PI * 2;
 const ROOM = 'wss://relay.js13kgames.com/unicorn-fireball-v2';
 const SEATS = 7;
-const JOINING = 'CONNECTING';
+const JOINING = 'JOINING';
 const ALONE = 'OFFLINE';
 const SNAP = 1 / 20;                      // state at 20 Hz, input every rendered frame
 const GONE = 3.5;                         // silence this long and you are out
@@ -37,7 +38,6 @@ export const net = {
   seats: 1,                               // people on the plain
   said: '',                               // a line for the HUD
   news: null,                             // {k, i}: a seat taken or given up
-  room: '',                               // a room other than the default
 };
 
 let ws = null, id = '', tag = 0, hello = 0;
@@ -141,7 +141,7 @@ function write() {
   for (let i = 0; i < leaders.length; i++) {
     const L = leaders[i];
     for (const n of [L.stun * 20, L.cool * 20, L.charge * 255, L.wave, (L.st === 3 ? L.gone || 0 : L.wave ? L.burn : L.heat || 0) * 20]) v.setUint8(o++, Math.min(255, n));
-    v.setUint8(o++, (L.hearts & 3) | ((L.st & 3) << 2) | (L.cool > 0 ? 16 : 0) | (L.chg ? 32 : 0) | (roster[i] ? 64 : 0));
+    v.setUint8(o++, (L.hearts & 3) | ((L.st & 3) << 2) | (L.chg ? 32 : 0) | (roster[i] ? 64 : 0));
   }
   ws.send(buf);
 }
@@ -174,7 +174,7 @@ function packet(v) {
     L.wave = v.getUint8(o++);
     L.burn = v.getUint8(o++) / 20;
     const f = v.getUint8(o++);
-    L.hearts = f & 3; L.st = (f >> 2) & 3; L.chg = f & 32 ? 1 : 0; L.man = f & 64 ? 1 : 0;
+    L.hearts = f & 3; L.st = (f >> 2) & 3; L.chg = f & 32; L.man = f & 64;
     if (L.st === 3) L.gone = L.burn;
     else if (!L.wave) L.heat = L.burn;
   }
@@ -183,7 +183,7 @@ function packet(v) {
 // --- the client's own frame ----------------------------------------------
 // Legs, tumbles and the herd's footprint are worked out here rather than
 // sent: they are the parts nobody can tell apart from the real thing.
-export function ghost(dt) {
+export function ghost(dt, local) {
   recount();
   const k = Math.min(1, dt * 14);
   for (const u of units) {
@@ -208,6 +208,17 @@ export function ghost(dt) {
   }
   // Leaders are unicorns too, so their own eased speed is the herd's.
   for (const L of leaders) L.spd = L.sp;
+  // Apply local input after reconciliation, so steering appears this frame.
+  // This bounded anticipation uses the same kinematics as the host, without
+  // replaying combat. Move standing followers with the leader to keep the
+  // ribbon connected. Stun/death and stale snapshots disable anticipation.
+  const L = leaders[net.me];
+  if (L && !L.st && !L.stun && t - tHeard < .5) {
+    L.chg = (local.c && !local.b || L.wave) && !L.cool;
+    L.charge = Math.max(0, Math.min(1, L.charge + dt * (L.chg ? 1 / chargeTime(L) : -1.5)));
+    move(L, dt, local.t, L.chg ? 11 + 26 * L.charge : local.b ? 0 : local.f ? 15 : 11);
+    for (const u of units) if (u.lead === net.me && !u.st) { u.x += L.vx * dt; u.z += L.vz * dt; }
+  }
 }
 
 // --- the tick -------------------------------------------------------------

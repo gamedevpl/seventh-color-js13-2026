@@ -91,7 +91,7 @@ export const alive = () => leaders.filter((L) => L.st !== 3);
 // ...unless a rainbow is already coming at you: an ANSWER builds twice as
 // fast. Without that the attacker always arrives before the defender has
 // lit, and two rainbows never meet - the clash exists on paper only.
-const chargeTime = (L) => (2.4 + .08 * L.n) / (1 + Math.max(0, L.n - 20) * .1) * (L.threat ? .5 : 1);
+export const chargeTime = (L) => (2.4 + .08 * L.n) / (1 + Math.max(0, L.n - 20) * .1) * (L.threat ? .5 : 1);
 export const burnTime = (L) => 2.5 + .12 * L.n;
 // Is a rainbow, or a charge about to be one, bearing down on L?
 function threatened(L) {
@@ -165,6 +165,14 @@ export function revive(L) {
     n--;
   }
   events.push({ k: 'rise', L });
+}
+
+// Shared kinematics; prediction never runs collisions or changes herd ownership.
+export function move(L, dt, turn, want) {
+  L.yaw += turn * dt * 2.6 * (1 - .4 * L.charge) / (L.wave ? 1 + Math.sqrt(L.n) * .12 : 1);
+  L.spd = lerp(L.spd, want, dt * (want > L.spd ? 1.7 : 4));
+  const tx = Math.cos(L.yaw) * L.spd, tz = Math.sin(L.yaw) * L.spd;
+  L.vx = lerp(L.vx, tx, dt * 6); L.vz = lerp(L.vz, tz, dt * 6);
 }
 
 // Release or brake cancels the run-up. Once lit, the rainbow commits
@@ -344,10 +352,7 @@ export function step(dt, input) {
     // Heavy at speed: a charging herd turns like a herd, not a bicycle -
     // and a LIT herd is heavier again the bigger it is, so the biggest
     // rainbow on the plain is also the one that cannot correct its aim.
-    L.yaw += turn * dt * 2.6 * (1 - .4 * L.charge) / (L.wave ? 1 + Math.sqrt(L.n) * .12 : 1);
-    L.spd = lerp(L.spd, want, dt * (want > L.spd ? 1.7 : 4));
-    const tx = Math.cos(L.yaw) * L.spd, tz = Math.sin(L.yaw) * L.spd;
-    L.vx = lerp(L.vx, tx, dt * 6); L.vz = lerp(L.vz, tz, dt * 6);
+    move(L, dt, turn, want);
   }
 
   for (const u of units) {

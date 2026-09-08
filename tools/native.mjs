@@ -8,6 +8,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { compactEvents } from './lib/fireball-pack.mjs';
 import { minifyJs, squeeze } from './lib/squeeze.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -48,7 +49,7 @@ const result = await build({
 const raw = result.outputFiles[0].text;
 console.log(`  esbuild bundle           ${num(raw.length)}${cheats ? '   (+dev cheats)' : ''}`);
 
-const { js: minified, stages } = await minifyJs(raw, { mangleProps: !cheats && entry.privateProps ? new RegExp('^(' + entry.privateProps.join('|') + ')$') : true });
+const { js: minified, stages } = await minifyJs(game === 'fireball' && !cheats ? compactEvents(raw) : raw, { asciiOnly: game === 'fireball', mangleProps: !cheats && entry.privateProps ? new RegExp('^(' + entry.privateProps.join('|') + ')$') : true });
 console.log(`  terser + mangle          ${num(minified.length)}`);
 
 // The dev skip must never reach a shipped build. Checked here, on the
@@ -75,13 +76,13 @@ if (game === 'fireball') head = head.replace(',initial-scale=1', '');
 const css = (entry.canvasOnly
   ? 'body{margin:0;background:#000;overflow:hidden;height:100vh;display:grid;place-items:center}canvas{display:block}'
   : 'body{margin:0;background:#0b0f14;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center}')
-  + (entry.mobile ? entry.canvasOnly ? `${game === 'fireball' ? 'html' : 'html,body'}{touch-action:none;overscroll-behavior:none}` : TOUCHCSS : '');
+  + (entry.mobile ? entry.canvasOnly ? game === 'fireball' ? '*{touch-action:none;-webkit-user-select:none;-webkit-touch-callout:none}' : 'html,body{touch-action:none;overscroll-behavior:none}' : TOUCHCSS : '');
 
 let best = null, worst = null;
 for (let i = 0; i < rolls; i++) {
   const out = await squeeze({
     js: minified, css, markup, head, title: game === 'fireball' ? '' : entry.title,
-    roadroller: !noRoadroller, level, zopfliIterations: rolls > 1 ? 15 : 200,
+    roadroller: !noRoadroller, level, zopfliIterations: game === 'fireball' ? 1000 : rolls > 1 ? 15 : 200,
   });
   console.log(`  roll ${i + 1}/${rolls}: index.zip = ${num(out.archiveBytes)}`);
   if (!best || out.archiveBytes < best.archiveBytes) best = out;

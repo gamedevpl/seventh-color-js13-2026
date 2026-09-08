@@ -12,7 +12,7 @@ import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, 
 import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
 import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, rnd, lerp, wrapA, edgeDanger, ARENA, EDGE, WILD, now, burnTime } from './herd.js';
 import { net, open as netOpen, close as netClose, tick as netTick, ghost, spy } from './net.js';
-import { wake, music, join as sJoin, clang, thud, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
+import { wake, music, spatial, join as sJoin, thud, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
 
 document.title = 'UNICORN FIREBALL';
 const VW = 640, VH = 360;
@@ -64,6 +64,8 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => { held[e.key.toLowerCase()] = false; });
 const touch = navigator.maxTouchPoints > 0;
+const chargeHint = 'HOLD ' + (touch ? 'TOP' : 'SPACE') + ': charge; LIT = NO BRAKES';
+hud.oncontextmenu = e => e.preventDefault();
 const pts = new Map();
 let tL = 0, tR = 0, tT = 0, tB = 0, tF = 0;
 const at = (e) => {
@@ -73,7 +75,7 @@ const at = (e) => {
 const scan = () => {
   tL = tR = tT = tB = tF = 0;
   let drag = 0;
-  for (const [x, y, ox, oy] of pts.values()) {
+  for (const [x, ox, oy] of pts.values()) {
     if (oy < 108) { tT = 1; continue; }
     if (oy > 305 && Math.abs(ox - VW / 2) < 60) { tB = 1; continue; }
     if (ox < VW / 2) tL = 1; else tR = 1;
@@ -84,8 +86,8 @@ const scan = () => {
     tR = drag > 8;
   }
 };
-hud.addEventListener('pointerdown', (e) => {
-  wake();
+hud.onpointerdown = (e) => {
+  e.preventDefault(); wake();
   if (innerHeight > innerWidth && !net.on) return;
   const [x, y] = at(e);
   hud.setPointerCapture(e.pointerId);
@@ -95,16 +97,14 @@ hud.addEventListener('pointerdown', (e) => {
   if (watching()) { watch += x < VW / 2 ? -1 : 1; return; }
   if (mode !== 'run') { acted = true; return; }
   if (y < 48) return;
-  pts.set(e.pointerId, [x, y, x, y]); scan();
-});
-hud.addEventListener('pointermove', (e) => {
+  pts.set(e.pointerId, [x, x, y]); scan();
+};
+hud.onpointermove = (e) => {
   const p = pts.get(e.pointerId);
-  if (p) { [p[0], p[1]] = at(e); scan(); }
-});
+  if (p) { p[0] = at(e)[0]; scan(); }
+};
 const drop = (e) => { pts.delete(e.pointerId); scan(); };
-hud.addEventListener('pointerup', drop);
-hud.addEventListener('pointercancel', drop);
-hud.addEventListener('lostpointercapture', drop);
+hud.onpointerup = hud.onpointercancel = hud.onlostpointercapture = drop;
 const clearInput = () => { for (const k in held) held[k] = false; pts.clear(); scan(); };
 addEventListener('blur', clearInput);
 addEventListener('resize', clearInput);
@@ -112,7 +112,7 @@ addEventListener('resize', clearInput);
 // so LEFT lowers the yaw. The first build had this backwards, and the probe
 // happily asserted the backwards version, because it only checked that a
 // left thumb moved the yaw, not which way.
-const turnDir = () => (held.arrowright || held.d || (tR && !tL) ? 1 : 0) - (held.arrowleft || held.a || (tL && !tR) ? 1 : 0);
+const turnDir = () => (held.arrowright || held.d || tR ? 1 : 0) - (held.arrowleft || held.a || tL ? 1 : 0);
 const button = () => held[' '] || tT;
 
 // --- the plain ------------------------------------------------------------
@@ -425,9 +425,14 @@ function ghostSound(P) {
   if (boom) explode(...boom);
 }
 
+function sound(fn, power, u) {
+  const P = who(), dx = u.x - P.x, dz = u.z - P.z;
+  spatial(fn, power, dx * camR[0] + dz * camR[2], dz * camR[0] - dx * camR[2]);
+}
+
 function explode(x, z, pw) {
   if (pw >= 62 && Math.hypot(x - who().x, z - who().z) < 35 && (mode !== 'end' || victory)) impact = { x, z, t: 2 };
-  sBoom(pw); BOOMS.push({ x, z, t: 0, pw }); boomCloud(x, z, pw);
+  sound(sBoom, pw, {x, z}); BOOMS.push({ x, z, t: 0, pw }); boomCloud(x, z, pw);
   burst([x, 1.5, z], 120, 9 + pw * .4); shake = 1; flash = .4;
 }
 
@@ -436,7 +441,7 @@ let last = 0, lastPick = 0, lastSaid = '';
 function rotate() {
   ctx.fillStyle = '#0b0f14'; ctx.fillRect(0, 0, VW, VH);
   font(32, 1); ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
-  label('Rotate your phone to play', VH / 2);
+  label('Rotate', VH / 2);
 }
 function frame(now_) {
   const realDt = Math.min(.05, (now_ - last) / 1000 || 0);
@@ -499,12 +504,13 @@ function frame(now_) {
   flash = Math.max(0, flash - dt * 2);
 
   // Events into sound and sparks.
-  let impactSound = 0;
+  // Coalesce herd hits per frame; blast takes priority without drowning the music.
+  let impactSound;
   for (const e of events) {
     if (e.k === 'join') { if (e.L === P) sJoin(P.n); burst([e.u.x, .8, e.u.z], 6, 2, COL[e.u.col]); }
-    else if (e.k === 'knock') { impactSound = Math.max(impactSound, 1); burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
-    else if (e.k === 'horn') { clang(); burst([e.x, 1, e.z], 5, 3, [1, .9, .6]); }
-    else if (e.k === 'graze') { clang(); burst([e.x, 1.5, e.z], 40, 7); }
+    else if (e.k === 'knock') { impactSound ||= e; burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
+    else if (e.k === 'horn') { sound(thud, .5, e); burst([e.x, 1, e.z], 5, 3, [1, .9, .6]); }
+    else if (e.k === 'graze') { sound(thud, .5, e); burst([e.x, 1.5, e.z], 40, 7); }
     else if (e.k === 'ignite') {
       // The band lights: a flash, a fan of sparks the size of the herd, and
       // the upward plasma zing.
@@ -512,17 +518,17 @@ function frame(now_) {
       if (e.L === P) { say('RAINBOW!', 1.5); flash = Math.max(flash, .35); }
     }
     else if (e.k === 'spend') { burst([e.u.x, .8, e.u.z], 5, 3, COL[e.u.col]); }
-    else if (e.k === 'lost') { thud(); burst([e.u.x, .8, e.u.z], 8, 5, COL[WILD]); }
+    else if (e.k === 'lost') { sound(thud, 1, e.u); burst([e.u.x, .8, e.u.z], 8, 5, COL[WILD]); }
     else if (e.k === 'fell') {
-      sBoom(3); shake = 1;
+      sound(sBoom, 3, e.L); shake = 1;
       if (e.L === P) say('OFF THE PLAIN', 2.5);
     }
-    else if (e.k === 'blast') { impactSound = 2; burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
+    else if (e.k === 'blast') { impactSound = e; burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
     else if (e.k === 'boom') explode(e.x, e.z, e.pw);
     else if (e.k === 'hurt') { if (e.L === P) { ouch(); say(P.hearts ? 'HEART LOST' : 'HERD LOST', 2); } }
-    else if (e.k === 'dead') { if (e.L !== P) say('A RIVAL FALLS', 2.5); }
+    else if (e.k === 'dead') { if (e.L !== P) say('RIVAL LOST', 2.5); }
   }
-  if (impactSound) thud(impactSound);
+  if (impactSound) sound(thud, impactSound.k === 'blast' ? 2 : 1, impactSound);
   events.length = 0;
   for (const b of BOOMS) b.t += dt;
   while (BOOMS.length && BOOMS[0].t > 1.6) BOOMS.shift();
@@ -683,7 +689,7 @@ function frame(now_) {
     ctx.strokeRect(0, 0, VW, VH); ctx.lineWidth = 1;
     font(20, 1);
     ctx.fillStyle = (timer * 5 | 0) % 2 ? '#ff5f6e' : '#ffb0b8';
-    label(P.wave ? 'EDGE! STEER NOW' : 'EDGE! BRAKE & TURN', VH * .18);
+    label(P.wave ? 'EDGE! TURN NOW' : 'EDGE! BRAKE & TURN', VH * .18);
   }
   const pc = COL[P.col];
   if (mode === 'title') {
@@ -696,15 +702,15 @@ function frame(now_) {
     ctx.fillStyle = '#d8d0ea';
     label('gather your colour - last herd wins', 132);
     ctx.fillStyle = '#ffb0b8';
-    label(touch ? 'HOLD TOP: charge; LIT = NO BRAKES' : 'HOLD SPACE: charge; LIT = NO BRAKES', 160);
+    label(chargeHint, 160);
     font(12);
-    label(touch ? 'SIDES: steer / BOTH: sprint + drag to steer' : 'AUTO-RUN | WASD: steer / UP: sprint', 182);
+    label(touch ? 'SIDES: steer / BOTH: sprint + drag' : 'WASD: steer / UP: sprint', 182);
     label('DOWN / bottom: brake / red edge = death', 200);
     font(15, 1);
     ctx.fillStyle = css(pc);
     dot(VW / 2, VH * .65, 14);
     ctx.fillStyle = '#f3ead6';
-    label('<   your colour   >', VH * .65 + 34);
+    label('< colour >', VH * .65 + 34);
     font(18, 1);
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
     label('SPACE / tap to run', VH - 42);
@@ -743,10 +749,10 @@ function frame(now_) {
       RAINBOW.forEach((c, i) => g.addColorStop(i / 6, css(c)));
       ctx.fillStyle = g; ctx.fillRect(VW / 2 - 80, VH - 30, 160 * k, 10);
       font(12, 1); ctx.fillStyle = '#fff';
-      label(P.wave ? 'NO BRAKES - herd ' + P.n : 'CHARGE ' + (P.charge * 100 | 0) + '%', VH - 42);
+      label(P.wave ? 'NO BRAKES' : 'CHARGE ' + (P.charge * 100 | 0) + '%', VH - 42);
     } else if (P.st === 0 && (P.cool || P.n >= 2 && timer < 40)) {
       font(12); ctx.fillStyle = '#fff';
-      label(P.cool ? 'COOLDOWN' : touch ? 'HOLD TOP: charge; LIT = NO BRAKES' : 'HOLD SPACE: charge; LIT = NO BRAKES', VH - 26);
+      label(P.cool ? 'COOLDOWN' : chargeHint, VH - 26);
     }
     if (P.heat > 0 && !P.wave && mode === 'run') { font(15, 1); ctx.fillStyle = '#ffb0b8'; label('UNSTABLE ' + (P.heat * 100 | 0) + '% - brake to cool', VH - 62); }
     if (msgT && !impact) {
@@ -754,7 +760,7 @@ function frame(now_) {
       label(msg, VH * .3); ctx.globalAlpha = 1;
     }
     font(13); ctx.fillStyle = 'rgba(255,255,255,.6)';
-    label((timer / 60 | 0) + ':' + String((timer % 60 | 0)).padStart(2, '0'), 16);
+    label((timer / 60 | 0) + ':' + ('0' + (timer % 60 | 0)).slice(-2), 16);
     if (net.on) {
       font(13, 1); ctx.fillStyle = '#8fe3c8';
       label((net.seats + ' riding') + ' - tap / ESC: exit', 34);

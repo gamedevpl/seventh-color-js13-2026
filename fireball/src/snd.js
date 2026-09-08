@@ -82,6 +82,16 @@ export function music(heat, bare, magic = 0, pan = 0, drive = 0) {
   }
 }
 
+// Each event owns its panner; later events cannot move an existing tail.
+export function spatial(fn, power, x, z) {
+  if (!ac) return;
+  const bus = master, p = ac.createPanner();
+  // Default inverse-distance falloff, with an eight-world-unit reference radius.
+  p.setPosition(x / 8, 0, z / 8); p.connect(bus);
+  master = p; fn(power); master = bus;
+  setTimeout(() => p.disconnect(), 4000);
+}
+
 // --- the noises the game makes -------------------------------------------
 const t0 = () => ac.currentTime;
 // A unicorn joining: one bell, climbing the pentatonic with the herd.

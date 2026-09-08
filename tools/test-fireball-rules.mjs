@@ -229,10 +229,10 @@ test('AI collects nearby neutrals but answers an incoming rainbow', () => {
   Object.assign(B, {x: 40, z: 0, wave: 0, charge: 0, chg: 0, stun: 99});
   followers(A, 3);
   const food = units.find(u => !leaders.includes(u) && u.lead < 0);
-  Object.assign(food, {col: 7, st: 0, x: 20, z: 0});
+  Object.assign(food, {col: 7, st: 0, x: 6, z: 0});
   for (let i = 0; i < 481; i++) {
     A.x = A.z = A.vx = A.vz = 0;
-    food.x = 20; food.z = 0; food.lead = -1;
+    food.x = 6; food.z = 0; food.lead = -1;
     step(1 / 30, {});
   }
   assert.equal(A.ai.sprint, false, 'nearby food takes precedence over hunting');

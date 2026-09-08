@@ -221,6 +221,7 @@ function think(L, dt) {
   ai.t -= dt;
   if (ai.t > 0) return;
   ai.t = .25;
+  const late = alive().length < 4;
   let target = L.threat;
   let want, run = false;
   // Pick a recruit once; dazed unicorns cannot join yet. Build a viable
@@ -232,27 +233,26 @@ function think(L, dt) {
     const d = Math.hypot(u.x - L.x, u.z - L.z);
     if (d < best) { best = d; want = [u.x, u.z]; }
   }
-  if (!target && !(L.n < 30 && !L.wave && best < 45) && time > 15 && (L.n >= 8 || time > 90)) {
+  if (!target && !(L.n < 20 && !L.charge && best < (late ? 8 : 45)) && time > 12 && (L.n >= 8 || late)) {
     best = 100;
     for (const R of alive()) {
       const d = Math.hypot(R.x - L.x, R.z - L.z) * R.hearts / 3;
-      if (R !== L && d < best && R.n <= L.n * 1.2) { target = R; best = d; }
+      if (R !== L && d < best && (R.n <= L.n * 1.2 || late)) { target = R; best = d; }
     }
   }
   if (target) {
     const d = Math.hypot(target.x - L.x, target.z - L.z);
     const lead = Math.min(.8, d / 45);
     want = [target.x + target.vx * lead, target.z + target.vz * lead];
-    const err = Math.abs(wrapA(Math.atan2(want[1] - L.z, want[0] - L.x) - L.yaw));
     // Start the close-range answer before mutual pursuit settles into an orbit.
-    run = d < 30 || d < 70 && (L.charge ? err < 1.5 : err < .35);
-    // An outnumbered herd dodges an incoming rainbow, even at close range.
-    if (target === L.threat && target.n > (L.n + 1) * 1.6) {
+    run = L.charge > 0 || d < 80 && Math.cos(Math.atan2(want[1] - L.z, want[0] - L.x) - L.yaw) > .7;
+    // A heavily outnumbered herd sidesteps contact instead of ramming head-on.
+    if (target.n > (L.n + 1) * 1.6 && d < 25) {
       want = [L.x - (L.z - target.z) * 2, L.z + (L.x - target.x) * 2]; run = false;
     }
   }
   // A size-scaled but bounded lookahead leaves big armies room to ignite.
-  const look = L.wave ? 45 + Math.sqrt(L.n) * 6 : 14 + L.spd * 1.4;
+  const look = L.wave ? 45 + Math.sqrt(L.n) * 6 : 10 + L.spd * .6;
   const edge = nearEdge(L.x + Math.cos(L.yaw) * look, L.z + Math.sin(L.yaw) * look) || nearEdge(L.x, L.z);
   ai.goal = edge ? [0, 0] : want;
   ai.sprint = !!target;

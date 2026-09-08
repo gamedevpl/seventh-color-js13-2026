@@ -9,6 +9,12 @@ const code=await build({entryPoints:['fireball/src/main.js'],bundle:true,write:f
 writeFileSync(dir+'/index.html','<!doctype html><meta name="viewport" content="width=device-width"><style>body{margin:0;background:#000;overflow:hidden;height:100vh;display:grid;place-items:center}canvas{display:block}html{touch-action:none;overscroll-behavior:none}</style><canvas id=c></canvas><script>'+code.outputFiles[0].text.replace('const mine = tick(dt, local);','window.auditInput = local; const mine = net.on ? 0 : tick(dt, local);')+'</script>');
 const browser=await chromium.launch(process.argv.includes('--gpu') ? {channel:'chrome',headless:false} : {args:['--enable-unsafe-swiftshader']});
 try{
+ const desktop=await browser.newPage({viewport:{width:700,height:1000},hasTouch:false});
+ await desktop.goto('file://'+dir+'/index.html');await desktop.waitForFunction(()=>window.FB);
+ await desktop.keyboard.press('Space');await desktop.waitForFunction(()=>FB.mode==='run');
+ const desktopTime=await desktop.evaluate(()=>FB.timer);await desktop.waitForTimeout(250);
+ assert.ok(await desktop.evaluate(()=>FB.timer)>desktopTime,'tall desktop window must keep running');
+ await desktop.close();
  const p=await browser.newPage({viewport:{width:844,height:390},isMobile:true,hasTouch:true,deviceScaleFactor:3});
  const errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.addInitScript(()=>{const A=window.AudioContext;window.AudioContext=class extends A{constructor(...args){super(...args);window.auditAudio=this;}};});
@@ -47,9 +53,16 @@ try{
  await move([[160,330],[500,330]]);assert.ok(await p.evaluate(()=>FB.leaders[0].wave>0));await release();
  await p.screenshot({path:dir+'/landscape.png'});
  await p.setViewportSize({width:390,height:844});await p.waitForTimeout(100);const start=await p.evaluate(()=>FB.timer);await p.waitForTimeout(600);out.portrait={before:start,after:await p.evaluate(()=>FB.timer)};
+ await load();await touch([[450,318]]);await release();
+ assert.equal(await p.evaluate(()=>FB.mode),'run','portrait menu accepts touch');
+ const portraitBox=await p.locator('canvas').last().boundingBox();
+ assert.ok(Math.abs(portraitBox.width/portraitBox.height-16/9)<.01,'portrait retains landscape aspect');
+ await touch([[160,230],[500,230]]);assert.equal((await p.evaluate(()=>window.auditInput)).c,1,'portrait two-thumb charge');
+ assert.equal((await move([[130,230],[500,230]])).t,-1,'portrait charge steering');await release();
+ await p.screenshot({path:dir+'/portrait.png'});
  await p.setViewportSize({width:844,height:390});
  await load();await touch([[450,318]]);await release();await p.waitForTimeout(200);out.audioBefore=await p.evaluate(()=>auditAudio.state);await p.evaluate(()=>auditAudio.suspend());await touch([[100,240]]);await release();out.audioAfterTouch=await p.evaluate(()=>auditAudio.state);
  await p.evaluate(()=>{FB.net.on=1;FB.net.host=1;FB.net.me=0;});await p.setViewportSize({width:390,height:844});await touch([[160,230],[500,230]]);out.onlinePortrait=await move([[120,200],[500,230]]);assert.equal(out.onlinePortrait.c,1);assert.equal(out.onlinePortrait.t,-1);await release();await p.setViewportSize({width:844,height:390});out.onlineTopCentre=await touch([[320,25]]);await release();
- assert.equal(out.audioAfterTouch,'running');assert.equal(out.onlineTopCentre.mode,'title');assert.equal(out.portrait.before,out.portrait.after);assert.deepEqual(errors,[]);
+ assert.equal(out.audioAfterTouch,'running');assert.equal(out.onlineTopCentre.mode,'title');assert.ok(out.portrait.after>out.portrait.before,'portrait play keeps advancing');assert.deepEqual(errors,[]);
  out.errors=errors;writeFileSync(dir+'/results.json',JSON.stringify(out,null,2));console.log(JSON.stringify(out,null,2));
 }finally{await browser.close()}

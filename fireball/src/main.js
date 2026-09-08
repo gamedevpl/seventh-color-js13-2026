@@ -89,7 +89,6 @@ const scan = () => {
 };
 hud.onpointerdown = (e) => {
   e.preventDefault(); wake();
-  if (innerHeight > innerWidth && !net.on) return;
   const [x, y] = at(e);
   hud.setPointerCapture(e.pointerId);
   if (mode === 'title' && y > 280 && y < 310) { goOnline(); return; }
@@ -439,18 +438,11 @@ function explode(x, z, pw) {
 
 // --- the frame ------------------------------------------------------------
 let last = 0, lastPick = 0, lastSaid = '';
-function rotate() {
-  ctx.fillStyle = '#0b0f14'; ctx.fillRect(0, 0, VW, VH);
-  font(32, 1); ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
-  label('Rotate', VH / 2);
-}
 function frame(now_) {
   const realDt = Math.min(.05, (now_ - last) / 1000 || 0);
   if (impact) { impact.t -= realDt; if (impact.t <= 0) impact = null; }
   const dt = realDt * (impact && !net.on ? .3 : 1);
   last = now_;
-  const portrait = innerHeight > innerWidth;
-  if (portrait && !net.on) { rotate(); requestAnimationFrame(frame); return; }
   const doAct = acted; acted = false;
   timer += dt;
   if (mode === 'title' && pick !== lastPick) { lastPick = pick; newRun(1); }

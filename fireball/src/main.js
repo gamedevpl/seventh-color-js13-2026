@@ -45,8 +45,8 @@ resize();
 
 // --- input ----------------------------------------------------------------
 // Keyboard: arrows or WASD steer and sprint; hold SPACE to charge and burn,
-// Touch: sides steer, both sprint; drag either thumb to steer the sprint.
-// Top charges, bottom centre brakes. Roles stay fixed until release.
+// Touch: sides steer; both charge and drag steers. Height controls sprint/brake.
+// Side ownership stays fixed until release; height follows the fingers.
 const held = {};
 let acted = false, pick = 0;
 addEventListener('keydown', (e) => {
@@ -64,7 +64,7 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => { held[e.key.toLowerCase()] = false; });
 const touch = navigator.maxTouchPoints > 0;
-const chargeHint = 'HOLD ' + (touch ? 'TOP' : 'SPACE') + ': charge; LIT = NO BRAKES';
+const chargeHint = 'HOLD ' + (touch ? 'BOTH' : 'SPACE') + ': charge; LIT = NO BRAKES';
 hud.oncontextmenu = e => e.preventDefault();
 const pts = new Map();
 let tL = 0, tR = 0, tT = 0, tB = 0, tF = 0;
@@ -73,15 +73,16 @@ const at = (e) => {
   return [(e.clientX - r.left) / r.width * VW, (e.clientY - r.top) / r.height * VH];
 };
 const scan = () => {
-  tL = tR = tT = tB = tF = 0;
-  let drag = 0;
-  for (const [x, ox, oy] of pts.values()) {
-    if (oy < 108) { tT = 1; continue; }
-    if (oy > 305 && Math.abs(ox - VW / 2) < 60) { tB = 1; continue; }
+  tL = tR = tT = 0;
+  let drag = 0, height = 0;
+  for (const [x, y, ox] of pts.values()) {
     if (ox < VW / 2) tL = 1; else tR = 1;
-    drag += x - ox;
+    drag += x - ox; height += y;
   }
-  if (tF = tL && tR) {
+  height /= pts.size;
+  tF = height < 140; tB = height > 280;
+  if (tL && tR) {
+    tT = !tF && !tB;
     tL = drag < -8;
     tR = drag > 8;
   }
@@ -97,11 +98,11 @@ hud.onpointerdown = (e) => {
   if (watching()) { watch += x < VW / 2 ? -1 : 1; return; }
   if (mode !== 'run') { acted = true; return; }
   if (y < 48) return;
-  pts.set(e.pointerId, [x, x, y]); scan();
+  pts.set(e.pointerId, [x, y, x]); scan();
 };
 hud.onpointermove = (e) => {
   const p = pts.get(e.pointerId);
-  if (p) { p[0] = at(e)[0]; scan(); }
+  if (p) { [p[0], p[1]] = at(e); scan(); }
 };
 const drop = (e) => { pts.delete(e.pointerId); scan(); };
 hud.onpointerup = hud.onpointercancel = hud.onlostpointercapture = drop;
@@ -704,8 +705,8 @@ function frame(now_) {
     ctx.fillStyle = '#ffb0b8';
     label(chargeHint, 160);
     font(12);
-    label(touch ? 'SIDES: steer / BOTH: sprint + drag' : 'WASD: steer / UP: sprint', 182);
-    label('DOWN / bottom: brake / red edge = death', 200);
+    label(touch ? 'SIDES: steer / BOTH: charge + drag' : 'WASD: steer / UP: sprint', 182);
+    label('UP / top: sprint / DOWN / bottom: brake', 200);
     font(15, 1);
     ctx.fillStyle = css(pc);
     dot(VW / 2, VH * .65, 14);

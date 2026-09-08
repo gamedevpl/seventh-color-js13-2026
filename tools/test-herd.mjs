@@ -160,7 +160,7 @@ const edge = await page.evaluate(async () => {
 check('running off the plain eliminates the rider', edge.playerDied, `at ${edge.x},${edge.z}`);
 check('the brains keep off the edge', edge.fellCount <= edge.deaths * .25, `${edge.fellCount} of ${edge.deaths} deaths were falls`);
 
-// Sides steer; top holds charge, release cancels before ignition.
+// Sides steer; both thumbs charge, release cancels before ignition.
 const tap = async (x, y, ms, dx = 0) => {
   const box = await page.evaluate(() => { const r = document.querySelector('canvas:last-of-type').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
   await page.mouse.move(box[0] + box[2] * x, box[1] + box[3] * y);
@@ -182,9 +182,13 @@ yaw1 = await page.evaluate(() => FB.leaders[0].yaw);
 await lift();
 check('a right thumb steers right (yaw rises)', yaw1 > yaw0 + .5, `yaw ${yaw0.toFixed(2)} -> ${yaw1.toFixed(2)}`);
 await page.waitForTimeout(3500);
-lift = await tap(.5, .2, 1200);
+const touchBox = await page.locator('canvas').last().boundingBox();
+const touchSession = await page.context().newCDPSession(page);
+await touchSession.send('Input.dispatchTouchEvent', {type:'touchStart',touchPoints:[.25,.75].map((x,id)=>({x:touchBox.x+touchBox.width*x,y:touchBox.y+touchBox.height*.65,id:id+1}))});
+await page.waitForTimeout(1200);
+lift = () => touchSession.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 s = await st();
-check('a thumb below the HUD charges', s.chg === 1 && s.charge > .25, `charge ${s.charge.toFixed(2)}`);
+check('both thumbs on the sides charge', s.chg === 1 && s.charge > .25, `charge ${s.charge.toFixed(2)}`);
 await lift();
 await page.waitForTimeout(300);
 s = await st();

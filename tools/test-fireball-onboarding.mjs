@@ -17,7 +17,8 @@ try {
   assert.equal(await p.evaluate(() => FB.mode), 'run');
   const box = await p.locator('canvas').last().boundingBox();
   await p.mouse.move(box.x + box.width / 2, box.y + box.height * .95);
-  await p.mouse.down(); await p.keyboard.up('s');
+  await p.mouse.down();
+  await p.keyboard.up('s');
   await p.waitForTimeout(300);
   assert.ok(await p.evaluate(() => FB.leaders[0].in.b && FB.leaders[0].spd < .02 && !FB.leaders[0].chg));
   await p.mouse.up();

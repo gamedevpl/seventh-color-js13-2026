@@ -45,7 +45,8 @@ resize();
 
 // --- input ----------------------------------------------------------------
 // Keyboard: arrows or WASD steer and sprint; hold SPACE to charge and burn,
-// release to cancel. Touch: bottom halves steer, both sprint, top charges.
+// Touch: sides steer, both sprint; drag either thumb to steer the sprint.
+// Top charges, bottom centre brakes. Roles stay fixed until release.
 const held = {};
 let acted = false, pick = 0;
 addEventListener('keydown', (e) => {
@@ -62,37 +63,51 @@ addEventListener('keydown', (e) => {
   if (key === ' ') e.preventDefault();
 });
 addEventListener('keyup', (e) => { held[e.key.toLowerCase()] = false; });
+const touch = navigator.maxTouchPoints > 0;
 const pts = new Map();
-let tL = 0, tR = 0, tT = 0, tB = 0;
+let tL = 0, tR = 0, tT = 0, tB = 0, tF = 0;
 const at = (e) => {
   const r = hud.getBoundingClientRect();
   return [(e.clientX - r.left) / r.width * VW, (e.clientY - r.top) / r.height * VH];
 };
 const scan = () => {
-  tL = tR = tT = tB = 0;
-  for (const [x, y] of pts.values()) {
-    if (y > 305 && Math.abs(x - VW / 2) < 60) { tB = 1; continue; }
-    if (y < VH * .3) { tT = 1; continue; }
-    if (x < VW / 2) tL = 1; else tR = 1;
+  tL = tR = tT = tB = tF = 0;
+  let drag = 0;
+  for (const [x, y, ox, oy] of pts.values()) {
+    if (oy < 108) { tT = 1; continue; }
+    if (oy > 305 && Math.abs(ox - VW / 2) < 60) { tB = 1; continue; }
+    if (ox < VW / 2) tL = 1; else tR = 1;
+    drag += x - ox;
+  }
+  if (tF = tL && tR) {
+    tL = drag < -8;
+    tR = drag > 8;
   }
 };
 hud.addEventListener('pointerdown', (e) => {
-  if (innerHeight > innerWidth) return;
+  wake();
+  if (innerHeight > innerWidth && !net.on) return;
   const [x, y] = at(e);
   hud.setPointerCapture(e.pointerId);
   if (mode === 'title' && y > 280 && y < 310) { goOnline(); return; }
   if (net.on && mode === 'run' && y < 48 && x > 200 && x < 440) { goHome(); return; }
-  pts.set(e.pointerId, [x, y]); scan();
-  if (mode === 'title') { if (y > VH * .58 && y < VH * .72) { pick += x < VW / 2 ? -1 : 1; return; } }
+  if (mode === 'title' && y > 208 && y < 280) { pick += x < VW / 2 ? -1 : 1; return; }
   if (watching()) { watch += x < VW / 2 ? -1 : 1; return; }
-  if (mode !== 'run') acted = true;
+  if (mode !== 'run') { acted = true; return; }
+  if (y < 48) return;
+  pts.set(e.pointerId, [x, y, x, y]); scan();
 });
-hud.addEventListener('pointermove', (e) => { if (pts.has(e.pointerId)) { pts.set(e.pointerId, at(e)); scan(); } });
+hud.addEventListener('pointermove', (e) => {
+  const p = pts.get(e.pointerId);
+  if (p) { [p[0], p[1]] = at(e); scan(); }
+});
 const drop = (e) => { pts.delete(e.pointerId); scan(); };
 hud.addEventListener('pointerup', drop);
 hud.addEventListener('pointercancel', drop);
 hud.addEventListener('lostpointercapture', drop);
-addEventListener('blur', () => { for (const k in held) held[k] = false; pts.clear(); scan(); });
+const clearInput = () => { for (const k in held) held[k] = false; pts.clear(); scan(); };
+addEventListener('blur', clearInput);
+addEventListener('resize', clearInput);
 // Yaw grows toward +z, and +z is the RIGHT of a camera looking along +x -
 // so LEFT lowers the yaw. The first build had this backwards, and the probe
 // happily asserted the backwards version, because it only checked that a
@@ -382,6 +397,7 @@ function who() {
 }
 
 function newRun(attract) {
+  clearInput();
   newWorld(((pick % 7) + 7) % 7);
   // On the title every herd is a rival's - the plain plays itself under
   // the words, and the colour you are picking plays too.
@@ -439,7 +455,7 @@ function frame(now_) {
     music(.2, 1);
     step(dt, { over: 1 });
     if (doAct) {
-      wake(); netClose(); newRun(); mode = 'run'; say('AUTO-RUN: steer / DOWN: brake', 4);
+      wake(); netClose(); newRun(); mode = 'run'; say('AUTO-RUN / red edge = death', 4);
     }
   } else if (mode === 'run') {
     const heat = Math.min(1, P.n / 12);
@@ -451,7 +467,7 @@ function frame(now_) {
     }
     music(heat, 0, Math.min(1, magic), pan / (2 + magic), P.wave ? 1 : P.charge);
     const local = {
-      t: turnDir(), f: held.arrowup || held.w || (tL && tR) ? 1 : 0,
+      t: turnDir(), f: held.arrowup || held.w || tF ? 1 : 0,
       b: held.arrowdown || held.s || tB ? 1 : 0, c: button() ? 1 : 0,
     };
     // Offline this is always ours. Online it is ours only while we host;
@@ -680,10 +696,10 @@ function frame(now_) {
     ctx.fillStyle = '#d8d0ea';
     label('gather your colour - last herd wins', 132);
     ctx.fillStyle = '#ffb0b8';
-    label('HOLD SPACE / top: charge; LIT = NO BRAKES', 160);
+    label(touch ? 'HOLD TOP: charge; LIT = NO BRAKES' : 'HOLD SPACE: charge; LIT = NO BRAKES', 160);
     font(12);
-    label('AUTO-RUN | WASD / sides: steer | both: sprint', 182);
-    label('DOWN / bottom: brake | red edge = death', 200);
+    label(touch ? 'SIDES: steer / BOTH: sprint + drag to steer' : 'AUTO-RUN | WASD: steer / UP: sprint', 182);
+    label('DOWN / bottom: brake / red edge = death', 200);
     font(15, 1);
     ctx.fillStyle = css(pc);
     dot(VW / 2, VH * .65, 14);
@@ -730,7 +746,7 @@ function frame(now_) {
       label(P.wave ? 'NO BRAKES - herd ' + P.n : 'CHARGE ' + (P.charge * 100 | 0) + '%', VH - 42);
     } else if (P.st === 0 && (P.cool || P.n >= 2 && timer < 40)) {
       font(12); ctx.fillStyle = '#fff';
-      label(P.cool ? 'COOLDOWN' : 'HOLD SPACE / top: charge; LIT = NO BRAKES', VH - 26);
+      label(P.cool ? 'COOLDOWN' : touch ? 'HOLD TOP: charge; LIT = NO BRAKES' : 'HOLD SPACE: charge; LIT = NO BRAKES', VH - 26);
     }
     if (P.heat > 0 && !P.wave && mode === 'run') { font(15, 1); ctx.fillStyle = '#ffb0b8'; label('UNSTABLE ' + (P.heat * 100 | 0) + '% - brake to cool', VH - 62); }
     if (msgT && !impact) {
@@ -757,7 +773,6 @@ function frame(now_) {
       if (endT > 1) label('SPACE / tap to run', VH * .66);
     }
   }
-  if (portrait) rotate();
   clearBeat();
   requestAnimationFrame(frame);
 }

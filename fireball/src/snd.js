@@ -49,7 +49,7 @@ function hit(t0, dur, gain, freq, q) {
 }
 
 export function wake() {
-  if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  if (ac) { if (ac.state !== 'running') ac.resume(); return; }
   ac = new (window.AudioContext || window.webkitAudioContext)();
   // One shared compressor catches overlapping impacts without flattening quiet play.
   master = ac.createDynamicsCompressor();

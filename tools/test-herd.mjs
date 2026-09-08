@@ -160,13 +160,12 @@ const edge = await page.evaluate(async () => {
 check('running off the plain eliminates the rider', edge.playerDied, `at ${edge.x},${edge.z}`);
 check('the brains keep off the edge', edge.fellCount <= edge.deaths * .25, `${edge.fellCount} of ${edge.deaths} deaths were falls`);
 
-// Touch. The lower halves steer, the top strip is the button: a pointer
-// held there must charge, and lifting it must fire. Checked against the
-// keyboard, which the section above already proved.
-const tap = async (x, y, ms) => {
+// Sides steer; top holds charge, release cancels before ignition.
+const tap = async (x, y, ms, dx = 0) => {
   const box = await page.evaluate(() => { const r = document.querySelector('canvas:last-of-type').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
   await page.mouse.move(box[0] + box[2] * x, box[1] + box[3] * y);
   await page.mouse.down();
+  await page.mouse.move(box[0] + box[2] * (x + dx), box[1] + box[3] * y);
   await page.waitForTimeout(ms);
   return async () => { await page.mouse.up(); };
 };
@@ -183,9 +182,9 @@ yaw1 = await page.evaluate(() => FB.leaders[0].yaw);
 await lift();
 check('a right thumb steers right (yaw rises)', yaw1 > yaw0 + .5, `yaw ${yaw0.toFixed(2)} -> ${yaw1.toFixed(2)}`);
 await page.waitForTimeout(3500);
-lift = await tap(.5, .12, 1200);
+lift = await tap(.5, .2, 1200);
 s = await st();
-check('a thumb on the top strip charges', s.chg === 1 && s.charge > .25, `charge ${s.charge.toFixed(2)}`);
+check('a thumb below the HUD charges', s.chg === 1 && s.charge > .25, `charge ${s.charge.toFixed(2)}`);
 await lift();
 await page.waitForTimeout(300);
 s = await st();

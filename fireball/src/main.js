@@ -25,7 +25,7 @@ const glc = document.getElementById('c');
 glc.width = VW; glc.height = VH;
 initGL(glc);
 const wrap = document.createElement('div');
-wrap.style.position = 'relative';
+wrap.style.position = 'absolute';
 glc.before(wrap);
 wrap.append(glc);
 const hud = document.createElement('canvas');
@@ -35,10 +35,13 @@ wrap.append(hud);
 const ctx = hud.getContext('2d');
 const label = (text, y, x = VW / 2) => ctx.fillText(text, x, y);
 const font = (size, bold) => { ctx.font = (bold ? 'bold ' : '') + size + 'px system-ui'; };
+const touch = navigator.maxTouchPoints;
+let rotated;
 function resize() {
-  const sc = Math.min(innerWidth / VW, innerHeight / VH);
+  rotated = touch && innerHeight > innerWidth;
+  const sc = Math.min(innerWidth / (rotated ? VH : VW), innerHeight / (rotated ? VW : VH));
+  wrap.style.rotate = rotated * 90 + 'deg';
   glc.style.width = VW * sc + 'px';
-  glc.style.height = VH * sc + 'px';
 }
 addEventListener('resize', resize);
 resize();
@@ -63,14 +66,14 @@ addEventListener('keydown', (e) => {
   if (key === ' ') e.preventDefault();
 });
 addEventListener('keyup', (e) => { held[e.key.toLowerCase()] = false; });
-const touch = navigator.maxTouchPoints > 0;
 const chargeHint = 'HOLD ' + (touch ? 'BOTH' : 'SPACE') + ': charge; LIT = NO BRAKES';
 hud.oncontextmenu = e => e.preventDefault();
 const pts = new Map();
 let tL = 0, tR = 0, tT = 0, tB = 0, tF = 0;
 const at = (e) => {
   const r = hud.getBoundingClientRect();
-  return [(e.clientX - r.left) / r.width * VW, (e.clientY - r.top) / r.height * VH];
+  const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  return rotated ? [y * VW, (1 - x) * VH] : [x * VW, y * VH];
 };
 const scan = () => {
   tL = tR = tT = 0;
@@ -697,7 +700,7 @@ function frame(now_) {
     ctx.fillStyle = '#ffb0b8';
     label(chargeHint, 160);
     font(12);
-    label(touch ? 'SIDES: steer / BOTH: charge + drag' : 'WASD: steer / UP: sprint', 182);
+    label(touch ? 'SIDES: steer / BOTH: drag' : 'WASD: steer', 182);
     label('UP / top: sprint / DOWN / bottom: brake', 200);
     font(15, 1);
     ctx.fillStyle = css(pc);

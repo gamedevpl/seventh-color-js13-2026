@@ -6,7 +6,7 @@ const dir=process.cwd()+'/.cache/mobile-audit';
 mkdirSync(dir,{recursive:true});
 const code=await build({entryPoints:['fireball/src/main.js'],bundle:true,write:false,format:'iife',define:{DEV:'true'}});
 // Expose the input before networking: online fixtures do not contact the relay.
-writeFileSync(dir+'/index.html','<!doctype html><meta name="viewport" content="width=device-width"><style>body{margin:0;background:#000;overflow:hidden;height:100vh;display:grid;place-items:center}canvas{display:block}html{touch-action:none;overscroll-behavior:none}</style><canvas id=c></canvas><script>'+code.outputFiles[0].text.replace('const mine = tick(dt, local);','window.auditInput = local; const mine = net.on ? 0 : tick(dt, local);')+'</script>');
+writeFileSync(dir+'/index.html','<!doctype html><meta name=viewport content="width=device-width,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>body{margin:0;background:#000;overflow:hidden;height:100vh;display:grid;place-items:center}canvas{display:block}html{touch-action:none;overscroll-behavior:none}</style><canvas id=c></canvas><script>'+code.outputFiles[0].text.replace('const mine = tick(dt, local);','window.auditInput = local; const mine = net.on ? 0 : tick(dt, local);')+'</script>');
 const browser=await chromium.launch(process.argv.includes('--gpu') ? {channel:'chrome',headless:false} : {args:['--enable-unsafe-swiftshader']});
 try{
  const desktop=await browser.newPage({viewport:{width:700,height:1000},hasTouch:false});
@@ -15,16 +15,18 @@ try{
  const desktopTime=await desktop.evaluate(()=>FB.timer);await desktop.waitForTimeout(250);
  assert.ok(await desktop.evaluate(()=>FB.timer)>desktopTime,'tall desktop window must keep running');
  await desktop.close();
- const p=await browser.newPage({viewport:{width:844,height:390},isMobile:true,hasTouch:true,deviceScaleFactor:3});
+ const p=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:3});
  const errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.addInitScript(()=>{const A=window.AudioContext;window.AudioContext=class extends A{constructor(...args){super(...args);window.auditAudio=this;}};});
  const cdp=await p.context().newCDPSession(p);
  const url='file://'+dir+'/index.html';
  async function load(){await p.goto(url);await p.waitForFunction(()=>window.FB);}
- async function point(x,y,id=1){const r=await p.locator('canvas').last().boundingBox();return {x:r.x+x*r.width/640,y:r.y+y*r.height/360,id};}
+ async function point(x,y,id=1){const r=await p.locator('canvas').last().boundingBox();const rotated=await p.evaluate(()=>innerHeight>innerWidth);return rotated?{x:r.x+(1-y/360)*r.width,y:r.y+x*r.height/640,id}:{x:r.x+x*r.width/640,y:r.y+y*r.height/360,id};}
  async function touch(points){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:await Promise.all(points.map(([x,y],i)=>point(x,y,i+1)))});await p.waitForTimeout(80);return p.evaluate(()=>({mode:FB.mode,input:FB.leaders[0].in}));}
  async function release(){await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await p.waitForTimeout(50);}
  const out={};
+ await load();const firstBox=await p.locator('canvas').last().boundingBox();assert.ok(Math.abs(firstBox.height/firstBox.width-16/9)<.01,'cold portrait load rotates immediately');assert.ok(Math.abs(firstBox.x+firstBox.width/2-195)<2&&Math.abs(firstBox.y+firstBox.height/2-422)<2,'rotated canvas stays centred and inside viewport');
+ await p.setViewportSize({width:844,height:390});
  await load();out.colourText=await touch([[390,268]]);await release();
  await load();out.colourDot=await touch([[330,234]]);await release();
  await p.evaluate(()=>FB.reset(0,false));
@@ -56,7 +58,7 @@ try{
  await load();await touch([[450,318]]);await release();
  assert.equal(await p.evaluate(()=>FB.mode),'run','portrait menu accepts touch');
  const portraitBox=await p.locator('canvas').last().boundingBox();
- assert.ok(Math.abs(portraitBox.width/portraitBox.height-16/9)<.01,'portrait retains landscape aspect');
+ assert.ok(Math.abs(portraitBox.height/portraitBox.width-16/9)<.01,'portrait rotates the landscape canvas');
  await touch([[160,230],[500,230]]);assert.equal((await p.evaluate(()=>window.auditInput)).c,1,'portrait two-thumb charge');
  assert.equal((await move([[130,230],[500,230]])).t,-1,'portrait charge steering');await release();
  await p.screenshot({path:dir+'/portrait.png'});

@@ -18,7 +18,7 @@ import { startRelay, startBridge } from './lib/relay.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
-const html = readFileSync(path.join(root, 'build/fireball/index.html'));
+const html = readFileSync(process.env.FIREBALL_TEST_HTML || path.join(root, 'build/fireball/index.html'));
 const stage = mkdtempSync(path.join(tmpdir(), 'fb-net-'));
 const pagePath = path.join(stage, 'index.html');
 writeFileSync(pagePath, html);

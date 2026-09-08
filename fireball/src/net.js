@@ -7,7 +7,7 @@
 // only thing it adds is a line when someone arrives or leaves. So all of
 // the structure below is built out of nothing but broadcasts.
 //
-// One client is the HOST: it alone runs the herd, and twelve times a
+// One client is the HOST: it alone runs the herd, and twenty times a
 // second it writes the whole plain into a packet - every unicorn's place,
 // heading and state - which everyone else eases toward and animates
 // locally. Nobody replays the simulation, so nobody can drift out of it.
@@ -24,8 +24,7 @@ const ROOM = 'wss://relay.js13kgames.com/unicorn-fireball-v2';
 const SEATS = 7;
 const JOINING = 'CONNECTING';
 const ALONE = 'OFFLINE';
-const SNAP = 1 / 12;                      // the plain, twelve times a second
-const IN = 1 / 20;                        // input, a little faster
+const SNAP = 1 / 20;                      // state at 20 Hz, input every rendered frame
 const GONE = 3.5;                         // silence this long and you are out
 
 export const net = {
@@ -44,7 +43,7 @@ export const net = {
 let ws = null, id = '', tag = 0, hello = 0;
 let seen = new Map();                     // id -> when we last heard it
 let roster = [];                          // seat -> id, '' for a free one
-let t = 0, tSnap = 0, tIn = 0, tSeen = 0, tHeard = -99, joined = 0;
+let t = 0, tSnap = 0, tSeen = 0, tHeard = -99, joined = 0;
 let netIn = [];                           // seat -> the input it last sent
 let held = [];                            // seat -> was somebody on it last frame
 let lastR = '';                           // the seating as last announced
@@ -73,7 +72,7 @@ export function open(room) {
 // smallest and blocked the election for as long as it took to go stale.
 export function close() {
   const w = ws; ws = null; clearInterval(hello); id = '';
-  t = tSnap = tIn = tSeen = joined = 0; tHeard = -99;
+  t = tSnap = tSeen = joined = 0; tHeard = -99;
   net.dropped = 0; net.news = null; net.seats = 1;
   net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; seen.clear();
   held = []; netIn = [];
@@ -148,7 +147,7 @@ function write() {
 }
 
 // What the client hears. Positions become targets rather than truth: the
-// frame eases toward them, so a packet every 83ms still draws at 60.
+// frame eases toward them, so a packet every 50ms still draws at 60.
 function packet(v) {
   if (v.getUint8(0) !== 1) return;
   const theirs = v.getUint16(1);
@@ -249,7 +248,7 @@ export function tick(dt, local) {
     seat([...seen.keys()].sort());
     drive(local);
     tSnap += dt;
-    if (tSnap >= SNAP) { tSnap = 0; write(); }
+    if (tSnap >= SNAP) { tSnap %= SNAP; queueMicrotask(write); }
     net.said = '';
     return 1;
   }
@@ -257,9 +256,7 @@ export function tick(dt, local) {
   // and the sort above will hand the plain to whoever is next.
   if (t - tHeard > 2) { net.said = JOINING; return 0; }
   net.said = '';
-  tIn += dt;
-  if (tIn >= IN && net.me >= 0) {
-    tIn = 0;
+  if (net.me >= 0) {
     const b = new Uint8Array([2, net.me, (local.t + 1) | (local.f ? 4 : 0) | (local.b ? 8 : 0) | (local.c ? 16 : 0)]);
     ws.send(b.buffer);
   }

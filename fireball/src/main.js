@@ -442,12 +442,12 @@ function explode(x, z, pw) {
 // --- the frame ------------------------------------------------------------
 let last = 0, lastPick = 0, lastSaid = '';
 function frame(now_) {
-  const realDt = Math.min(.05, (now_ - last) / 1000 || 0);
+  const realDt = (now_ - last) / 1000 || 0;
   if (impact) { impact.t -= realDt; if (impact.t <= 0) impact = null; }
-  const dt = realDt * (impact && !net.on ? .3 : 1);
+  const dt = Math.min(.05, realDt) * (impact && !net.on ? .3 : 1);
   last = now_;
   const doAct = acted; acted = false;
-  timer += dt;
+  timer += net.on ? realDt : dt;
   if (mode === 'title' && pick !== lastPick) { lastPick = pick; newRun(1); }
 
   if (net.dropped) { goHome(); net.said = 'OFFLINE - O'; }
@@ -473,13 +473,14 @@ function frame(now_) {
     };
     // Offline this is always ours. Online it is ours only while we host;
     // otherwise the plain arrives in packets and we animate what we are told.
-    const mine = netTick(dt, local);
+    const mine = netTick(realDt, local);
     if (net.news) { say(net.news.k ? 'RIDER JOINED' : 'RIDER LEFT', 2.5, css(COL[leaders[net.news.i].col])); net.news = null; }
     if (net.said !== lastSaid) { lastSaid = net.said; if (net.said) say(net.said, 3); }
     if (mine) {
       if (!net.on) { P.in = local; charge(P, local.c); }
-      step(dt, { arena: net.on });
-    } else { ghost(dt); ghostSound(P); }
+      // Catch up slow hosts in bounded physics steps; never slow the network clock.
+      for (let left = net.on ? Math.min(.25, realDt) : dt; left > 0; left -= .05) step(Math.min(.05, left), { arena: net.on });
+    } else { ghost(Math.min(.1, realDt)); ghostSound(P); }
     if (!net.on && (lost(0) || won(0))) {
       // Latch the result before displaying the finished world.
       victory = won(0);

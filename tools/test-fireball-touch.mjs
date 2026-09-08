@@ -6,7 +6,7 @@ const dir=process.cwd()+'/.cache/mobile-audit';
 mkdirSync(dir,{recursive:true});
 const code=await build({entryPoints:['fireball/src/main.js'],bundle:true,write:false,format:'iife',define:{DEV:'true'}});
 // Expose the input before networking: online fixtures do not contact the relay.
-writeFileSync(dir+'/index.html','<!doctype html><meta name=viewport content="width=device-width,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>body{margin:0;background:#000;overflow:hidden;height:100vh;display:grid;place-items:center}canvas{display:block}html{touch-action:none;overscroll-behavior:none}</style><canvas id=c></canvas><script>'+code.outputFiles[0].text.replace('const mine = tick(dt, local);','window.auditInput = local; const mine = net.on ? 0 : tick(dt, local);')+'</script>');
+writeFileSync(dir+'/index.html','<!doctype html><meta name=viewport content="width=device-width,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>body{margin:0;background:#000;overflow:hidden;height:100vh;display:grid;place-items:center}canvas{display:block}html{touch-action:none;overscroll-behavior:none}</style><canvas id=c></canvas><script>'+code.outputFiles[0].text.replace('const mine = tick(realDt, local);','window.auditInput = local; const mine = net.on ? 0 : tick(realDt, local);')+'</script>');
 const browser=await chromium.launch(process.argv.includes('--gpu') ? {channel:'chrome',headless:false} : {args:['--enable-unsafe-swiftshader']});
 try{
  const desktop=await browser.newPage({viewport:{width:700,height:1000},hasTouch:false});

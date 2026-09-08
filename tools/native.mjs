@@ -83,6 +83,7 @@ for (let i = 0; i < rolls; i++) {
   const out = await squeeze({
     js: minified, css, markup, head, title: game === 'fireball' ? '' : entry.title,
     roadroller: !noRoadroller, level, zopfliIterations: game === 'fireball' ? 1000 : rolls > 1 ? 15 : 200,
+    roadrollerOptions: !cheats && entry.roadroller,
   });
   console.log(`  roll ${i + 1}/${rolls}: index.zip = ${num(out.archiveBytes)}`);
   if (!best || out.archiveBytes < best.archiveBytes) best = out;

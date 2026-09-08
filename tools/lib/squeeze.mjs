@@ -25,9 +25,11 @@ export async function minifyJs(js, { mangleProps = false, asciiOnly = false } = 
   return { js: out, stages };
 }
 
-export async function roadroll(js, level = 0) {
-  const packer = new Packer([{ data: js, type: 'js', action: 'eval' }], { maxMemoryMB: 512 });
-  if (level > 0) await packer.optimize(level);
+export async function roadroll(js, level = 0, options) {
+  const packer = new Packer([{ data: js, type: 'js', action: 'eval' }], options || { maxMemoryMB: 512 });
+  // A saved profile is already tuned. Re-optimizing it would reintroduce
+  // stochastic output and make the submission size depend on a lucky roll.
+  if (!options && level > 0) await packer.optimize(level);
   const { firstLine, secondLine } = packer.makeDecoder();
   return firstLine + secondLine;
 }
@@ -41,8 +43,8 @@ export function shell({ title, css, markup, script, head = '' }) {
 }
 
 /** Minified JS + page parts → the archive that would be submitted. */
-export async function squeeze({ js, css, markup, title, head = '', roadroller = true, level = 0, zopfliIterations = 200 }) {
-  const payload = roadroller ? await roadroll(js, level) : js;
+export async function squeeze({ js, css, markup, title, head = '', roadroller = true, level = 0, roadrollerOptions, zopfliIterations = 200 }) {
+  const payload = roadroller ? await roadroll(js, level, roadrollerOptions) : js;
   const document = shell({ title, css, markup, head, script: payload });
   const zipped = await zipSingleFile('index.html', document, { zopfliIterations });
   return { payload, document, ...zipped, archiveBytes: zipped.archive.length };

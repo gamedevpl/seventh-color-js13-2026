@@ -374,7 +374,7 @@ const WILDC = COL[WILD];
 
 // --- state ----------------------------------------------------------------
 let mode = 'title', timer = 0, msg = '', msgT = 0, shake = 0, flash = 0, endT = 0;
-let victory = false;
+let victory = false, best = 0;
 const BOOMS = [], TRAIL = new Map(), ARCS = [];
 let eye = null, look = null, camYaw = 0;
 let msgCol = '#fff4d6';
@@ -447,7 +447,7 @@ function frame(now_) {
   const dt = Math.min(.05, realDt) * (impact && !net.on ? .3 : 1);
   last = now_;
   const doAct = acted; acted = false;
-  timer += net.on ? realDt : dt;
+  if (mode !== 'end') timer += realDt;
   if (mode === 'title' && pick !== lastPick) { lastPick = pick; newRun(1); }
 
   if (net.dropped) { goHome(); net.said = 'OFFLINE - O'; }
@@ -484,6 +484,10 @@ function frame(now_) {
     if (!net.on && (lost(0) || won(0))) {
       // Latch the result before displaying the finished world.
       victory = won(0);
+      try {
+        best = +localStorage.ufTime || 0;
+        if (victory && (!best || timer < best)) localStorage.ufTime = best = timer;
+      } catch {}
       mode = 'end'; endT = 0;
       if (!victory) impact = null;
       // Stop decisions, but let existing motion, rainbows and debris settle.
@@ -757,7 +761,7 @@ function frame(now_) {
       label(msg, VH * .3); ctx.globalAlpha = 1;
     }
     font(13); ctx.fillStyle = 'rgba(255,255,255,.6)';
-    label((timer / 60 | 0) + ':' + ('0' + (timer % 60 | 0)).slice(-2), 16);
+    label(timer.toFixed(1) + 's', 16);
     if (net.on) {
       font(13, 1); ctx.fillStyle = '#8fe3c8';
       label((net.seats + ' riding') + ' - tap / ESC: exit', 34);
@@ -773,6 +777,7 @@ function frame(now_) {
       font(40, 1); ctx.fillStyle = '#f3ead6';
       label(victory ? 'VICTORY' : !alive().length ? 'DRAW' : 'DEFEAT', VH * .44);
       font(17); ctx.fillStyle = '#d8d0ea';
+      label('BEST ' + (best ? best.toFixed(1) + 's' : '-'), VH * .54);
       if (endT > 1) label('SPACE / tap to run', VH * .66);
     }
   }

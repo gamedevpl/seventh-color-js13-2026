@@ -1143,6 +1143,22 @@ written again in every party game.
 
 ## Milestone log
 
+Solo results now retain the fastest victory as `ufTime` in local storage.
+The clock uses elapsed seconds and stops at the result; defeat and online play
+cannot improve the record. Blocked storage does not prevent playing.
+
+The production build uses the saved Roadroller 2.1 profile in `fireball/entry.json`
+instead of running stochastic optimization again. Five builds produced 13,268 B
+each, including the solo record (44 B below the limit). The profile's 256 MB
+budget yields about 195 MB of decoder arrays. `allowFreeVars` saves decoder bytes
+and is appropriate only for this standalone page: game code is bundled in an
+IIFE and accesses the canvas with `getElementById`, not the global `c` that the
+decoder overwrites. Do not reuse this profile for scripts embedded in another
+application. `--no-roadroller` and cheat builds retain their development paths;
+other games keep their existing optimization behavior. After source changes,
+run `npm run fireball:gate`; the saved profile is repeatable, not a guarantee that
+future changes fit.
+
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
 | F10 predictable fights and recovery | 13,312 | 13,307 (O1 worst-of-5) | fair ties, current herd power, safe glancing contact, host migration, predictive edge warning, recovery radar and controls; shared helpers and unused glass removed |

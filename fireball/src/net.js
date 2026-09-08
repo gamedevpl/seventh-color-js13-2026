@@ -127,7 +127,7 @@ function room() {
 }
 function write() {
   const v = room();
-  v.setUint8(0, 1); v.setUint16(1, tag); v.setUint8(3, 0);
+  v.setUint8(0, 1); v.setUint16(1, tag);
   v.setUint8(4, net.seats);
   let o = 5;
   for (const u of units) {
@@ -258,7 +258,7 @@ export function tick(dt, local) {
   net.said = '';
   if (net.me >= 0) {
     const b = new Uint8Array([2, net.me, (local.t + 1) | (local.f ? 4 : 0) | (local.b ? 8 : 0) | (local.c ? 16 : 0)]);
-    ws.send(b.buffer);
+    ws.send(b);
   }
   return 0;
 }
@@ -307,6 +307,6 @@ function drive(local) {
 export function input(v) {
   if (v.getUint8(0) !== 2) return;
   const s = v.getUint8(1), b = v.getUint8(2);
-  if (s < 0 || s >= SEATS) return;
+  if (s >= SEATS) return;
   netIn[s] = { t: (b & 3) - 1, f: b & 4 ? 1 : 0, b: b & 8 ? 1 : 0, c: b & 16 ? 1 : 0, at: t };
 }

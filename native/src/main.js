@@ -211,6 +211,10 @@ function bloom(cx, cy, t, r0, spread) {
 }
 
 function paintHud(b) {
+  // The trailer paints its own words, in its own type, over a clean frame.
+  // With this on the game still runs - mouths still move, mechanics still
+  // draw - it just stops narrating itself. DEV only.
+  if (DEV && window.SCH) return null;
   if (round.phase === P.GAME) {
     box(126, 30);
     text(b.gamePrompt, 10, 136, { fill: '#cdbfa0', font: '9px system-ui' });
@@ -315,8 +319,9 @@ function frame(now) {
       fxEnd();
       dissolve(dt);
       const lines = wrap(cs.lines[i], 296, NARRATE);
-      box(108, 36);
-      lines.forEach((l, k) => text(l, VW / 2, (lines.length > 1 ? 122 : 128) + k * 12, { fill: `rgba(243,234,214,${fade})`, font: NARRATE, align: 'center' }));
+      // Same reason as paintHud: the film narrates itself, in its own type.
+      if (!(DEV && window.SCH)) box(108, 36);
+      if (!(DEV && window.SCH)) lines.forEach((l, k) => text(l, VW / 2, (lines.length > 1 ? 122 : 128) + k * 12, { fill: `rgba(243,234,214,${fade})`, font: NARRATE, align: 'center' }));
       // The chevron is the game telling a player it is waiting for them.
       // A film is not waiting for anybody, and this beat is in five of its
       // shots. Off whenever the trailer is the one holding the camera.

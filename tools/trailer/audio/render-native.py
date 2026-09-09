@@ -1,40 +1,22 @@
 #!/usr/bin/env python3
-"""THE SEVENTH COLOUR, arranged for The Seventh Color trailer.
+"""Trailer score for The Seventh Color.
 
-Not one note of this is new. The game carries eight compositions in
-native/src/audio.js - sixteen-step patterns, one character per step, packed
-so a context-mixing compressor can eat them - and they are already the
-right eight: a theme for the forest, one for Darkness, one for the winter,
-one for the road, the marsh, the castle, the throne, and one at a hundred
-and four for the floor giving way. A trailer that wrote its own music for
-this game would be throwing away the only score it needed.
+This is trailer music, with the grammar trailer music has: a quiet setup on
+a pulse, one enormous low brass hit where the story turns, a percussion bed
+that arrives with the montage and doubles in the drop, risers into every
+section, and a full stop before the last two cards. What keeps it the
+GAME'S trailer rather than a stock cue is that every melodic line in it is
+one of the eight compositions in native/src/audio.js - `wonder` in the
+setup as a music box, `winter` under the snow, `trail`, `marsh` and
+`castle` down the road, `throne` under the drop, and `wonder` again, whole
+and loud, over the dawn. The film opens on one voice of it and closes on
+six, and everything between is percussion and weather.
 
-What is new is the arrangement and the playing. The game has one square
-oscillator per voice and no room; this has:
-
-  - a real envelope per part, so a bass note holds and a lead plucks;
-  - octave doubling and a detuned pair on the leads, which is the whole
-    difference between a tracker and an instrument;
-  - a sub under the low rows through the castle, so the throne has a floor;
-  - one plate reverb, convolved, sized per movement - close in the glade,
-    enormous in the hall, gone entirely at the moment the horn breaks.
-
-And it is a SCORE rather than a loop: every movement starts on a cue the
-cut wrote (build/trailer-native/beats.json), so the music is arranged to
-the picture and never the other way round. The shape it plays:
-
-  the prologue    wonder, two octaves up, one note at a time, all room
-  the council     shadow, low and slow, no lead at all
-  the glade       wonder, warm and whole - the only place the film is happy
-  the creep       wonder with the tune taken out; just the pulse
-  THE HORN        everything stops. one impact, and a tail that is the
-                  first thirty seconds played backwards under it
-  the winter      winter, and it does not leave for a minute
-  the road        trail, then marsh: the first movement with a pulse
-  the castle      castle into throne, the sub arriving under it
-  the beam        throne, held, and a strike where the light lands
-  the fall        pursuit, at a hundred and four - the only fast bar
-  the dawn        wonder again, everything at once, in octaves
+The cut is on a grid - 92 to the minute, every shot a whole number of beats
+- and build/trailer-native/beats.json lists every cut. So a hit does not
+have to be placed by ear against the picture: it is placed ON the picture,
+because the picture was cut to the same clock. That is the difference
+between a montage with music over it and a trailer.
 
     python3 tools/trailer/audio/render-native.py
 
@@ -53,18 +35,16 @@ BEATS_JSON = os.path.normpath(os.path.join(OUT_DIR, '..', 'beats.json'))
 
 with open(BEATS_JSON) as fh:
     B = json.load(fh)
-C = B['cues']
+CUTS = B['cuts']
 MARK = {m['name']: m['at'] for m in B['marks']}
-END = C['end']
-# The end card crossfades in over the last of the picture, so the score has
-# to keep playing past the last frame of game.
+BEAT = B['beat']
+END = B['cues']['end']
 ENDCARD = 5.6
 DUR = END + ENDCARD + 1.0
 
 # --------------------------------------------------------------- the game --
 # native/src/audio.js, verbatim. ' ' is a rest; every other character is a
-# note, 440 * 2**((code - 78) / 12). The row is [wave, gain, pattern] and
-# 'n' is the noise channel - 'H' is the high hit, anything else the low one.
+# note, 440 * 2**((code - 78) / 12). Rows are [wave, gain, pattern].
 TRACKS = {
     'shadow': (58, [('t', 0.72, '/  /  - /  2 1  '), ('w', 0.16, '; > A > : = @ = '), ('n', 0.08, 'K     H K    H  ')]),
     'wonder': (82, [('s', 0.62, 'S W Z U R U Z W '), ('t', 0.42, ';   8   6   ; 6 '), ('s', 0.20, ' N   P   U   S  ')]),
@@ -77,149 +57,163 @@ TRACKS = {
 }
 FREQ = lambda ch: 440.0 * 2.0 ** ((ord(ch) - 78) / 12.0)
 
-buf = np.zeros(int(SR * DUR))
-wet = np.zeros(int(SR * DUR))       # everything that goes to the plate
+N = int(SR * DUR)
+dry = np.zeros(N)
+wet = np.zeros(N)
+RNG = np.random.default_rng(4)
 
 
-def add(dst, t, mono, gain):
-    start = int(t * SR)
-    if start >= len(dst) or gain <= 0 or start < 0:
+def add(dst, t, mono, gain=1.0):
+    i = int(t * SR)
+    if i >= len(dst) or i < -len(mono) or gain <= 0:
         return
-    n = min(len(mono), len(dst) - start)
+    if i < 0:
+        mono, i = mono[-i:], 0
+    n = min(len(mono), len(dst) - i)
     if n > 0:
-        dst[start:start + n] += gain * mono[:n]
+        dst[i:i + n] += gain * mono[:n]
 
 
-# ------------------------------------------------------------ instruments --
+def put(t, mono, gain=1.0, room=0.0):
+    add(dry, t, mono, gain)
+    if room:
+        add(wet, t, mono, gain * room)
+
+
+# ---------------------------------------------------------- the trailer kit --
 def adsr(n, a, d, s, r):
-    """Sample-count ADSR. Everything here is a note of known length, so the
-    release is inside the note rather than after it."""
     a, d, r = max(1, int(a * SR)), max(1, int(d * SR)), max(1, int(r * SR))
-    a = min(a, n)
-    d = min(d, max(1, n - a))
-    r = min(r, max(1, n - a - d))
+    a = min(a, n); d = min(d, max(1, n - a)); r = min(r, max(1, n - a - d))
     hold = max(0, n - a - d - r)
-    return np.concatenate([
-        np.linspace(0, 1, a),
-        np.linspace(1, s, d),
-        np.full(hold, s),
-        np.linspace(s, 0, r),
-    ])[:n]
+    return np.concatenate([np.linspace(0, 1, a), np.linspace(1, s, d),
+                           np.full(hold, s), np.linspace(s, 0, r)])[:n]
 
 
-def osc(freq, n, kind, detune=0.0):
-    """Bandlimited enough for the job: a saw and a square built from a fixed
-    stack of harmonics rather than a hard edge, which is what stops the low
-    rows of `shadow` and `throne` from fizzing at this sample rate."""
+def saw(f, n, harmonics=22):
     t = np.arange(n) / SR
-    f = freq * (1.0 + detune)
-    if kind == 's':
-        return np.sin(2 * np.pi * f * t)
-    if kind == 't':
-        # A triangle is odd harmonics falling as 1/k^2, alternating sign.
-        out = np.zeros(n)
-        for k in range(1, 12, 2):
-            if f * k > SR / 2.2:
-                break
-            out += ((-1) ** ((k - 1) // 2)) / (k * k) * np.sin(2 * np.pi * f * k * t)
-        return out * (8 / np.pi ** 2)
-    if kind == 'q':
-        out = np.zeros(n)
-        for k in range(1, 16, 2):
-            if f * k > SR / 2.2:
-                break
-            out += np.sin(2 * np.pi * f * k * t) / k
-        return out * (4 / np.pi)
-    # 'w' - sawtooth
     out = np.zeros(n)
-    for k in range(1, 20):
+    for k in range(1, harmonics + 1):
         if f * k > SR / 2.2:
             break
         out += np.sin(2 * np.pi * f * k * t) / k
     return out * (2 / np.pi)
 
 
-def note(freq, dur, kind, gain, a=0.006, d=0.10, s=0.55, r=None, oct2=0.0, det=0.0):
-    """One note. `oct2` mixes in the octave above and `det` a second copy a
-    few cents off - between them that is most of the distance from a
-    tracker channel to something that sounds played."""
-    n = max(8, int(dur * SR))
-    if r is None:
-        r = dur * 0.55
-    e = adsr(n, a, d, s, r)
-    w = osc(freq, n, kind)
-    if det:
-        w = 0.6 * w + 0.6 * osc(freq, n, kind, det)
-    if oct2:
-        w = w + oct2 * osc(freq * 2, n, kind)
-    return w * e * gain
+def lp(x, k):
+    """A cheap moving-average lowpass. k is the window in samples."""
+    if k < 2:
+        return x
+    return np.convolve(x, np.ones(k) / k, mode='same')
 
 
-def hit(dur, high, gain):
-    """The noise channel. The game filters white noise one way for a hat and
-    the other for a kick; this gives the kick a pitched body as well, since
-    a lowpassed noise burst on its own is a rustle, not a drum."""
-    n = int(dur * SR)
-    rng = np.random.default_rng(7 if high else 3)
-    x = rng.standard_normal(n)
-    if high:
-        # A one-pole highpass, then a fast decay.
-        y = np.zeros(n)
-        prev = 0.0
-        for i in range(0, n, 1024):
-            blk = x[i:i + 1024]
-            y[i:i + 1024] = blk - np.concatenate([[prev], blk[:-1]]) * 0.92
-            prev = blk[-1] if len(blk) else prev
-        env = np.exp(-np.arange(n) / (SR * 0.03))
-        return y * env * gain
-    y = np.convolve(x, np.ones(48) / 48, mode='same')
-    env = np.exp(-np.arange(n) / (SR * 0.10))
-    t = np.arange(n) / SR
-    body = np.sin(2 * np.pi * 52 * t) * np.exp(-t / 0.12)
-    return (y * 0.6 + body * 1.1) * env * gain
-
-
-def sub(freq, dur, gain):
-    n = int(dur * SR)
-    t = np.arange(n) / SR
-    return np.sin(2 * np.pi * freq * t) * adsr(n, 0.02, 0.1, 0.8, dur * 0.4) * gain
-
-
-def impact(gain, length=3.2):
-    """The horn. A body that falls a fifth as it decays, a noise crack on
-    the front, and nothing else in the mix for two seconds afterwards."""
+def braam(length, root, gain, bite=0.5, fall=0.06):
+    """The low brass hit. A detuned cluster an octave apart, hard attack,
+    long decay, sagging in pitch as it goes - which is what makes it a
+    'braam' rather than a chord. Two layers: a filtered body and a thin
+    bright one on top so it survives small speakers."""
     n = int(length * SR)
     t = np.arange(n) / SR
-    f = 78 * np.exp(-t * 1.5) + 34
-    ph = 2 * np.pi * np.cumsum(f) / SR
-    body = np.sin(ph) * np.exp(-t / 0.9)
-    rng = np.random.default_rng(11)
-    crack = rng.standard_normal(n) * np.exp(-t / 0.05) * 0.5
-    ring = np.sin(2 * np.pi * 1870 * t) * np.exp(-t / 0.35) * 0.10
-    return (body * 1.2 + crack + ring) * gain
+    bend = np.exp(-t * 0.9) * fall            # the sag, in semitone-ish units
+    body = np.zeros(n)
+    for mult, det, g in ((1.0, 0.000, 1.0), (1.0, 0.006, 0.9), (1.0, -0.005, 0.9),
+                         (2.0, 0.004, 0.55), (2.0, -0.003, 0.5), (3.0, 0.002, 0.22)):
+        f = root * mult * (1 + det)
+        ph = 2 * np.pi * np.cumsum(f * (1 - bend)) / SR
+        body += g * (2 / np.pi) * sum(np.sin(ph * k) / k for k in range(1, 9))
+    body = lp(body, 24)
+    bright = lp(saw(root * 4, n, 10), 5) * bite * 0.25
+    sub = np.sin(2 * np.pi * np.cumsum(root * 0.5 * (1 - bend)) / SR) * 0.9
+    env = adsr(n, 0.035, 0.35, 0.55, length * 0.72)
+    # A slow tremolo, the thing that makes a held braam feel alive.
+    trem = 1 + 0.14 * np.sin(2 * np.pi * 5.5 * t)
+    return (body * 0.5 + bright + sub) * env * trem * gain
 
 
-def plate(seconds, bright=0.5):
-    """A decaying noise impulse response. Cheap, and after an FFT convolution
-    it is the difference between eight square waves and a room."""
-    n = int(seconds * SR)
-    rng = np.random.default_rng(23)
-    ir = rng.standard_normal(n) * np.exp(-np.arange(n) / (SR * seconds / 5.0))
-    # Roll the top off so the tail is a room and not a hiss.
-    k = int(2 + (1 - bright) * 26)
-    ir = np.convolve(ir, np.ones(k) / k, mode='same')
-    ir[:int(SR * 0.008)] = 0
-    return ir / (np.sqrt(np.sum(ir ** 2)) + 1e-9)
+def taiko(gain, pitch=64, length=1.1):
+    n = int(length * SR)
+    t = np.arange(n) / SR
+    f = pitch * np.exp(-t * 7) + pitch * 0.55
+    body = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.24)
+    skin = lp(RNG.standard_normal(n), 26) * np.exp(-t / 0.05) * 0.8
+    return (body * 1.15 + skin) * gain
 
 
-# ------------------------------------------------------------- the arranger --
-def play(track, t0, t1, rows=None, gain=1.0, oct_shift=0, lead_oct2=0.0,
-         det=0.0, wet_gain=0.5, sub_row=None, sustain=1.0, drums=True):
-    """Lay one of the game's tracks across a span of the film.
+def sub_drop(gain, f0=70, f1=24, length=2.4):
+    n = int(length * SR)
+    t = np.arange(n) / SR
+    f = f0 * (f1 / f0) ** (t / length)
+    return np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / (length * 0.55)) * gain
 
-    `rows` selects which of its voices play - taking the tune out of
-    `wonder` is what the creep is - and everything else is how it is
-    played rather than what is played."""
+
+def riser(length, gain, f0=200, f1=2400):
+    """Noise climbing a resonant band plus a rising tone, cut dead at the
+    end - the thing that makes the listener expect a hit."""
+    n = int(length * SR)
+    t = np.arange(n) / SR
+    u = t / length
+    x = RNG.standard_normal(n)
+    # A one-pole bandpass swept by hand, block by block.
+    out = np.zeros(n)
+    step = 512
+    y1 = 0.0
+    for i in range(0, n, step):
+        blk = x[i:i + step]
+        f = f0 * (f1 / f0) ** (i / n)
+        k = np.clip(f / (SR / 2), 0.002, 0.9)
+        for j, v in enumerate(blk):
+            y1 += k * (v - y1)
+            out[i + j] = v - y1
+    tone = np.sin(2 * np.pi * np.cumsum(f0 * (f1 / f0) ** u * 0.5) / SR) * 0.30
+    return (out * 0.5 + tone) * (u ** 2.4) * gain
+
+
+def whoosh(length, gain):
+    n = int(length * SR)
+    u = np.arange(n) / n
+    x = lp(RNG.standard_normal(n), 9)
+    env = np.sin(np.pi * u ** 1.6) ** 2
+    return x * env * gain
+
+
+def tick(gain, high=True):
+    n = int(0.16 * SR)
+    x = RNG.standard_normal(n)
+    if high:
+        x = x - lp(x, 6)
+        env = np.exp(-np.arange(n) / (SR * 0.018))
+    else:
+        x = lp(x, 40)
+        env = np.exp(-np.arange(n) / (SR * 0.05))
+    return x * env * gain
+
+
+def note(f, dur, kind, gain, a=0.006, d=0.10, s=0.55, oct2=0.0, det=0.0):
+    n = max(8, int(dur * SR))
+    t = np.arange(n) / SR
+    def w(ff):
+        if kind == 's':
+            return np.sin(2 * np.pi * ff * t)
+        if kind == 't':
+            o = np.zeros(n)
+            for k in range(1, 12, 2):
+                if ff * k > SR / 2.2:
+                    break
+                o += ((-1) ** ((k - 1) // 2)) / (k * k) * np.sin(2 * np.pi * ff * k * t)
+            return o * (8 / np.pi ** 2)
+        return saw(ff, n)
+    x = w(f)
+    if det:
+        x = 0.62 * x + 0.62 * w(f * (1 + det))
+    if oct2:
+        x = x + oct2 * w(f * 2)
+    return x * adsr(n, a, d, s, dur * 0.55) * gain
+
+
+def play(track, t0, t1, rows=None, gain=1.0, oct_shift=0, oct2=0.0, det=0.0,
+         room=0.5, sustain=1.0, drums=False, every=1):
+    """One of the game's tracks across a span. `every` thins it - the setup
+    plays one note in two, which is what turns a tracker line into a music
+    box."""
     bpm, voices = TRACKS[track]
     spb = 60.0 / bpm / 4.0
     step = 0
@@ -229,145 +223,173 @@ def play(track, t0, t1, rows=None, gain=1.0, oct_shift=0, lead_oct2=0.0,
             if rows is not None and vi not in rows:
                 continue
             ch = pat[step % len(pat)]
-            if ch == ' ':
+            if ch == ' ' or (every > 1 and (step % every)):
                 continue
             if w == 'n':
-                if not drums:
-                    continue
-                s = hit(0.22, ch == 'H', g * 3.2 * gain)
-                add(buf, t, s, 1.0)
-                add(wet, t, s, wet_gain * 0.5)
+                if drums:
+                    put(t, tick(g * 2.4 * gain, ch == 'H'), room=room * .4)
                 continue
             f = FREQ(ch) * (2.0 ** oct_shift)
-            dur = spb * 3.4 * sustain
-            kind = {'t': 't', 's': 's', 'w': 'w', 'q': 'q'}[w]
-            # The lowest row of a track is its bass: long, held, no octave.
             low = f < 120
-            s = note(f, dur, kind, g * gain,
-                     a=0.02 if low else 0.008,
-                     d=0.18 if low else 0.10,
-                     s=0.72 if low else 0.5,
-                     oct2=0.0 if low else lead_oct2,
-                     det=0.0 if low else det)
-            add(buf, t, s, 1.0)
-            add(wet, t, s, wet_gain)
-            if sub_row is not None and vi == sub_row:
-                add(buf, t, sub(f / 2, dur * 0.9, g * gain * 0.55), 1.0)
+            put(t, note(f, spb * 3.4 * sustain, {'t': 't', 's': 's', 'w': 'w', 'q': 't'}[w],
+                        g * gain, a=0.02 if low else 0.008, d=0.18 if low else 0.10,
+                        s=0.72 if low else 0.5, oct2=0.0 if low else oct2,
+                        det=0.0 if low else det), room=room)
         step += 1
         t += spb
 
 
-def drone(t0, t1, freq, gain):
+def drone(t0, t1, f, gain, room=0.4):
     n = int((t1 - t0) * SR)
+    if n <= 0:
+        return
     t = np.arange(n) / SR
-    x = (np.sin(2 * np.pi * freq * t) + 0.5 * np.sin(2 * np.pi * freq * 2.003 * t)
-         + 0.25 * np.sin(2 * np.pi * freq * 0.5 * t))
-    fade = np.minimum(1, np.minimum(t / 1.2, (t[-1] - t) / 1.2)) if n else x
-    add(buf, t0, x * fade * gain, 1.0)
-    add(wet, t0, x * fade * gain, 0.35)
+    x = (np.sin(2 * np.pi * f * t) + 0.5 * np.sin(2 * np.pi * f * 2.004 * t)
+         + 0.3 * np.sin(2 * np.pi * f * 0.5 * t))
+    fade = np.minimum(1, np.minimum(t / 1.5, (t[-1] - t) / 1.5))
+    put(t0, x * fade * gain, room=room)
+
+
+def plate(seconds, bright=0.45):
+    n = int(seconds * SR)
+    ir = RNG.standard_normal(n) * np.exp(-np.arange(n) / (SR * seconds / 5.0))
+    ir = lp(ir, int(2 + (1 - bright) * 26))
+    ir[:int(SR * 0.008)] = 0
+    return ir / (np.sqrt(np.sum(ir ** 2)) + 1e-9)
 
 
 # =========================================================================
-# The score, movement by movement, on the cut's own clock.
+# The score. Everything is placed off the cut list, because the cut is on
+# the same clock the drum is.
 # =========================================================================
-K = lambda name: C[name] if name in C else MARK[name]
+M = MARK
+cut_at = {c['name']: c['at'] for c in CUTS}
+cut_times = [c['at'] for c in CUTS]
+after = lambda t: [x for x in cut_times if x >= t - 1e-6]
+between = lambda a, z: [x for x in cut_times if a - 1e-6 <= x < z - 1e-6]
 
-# --- the prologue. One note at a time, two octaves up, and all room. The
-# tune is `wonder` - so the last movement of the film is answering the
-# first, which is the whole story in one gesture.
-play('wonder', K('open'), K('council') - 0.15, rows=[0], gain=0.30,
-     oct_shift=1, det=0.004, wet_gain=1.25, sustain=2.4)
-drone(K('open'), K('council') - 0.15, 73.42, 0.16)
+# --- ACT ONE. A drone, a heartbeat, and the game's theme as a music box two
+# octaves up, one note in two. Nothing else for twenty seconds.
+drone(0.0, M['horn'] - 0.1, 55.0, 0.055)
+drone(6.0, M['horn'] - 0.1, 82.41, 0.028)
+play('wonder', 1.2, M['creep'], rows=[0], gain=0.19, oct_shift=1, det=0.004,
+     room=1.35, sustain=2.6, every=2)
+# The pulse comes in under the second card and never stops until the horn.
+t = 5.87
+while t < M['creep']:
+    put(t, taiko(0.11, pitch=52, length=1.6), room=0.5)
+    t += BEAT * 2
+# A breath into every card in the setup.
+for c in CUTS:
+    if c['kind'] == 'card' and c['at'] < M['creep'] + 1:
+        put(c['at'] - 0.55, whoosh(0.75, 0.09), room=0.7)
 
-# --- the council. No lead: he does not get a tune.
-play('shadow', K('council'), K('glade') - 0.2, rows=[0, 1], gain=0.42,
-     det=0.006, wet_gain=0.75, sub_row=0)
+# --- the tension. Five beats of riser, the pulse doubling, and the theme
+# stops dead one beat before the horn.
+put(M['creep'], riser(M['horn'] - M['creep'], 0.26, 150, 2600), room=0.35)
+t = M['creep']
+while t < M['horn'] - BEAT:
+    put(t, taiko(0.17, pitch=52, length=1.2), room=0.4)
+    t += BEAT
+drone(M['creep'], M['horn'], 55.0 * 2 ** (1 / 12), 0.06)
 
-# --- the glade. The only warm place in the film, and the only movement
-# that gets all three voices of `wonder` at once.
-play('wonder', K('glade'), K('still') - 0.1, gain=0.60,
-     lead_oct2=0.22, det=0.005, wet_gain=0.55)
+# --- THE HORN. The film's first loud thing, thirty seconds in.
+put(M['horn'], braam(4.2, 41.2, 0.95, bite=0.75), room=0.55)
+put(M['horn'], sub_drop(0.75), room=0.1)
+put(M['horn'], taiko(0.85, pitch=58, length=1.8), room=0.35)
+put(M['horn'] + 0.02, whoosh(2.2, 0.22), room=1.1)
 
-# --- the creep. Same track, tune removed: the pad and the counter-line
-# only, so the picture is doing the talking and the music is only breathing.
-play('wonder', K('still'), K('break') - 0.35, rows=[1, 2], gain=0.50,
-     det=0.004, wet_gain=0.7, sustain=1.6)
+# --- the winter. Low, slow, and a taiko every other beat.
+play('winter', M['winter'], M['road'] - 0.15, gain=0.44, det=0.003, room=0.9)
+drone(M['winter'], M['road'], 49.0, 0.10)
+t = M['winter']
+while t < M['road']:
+    put(t, taiko(0.24, pitch=48, length=1.5), room=0.45)
+    t += BEAT * 2
+# A smaller braam under "she was already gone".
+put(M['gone'], braam(3.0, 36.7, 0.44, bite=0.35), room=0.6)
+put(M['gone'], taiko(0.42, pitch=52), room=0.3)
+put(M['road'] - 1.4, riser(1.4, 0.24, 200, 2000), room=0.3)
 
-# --- THE HORN. Everything stops. Three seconds of nothing but a sub
-# climbing under the shards, then the impact on the frame the line says it,
-# and after that only the plate emptying out. The silence before is doing
-# as much work as the hit.
-_sw = int(3.0 * SR)
-_t = np.arange(_sw) / SR
-_ph = 2 * np.pi * np.cumsum(28 + 16 * (_t / 3.0) ** 2) / SR
-add(buf, K('break'), np.sin(_ph) * (_t / 3.0) ** 2.2 * 0.34, 1.0)
-add(buf, K('horn') - 0.06, impact(0.85, 4.0), 1.0)
-add(wet, K('horn') - 0.06, impact(0.5, 4.0), 1.4)
+# --- ACT TWO. The percussion bed arrives, and from here every cut in the
+# film gets a hit. That is the entire trick.
+play('trail', M['road'], M['darkness'] - 0.1, gain=0.55, oct2=0.16, det=0.005, room=0.45, drums=True)
+play('castle', M['darkness'], M['drop'] - 0.1, gain=0.55, det=0.005, room=0.6, drums=True)
+drone(M['road'], M['drop'], 41.2, 0.10)
+t = M['road']
+while t < M['drop']:
+    put(t, taiko(0.30, pitch=50, length=1.0), room=0.3)
+    put(t + BEAT * .5, tick(0.10, True), room=0.25)
+    t += BEAT
+for x in between(M['road'], M['drop']):
+    put(x, taiko(0.46, pitch=54, length=1.2), room=0.35)
+put(M['darkness'], braam(3.4, 38.9, 0.52, bite=0.5), room=0.5)
+put(M['refuse'], braam(2.6, 46.2, 0.46, bite=0.6), room=0.45)
+put(M['drop'] - 1.7, riser(1.7, 0.34, 220, 3000), room=0.3)
 
-# --- the winter, which does not leave for a minute.
-play('winter', K('snow'), K('chain') - 0.2, gain=0.58,
-     det=0.003, wet_gain=0.85, sub_row=1)
-# A cold sheet under the whole of it.
-drone(K('snow'), K('chain') - 0.2, 55.0, 0.10)
+# --- THE DROP. A hit on every beat, a hit on every cut, `throne` under it,
+# and the biggest braam in the film where the light lands.
+play('throne', M['drop'], M['land'], gain=0.74, det=0.006, room=0.5, drums=True)
+drone(M['drop'], M['land'] + 2.0, 36.71, 0.13)
+t = M['drop']
+while t < M['land']:
+    put(t, taiko(0.60, pitch=52, length=0.9), room=0.25)
+    put(t + BEAT * .5, taiko(0.30, pitch=64, length=0.5), room=0.2)
+    put(t + BEAT * .25, tick(0.09, True), room=0.2)
+    put(t + BEAT * .75, tick(0.09, True), room=0.2)
+    t += BEAT
+for x in between(M['drop'], M['land']):
+    put(x, taiko(0.68, pitch=56, length=1.1), room=0.3)
+put(M['shaft'] - 0.9, riser(0.9, 0.30, 400, 4000), room=0.25)
+put(M['land'] - 1.6, riser(1.6, 0.42, 260, 3800), room=0.3)
 
-# --- the road. `trail` walks; `marsh` is the first movement with a pulse
-# in it, and it arrives exactly where the film starts cutting fast.
-play('trail', K('chain'), K('lights') - 0.15, gain=0.60, lead_oct2=0.18, det=0.005, wet_gain=0.5)
-play('marsh', K('lights'), K('gown') - 0.15, gain=0.62, lead_oct2=0.16, det=0.005, wet_gain=0.5, sub_row=0)
+# The landing, and then the film stops dead.
+put(M['land'], braam(5.0, 32.7, 1.0, bite=0.9), room=0.65)
+put(M['land'], sub_drop(0.85, 80, 22, 2.8), room=0.1)
+put(M['land'], taiko(0.95, pitch=60, length=2.2), room=0.4)
+put(M['land'] + 0.01, whoosh(3.0, 0.26), room=1.2)
 
-# --- the castle, and then the throne with a floor under it.
-play('castle', K('gown'), K('offer') - 0.15, gain=0.60, det=0.005, wet_gain=0.9, sub_row=0)
-play('throne', K('offer'), K('fall') - 0.25, gain=0.66, det=0.006, wet_gain=1.0, sub_row=0)
-drone(K('offer'), K('fall') - 0.25, 36.71, 0.13)
+# --- the two cards. Nothing but a sustain and one hit each, and true
+# silence in the black beat between them.
+drone(cut_at['c10'], M['hold'] - 0.35, 32.7, 0.070, room=0.6)
+put(cut_at['c10'], taiko(0.30, pitch=46, length=2.0), room=0.5)
+drone(cut_at['c11'], M['dawn'], 41.2, 0.10, room=0.6)
+put(cut_at['c11'], taiko(0.36, pitch=46, length=2.0), room=0.5)
+put(cut_at['c11'], braam(3.6, 41.2, 0.34, bite=0.25), room=0.7)
+put(M['dawn'] - 1.2, riser(1.2, 0.26, 200, 1800), room=0.4)
 
-# The light landing on him: one bright strike, up where nothing else is.
-for k, g in ((0, 0.30), (0.09, 0.19), (0.20, 0.11)):
-    s = note(FREQ('Z') * 2, 1.9, 's', g, a=0.002, d=0.5, s=0.25, r=1.2)
-    add(buf, K('land') + k, s, 1.0)
-    add(wet, K('land') + k, s, 1.3)
+# --- THE DAWN. The theme, whole, in octaves, and the only place in the film
+# where everything is playing at once.
+D0, D1 = M['dawn'], END + 0.9
+play('wonder', D0, D1, gain=0.72, oct2=0.32, det=0.006, room=0.65)
+play('wonder', D0 + 0.8, D1, rows=[0], gain=0.32, oct_shift=1, det=0.004, room=1.15, sustain=2.0)
+play('wonder', M['named'], D1, rows=[1], gain=0.46, oct_shift=-1, room=0.5)
+play('wonder', M['named'], D1, rows=[2], gain=0.32, oct_shift=1, det=0.004, room=0.95)
+drone(D0, D1, 73.42, 0.16)
+put(D0, taiko(0.44, pitch=44, length=2.6), room=0.6)
+put(M['named'], taiko(0.40, pitch=48, length=2.4), room=0.6)
+put(M['named'], braam(4.0, 55.0, 0.30, bite=0.2), room=0.7)
 
-# --- the fall. The only fast bar in the film, and the game wrote it.
-play('pursuit', K('fall'), K('dawn') - 0.3, gain=0.66, lead_oct2=0.2, det=0.006, wet_gain=0.45, sub_row=0)
-
-# --- the dawn. `wonder` again and all of it: the tune where it was written,
-# an octave above it, the counter-line, the bass, and the prologue's high
-# music-box copy still up there on top. The film opened on one voice of
-# this and closes on six.
-D0, D1 = K('dawn'), END + 0.9
-play('wonder', D0, D1, gain=0.76, lead_oct2=0.34, det=0.006, wet_gain=0.65, sub_row=1)
-play('wonder', D0 + 0.9, D1, rows=[0], gain=0.34, oct_shift=1, det=0.004, wet_gain=1.1, sustain=2.0)
-# From "they named it the seventh colour" the bass doubles down an octave -
-# the only place in the film with real weight under the theme, and the
-# loudest thing in it. The council was louder than the dawn on the first
-# pass, which is a score that does not know which way the story goes.
-play('wonder', K('named'), D1, rows=[1], gain=0.48, oct_shift=-1, wet_gain=0.5)
-play('wonder', K('named'), D1, rows=[2], gain=0.34, oct_shift=1, det=0.004, wet_gain=0.9)
-drone(D0, D1, 73.42, 0.18)
-
-# =========================================================================
-# The room, and the master.
 # =========================================================================
 print('mixing the plate...')
-ir = plate(2.6, bright=0.45)
-n = len(buf)
+ir = plate(2.8, bright=0.45)
 size = 1
-while size < n + len(ir):
+while size < N + len(ir):
     size *= 2
-rev = np.fft.irfft(np.fft.rfft(wet, size) * np.fft.rfft(ir, size))[:n]
-mix = buf + rev * 0.55
+rev = np.fft.irfft(np.fft.rfft(wet, size) * np.fft.rfft(ir, size))[:N]
+mix = dry + rev * 0.5
+mix = lp(mix, 3)
 
-# A gentle high shelf off the top - the whole thing is oscillators and the
-# plate is noise, and both live in the same 6kHz that makes a mix tiring.
-mix = np.convolve(mix, np.array([0.25, 0.5, 0.25]), mode='same')
-
-# Fade the head and the tail, and leave the last second under the end card.
-head = int(SR * 0.8)
+head = int(SR * 0.5)
 mix[:head] *= np.linspace(0, 1, head)
-tail = int(SR * 1.6)
+tail = int(SR * 1.8)
 mix[-tail:] *= np.linspace(1, 0, tail) ** 1.4
 
-peak = np.max(np.abs(mix))
-mix = mix / peak * 0.90
+# A soft knee on the peaks rather than a hard clip: the braams are meant to
+# be the loudest thing in the film and a limiter is what lets them be.
+lim = 0.92
+mix = np.tanh(mix / lim * 0.92) * lim
+mix = mix / (np.max(np.abs(mix)) + 1e-9) * 0.94
 stereo = np.stack([mix, mix], axis=1)
 
 os.makedirs(OUT_DIR, exist_ok=True)
@@ -378,12 +400,11 @@ with wave.open(out, 'wb') as fh:
     fh.setframerate(SR)
     fh.writeframes((np.clip(stereo, -1, 1) * 32767).astype('<i2').tobytes())
 
-# The level arc, printed, because "does the drop drop" is a question with a
-# number for an answer.
-print('movements:', ' '.join(f'{k}@{v:.2f}' for k, v in sorted(C.items(), key=lambda kv: kv[1]) if isinstance(v, (int, float))))
-for name in ('open', 'council', 'glade', 'still', 'snow', 'chain', 'lights', 'gown', 'offer', 'beam', 'fall', 'dawn'):
-    a = int(K(name) * SR)
-    b = min(len(mix), a + int(2.0 * SR))
-    rms = np.sqrt(np.mean(mix[a:b] ** 2)) if b > a else 0
-    print(f'  {name:9s} {20 * np.log10(rms + 1e-9):6.1f} dB')
-print(f'wrote {out}, {DUR:.2f}s')
+print('the arc, in dB over two seconds from each mark:')
+for name in ('open', 'creep', 'horn', 'winter', 'gone', 'road', 'darkness',
+             'refuse', 'drop', 'land', 'hold', 'dawn', 'named'):
+    a = int(M[name] * SR)
+    z = min(N, a + int(2.0 * SR))
+    r = np.sqrt(np.mean(mix[a:z] ** 2)) if z > a else 0
+    print(f'  {name:9s} {M[name]:6.2f}s  {20 * np.log10(r + 1e-9):6.1f}')
+print(f'wrote {out}, {DUR:.2f}s, {len(CUTS)} cuts hit')

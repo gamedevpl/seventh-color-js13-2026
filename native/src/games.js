@@ -19,14 +19,19 @@ import { sfxHit, sfxNo, sfxJump, sfxTap } from './audio.js';
 // Shared readouts. Four mechanics, one status vocabulary - pips for
 // countable progress, a meter for continuous progress - so the player
 // learns to read the top strip once rather than four times.
+// The status vocabulary the four mechanics share - and the first thing a
+// film of them has to lose. DEV only; without --cheats these guards are
+// deleted along with the flag that reads them.
 function pips(x, y, n, filled, on, off) {
+  if (DEV && window.SCH) return;
   for (let i = 0; i < n; i++) circle(x + i * 9, y, 3, { fill: i < filled ? on : off });
 }
 function meter(x, y, w, p, color) {
+  if (DEV && window.SCH) return;
   rect(x, y, w, 4, { fill: '#0009' });
   rect(x, y, w * Math.max(0, Math.min(1, p)), 4, { fill: color });
 }
-function strip() { rect(0, 0, 320, 16, { fill: '#0007' }); }
+function strip() { if (DEV && window.SCH) return; rect(0, 0, 320, 16, { fill: '#0007' }); }
 
 // --- crack: the ice answers back on both sides --------------------------
 // Was a reflex test: hit the lit thing before it closed. Now striking the
@@ -97,7 +102,7 @@ function crackRender(g) {
     circle(crackX(j), 92, 2, { fill: j === g.sel ? '#e8b923' : '#e8b92377' });
   }
   strip();
-  text(`moves ${g.moves}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
+  if (!(DEV && window.SCH)) text(`moves ${g.moves}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
 }
 
 // --- beam: route the light to where it has to land ----------------------
@@ -189,10 +194,10 @@ function lightsRender(g) {
   g.history.slice(-4).forEach(([row, score], k) => {
     const y = 92 + k * 10;
     row.forEach((v, i) => circle(160 + (i - (g.n - 1) / 2) * 14, y, 3, { fill: LIT[v % 4] }));
-    text(`${score} right`, 160 + (g.n / 2) * 14 + 8, y + 3, { fill: '#a89b84', font: '8px system-ui' });
+    if (!(DEV && window.SCH)) text(`${score} right`, 160 + (g.n / 2) * 14 + 8, y + 3, { fill: '#a89b84', font: '8px system-ui' });
   });
   strip();
-  text(`tries ${g.history.length}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
+  if (!(DEV && window.SCH)) text(`tries ${g.history.length}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
   meter(258, 6, 52, g.wake / 6, '#6a8a5a');
 }
 
@@ -240,14 +245,16 @@ function stillRender(g) {
     const up = headUp(u, g.t), warn = rising(u, g.t);
     const y = 96 - (up ? 18 : 0);
     paintFace('unicorn', 148 + i * 58, y, .34, g.t, false, true);
-    circle(148 + i * 58, y + 22, 3, { fill: up ? '#e8735a' : warn ? '#e8b923' : '#7cb56a' });
+    // The tells are readouts, not scenery: they go with the rest of the
+    // interface when the film is holding the camera.
+    if (!(DEV && window.SCH)) circle(148 + i * 58, y + 22, 3, { fill: up ? '#e8735a' : warn ? '#e8b923' : '#7cb56a' });
   });
   // Lili, closing the distance she has earned.
-  circle(46 + g.near * 88, 104, 4, { fill: g.spooked ? '#e8735a' : '#e8cdb0' });
-  rect(0, 116, 320, 2, { fill: safe ? '#7cb56a55' : '#e8735a55' });
+  if (!(DEV && window.SCH)) circle(46 + g.near * 88, 104, 4, { fill: g.spooked ? '#e8735a' : '#e8cdb0' });
+  if (!(DEV && window.SCH)) rect(0, 116, 320, 2, { fill: safe ? '#7cb56a55' : '#e8735a55' });
   strip();
   meter(10, 6, 240, g.near, g.spooked ? '#e8735a' : safe ? '#fff0a0' : '#8a7a5a');
-  text(safe ? 'still' : 'watching', 268, 11, { fill: safe ? '#7cb56a' : '#e8735a', font: '8px system-ui' });
+  if (!(DEV && window.SCH)) text(safe ? 'still' : 'watching', 268, 11, { fill: safe ? '#7cb56a' : '#e8735a', font: '8px system-ui' });
 }
 
 // --- dungeon: carry the light down to him -------------------------------
@@ -447,13 +454,13 @@ function dunRender(st, b) {
   strip();
   if (st.open) meter(10, 6, 300, st.sweep, '#fff0a0');
   else if (st.lock > 0) meter(10, 6, 300 * (st.lock / 2), 1, '#5a4a3a');
-  else text(`bucklers ${g.mirrors - st.mir.length}/${g.mirrors}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
+  else if (!(DEV && window.SCH)) text(`bucklers ${g.mirrors - st.mir.length}/${g.mirrors}`, 10, 11, { fill: '#a89b84', font: '8px system-ui' });
   const here = Math.round(st.x), on = st.mir.find((m) => m[0] === here && m[1] === st.r);
   const doesWhat = st.r === 0 && here === g.entry ? 'SPACE opens the shaft'
     : on ? (on[2] ? 'SPACE takes it back' : 'SPACE turns it')
     : st.mir.length < g.mirrors ? 'SPACE puts a buckler here' : 'no bucklers left - take one back';
-  if (st.msg > 0) text(['no bucklers left', 'seen! the shaft slams shut', 'a guard knocks it askew'][st.why], 96, 11, { fill: '#e8735a', font: '8px system-ui' });
-  else text(doesWhat, 96, 11, { fill: t.hit ? '#fff0a0' : '#8a7f6a', font: '8px system-ui' });
+  if (st.msg > 0 && !(DEV && window.SCH)) text(['no bucklers left', 'seen! the shaft slams shut', 'a guard knocks it askew'][st.why], 96, 11, { fill: '#e8735a', font: '8px system-ui' });
+  else if (!(DEV && window.SCH)) text(doesWhat, 96, 11, { fill: t.hit ? '#fff0a0' : '#8a7f6a', font: '8px system-ui' });
   meter(258, 6, 52, st.alarm / 5, '#e8735a');
 }
 

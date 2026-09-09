@@ -37,6 +37,8 @@ with open(BEATS_JSON) as fh:
     B = json.load(fh)
 CUTS = B['cuts']
 MARK = {m['name']: m['at'] for m in B['marks']}
+VO = B.get('vo', [])
+VO_DIR = os.path.join(OUT_DIR, 'vo')
 BEAT = B['beat']
 END = B['cues']['end']
 ENDCARD = 5.6
@@ -269,23 +271,23 @@ after = lambda t: [x for x in cut_times if x >= t - 1e-6]
 between = lambda a, z: [x for x in cut_times if a - 1e-6 <= x < z - 1e-6]
 
 # --- ACT ONE. A drone, a heartbeat, and the game's theme as a music box two
-# octaves up, one note in two. Nothing else for twenty seconds.
+# octaves up, one note in two. The narrator does the rest.
 drone(0.0, M['horn'] - 0.1, 55.0, 0.055)
 drone(6.0, M['horn'] - 0.1, 82.41, 0.028)
-play('wonder', 1.2, M['creep'], rows=[0], gain=0.19, oct_shift=1, det=0.004,
+play('wonder', 1.2, M['darkness1'] - 0.1, rows=[0], gain=0.19, oct_shift=1, det=0.004,
      room=1.35, sustain=2.6, every=2)
-# The pulse comes in under the second card and never stops until the horn.
-t = 5.87
+# His hall gets his own theme under him, low, with no lead - he does not get
+# a tune, he gets a floor.
+play('shadow', M['darkness1'], M['creep'] - 0.1, rows=[0, 1], gain=0.30, det=0.006, room=0.8)
+t = 4.57
 while t < M['creep']:
     put(t, taiko(0.11, pitch=52, length=1.6), room=0.5)
     t += BEAT * 2
-# A breath into every card in the setup.
 for c in CUTS:
     if c['kind'] == 'card' and c['at'] < M['creep'] + 1:
         put(c['at'] - 0.55, whoosh(0.75, 0.09), room=0.7)
 
-# --- the tension. Five beats of riser, the pulse doubling, and the theme
-# stops dead one beat before the horn.
+# --- the tension. Four beats of riser, and everything stops one beat short.
 put(M['creep'], riser(M['horn'] - M['creep'], 0.26, 150, 2600), room=0.35)
 t = M['creep']
 while t < M['horn'] - BEAT:
@@ -293,28 +295,26 @@ while t < M['horn'] - BEAT:
     t += BEAT
 drone(M['creep'], M['horn'], 55.0 * 2 ** (1 / 12), 0.06)
 
-# --- THE HORN. The film's first loud thing, thirty seconds in.
+# --- THE HORN. The film's first loud thing.
 put(M['horn'], braam(4.2, 41.2, 0.95, bite=0.75), room=0.55)
 put(M['horn'], sub_drop(0.75), room=0.1)
 put(M['horn'], taiko(0.85, pitch=58, length=1.8), room=0.35)
 put(M['horn'] + 0.02, whoosh(2.2, 0.22), room=1.1)
 
-# --- the winter. Low, slow, and a taiko every other beat.
-play('winter', M['winter'], M['road'] - 0.15, gain=0.44, det=0.003, room=0.9)
+# --- the winter. He is talking over it, so it plays under him.
+play('winter', M['winter'], M['road'] - 0.15, gain=0.42, det=0.003, room=0.9)
 drone(M['winter'], M['road'], 49.0, 0.10)
 t = M['winter']
 while t < M['road']:
-    put(t, taiko(0.24, pitch=48, length=1.5), room=0.45)
+    put(t, taiko(0.28, pitch=48, length=1.5), room=0.45)
     t += BEAT * 2
-# A smaller braam under "she was already gone".
 put(M['gone'], braam(3.0, 36.7, 0.44, bite=0.35), room=0.6)
 put(M['gone'], taiko(0.42, pitch=52), room=0.3)
 put(M['road'] - 1.4, riser(1.4, 0.24, 200, 2000), room=0.3)
 
-# --- ACT TWO. The percussion bed arrives, and from here every cut in the
-# film gets a hit. That is the entire trick.
-play('trail', M['road'], M['darkness'] - 0.1, gain=0.55, oct2=0.16, det=0.005, room=0.45, drums=True)
-play('castle', M['darkness'], M['drop'] - 0.1, gain=0.55, det=0.005, room=0.6, drums=True)
+# --- ACT TWO. The percussion bed arrives, and from here every cut gets a hit.
+play('trail', M['road'], M['offer'] - 0.1, gain=0.52, oct2=0.16, det=0.005, room=0.45, drums=True)
+play('castle', M['offer'], M['drop'] - 0.1, gain=0.50, det=0.005, room=0.6, drums=True)
 drone(M['road'], M['drop'], 41.2, 0.10)
 t = M['road']
 while t < M['drop']:
@@ -323,23 +323,22 @@ while t < M['drop']:
     t += BEAT
 for x in between(M['road'], M['drop']):
     put(x, taiko(0.46, pitch=54, length=1.2), room=0.35)
-put(M['darkness'], braam(3.4, 38.9, 0.52, bite=0.5), room=0.5)
+put(M['offer'], braam(3.4, 38.9, 0.48, bite=0.5), room=0.5)
 put(M['refuse'], braam(2.6, 46.2, 0.46, bite=0.6), room=0.45)
 put(M['drop'] - 1.7, riser(1.7, 0.34, 220, 3000), room=0.3)
 
-# --- THE DROP. A hit on every beat, a hit on every cut, `throne` under it,
-# and the biggest braam in the film where the light lands.
-play('throne', M['drop'], M['land'], gain=0.74, det=0.006, room=0.5, drums=True)
+# --- THE DROP. A hit on every beat and every cut, `throne` under it.
+play('throne', M['drop'], M['land'], gain=0.66, det=0.006, room=0.5, drums=True)
 drone(M['drop'], M['land'] + 2.0, 36.71, 0.13)
 t = M['drop']
 while t < M['land']:
-    put(t, taiko(0.60, pitch=52, length=0.9), room=0.25)
-    put(t + BEAT * .5, taiko(0.30, pitch=64, length=0.5), room=0.2)
+    put(t, taiko(0.58, pitch=52, length=0.9), room=0.25)
+    put(t + BEAT * .5, taiko(0.28, pitch=64, length=0.5), room=0.2)
     put(t + BEAT * .25, tick(0.09, True), room=0.2)
     put(t + BEAT * .75, tick(0.09, True), room=0.2)
     t += BEAT
 for x in between(M['drop'], M['land']):
-    put(x, taiko(0.68, pitch=56, length=1.1), room=0.3)
+    put(x, taiko(0.66, pitch=56, length=1.1), room=0.3)
 put(M['shaft'] - 0.9, riser(0.9, 0.30, 400, 4000), room=0.25)
 put(M['land'] - 1.6, riser(1.6, 0.42, 260, 3800), room=0.3)
 
@@ -349,35 +348,75 @@ put(M['land'], sub_drop(0.85, 80, 22, 2.8), room=0.1)
 put(M['land'], taiko(0.95, pitch=60, length=2.2), room=0.4)
 put(M['land'] + 0.01, whoosh(3.0, 0.26), room=1.2)
 
-# --- the two cards. Nothing but a sustain and one hit each, and true
-# silence in the black beat between them.
-drone(cut_at['c10'], M['hold'] - 0.35, 32.7, 0.070, room=0.6)
-put(cut_at['c10'], taiko(0.30, pitch=46, length=2.0), room=0.5)
-drone(cut_at['c11'], M['dawn'], 41.2, 0.10, room=0.6)
-put(cut_at['c11'], taiko(0.36, pitch=46, length=2.0), room=0.5)
-put(cut_at['c11'], braam(3.6, 41.2, 0.34, bite=0.25), room=0.7)
+# --- the two cards. A sustain, one hit each, and true silence between them,
+# because Jack is speaking and he is the only thing that should be.
+drone(cut_at['c3'], M['hold'] - 0.35, 32.7, 0.070, room=0.6)
+put(cut_at['c3'], taiko(0.30, pitch=46, length=2.0), room=0.5)
+drone(cut_at['c4'], M['dawn'], 41.2, 0.10, room=0.6)
+put(cut_at['c4'], taiko(0.36, pitch=46, length=2.0), room=0.5)
+put(cut_at['c4'], braam(3.6, 41.2, 0.34, bite=0.25), room=0.7)
 put(M['dawn'] - 1.2, riser(1.2, 0.26, 200, 1800), room=0.4)
 
-# --- THE DAWN. The theme, whole, in octaves, and the only place in the film
-# where everything is playing at once.
-D0, D1 = M['dawn'], END + 0.9
-play('wonder', D0, D1, gain=0.72, oct2=0.32, det=0.006, room=0.65)
+# --- THE DAWN. The theme, whole, in octaves - and it carries the end card,
+# which the first pass did not: the picture stopped, the music stopped with
+# it, and five seconds of title sat there in a room tone.
+D0, D1 = M['dawn'], DUR - 1.4
+play('wonder', D0, D1, gain=0.80, oct2=0.34, det=0.006, room=0.65)
 play('wonder', D0 + 0.8, D1, rows=[0], gain=0.32, oct_shift=1, det=0.004, room=1.15, sustain=2.0)
-play('wonder', M['named'], D1, rows=[1], gain=0.46, oct_shift=-1, room=0.5)
+play('wonder', M['named'], D1, rows=[1], gain=0.52, oct_shift=-1, room=0.5)
 play('wonder', M['named'], D1, rows=[2], gain=0.32, oct_shift=1, det=0.004, room=0.95)
-drone(D0, D1, 73.42, 0.16)
+drone(D0, D1, 73.42, 0.18)
+# One last swell where the picture hands over to the card.
+put(END - 0.9, riser(0.9, 0.20, 200, 1600), room=0.5)
+put(END, taiko(0.42, pitch=44, length=2.8), room=0.7)
+put(END, braam(4.6, 55.0, 0.34, bite=0.2), room=0.8)
 put(D0, taiko(0.44, pitch=44, length=2.6), room=0.6)
 put(M['named'], taiko(0.40, pitch=48, length=2.4), room=0.6)
 put(M['named'], braam(4.0, 55.0, 0.30, bite=0.2), room=0.7)
 
 # =========================================================================
+# The voices, and the hole in the music they speak through.
+# =========================================================================
+def read_wav(path_):
+    with wave.open(path_, 'rb') as fh:
+        n = fh.getnframes()
+        a = np.frombuffer(fh.readframes(n), dtype='<i2').astype(np.float64) / 32768.0
+        if fh.getnchannels() == 2:
+            a = a.reshape(-1, 2).mean(axis=1)
+    return a
+
+
+voice = np.zeros(N)
+vwet = np.zeros(N)
+# The duck: the music drops under every line and comes back after it.
+# Written as an envelope over the whole film rather than per-cue, because
+# two lines close together should not duck twice and let the bed jump up
+# for a tenth of a second between them.
+duck = np.ones(N)
+DUCK = 0.40                              # about -8dB under speech
+for v in VO:
+    a = read_wav(os.path.join(VO_DIR, f"{v['id']}.wav"))
+    add(voice, v['at'], a, 1.0)
+    add(vwet, v['at'], a, 0.16)          # a touch of the same room, no more
+    i0 = max(0, int((v['at'] - 0.30) * SR))
+    i1 = min(N, int((v['at'] + v['dur'] + 0.45) * SR))
+    lead, tailn = int(0.25 * SR), int(0.45 * SR)
+    seg = np.full(i1 - i0, DUCK)
+    seg[:min(lead, len(seg))] = np.linspace(1, DUCK, min(lead, len(seg)))
+    if len(seg) > tailn:
+        seg[-tailn:] = np.linspace(DUCK, 1, tailn)
+    duck[i0:i1] = np.minimum(duck[i0:i1], seg)
+print(f'{len(VO)} lines, {sum(v["dur"] for v in VO):.1f}s of speech, ducking to {20 * np.log10(DUCK):.1f}dB')
+
 print('mixing the plate...')
 ir = plate(2.8, bright=0.45)
 size = 1
 while size < N + len(ir):
     size *= 2
 rev = np.fft.irfft(np.fft.rfft(wet, size) * np.fft.rfft(ir, size))[:N]
-mix = dry + rev * 0.5
+vrev = np.fft.irfft(np.fft.rfft(vwet, size) * np.fft.rfft(ir, size))[:N]
+# The score ducks; the voice does not.
+mix = (dry + rev * 0.5) * duck + (voice * 0.92 + vrev * 0.5)
 mix = lp(mix, 3)
 
 head = int(SR * 0.5)
@@ -401,8 +440,8 @@ with wave.open(out, 'wb') as fh:
     fh.writeframes((np.clip(stereo, -1, 1) * 32767).astype('<i2').tobytes())
 
 print('the arc, in dB over two seconds from each mark:')
-for name in ('open', 'creep', 'horn', 'winter', 'gone', 'road', 'darkness',
-             'refuse', 'drop', 'land', 'hold', 'dawn', 'named'):
+for name in ('open', 'darkness1', 'creep', 'horn', 'winter', 'gone', 'road',
+             'offer', 'refuse', 'drop', 'land', 'hold', 'dawn', 'named'):
     a = int(M[name] * SR)
     z = min(N, a + int(2.0 * SR))
     r = np.sqrt(np.mean(mix[a:z] ** 2)) if z > a else 0

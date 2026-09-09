@@ -8,10 +8,18 @@
 //
 //   THE INTERFACE IS OFF. `SCH` (a DEV hook) stops the game narrating
 //   itself - no dialogue panel, no choice list, no status strips over the
-//   mechanics. What is left is the picture, and the film puts its own words
-//   on it, in its own type, full frame. Every one of those words is still a
-//   line the game wrote; they are cut down to card length, which is what a
-//   trailer does to a script.
+//   mechanics. What is left is the picture, and four voices say the lines
+//   over it: a narrator, Darkness, Jack and Lili, generated with ElevenLabs
+//   by audio/voice-native.mjs. Every word any of them says is a line out of
+//   native/src/data.js, trimmed the way a trailer trims a script. Cards are
+//   down to four - the one nobody says, and the three the film wants both
+//   said AND written.
+//
+//   THE VOICE SETS THE LENGTHS. audio/vo/vo.json carries each line's
+//   measured seconds; every shot below is long enough for the line laid on
+//   it, rounded up to the beat. A line may run over a cut - a sentence
+//   bridging two images is the oldest trick in the form - but never over a
+//   section boundary.
 //
 //   EVERYTHING IS ON A GRID. One beat is 0.6522s (92bpm) and every shot is
 //   a whole number of them, so every cut lands on a beat and the score
@@ -38,7 +46,7 @@
 // Frame-stepped, never real time: rAF, performance.now and setTimeout are a
 // virtual clock the recorder pumps. beats.json goes out beside the frames
 // with every cut's second, and the score is arranged to those numbers.
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright-core';
@@ -57,6 +65,10 @@ const VW = 320, VH = 156, SCX = 8;
 // comfortable length for one to be read.
 const BPM = 92, BEAT = 60 / BPM;
 const b = (n) => n * BEAT;
+
+// What the voices actually came out at. The cut is built on these numbers.
+const VO = JSON.parse(readFileSync(path.join(outDir, 'audio', 'vo', 'vo.json'), 'utf8'));
+const vos = [];
 
 rmSync(framesDir, { recursive: true, force: true });
 mkdirSync(framesDir, { recursive: true });
@@ -218,6 +230,9 @@ async function shoot(s) {
   const at = +vt.toFixed(4);
   cuts.push({ name: s.name, at, beats: s.beats, kind: s.text ? 'card' : 'shot', ...(s.mark ? { mark: s.mark } : {}) });
   if (s.mark) marks.push({ name: s.mark, at });
+  // A line is placed at the cut it belongs to, plus whatever lead-in the
+  // shot asks for. The score reads these back and ducks the music under them.
+  if (s.vo) vos.push({ id: s.vo, at: +(at + (s.voAt ?? 0.12)).toFixed(4), dur: VO[s.vo].dur, who: VO[s.vo].who });
   if (s.stage) await stage(s.stage, s.arg);
   const n = Math.round(b(s.beats) * FPS);
   const f0 = s.focus || [160, 78], f1 = s.focus1 || f0;
@@ -270,28 +285,36 @@ console.log(`recording The Seventh Color  (${BPM}bpm, one beat = ${BEAT.toFixed(
 
 // =========================================================================
 // ACT ONE - what there was
-// Long units, wide pushes, and nothing loud. Every card is on black.
+// The narrator over four pictures. No cards here: he is saying the words,
+// and a card that repeats a line being spoken is a subtitle with ambitions.
 // =========================================================================
 await put('prologue', { phase: 6, cut: 4.0 });
-await card('c1', 'Before the first winter', 4, { size: 60, tscale: [1, 1.04] });
-await shoot({ name: 'bloom', beats: 5, focus: [160, 72], push: [1.34, 1.02], ease: 'out', mark: 'open' });
-await card('c2', 'light had seven colours', 4, { size: 62, tscale: [1, 1.04] });
+await shoot({ name: 'bloom', beats: 7, vo: 'n1', voAt: 0.55, mark: 'open',
+  focus: [160, 72], push: [1.34, 1.02], ease: 'out' });
 
 await put('jacks-glade', { phase: 0, line: 4 });
-await shoot({ name: 'glade', beats: 5, focus: [150, 62], push: [1.28, 1.42], ease: 'lin' });
-await card('c3', 'six, the world was allowed to keep', 5, { size: 56, tscale: [1, 1.04] });
+await shoot({ name: 'glade', beats: 5, vo: 'n2',
+  focus: [150, 62], push: [1.26, 1.4], ease: 'lin' });
 
 await put('unicorn-stream', { phase: 0, line: 0 });
 await intoGame('unicorn-stream');
-await shoot({ name: 'herd', beats: 4, drv: 'still', drvArg: { slipAt: 9 }, focus: [232, 94], push: [1.5, 1.34], ease: 'lin' });
-await card('c4', 'the seventh lived in a horn', 4, { size: 60, color: '#e8b923', tscale: [1, 1.05] });
+await shoot({ name: 'herd', beats: 7, vo: 'n3', drv: 'still', drvArg: { slipAt: 99 },
+  focus: [232, 94], focus1: [200, 94], push: [1.5, 1.3], ease: 'lin' });
+
+// His hall, and the first thing in the film that is enjoying itself.
+await put('shadow-council', { phase: 0, line: 0 });
+await shoot({ name: 'council', beats: 6, vo: 'd1', mark: 'darkness1',
+  focus: [166, 58], push: [1.16, 1.36], ease: 'out' });
 
 // =========================================================================
-// THE BREAK - the first loud thing in the film, and it is thirty seconds in
+// THE BREAK
 // =========================================================================
-await shoot({ name: 'creep', beats: 5, drv: 'still', drvArg: {}, focus: [150, 96], focus1: [200, 96], push: [1.42, 1.6], ease: 'in', mark: 'creep' });
-await shoot({ name: 'reach', beats: 3, drv: 'still', drvArg: {}, focus: [232, 94], push: [1.7, 1.9], ease: 'in' });
-// The horn. Hard cut, two white frames, and the shards.
+await put('unicorn-stream', { phase: 0, line: 0 });
+await intoGame('unicorn-stream');
+await shoot({ name: 'creep', beats: 4, drv: 'still', drvArg: {}, mark: 'creep',
+  focus: [150, 96], focus1: [200, 96], push: [1.42, 1.6], ease: 'in' });
+await shoot({ name: 'reach', beats: 3, drv: 'still', drvArg: {},
+  focus: [232, 94], push: [1.7, 1.9], ease: 'in' });
 await shoot({
   name: 'shatter', beats: 5, flash: 3, mark: 'horn',
   stage: () => {
@@ -302,8 +325,9 @@ await shoot({
   },
   focus: [160, 72], push: [1.0, 1.26], ease: 'in',
 });
+// And he is still amused about it, over the snow.
 await shoot({
-  name: 'snow', beats: 4, mark: 'winter',
+  name: 'snow', beats: 7, vo: 'd2', voAt: 0.5, mark: 'winter',
   stage: () => {
     const bt = window.SC.BEATS.find((x) => x.id === 'winter-comes');
     bt.cutscene.hold = 3.0;
@@ -312,51 +336,54 @@ await shoot({
   },
   focus: [160, 86], push: [1.3, 1.06], ease: 'out',
 });
-await card('c5', 'and the cold came in behind it', 4, { size: 58 });
 await put('winter-falls', { phase: 0, line: 1 });
 await shoot({ name: 'pond', beats: 4, focus: [110, 66], push: [1.24, 1.4], ease: 'lin' });
-await card('c6', 'she was already gone', 3, { size: 62, mark: 'gone' });
+await card('c1', 'she was already gone', 3, { size: 62, mark: 'gone' });
 
 // =========================================================================
-// ACT TWO - the road. Two and three beats a shot, and the cuts start
-// landing on the drum rather than beside it.
+// ACT TWO - the road
 // =========================================================================
 await intoGame('winter-falls');
-await shoot({ name: 'ice', beats: 3, drv: 'crack', drvArg: { every: .26 }, focus: [160, 110], push: [1.5, 1.34], ease: 'lin', mark: 'road' });
+await shoot({ name: 'ice', beats: 3, vo: 'g1', drv: 'crack', drvArg: { every: .26 },
+  focus: [160, 110], push: [1.5, 1.34], ease: 'lin', mark: 'road' });
 await put('hollow-armory', { phase: 0, line: 1 });
 await shoot({ name: 'gump', beats: 2, focus: [84, 70], push: [1.36, 1.46], ease: 'lin' });
 await put('bog-road', { phase: 0, line: 1 });
 await intoGame('bog-road');
-await shoot({ name: 'bog', beats: 2, drv: 'lights', drvArg: { every: .22 }, focus: [160, 56], push: [1.4, 1.3], ease: 'lin' });
+await shoot({ name: 'bog', beats: 2, drv: 'lights', drvArg: { every: .22 },
+  focus: [160, 56], push: [1.4, 1.3], ease: 'lin' });
 await put('megs-looking-glass', { phase: 0, line: 2 });
 await shoot({ name: 'meg', beats: 2, focus: [274, 52], push: [1.38, 1.5], ease: 'lin' });
 await put('root-door', { phase: 0, line: 1 });
 await shoot({ name: 'roots', beats: 2, focus: [160, 74], push: [1.3, 1.4], ease: 'lin' });
 await put('gown-that-breathes', { phase: 0, line: 2 });
 await shoot({ name: 'hall', beats: 2, focus: [160, 60], push: [1.24, 1.36], ease: 'lin' });
+
+// The offer, the refusal, and her answer to the same offer.
 await put('hidden-hand', { phase: 0, line: 0 });
-await shoot({ name: 'throne', beats: 3, focus: [226, 56], push: [1.3, 1.46], ease: 'lin', mark: 'darkness' });
-await card('c7', 'stand beside me', 3, { size: 66, color: '#c9524f' });
-await shoot({ name: 'throne2', beats: 2, focus: [226, 56], push: [1.6, 1.72], ease: 'lin' });
-await card('c8', 'the night can be yours to keep', 4, { size: 56 });
-await shoot({ name: 'jack', beats: 3, focus: [96, 74], push: [1.4, 1.56], ease: 'lin' });
-await card('c9', 'dawn needs no throne', 3, { size: 64, color: '#e8b923', mark: 'refuse' });
+await shoot({ name: 'throne', beats: 6, vo: 'd3', mark: 'offer',
+  focus: [226, 56], push: [1.3, 1.5], ease: 'lin' });
+await shoot({ name: 'jack', beats: 5, vo: 'j1',
+  focus: [96, 74], push: [1.4, 1.56], ease: 'lin' });
+await card('c2', 'dawn needs no throne', 3, { size: 64, color: '#e8b923', vo: 'j2', mark: 'refuse' });
+await put('false-sacrifice', { phase: 0, line: 1 });
+await shoot({ name: 'lili', beats: 6, vo: 'l1',
+  focus: [96, 76], push: [1.42, 1.58], ease: 'lin' });
 
 // =========================================================================
-// THE DROP - one and two beats, everything on the grid, and the light going
-// down the castle to him at the end of it.
+// THE DROP
 // =========================================================================
-await put('gown-that-breathes', { phase: 0, line: 1 });
-await shoot({ name: 'lili', beats: 2, focus: [88, 62], push: [1.5, 1.62], ease: 'lin', mark: 'drop' });
 await put('megs-looking-glass', { phase: 0, line: 2 });
 await intoGame('megs-looking-glass');
-await shoot({ name: 'mirror', beats: 1, focus: [160, 70], push: [1.34, 1.4], ease: 'lin' });
+await shoot({ name: 'mirror', beats: 1, focus: [160, 70], push: [1.34, 1.4], ease: 'lin', mark: 'drop' });
 await put('winter-falls', { phase: 0, line: 1 });
 await intoGame('winter-falls');
-await shoot({ name: 'ice2', beats: 1, drv: 'crack', drvArg: { every: .18 }, focus: [200, 110], push: [1.66, 1.72], ease: 'lin' });
+await shoot({ name: 'ice2', beats: 1, drv: 'crack', drvArg: { every: .18 },
+  focus: [200, 110], push: [1.66, 1.72], ease: 'lin' });
 await put('bog-road', { phase: 0, line: 1 });
 await intoGame('bog-road');
-await shoot({ name: 'bog2', beats: 1, drv: 'lights', drvArg: { every: .16 }, focus: [160, 56], push: [1.5, 1.56], ease: 'lin' });
+await shoot({ name: 'bog2', beats: 1, drv: 'lights', drvArg: { every: .16 },
+  focus: [160, 56], push: [1.5, 1.56], ease: 'lin' });
 await shoot({
   name: 'causeway', beats: 2,
   stage: () => {
@@ -368,19 +395,18 @@ await shoot({
   },
   focus: [160, 78], push: [1.2, 1.34], ease: 'lin',
 });
-await put('false-sacrifice', { phase: 0, line: 1 });
-await shoot({ name: 'defy', beats: 2, focus: [96, 76], push: [1.46, 1.58], ease: 'lin' });
 
-// The finale of the game, played: a route a real tracer says works, opened
-// at the one moment two patrols allow it.
+// The finale of the game, played. The route is searched for twice - once
+// with the patrol off the board for a route that works geometrically, then
+// frame by frame from every candidate second until one gets the whole beam
+// down before anybody walks into it - and he is mocking the trick right up
+// to the frame it works.
 const beamPlan = await stage(() => {
   const bt = window.SC.BEATS.find((x) => x.id === 'final-beam');
   const G = window.SC.GAMES.dungeon;
   const cells = [];
   for (let c = 0; c < bt.g.cols; c++) for (let r = 0; r < bt.g.rows; r++) cells.push([c, r]);
   const guards = bt.g.guards;
-  // Geometry first, with the patrol off the board: a route that cannot
-  // reach him is not a route whose timing is worth solving.
   bt.g.guards = [];
   let mir = null;
   for (let trial = 0; trial < 60000 && !mir; trial++) {
@@ -398,9 +424,6 @@ const beamPlan = await stage(() => {
   }
   bt.g.guards = guards;
   if (!mir) return null;
-  // Then the moment. The guards are a pure function of the clock, so the
-  // sweep is simulated frame by frame from each candidate second until one
-  // gets the whole beam down before anybody walks into it.
   for (let openT = 0; openT < 30; openT += 1 / 30) {
     const st = G.init(bt);
     st.mir = mir.map((m) => m.slice());
@@ -413,13 +436,17 @@ const beamPlan = await stage(() => {
   }
   return { mir, openT: 0 };
 });
-if (!beamPlan) { console.error('no route to Darkness found'); await browser.close(); process.exit(1); }
+if (!beamPlan) {
+  console.error('no route to Darkness found');
+  await browser.close();
+  process.exit(1);
+}
 console.log(`  beam: ${beamPlan.mir.length} bucklers, shaft opens at t=${beamPlan.openT.toFixed(2)}`);
 
 await put('final-beam', { phase: 0, line: 1 });
 await intoGame('final-beam');
 await shoot({
-  name: 'castle', beats: 3, drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 99, openT: 0 },
+  name: 'castle', beats: 6, vo: 'd4', drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 99, openT: 0 },
   focus: [160, 70], push: [1.34, 1.16], ease: 'lin', mark: 'mirrors',
 });
 await shoot({
@@ -427,22 +454,21 @@ await shoot({
   drvArg: { mir: beamPlan.mir, openAt: 0.05, openT: beamPlan.openT },
   focus: [160, 60], focus1: [110, 92], push: [1.16, 1.42], ease: 'in', mark: 'shaft',
 });
-// It lands. Two white frames, and the film's biggest hit.
 await shoot({
   name: 'land', beats: 4, flash: 4, mark: 'land',
   drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 1e9, openT: 0 },
   focus: [58, 96], focus1: [80, 88], push: [2.0, 1.55], ease: 'out',
 });
-await card('c10', 'you were never the night', 4, { size: 62 });
+await card('c3', 'you were never the night', 4, { size: 62, vo: 'j3a' });
 // The one black beat in the film.
 await shoot({ name: 'hold', beats: 1, text: ' ', size: 62, mark: 'hold' });
-await card('c11', 'you were only its shadow', 4, { size: 62, color: '#e8b923' });
+await card('c4', 'you were only its shadow', 4, { size: 62, color: '#e8b923', vo: 'j3b', voAt: 0.2 });
 
 // =========================================================================
 // THE DAWN
 // =========================================================================
 await shoot({
-  name: 'dawn', beats: 9, mark: 'dawn',
+  name: 'dawn', beats: 8, vo: 'n4', voAt: 0.9, mark: 'dawn',
   stage: () => {
     const bt = window.SC.BEATS.find((x) => x.id === 'epilogue');
     bt.cutscene.hold = 3.4;
@@ -451,16 +477,15 @@ await shoot({
   },
   focus: [160, 74], push: [1.36, 1.04], ease: 'out',
 });
-await card('c12', 'they named it the seventh colour', 5, { size: 56, color: '#e8b923', mark: 'named' });
 await shoot({
-  name: 'last', beats: 5, focus: [160, 74], push: [1.04, 1.16], ease: 'lin',
+  name: 'last', beats: 7, vo: 'n5', voAt: 0.35, mark: 'named',
+  focus: [160, 74], push: [1.04, 1.18], ease: 'lin',
   stage: () => { window.SC.set({ cut: 12.4 }); },
-  scrim: 0,
 });
 
 await browser.close();
 const end = +vt.toFixed(4);
 writeFileSync(path.join(outDir, 'beats.json'), JSON.stringify({
-  fps: FPS, bpm: BPM, beat: BEAT, cuts, marks, cues: { end }, duration: frame / FPS,
+  fps: FPS, bpm: BPM, beat: BEAT, cuts, marks, vo: vos, cues: { end }, duration: frame / FPS,
 }, null, 2));
 console.log(`wrote ${frame} frames to ${path.relative(root, framesDir)} @ ${FPS}fps (${(frame / FPS).toFixed(2)}s, ${cuts.length} cuts)`);

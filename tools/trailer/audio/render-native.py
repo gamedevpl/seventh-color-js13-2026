@@ -386,6 +386,16 @@ def read_wav(path_):
     return a
 
 
+def level(a, target=0.132):
+    """Every line to the same presence. loudnorm gets each file close on
+    its own terms, but a short line with a pause in it and a long even one
+    come out three or four dB apart, and in a mix under percussion that is
+    the difference between a line you hear and a line you catch."""
+    loud = a[np.abs(a) > 0.02]
+    rms = np.sqrt(np.mean(loud ** 2)) if len(loud) > 400 else np.sqrt(np.mean(a ** 2))
+    return a * (target / (rms + 1e-9))
+
+
 voice = np.zeros(N)
 vwet = np.zeros(N)
 # The duck: the music drops under every line and comes back after it.
@@ -393,9 +403,9 @@ vwet = np.zeros(N)
 # two lines close together should not duck twice and let the bed jump up
 # for a tenth of a second between them.
 duck = np.ones(N)
-DUCK = 0.40                              # about -8dB under speech
+DUCK = 0.33                              # about -9.6dB under speech
 for v in VO:
-    a = read_wav(os.path.join(VO_DIR, f"{v['id']}.wav"))
+    a = level(read_wav(os.path.join(VO_DIR, f"{v['id']}.wav")))
     add(voice, v['at'], a, 1.0)
     add(vwet, v['at'], a, 0.16)          # a touch of the same room, no more
     i0 = max(0, int((v['at'] - 0.30) * SR))
@@ -415,8 +425,10 @@ while size < N + len(ir):
     size *= 2
 rev = np.fft.irfft(np.fft.rfft(wet, size) * np.fft.rfft(ir, size))[:N]
 vrev = np.fft.irfft(np.fft.rfft(vwet, size) * np.fft.rfft(ir, size))[:N]
-# The score ducks; the voice does not.
-mix = (dry + rev * 0.5) * duck + (voice * 0.92 + vrev * 0.5)
+# The score ducks; the voice does not. Six to eight dB over the ducked bed
+# is where a line stops being something you catch and becomes something you
+# hear - at two or three it is still competing with a taiko.
+mix = (dry + rev * 0.5) * duck + (voice * 1.70 + vrev * 0.5)
 mix = lp(mix, 3)
 
 head = int(SR * 0.5)

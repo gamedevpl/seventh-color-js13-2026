@@ -59,6 +59,11 @@ const framesDir = path.join(outDir, 'frames');
 
 const FPS = 30, DT = 1 / FPS;
 const PREVIEW = Number(process.env.SC_PREVIEW || 0);
+// Re-times the film and rewrites beats.json without photographing a
+// frame. Where a line starts is metadata, not picture, and re-rendering
+// two and a half thousand stills to move a voice cue by three tenths of a
+// second is how an afternoon goes.
+const DRY = !!process.env.SC_DRY;
 const VW = 320, VH = 156, SCX = 8;
 // 92 to the minute. Chosen because 0.6522s is about as long as a card can
 // be on screen and still feel cut rather than held, and four of them is a
@@ -70,7 +75,7 @@ const b = (n) => n * BEAT;
 const VO = JSON.parse(readFileSync(path.join(outDir, 'audio', 'vo', 'vo.json'), 'utf8'));
 const vos = [];
 
-rmSync(framesDir, { recursive: true, force: true });
+if (!process.env.SC_DRY) rmSync(framesDir, { recursive: true, force: true });
 mkdirSync(framesDir, { recursive: true });
 mkdirSync(path.join(outDir, 'audio'), { recursive: true });
 
@@ -255,7 +260,7 @@ async function shoot(s) {
       push: lerp(p0, p1, k),
       drv: s.drv || null, t, ...(s.drvArg || {}),
     });
-    if (!PREVIEW || frame % PREVIEW === 0) {
+    if (!DRY && (!PREVIEW || frame % PREVIEW === 0)) {
       await page.screenshot({ path: path.join(framesDir, `f${String(frame).padStart(6, '0')}.png`) });
     }
     frame++; vt += DT;
@@ -303,7 +308,7 @@ await shoot({ name: 'herd', beats: 7, vo: 'n3', drv: 'still', drvArg: { slipAt: 
 
 // His hall, and the first thing in the film that is enjoying itself.
 await put('shadow-council', { phase: 0, line: 0 });
-await shoot({ name: 'council', beats: 6, vo: 'd1', mark: 'darkness1',
+await shoot({ name: 'council', beats: 6, vo: 'd1', voAt: 0.45, mark: 'darkness1',
   focus: [166, 58], push: [1.16, 1.36], ease: 'out' });
 
 // =========================================================================
@@ -363,11 +368,11 @@ await shoot({ name: 'hall', beats: 2, focus: [160, 60], push: [1.24, 1.36], ease
 await put('hidden-hand', { phase: 0, line: 0 });
 await shoot({ name: 'throne', beats: 6, vo: 'd3', mark: 'offer',
   focus: [226, 56], push: [1.3, 1.5], ease: 'lin' });
-await shoot({ name: 'jack', beats: 5, vo: 'j1',
+await shoot({ name: 'jack', beats: 5, vo: 'j1', voAt: 0.45,
   focus: [96, 74], push: [1.4, 1.56], ease: 'lin' });
-await card('c2', 'dawn needs no throne', 3, { size: 64, color: '#e8b923', vo: 'j2', mark: 'refuse' });
+await card('c2', 'dawn needs no throne', 3, { size: 64, color: '#e8b923', vo: 'j2', voAt: 0.35, mark: 'refuse' });
 await put('false-sacrifice', { phase: 0, line: 1 });
-await shoot({ name: 'lili', beats: 6, vo: 'l1',
+await shoot({ name: 'lili', beats: 6, vo: 'l1', voAt: 0.40,
   focus: [96, 76], push: [1.42, 1.58], ease: 'lin' });
 
 // =========================================================================

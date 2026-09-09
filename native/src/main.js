@@ -317,7 +317,10 @@ function frame(now) {
       const lines = wrap(cs.lines[i], 296, NARRATE);
       box(108, 36);
       lines.forEach((l, k) => text(l, VW / 2, (lines.length > 1 ? 122 : 128) + k * 12, { fill: `rgba(243,234,214,${fade})`, font: NARRATE, align: 'center' }));
-      if (local > .9) text('>', VW - 12, 150, { fill: '#5f5648', font: '8px system-ui', align: 'center' });
+      // The chevron is the game telling a player it is waiting for them.
+      // A film is not waiting for anybody, and this beat is in five of its
+      // shots. Off whenever the trailer is the one holding the camera.
+      if (local > .9 && !(DEV && window.SCX)) text('>', VW - 12, 150, { fill: '#5f5648', font: '8px system-ui', align: 'center' });
       cardOverlay();
       if (doAct) { press(round); sfxTap(); }
       return requestAnimationFrame(frame);

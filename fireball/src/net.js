@@ -12,7 +12,7 @@
 // heading and state - which everyone else eases toward and animates
 // locally. Clients only anticipate their own movement; the host still
 // owns collision, ownership, ignition and life state.
-// The people who are not host send three bytes of input instead.
+// The people who are not host send four bytes of input instead.
 //
 // Who hosts is not negotiated. Everyone announces themselves once a
 // second, so everyone knows the same set of names, and the smallest name
@@ -21,7 +21,7 @@
 import { units, leaders, newWorld, charge, chargeTime, move, recount, revive, lerp, wrapA } from './herd.js';
 
 const TAU = Math.PI * 2;
-const ROOM = 'wss://relay.js13kgames.com/unicorn-fireball-v2';
+const ROOM = 'wss://relay.js13kgames.com/uf-v3';
 const SEATS = 7;
 const JOINING = 'JOINING';
 const ALONE = 'OFFLINE';
@@ -46,6 +46,7 @@ let roster = [];                          // seat -> id, '' for a free one
 let t = 0, tSnap = 0, tSeen = 0, tHeard = -99, joined = 0;
 let netIn = [];                           // seat -> the input it last sent
 let held = [];                            // seat -> was somebody on it last frame
+let pending = [], serial = 0, turns = 0;
 let lastR = '';                           // the seating as last announced
 
 export function open(room) {
@@ -75,7 +76,7 @@ export function close() {
   t = tSnap = tSeen = joined = 0; tHeard = -99;
   net.dropped = 0; net.news = null; net.seats = 1;
   net.on = net.host = 0; net.me = -1; roster = []; lastR = ''; was = null; seen.clear();
-  held = []; netIn = [];
+  held = []; netIn = []; pending = []; turns = serial = 0;
   // Closing a socket that is still connecting makes the browser complain
   // in the console; let it arrive first, then leave.
   if (!w) return;
@@ -85,7 +86,7 @@ export function close() {
 
 function hear(d) {
   if (typeof d !== 'string') {
-    if (d.byteLength !== 3 && d.byteLength !== 5 + units.length * 7 + SEATS * 6) return;
+    if (d.byteLength !== 4 && d.byteLength !== 4 + units.length * 7 + SEATS * 7) return;
     const v = new DataView(d);
     if (v.getUint8(0) === 1) packet(v); else input(v);
     return;
@@ -118,45 +119,42 @@ function reseat() {
 
 // --- the packet -----------------------------------------------------------
 // Seven bytes a unicorn: where it is, which way it faces, and one byte
-// holding its state, its herd and its colour. Three bytes a leader on top.
-let buf = null, dv = null;
-function room() {
-  const n = 5 + units.length * 7 + SEATS * 6;
-  if (!buf || buf.byteLength !== n) { buf = new ArrayBuffer(n); dv = new DataView(buf); }
-  return dv;
-}
+// holding its state, its herd and its colour. Seven bytes a leader on top.
+let dv;
 function write() {
-  const v = room();
+  const n = 4 + units.length * 7 + SEATS * 7;
+  if (dv?.byteLength !== n) dv = new DataView(new ArrayBuffer(n));
+  const v = dv;
   v.setUint8(0, 1); v.setUint16(1, tag);
-  v.setUint8(4, net.seats);
-  let o = 5;
+  v.setUint8(3, net.seats);
+  let o = 4;
   for (const u of units) {
     v.setInt16(o, Math.max(-32000, Math.min(32000, u.x * 128))); o += 2;
     v.setInt16(o, Math.max(-32000, Math.min(32000, u.z * 128))); o += 2;
-    v.setUint8(o++, (u.yaw / TAU * 256) & 255);
+    v.setUint8(o++, u.yaw / TAU * 256);
     const ld = u.lead < 0 ? 7 : u.lead;
-    v.setUint8(o++, (u.st & 3) | (ld << 2) | ((u.col & 7) << 5));
+    v.setUint8(o++, u.st | (ld << 2) | (u.col << 5));
     v.setUint8(o++, Math.min(255, u.y * 16));
   }
   for (let i = 0; i < leaders.length; i++) {
     const L = leaders[i];
-    for (const n of [L.stun * 20, L.cool * 20, L.charge * 255, L.wave, (L.st === 3 ? L.gone || 0 : L.wave ? L.burn : L.heat || 0) * 20]) v.setUint8(o++, Math.min(255, n));
-    v.setUint8(o++, (L.hearts & 3) | ((L.st & 3) << 2) | (L.chg ? 32 : 0) | (roster[i] ? 64 : 0));
+    for (const n of [L.stun * 20, L.cool * 20, L.charge * 255, L.wave, (L.st === 3 ? L.gone || 0 : L.wave ? L.burn : L.heat || 0) * 20, netIn[i]?.seq || 0]) v.setUint8(o++, Math.min(255, n));
+    v.setUint8(o++, L.hearts | (L.st << 2) | (L.chg ? 32 : 0) | (roster[i] ? 64 : 0));
   }
-  ws.send(buf);
+  ws.send(v.buffer);
 }
 
 // What the client hears. Positions become targets rather than truth: the
-// frame eases toward them, so a packet every 50ms still draws at 60.
+// frame follows them through a damped velocity, so 20 Hz packets do not
+// turn into a stop/start displacement and camera-speed pulse every frame.
 function packet(v) {
-  if (v.getUint8(0) !== 1) return;
   const theirs = v.getUint16(1);
   // Two hosts can only happen in the first second of an empty room. The
   // smaller tag keeps the plain; the other one stands down mid-packet.
   if (net.host) { if (theirs >= tag) return; net.host = 0; }
   tHeard = t;
-  net.seats = v.getUint8(4);
-  let o = 5;
+  net.seats = v.getUint8(3);
+  let o = 4;
   for (const u of units) {
     u.tx = v.getInt16(o) / 128; o += 2;
     u.tz = v.getInt16(o) / 128; o += 2;
@@ -173,8 +171,13 @@ function packet(v) {
     L.charge = v.getUint8(o++) / 255;
     L.wave = v.getUint8(o++);
     L.burn = v.getUint8(o++) / 20;
+    const ack = v.getUint8(o++);
     const f = v.getUint8(o++);
     L.hearts = f & 3; L.st = (f >> 2) & 3; L.chg = f & 32; L.man = f & 64;
+    if (L === leaders[net.me]) {
+      if (L.st || L.stun) { pending = []; turns = 0; }
+      L.tyaw += turns - (pending[ack] || 0);
+    }
     if (L.st === 3) L.gone = L.burn;
     else if (!L.wave) L.heat = L.burn;
   }
@@ -192,32 +195,36 @@ export function ghost(dt, local) {
     u.lunge = Math.max(0, u.lunge - dt * 4);
     u.recoil = Math.max(0, u.recoil - dt * 3);
     if (u.tx === undefined) continue;
-    const dx = (u.tx - u.x) * k, dz = (u.tz - u.z) * k;
-    u.vx = dx / (dt || .016); u.vz = dz / (dt || .016);
-    u.x += dx; u.z += dz;
+    u.vx = lerp(u.vx, (u.tx - u.x) * 14, Math.min(1, dt * 18));
+    u.vz = lerp(u.vz, (u.tz - u.z) * 14, Math.min(1, dt * 18));
+    u.x += u.vx * dt; u.z += u.vz * dt;
     u.y += (u.ty - u.y) * k;
     u.yaw += wrapA(u.tyaw - u.yaw) * k;
     u.roll = u.st === 1 ? u.roll + dt * (4 + u.spin) : 0;
-    // Two frames inside the same millisecond make dt zero, and a speed
-    // divided by it is an infinity that reaches the oscillators as a NaN
-    // and takes the whole loop down. Found on the real relay, where three
-    // tabs make the frame clock jump about.
+    // Velocity stays finite even when two frames share a timestamp.
     const sp = Math.hypot(u.vx, u.vz);
     u.sp = lerp(u.sp, sp, dt * 6);
     u.ph += sp * dt * 1.7 * u.gait;
   }
   // Leaders are unicorns too, so their own eased speed is the herd's.
   for (const L of leaders) L.spd = L.sp;
+  // Store cumulative local turns in a bounded 8-bit ring. Subtracting the
+  // acknowledged prefix replays only turns newer than the host snapshot.
+  // Between snapshots advance the target too, or it fights opposite input.
   // Apply local input after reconciliation, so steering appears this frame.
   // This bounded anticipation uses the same kinematics as the host, without
-  // replaying combat. Move standing followers with the leader to keep the
-  // ribbon connected. Stun/death and stale snapshots disable anticipation.
+  // replaying combat. Position integrates once per frame for every unicorn;
+  // adding another herd displacement here fights the snapshot correction.
+  // Stun/death and stale snapshots disable anticipation.
   const L = leaders[net.me];
   if (L && !L.st && !L.stun && t - tHeard < .5) {
     L.chg = (local.c && !local.b || L.wave) && !L.cool;
     L.charge = Math.max(0, Math.min(1, L.charge + dt * (L.chg ? 1 / chargeTime(L) : -1.5)));
+    const yaw = L.yaw;
     move(L, dt, local.t, L.chg ? 11 + 26 * L.charge : local.b ? 0 : local.f ? 15 : 11);
-    for (const u of units) if (u.lead === net.me && !u.st) { u.x += L.vx * dt; u.z += L.vz * dt; }
+    const delta = L.yaw - yaw;
+    L.tyaw += delta;
+    pending[serial] = turns += delta;
   }
 }
 
@@ -268,7 +275,8 @@ export function tick(dt, local) {
   if (t - tHeard > 2) { net.said = JOINING; return 0; }
   net.said = '';
   if (net.me >= 0) {
-    const b = new Uint8Array([2, net.me, (local.t + 1) | (local.f ? 4 : 0) | (local.b ? 8 : 0) | (local.c ? 16 : 0)]);
+    const b = new Uint8Array([2, net.me, (local.t + 1) | (local.f << 2) | (local.b << 3) | (local.c << 4), serial = (serial + 1) & 255]);
+    pending[serial] = turns; // Retire old ring slots even while stunned/stale.
     ws.send(b);
   }
   return 0;
@@ -276,7 +284,7 @@ export function tick(dt, local) {
 function say(s) { if (ws && ws.readyState === 1) ws.send(s); }
 
 function start() {
-  net.host = 1;
+  net.host = 1; pending = []; turns = 0;
   // Taking over from a host that left keeps the plain exactly as it was -
   // we have been drawing it all along. Only an empty room gets a new one.
   if (tHeard < 0) newWorld(0);
@@ -314,10 +322,10 @@ function drive(local) {
   }
 }
 
-// Three bytes from someone else's thumbs.
+// Four bytes from someone else's thumbs.
 export function input(v) {
   if (v.getUint8(0) !== 2) return;
   const s = v.getUint8(1), b = v.getUint8(2);
   if (s >= SEATS) return;
-  netIn[s] = { t: (b & 3) - 1, f: b & 4 ? 1 : 0, b: b & 8 ? 1 : 0, c: b & 16 ? 1 : 0, at: t };
+  netIn[s] = { t: (b & 3) - 1, f: b & 4, b: b & 8, c: b & 16, seq: v.getUint8(3), at: t };
 }

@@ -8,13 +8,13 @@ import { minify as terserMinify } from 'terser';
 import { Packer } from 'roadroller';
 import { zipSingleFile } from './zip.mjs';
 
-export async function minifyJs(js, { mangleProps = false, asciiOnly = false } = {}) {
+export async function minifyJs(js, { mangleProps = false, asciiOnly = false, compressOptions = {} } = {}) {
   const stages = {};
   let out = (await transform(js, { loader: 'js', minify: true, target: 'es2020', legalComments: 'none', mangleProps: mangleProps instanceof RegExp ? mangleProps : undefined })).code;
   stages.esbuild = out.length;
   const tersed = await terserMinify(out, {
     ecma: 2020,
-    compress: { booleans_as_integers: mangleProps instanceof RegExp, passes: 3, unsafe: true, unsafe_arrows: true, unsafe_math: true, pure_getters: true },
+    compress: { booleans_as_integers: mangleProps instanceof RegExp, passes: 3, unsafe: true, unsafe_arrows: true, unsafe_math: true, pure_getters: true, ...compressOptions },
     mangle: mangleProps === true ? { properties: { regex: /^_/ } } : true,
     format: { comments: false, ascii_only: asciiOnly },
   });

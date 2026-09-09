@@ -49,7 +49,7 @@ const result = await build({
 const raw = result.outputFiles[0].text;
 console.log(`  esbuild bundle           ${num(raw.length)}${cheats ? '   (+dev cheats)' : ''}`);
 
-const { js: minified, stages } = await minifyJs(game === 'fireball' && !cheats ? compactEvents(raw) : raw, { asciiOnly: game === 'fireball', mangleProps: !cheats && entry.privateProps ? new RegExp('^(' + entry.privateProps.join('|') + ')$') : true });
+const { js: minified, stages } = await minifyJs(game === 'fireball' && !cheats ? compactEvents(raw) : raw, { compressOptions: !cheats && entry.minify || {}, asciiOnly: game === 'fireball', mangleProps: !cheats && entry.privateProps ? new RegExp('^(' + entry.privateProps.join('|') + ')$') : true });
 console.log(`  terser + mangle          ${num(minified.length)}`);
 
 // The dev skip must never reach a shipped build. Checked here, on the

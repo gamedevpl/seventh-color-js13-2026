@@ -1,3 +1,8 @@
+import { wake, music, spatial, join as sJoin, thud, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
+import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, rnd, lerp, wrapA, edgeDanger, ARENA, EDGE, WILD, burnTime } from './herd.js';
+import { net, open as netOpen, close as netClose, tick as netTick, ghost, spy } from './net.js';
+import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox, setDim } from './gl.js';
+import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
 import { lightning } from './lightning.js';
 // UNICORN FIREBALL. Run the plain as a unicorn of one colour, gather every
 // unicorn that shares it into a herd, and fight the other herds horn to
@@ -8,12 +13,8 @@ import { lightning } from './lightning.js';
 // explode - the bigger herd wins, and the loser's herd is thrown across
 // the plain, where the gathering starts again.
 
-import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox, setDim } from './gl.js';
-import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
-import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, rnd, lerp, wrapA, edgeDanger, ARENA, EDGE, WILD, now, burnTime } from './herd.js';
-import { net, open as netOpen, close as netClose, tick as netTick, ghost, spy } from './net.js';
-import { wake, music, spatial, join as sJoin, thud, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
 
+const now = () => last / 1000;
 document.title = 'UNICORN FIREBALL';
 const VW = 640, VH = 360;
 const FOG = [.07, .05, .13];
@@ -55,9 +56,9 @@ let acted = false, pick = 0;
 addEventListener('keydown', (e) => {
   const key = e.key.toLowerCase();
   if (!held[key]) {
-    const l = key === 'arrowleft' || key === 'a', r = key === 'arrowright' || key === 'd';
-    if (mode === 'title') { if (l) pick--; if (r) pick++; }
-    else if (watching()) { if (l) watch--; if (r) watch++; }
+    const turn = (key === 'arrowright' || key === 'd') - (key === 'arrowleft' || key === 'a');
+    if (mode === 'title') pick += turn;
+    else if (watching()) watch += turn;
   }
   held[key] = true;
   if (key === 'o') goOnline();
@@ -441,6 +442,8 @@ function explode(x, z, pw) {
 
 // --- the frame ------------------------------------------------------------
 let last = 0, lastPick = 0, lastSaid = '';
+// Visual time must advance on guests too, independently of host simulation.
+
 function frame(now_) {
   const realDt = (now_ - last) / 1000 || 0;
   if (impact) { impact.t -= realDt; if (impact.t <= 0) impact = null; }
@@ -450,7 +453,7 @@ function frame(now_) {
   if (mode !== 'end') timer += realDt;
   if (mode === 'title' && pick !== lastPick) { lastPick = pick; newRun(1); }
 
-  if (net.dropped) { goHome(); net.said = 'OFFLINE - O'; }
+  if (net.dropped) goHome(); // The socket already preserves the OFFLINE status.
   const P = who();
   if (mode === 'title') {
     music(.2, 1);
@@ -536,6 +539,7 @@ function frame(now_) {
 
   // --- camera -------------------------------------------------------------
   let ex, ey, ez, lx, ly, lz;
+  const follow = net.on && !net.host ? 30 : 0;
   if (mode === 'title') {
     // A trackside camera circling the herd of the colour you are picking,
     // which plays itself under the words: the plain is live, not a still.
@@ -546,7 +550,7 @@ function frame(now_) {
     // Behind the herd, pulling back as it grows and further as it runs -
     // a charge should feel like the ground coming at you. The yaw eases
     // so a spin does not whip the world round.
-    camYaw += wrapA(P.yaw - camYaw) * Math.min(1, dt * 2.2);
+    camYaw += wrapA(P.yaw - camYaw) * Math.min(1, dt * (follow || 2.2));
     const sp = Math.min(1, P.spd / 33);
     // Lit, the shot opens right up: you are a hundred feet of rainbow now,
     // and a camera on your shoulder shows none of it.
@@ -559,7 +563,7 @@ function frame(now_) {
   }
   if (impact) { ex = impact.x - 42; ey = 32; ez = impact.z + 42; lx = impact.x; lz = impact.z; ly = 3; }
   if (!eye) eye = [ex, ey, ez], look = [lx, ly, lz];
-  const k = Math.min(1, realDt * 5);
+  const k = Math.min(1, realDt * (follow || 5));
   [ex, ey, ez].forEach((v, i) => eye[i] = lerp(eye[i], v, k));
   [lx, ly, lz].forEach((v, i) => look[i] = lerp(look[i], v, k));
   const sh = shake * shake * .5;
@@ -706,7 +710,7 @@ function frame(now_) {
     label(chargeHint, 160);
     font(12);
     label(touch ? 'SIDES: steer / BOTH: drag' : 'WASD: steer', 182);
-    label('UP / top: sprint / DOWN / bottom: brake', 200);
+    label((touch ? 'TOP/BOTTOM' : 'W/S') + ': sprint/brake', 200);
     font(15, 1);
     ctx.fillStyle = css(pc);
     dot(VW / 2, VH * .65, 14);
@@ -714,9 +718,9 @@ function frame(now_) {
     label('< colour >', VH * .65 + 34);
     font(18, 1);
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
-    label('SPACE/tap', VH - 42);
+    label('PLAY SOLO', VH - 42);
     font(14, 1); ctx.fillStyle = '#8fe3c8';
-    label(net.said || 'ONLINE - tap / O', VH - 62);
+    label(net.said || 'PLAY ONLINE', VH - 62);
     font(12); ctx.fillStyle = '#9a90b8';
     label('@gtanczyk | gamedev.pl', VH - 4);
   } else {
@@ -764,7 +768,7 @@ function frame(now_) {
     label(timer.toFixed(1) + 's', 16);
     if (net.on) {
       font(13, 1); ctx.fillStyle = '#8fe3c8';
-      label((net.seats + ' riding') + ' - tap/ESC: exit', 34);
+      label((net.seats + ' riding') + ' - EXIT', 34);
       if (watching()) {
         const mine = net.me >= 0 ? leaders[net.me] : null;
         font(17, 1); ctx.fillStyle = '#ffb0b8';
@@ -778,7 +782,7 @@ function frame(now_) {
       label(victory ? 'VICTORY' : !alive().length ? 'DRAW' : 'DEFEAT', VH * .44);
       font(17); ctx.fillStyle = '#d8d0ea';
       label('BEST ' + (best ? best.toFixed(1) + 's' : '-'), VH * .54);
-      if (endT > 1) label('SPACE/tap', VH * .66);
+      if (endT > 1) label('PLAY AGAIN', VH * .66);
     }
   }
   clearBeat();

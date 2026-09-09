@@ -18,6 +18,7 @@ try{
  const p=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:3});
  const errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.addInitScript(()=>{const A=window.AudioContext;window.AudioContext=class extends A{constructor(...args){super(...args);window.auditAudio=this;}};});
+ await p.addInitScript(()=>{window.drawnText=new Set();const draw=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(text,...args){drawnText.add(String(text));return draw.call(this,text,...args);};});
  const cdp=await p.context().newCDPSession(p);
  const url='file://'+dir+'/index.html';
  async function load(){await p.goto(url);await p.waitForFunction(()=>window.FB);}
@@ -26,6 +27,14 @@ try{
  async function release(){await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await p.waitForTimeout(50);}
  const out={};
  await load();const firstBox=await p.locator('canvas').last().boundingBox();assert.ok(Math.abs(firstBox.height/firstBox.width-16/9)<.01,'cold portrait load rotates immediately');assert.ok(Math.abs(firstBox.x+firstBox.width/2-195)<2&&Math.abs(firstBox.y+firstBox.height/2-422)<2,'rotated canvas stays centred and inside viewport');
+ await p.waitForTimeout(100);
+ const intro=await p.evaluate(()=>[...drawnText]);
+ assert.ok(intro.includes('PLAY SOLO')&&intro.includes('PLAY ONLINE'),'mobile menu exposes both play modes');
+ assert.ok(intro.includes('TOP/BOTTOM: sprint/brake'));
+ assert.ok(!intro.some(t=>/SPACE|WASD|ESC|W\/S|\/ O/.test(t)),'mobile intro must not ask for keyboard keys');
+ await p.screenshot({path:dir+'/intro-portrait.png'});
+ await p.evaluate(()=>{FB.net.said='OFFLINE';FB.net.dropped=1;});await p.waitForFunction(()=>drawnText.has('OFFLINE'));
+ assert.ok(!(await p.evaluate(()=>[...drawnText])).some(t=>/OFFLINE.*O$/.test(t)),'disconnection must not restore a keyboard-only prompt');
  await p.setViewportSize({width:844,height:390});
  await load();out.colourText=await touch([[390,268]]);await release();
  await load();out.colourDot=await touch([[330,234]]);await release();
@@ -54,6 +63,8 @@ try{
  out.ignited=await p.evaluate(()=>FB.leaders[0].wave);
  await move([[160,330],[500,330]]);assert.ok(await p.evaluate(()=>FB.leaders[0].wave>0));await release();
  await p.screenshot({path:dir+'/landscape.png'});
+ // Test orientation in a fresh run: the preceding lit charge is already at the lethal edge.
+ await p.evaluate(()=>{FB.reset(0,false);Object.assign(FB.leaders[0],{x:0,z:0,yaw:0});});
  await p.setViewportSize({width:390,height:844});await p.waitForTimeout(100);const start=await p.evaluate(()=>FB.timer);await p.waitForTimeout(600);out.portrait={before:start,after:await p.evaluate(()=>FB.timer)};
  await load();await touch([[450,318]]);await release();
  assert.equal(await p.evaluate(()=>FB.mode),'run','portrait menu accepts touch');

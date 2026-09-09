@@ -1,5 +1,43 @@
 # UNICORN FIREBALL — the fourth entry
 
+## Client steering and mobile intro (2026-09-09)
+
+ZIP: **13,283 / 13,312 bytes** in five deterministic builds. The saved
+Roadroller profile retains the previous memory budget; Fireball disables
+Terser sequence joining because that output compresses better. Other entries
+keep their minifier defaults. No effects or mechanics were removed.
+
+Protocol v3 adds an 8-bit input sequence and an acknowledgement per leader.
+Clients retain cumulative local turns in a 256-slot ring and apply only the
+unacknowledged difference over each authoritative heading. Between snapshots
+the heading target advances with local input. This prevents old snapshots
+from undoing a direction reversal. Stun/death clear the prediction prefix;
+reconnection and host migration discard obsolete history. Positions still
+reconcile with the host; combat, AI, movement constants and solo rules are
+unchanged. Both browsers must load this version; its room is separate from v2.
+
+The guest camera follows that heading faster. The browser test measures the
+rendered camera direction after settling it, rather than just the leader's
+first rotation. At simulated 200 ms RTT, the previous camera took 304–474 ms
+to react; the updated version measured 20–67 ms, with reversals at 19–84 ms.
+These are controlled local-relay measurements, not a guarantee for every
+network or device. Regression coverage includes acknowledgement wrap, stale
+snapshots, stun/death, host migration, low FPS and camera correction jumps.
+
+The reported client hopping was reproduced with a constant-speed host and
+20 Hz snapshots: apparent travel pulsed between 5.42 and 17.82 units/s at a
+target speed of 11. Position correction now uses damped velocity and integrates
+each unicorn once, instead of adding another local herd displacement after
+reconciliation. The same regression measures 10.34–11.41 units/s (91% less
+peak-to-peak ripple). Normal and rainbow travel, average speed, respawn and
+zero-duration frames are covered. This is client presentation only; it does
+not change the authoritative movement or collision simulation.
+
+Visual effects use the render clock: clients no longer freeze falling glitter
+or rainbow pulsation while waiting for a simulation clock they never advance.
+The mobile intro shows touch instructions and PLAY SOLO / PLAY ONLINE;
+disconnection and exit labels no longer assume a keyboard.
+
 ## F32 — animated aftermath (2026-09-06)
 
 Victory/defeat latches the result, disables AI and applies braking. Existing

@@ -84,19 +84,22 @@
       11,
       13,
       21,
-      51,
-      52,
+      49,
+      57,
       170,
-      338,
-      417
+      193,
+      338
     ],
     "maxMemoryMB": 256,
     "precision": 14,
     "modelMaxCount": 4,
     "modelRecipBaseCount": 32,
-    "recipLearningRate": 3100,
-    "numAbbreviations": 23,
+    "recipLearningRate": 2700,
+    "numAbbreviations": 24,
     "dynamicModels": 1,
     "allowFreeVars": true
+  },
+  "minify": {
+    "sequences": false
   }
 }

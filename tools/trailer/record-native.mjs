@@ -160,6 +160,12 @@ await page.evaluate(() => {
       if (!g) return;
       if (!g.__set) { g.__set = 1; g.mir = s.mir.map((m) => m.slice()); }
       if (!g.open && !g.win && s.t >= s.openAt) { g.t = s.openT; g.alarm = 0; g.open = 1; g.sweep = 0; }
+      // The mechanic hands the scene back a second after it is won, and
+      // what it hands back is the throne room with nobody in it. The film
+      // wants the frame the light is IN, held: clamped just under the
+      // threshold the update returns true on, the whole beam stays lit and
+      // Darkness stays ringed for as long as the shot needs.
+      if (g.win > 0.9) g.win = 0.9;
     },
     pick: (s, r) => {
       if (r.choiceIndex === s.want || s.t < (r.__next || 0)) return;
@@ -424,7 +430,8 @@ await shoot({
 // It lands. Two white frames, and the film's biggest hit.
 await shoot({
   name: 'land', beats: 4, flash: 4, mark: 'land',
-  focus: [58, 96], push: [1.9, 1.5], ease: 'out',
+  drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 1e9, openT: 0 },
+  focus: [58, 96], focus1: [80, 88], push: [2.0, 1.55], ease: 'out',
 });
 await card('c10', 'you were never the night', 4, { size: 62 });
 // The one black beat in the film.

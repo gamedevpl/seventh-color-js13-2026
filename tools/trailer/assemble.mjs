@@ -33,8 +33,14 @@ const GAMES = {
   // no bloom. What it does get is the one thing a 320x156 game needs at
   // 1080p and neither of the others does: the recorder photographs it at
   // eight times its own resolution, so this stage is only encoding.
+  // Flat canvas 2D, so there is no additive geometry to bloom the way
+  // Fireball's is - but the film wants the light in it to behave the way
+  // light behaved in a 1985 fantasy frame, which is to say it spills. A
+  // high threshold so only the genuinely bright things go: the moon, the
+  // horns, the rings, the beam, the pollen.
   native: {
     dir: 'trailer-native', music: 'seventh.wav', out: 'the-seventh-color-trailer.mp4', npm: 'native:trailer',
+    bloom: { thresh: 148, gain: 1.9, sigma: 24, opacity: 0.55 },
   },
 };
 const which = (process.argv.find((a) => a.startsWith('--game=')) || '--game=snap').split('=')[1];

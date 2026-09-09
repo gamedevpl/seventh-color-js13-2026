@@ -64,8 +64,16 @@ const LINES = [
   ['j2', 'jack', '[firm] Dawn needs no throne.'],
   ['l1', 'lili', '[cold] You cannot trade a threat for a hostage I refuse to be.'],
   ['d4', 'darkness', '[mocking] A parlour trick will not unmake me... child.'],
-  // Split, because the film puts a card and a black beat between the two
-  // halves of it and one file cannot straddle that.
+  // The close. In this kind of trailer the last voice is the antagonist's,
+  // and what he says is a statement of appetite rather than of outcome -
+  // so the film ends on a threat and hands over to the title. Both of these
+  // are the game's own prose: the second is the narrator's line about what
+  // Darkness wanted, given to Darkness to want out loud.
+  ['d5', 'darkness', '[low, savouring] Step inside... and every frightened heart will kneel.'],
+  ['d6', 'darkness', '[slow, relishing every word] I wanted a night... that no morning could argue with.'],
+  ['n6', 'narrator', '[slow] Darkness wanted a night... that no morning could argue with.'],
+  // Kept, unused by the current cut: the whole third act. A trailer that
+  // plays these has told you the ending.
   ['j3a', 'jack', '[quietly] You were never the night.'],
   ['j3b', 'jack', '[quietly] You were only... its shadow.'],
   ['n4', 'narrator', 'They named it the seventh colour.'],

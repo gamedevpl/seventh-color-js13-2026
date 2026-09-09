@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
-"""Trailer score for The Seventh Color.
+"""Score for The Seventh Color's trailer.
 
-This is trailer music, with the grammar trailer music has: a quiet setup on
-a pulse, one enormous low brass hit where the story turns, a percussion bed
-that arrives with the montage and doubles in the drop, risers into every
-section, and a full stop before the last two cards. What keeps it the
-GAME'S trailer rather than a stock cue is that every melodic line in it is
-one of the eight compositions in native/src/audio.js - `wonder` in the
-setup as a music box, `winter` under the snow, `trail`, `marsh` and
-`castle` down the road, `throne` under the drop, and `wonder` again, whole
-and loud, over the dawn. The film opens on one voice of it and closes on
-six, and everything between is percussion and weather.
+The reference is the way a fantasy film was scored in 1985, not the way a
+trailer is scored now, and the two differ in one thing above all: THIS ONE
+SUSTAINS. There are no braams under every section and no drum on every cut.
+There is a string bed that changes colour as the story does, a choir over
+it, the game's own themes carried on a celesta and then on the whole
+orchestra, timpani that roll rather than strike - and exactly one impact in
+the film, on the frame the horn breaks. A cut that dissolves needs music
+that holds a note through the dissolve; a cut that cuts needs a drum.
 
-The cut is on a grid - 92 to the minute, every shot a whole number of beats
-- and build/trailer-native/beats.json lists every cut. So a hit does not
-have to be placed by ear against the picture: it is placed ON the picture,
-because the picture was cut to the same clock. That is the difference
-between a montage with music over it and a trailer.
+Every melodic line is still one of the eight compositions in
+native/src/audio.js. `wonder` opens the film as a music box and closes it
+on everything at once; `shadow` is the floor under Darkness; `winter`,
+`trail`, `marsh`, `castle` and `throne` are the road and the castle. The
+pad chords under them are built from those same tracks' own bass notes, so
+the harmony is the game's too.
+
+Four voices sit on top (audio/voice-native.mjs) and the bed ducks under
+them as one envelope across the whole film.
 
     python3 tools/trailer/audio/render-native.py
 
@@ -40,6 +42,7 @@ MARK = {m['name']: m['at'] for m in B['marks']}
 VO = B.get('vo', [])
 VO_DIR = os.path.join(OUT_DIR, 'vo')
 BEAT = B['beat']
+b_ = lambda n: n * BEAT
 END = B['cues']['end']
 ENDCARD = 5.6
 DUR = END + ENDCARD + 1.0
@@ -106,6 +109,147 @@ def lp(x, k):
     if k < 2:
         return x
     return np.convolve(x, np.ones(k) / k, mode='same')
+
+
+def filt_saw(f, n, cutoff, res=2.6):
+    """A sawtooth as it comes out of a resonant lowpass, built additively:
+    harmonic k rolls off as a four-pole filter would and the one nearest the
+    cutoff gets a resonance bump. It is not a state-variable filter, but a
+    per-sample filter over ninety seconds in numpy is not a thing to write,
+    and what a sequencer line needs is the SWEEP - the sound opening up -
+    which this gives exactly."""
+    t = np.arange(n) / SR
+    out = np.zeros(n)
+    for k in range(1, 30):
+        fk = f * k
+        if fk > SR / 2.2:
+            break
+        roll = 1.0 / (1.0 + (fk / cutoff) ** 4)
+        bump = res / (1.0 + ((fk - cutoff) / (cutoff * 0.18)) ** 2)
+        out += np.sin(2 * np.pi * fk * t) * (roll * (1 + bump)) / k
+    return out * (2 / np.pi)
+
+
+def arp(t0, t1, notes, rate, gain, cut0=400, cut1=2600, res=2.6, oct_shift=0, room=0.7):
+    """The sequencer. The single most 1985 thing in this score: a short
+    cyclic figure at a fixed rate with the filter opening across the
+    section. Everything else here is weather; this is the pulse the film
+    walks to."""
+    step = 1.0 / rate
+    i = 0
+    t = t0
+    span = max(0.001, t1 - t0)
+    while t < t1:
+        u = (t - t0) / span
+        f = notes[i % len(notes)] * (2.0 ** oct_shift)
+        cut = cut0 * (cut1 / cut0) ** u
+        n = int(step * 1.9 * SR)
+        x = filt_saw(f, n, cut, res)
+        env = adsr(n, 0.004, step * 0.5, 0.25, step * 1.2)
+        put(t, x * env * gain, room=room)
+        i += 1
+        t += step
+
+
+def bass(t0, t1, f, rate, gain, room=0.25):
+    step = 1.0 / rate
+    t = t0
+    while t < t1:
+        n = int(step * 0.85 * SR)
+        tt = np.arange(n) / SR
+        x = (np.sin(2 * np.pi * f * tt) + 0.45 * np.sin(2 * np.pi * f * 2 * tt)
+             + 0.2 * filt_saw(f, n, 260, 1.4))
+        put(t, x * adsr(n, 0.008, 0.10, 0.55, step * 0.5) * gain, room=room)
+        t += step
+
+
+def gated(gain, length=0.30):
+    """The gated snare: a noise burst, a short bright room, and the whole
+    thing cut off square. Nothing dates a record to 1985 faster."""
+    n = int(length * SR)
+    x = RNG.standard_normal(n)
+    x = x - lp(x, 5)
+    body = np.sin(2 * np.pi * 190 * np.arange(n) / SR) * np.exp(-np.arange(n) / (SR * 0.03))
+    env = np.exp(-np.arange(n) / (SR * 0.12))
+    out = (x * 0.8 + body * 0.5) * env
+    out[-int(0.02 * SR):] *= np.linspace(1, 0, int(0.02 * SR))
+    return out * gain
+
+
+def kick(gain):
+    n = int(0.34 * SR)
+    t = np.arange(n) / SR
+    f = 105 * np.exp(-t * 26) + 44
+    return (np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.13)
+            + lp(RNG.standard_normal(n), 30) * np.exp(-t / 0.012) * 0.4) * gain
+
+
+def pad(t0, t1, roots, gain, bright=0.30, attack=1.4):
+    """The string bed. A chord of detuned saws, rolled well off the top, with
+    a slow attack and a slower release - the thing that can hold a note
+    across a dissolve, which is the whole reason this score is built the way
+    it is."""
+    n = int((t1 - t0) * SR)
+    if n <= 0:
+        return
+    t = np.arange(n) / SR
+    out = np.zeros(n)
+    for f in roots:
+        for det in (-0.004, 0.0, 0.005):
+            out += saw(f * (1 + det), n, harmonics=14) / (1 + 0.9 * len(roots))
+    out = lp(out, int(6 + (1 - bright) * 40))
+    # A slow swell inside the note, so a four-second chord is not four
+    # seconds of the same amplitude.
+    breathe = 1 + 0.10 * np.sin(2 * np.pi * 0.13 * t + 1.0)
+    env = np.minimum(1, np.minimum(t / attack, (t[-1] - t) / max(0.6, attack * 0.8)))
+    put(t0, out * env * breathe * gain, room=0.9)
+
+
+def choir(t0, t1, roots, gain, attack=1.8):
+    """Voices: sines with a slow vibrato and a little of the octave above.
+    Not a real choir, but at this level under strings it does the job a
+    choir does, which is to make a chord sound inhabited."""
+    n = int((t1 - t0) * SR)
+    if n <= 0:
+        return
+    t = np.arange(n) / SR
+    out = np.zeros(n)
+    for f in roots:
+        vib = 1 + 0.004 * np.sin(2 * np.pi * 4.6 * t + f)
+        ph = 2 * np.pi * np.cumsum(f * vib) / SR
+        out += (np.sin(ph) + 0.30 * np.sin(2 * ph) + 0.12 * np.sin(3 * ph)) / len(roots)
+    env = np.minimum(1, np.minimum(t / attack, (t[-1] - t) / max(0.8, attack)))
+    put(t0, out * env * gain, room=1.15)
+
+
+def roll(t0, length, gain, pitch=58):
+    """Timpani, rolled and swelling rather than struck. Thirty-odd soft hits
+    a second under a rising envelope."""
+    n = int(length * SR)
+    out = np.zeros(n + int(0.6 * SR))
+    step = int(SR / 17)
+    for i in range(0, n, step):
+        u = i / max(1, n)
+        h = taiko(0.35 + 0.9 * u ** 2, pitch=pitch, length=0.55)
+        m = min(len(h), len(out) - i)
+        out[i:i + m] += h[:m] * (0.5 + RNG.random() * 0.5)
+    put(t0, out * gain, room=0.7)
+
+
+def shock(t0, gain):
+    """The one impact in the film. A struck low note that sags, a noise
+    crack, and a high cluster left ringing over the top of it - which is
+    what an orchestra does at a moment like this and what a braam is the
+    modern shorthand for."""
+    n = int(5.0 * SR)
+    t = np.arange(n) / SR
+    f = 44 * np.exp(-t * 1.1) + 30
+    body = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 1.5)
+    crack = lp(RNG.standard_normal(n), 4) * np.exp(-t / 0.06) * 0.55
+    shimmer = np.zeros(n)
+    for k, g in ((1318.5, 0.10), (1567.9, 0.09), (1975.5, 0.075), (2637.0, 0.05)):
+        shimmer += np.sin(2 * np.pi * k * t) * np.exp(-t / 1.9) * g
+    put(t0, (body * 1.25 + crack + shimmer) * gain, room=1.0)
 
 
 def braam(length, root, gain, bite=0.5, fall=0.06):
@@ -270,109 +414,99 @@ cut_times = [c['at'] for c in CUTS]
 after = lambda t: [x for x in cut_times if x >= t - 1e-6]
 between = lambda a, z: [x for x in cut_times if a - 1e-6 <= x < z - 1e-6]
 
-# --- ACT ONE. A drone, a heartbeat, and the game's theme as a music box two
-# octaves up, one note in two. The narrator does the rest.
-drone(0.0, M['horn'] - 0.1, 55.0, 0.055)
-drone(6.0, M['horn'] - 0.1, 82.41, 0.028)
-play('wonder', 1.2, M['darkness1'] - 0.1, rows=[0], gain=0.19, oct_shift=1, det=0.004,
-     room=1.35, sustain=2.6, every=2)
-# His hall gets his own theme under him, low, with no lead - he does not get
-# a tune, he gets a floor.
-play('shadow', M['darkness1'], M['creep'] - 0.1, rows=[0, 1], gain=0.30, det=0.006, room=0.8)
-t = 4.57
-while t < M['creep']:
-    put(t, taiko(0.11, pitch=52, length=1.6), room=0.5)
-    t += BEAT * 2
-for c in CUTS:
-    if c['kind'] == 'card' and c['at'] < M['creep'] + 1:
-        put(c['at'] - 0.55, whoosh(0.75, 0.09), room=0.7)
+# The chords, all built from the bass notes of the game's own tracks.
+D2, A2, D3, Fs3, A3, D4 = 73.42, 110.0, 146.83, 185.00, 220.0, 293.66
+D1, F3, Gs3, C4 = 36.71, 174.61, 207.65, 261.63
+E2, B2, E3, G3, B3 = 82.41, 123.47, 164.81, 196.00, 246.94
 
-# --- the tension. Four beats of riser, and everything stops one beat short.
-put(M['creep'], riser(M['horn'] - M['creep'], 0.26, 150, 2600), room=0.35)
-t = M['creep']
-while t < M['horn'] - BEAT:
-    put(t, taiko(0.17, pitch=52, length=1.2), room=0.4)
-    t += BEAT
-drone(M['creep'], M['horn'], 55.0 * 2 ** (1 / 12), 0.06)
+# --- I. THE WORLD. A pad and a music box. No pulse at all for twenty
+# seconds - the sequencer arriving later is the film's first event.
+pad(0.4, M['darkness1'] + 1.0, [D2, A2, D3, Fs3], 0.085, bright=0.22, attack=3.0)
+choir(3.0, M['darkness1'] + 0.5, [D4, Fs3 * 2, A3 * 2], 0.030, attack=3.5)
+play('wonder', 1.4, M['darkness1'] - 0.2, rows=[0], gain=0.17, oct_shift=1,
+     det=0.004, room=1.4, sustain=2.6, every=2)
 
-# --- THE HORN. The film's first loud thing.
-put(M['horn'], braam(4.2, 41.2, 0.95, bite=0.75), room=0.55)
-put(M['horn'], sub_drop(0.75), room=0.1)
-put(M['horn'], taiko(0.85, pitch=58, length=1.8), room=0.35)
-put(M['horn'] + 0.02, whoosh(2.2, 0.22), room=1.1)
+# --- II. WHAT WANTED IT. The chord goes to the tritone the `shadow` track
+# is built on, and the sequencer starts under him - low, and shut.
+pad(M['darkness1'], M['horn'] - 0.1, [D1, D2, F3, Gs3], 0.10, bright=0.16, attack=2.2)
+arp(M['darkness1'] + 0.6, M['horn'] - 0.15, [D3, F3, Gs3, F3, D3, A2], 3.0, 0.085,
+    cut0=300, cut1=900, res=2.2, room=0.8)
+bass(M['darkness1'] + 0.6, M['horn'] - 0.15, D1, 1 / (BEAT * 2), 0.10)
 
-# --- the winter. He is talking over it, so it plays under him.
-play('winter', M['winter'], M['road'] - 0.15, gain=0.42, det=0.003, room=0.9)
-drone(M['winter'], M['road'], 49.0, 0.10)
-t = M['winter']
-while t < M['road']:
-    put(t, taiko(0.28, pitch=48, length=1.5), room=0.45)
-    t += BEAT * 2
-put(M['gone'], braam(3.0, 36.7, 0.44, bite=0.35), room=0.6)
-put(M['gone'], taiko(0.42, pitch=52), room=0.3)
-put(M['road'] - 1.4, riser(1.4, 0.24, 200, 2000), room=0.3)
+# The creep: the filter opens, the rate doubles, and the pad climbs a
+# semitone under it - the oldest way there is of saying something is coming.
+arp(M['creep'], M['horn'] - 0.1, [D3, F3, Gs3, C4, Gs3, F3], 6.0, 0.11,
+    cut0=700, cut1=3400, res=3.0, room=0.6)
+pad(M['creep'], M['horn'], [D1 * 2 ** (1 / 12), F3, Gs3, C4], 0.09, bright=0.34, attack=1.6)
 
-# --- ACT TWO. The percussion bed arrives, and from here every cut gets a hit.
-play('trail', M['road'], M['offer'] - 0.1, gain=0.52, oct2=0.16, det=0.005, room=0.45, drums=True)
-play('castle', M['offer'], M['drop'] - 0.1, gain=0.50, det=0.005, room=0.6, drums=True)
-drone(M['road'], M['drop'], 41.2, 0.10)
+# --- THE ONE IMPACT.
+shock(M['horn'], 0.95)
+put(M['horn'] + 0.02, whoosh(2.6, 0.20), room=1.2)
+
+# --- III. THE WINTER. Cold, wide, and slow: a pad and a sequencer at two a
+# second with almost no filter on it.
+pad(M['winter'], M['road'] - 0.2, [E2, B2, E3, G3], 0.095, bright=0.20, attack=2.4)
+choir(M['winter'] + 1.0, M['road'] - 0.3, [B3, E3 * 2], 0.026, attack=2.6)
+arp(M['winter'] + 0.4, M['road'] - 0.2, [E3, B2, G3, B2], 2.0, 0.075,
+    cut0=420, cut1=1000, res=2.0, room=1.0)
+play('winter', M['winter'] + 0.4, M['road'] - 0.2, rows=[0], gain=0.30, det=0.003, room=1.0)
+roll(M['gone'] - 1.6, 1.6, 0.16, pitch=52)
+
+# --- IV. THE ROAD. The engine room. Eight to the second, the filter opening
+# right across the section, a bass on every other beat and a gated snare on
+# two and four. This is the part of the score that is a 1985 record.
+SEQ = [D3, A2, D3, F3, A3, F3, D3, C4]
+arp(M['road'], M['offer'] - 0.15, SEQ, 8.0, 0.085, cut0=500, cut1=2600, res=2.8, room=0.45)
+bass(M['road'], M['offer'] - 0.15, D2, 1 / BEAT, 0.115)
+pad(M['road'], M['offer'], [D2, A2, D3, F3], 0.075, bright=0.30, attack=1.2)
+play('trail', M['road'], M['offer'] - 0.2, rows=[0, 1], gain=0.30, oct2=0.14, det=0.005, room=0.55)
 t = M['road']
-while t < M['drop']:
-    put(t, taiko(0.30, pitch=50, length=1.0), room=0.3)
-    put(t + BEAT * .5, tick(0.10, True), room=0.25)
+while t < M['offer'] - 0.1:
+    put(t, kick(0.34), room=0.14)
+    put(t + BEAT, gated(0.22), room=0.5)
+    t += BEAT * 2
+
+# --- V. THE OFFER. Same pulse, darker chord, and `castle` over the top.
+arp(M['offer'], M['shaft'] - 0.1, SEQ, 8.0, 0.090, cut0=800, cut1=3000, res=3.2, room=0.45)
+bass(M['offer'], M['shaft'] - 0.1, D2, 1 / BEAT, 0.125)
+pad(M['offer'], M['shaft'], [D1, D2, F3, Gs3], 0.085, bright=0.26, attack=1.4)
+play('castle', M['offer'], M['refuse'], rows=[0, 1], gain=0.28, det=0.005, room=0.7)
+play('throne', M['refuse'], M['shaft'] - 0.1, rows=[1, 2], gain=0.30, det=0.006, room=0.6)
+t = M['offer']
+while t < M['shaft'] - 0.1:
+    put(t, kick(0.36), room=0.14)
+    put(t + BEAT, gated(0.26), room=0.5)
+    t += BEAT * 2
+choir(M['mirrors'], M['shaft'] + 0.6, [D3, F3, Gs3], 0.045, attack=1.6)
+
+# --- VI. THE LIGHT STARTS, AND THE FILM LEAVES. Everything doubles for four
+# beats and then stops with the picture.
+# The bed has to come WITH it. The first pass ended the pad at the section
+# boundary and left the build as drums and a thin sequencer over nothing,
+# which measured five dB QUIETER than the road it was supposed to be
+# building out of - a climb that goes down.
+pad(M['shaft'] - 0.2, M['shaft'] + b_(3.9), [D1, D2, F3, Gs3, C4], 0.155, bright=0.42, attack=0.8)
+choir(M['shaft'], M['shaft'] + b_(3.9), [D3, F3, Gs3, C4], 0.070, attack=0.7)
+t = M['shaft']
+while t < M['shaft'] + b_(3.8):
+    put(t, kick(0.52), room=0.14)
+    put(t + BEAT * 0.5, gated(0.40), room=0.55)
     t += BEAT
-for x in between(M['road'], M['drop']):
-    put(x, taiko(0.46, pitch=54, length=1.2), room=0.35)
-put(M['offer'], braam(3.4, 38.9, 0.48, bite=0.5), room=0.5)
-put(M['refuse'], braam(2.6, 46.2, 0.46, bite=0.6), room=0.45)
-put(M['drop'] - 1.7, riser(1.7, 0.34, 220, 3000), room=0.3)
+arp(M['shaft'], M['shaft'] + b_(3.6), SEQ, 12.0, 0.145, cut0=1600, cut1=4600, res=3.6, room=0.4)
+bass(M['shaft'], M['shaft'] + b_(3.6), D2, 2 / BEAT, 0.175)
+put(M['shaft'] - 1.2, riser(1.2, 0.26, 300, 3200), room=0.3)
 
-# --- THE DROP. A hit on every beat and every cut, `throne` under it.
-play('throne', M['drop'], M['land'], gain=0.66, det=0.006, room=0.5, drums=True)
-drone(M['drop'], M['land'] + 2.0, 36.71, 0.13)
-t = M['drop']
-while t < M['land']:
-    put(t, taiko(0.58, pitch=52, length=0.9), room=0.25)
-    put(t + BEAT * .5, taiko(0.28, pitch=64, length=0.5), room=0.2)
-    put(t + BEAT * .25, tick(0.09, True), room=0.2)
-    put(t + BEAT * .75, tick(0.09, True), room=0.2)
-    t += BEAT
-for x in between(M['drop'], M['land']):
-    put(x, taiko(0.66, pitch=56, length=1.1), room=0.3)
-put(M['shaft'] - 0.9, riser(0.9, 0.30, 400, 4000), room=0.25)
-put(M['land'] - 1.6, riser(1.6, 0.42, 260, 3800), room=0.3)
-
-# The landing, and then the film stops dead.
-put(M['land'], braam(5.0, 32.7, 1.0, bite=0.9), room=0.65)
-put(M['land'], sub_drop(0.85, 80, 22, 2.8), room=0.1)
-put(M['land'], taiko(0.95, pitch=60, length=2.2), room=0.4)
-put(M['land'] + 0.01, whoosh(3.0, 0.26), room=1.2)
-
-# --- the two cards. A sustain, one hit each, and true silence between them,
-# because Jack is speaking and he is the only thing that should be.
-drone(cut_at['c3'], M['hold'] - 0.35, 32.7, 0.070, room=0.6)
-put(cut_at['c3'], taiko(0.30, pitch=46, length=2.0), room=0.5)
-drone(cut_at['c4'], M['dawn'], 41.2, 0.10, room=0.6)
-put(cut_at['c4'], taiko(0.36, pitch=46, length=2.0), room=0.5)
-put(cut_at['c4'], braam(3.6, 41.2, 0.34, bite=0.25), room=0.7)
-put(M['dawn'] - 1.2, riser(1.2, 0.26, 200, 1800), room=0.4)
-
-# --- THE DAWN. The theme, whole, in octaves - and it carries the end card,
-# which the first pass did not: the picture stopped, the music stopped with
-# it, and five seconds of title sat there in a room tone.
-D0, D1 = M['dawn'], DUR - 1.4
-play('wonder', D0, D1, gain=0.80, oct2=0.34, det=0.006, room=0.65)
-play('wonder', D0 + 0.8, D1, rows=[0], gain=0.32, oct_shift=1, det=0.004, room=1.15, sustain=2.0)
-play('wonder', M['named'], D1, rows=[1], gain=0.52, oct_shift=-1, room=0.5)
-play('wonder', M['named'], D1, rows=[2], gain=0.32, oct_shift=1, det=0.004, room=0.95)
-drone(D0, D1, 73.42, 0.18)
-# One last swell where the picture hands over to the card.
-put(END - 0.9, riser(0.9, 0.20, 200, 1600), room=0.5)
-put(END, taiko(0.42, pitch=44, length=2.8), room=0.7)
-put(END, braam(4.6, 55.0, 0.34, bite=0.2), room=0.8)
-put(D0, taiko(0.44, pitch=44, length=2.6), room=0.6)
-put(M['named'], taiko(0.40, pitch=48, length=2.4), room=0.6)
-put(M['named'], braam(4.0, 55.0, 0.30, bite=0.2), room=0.7)
+# --- VII. THE MONOLOGUE. No pulse. The warmest chord in the film, the
+# theme over it, and him talking across all of it.
+pad(M['close'] - 0.4, DUR - 1.6, [D2, A2, D3, Fs3, A3], 0.165, bright=0.30, attack=3.0)
+choir(M['close'] + 0.6, DUR - 1.6, [D4, Fs3 * 2, A3 * 2, D3 * 2], 0.055, attack=3.0)
+play('wonder', M['close'] + 1.0, DUR - 1.6, rows=[0], gain=0.30, oct_shift=1,
+     det=0.004, room=1.3, sustain=2.4, every=2)
+play('wonder', M['last'] + 1.2, DUR - 1.6, gain=0.46, oct2=0.28, det=0.006, room=0.8)
+roll(END - 1.8, 1.8, 0.20, pitch=46)
+# The hand-over to the title: one swell, no strike. A trailer that has held
+# off hitting anything for ninety seconds does not start now.
+put(END - 0.6, riser(0.6, 0.14, 200, 1400), room=0.6)
 
 # =========================================================================
 # The voices, and the hole in the music they speak through.
@@ -453,7 +587,7 @@ with wave.open(out, 'wb') as fh:
 
 print('the arc, in dB over two seconds from each mark:')
 for name in ('open', 'darkness1', 'creep', 'horn', 'winter', 'gone', 'road',
-             'offer', 'refuse', 'drop', 'land', 'hold', 'dawn', 'named'):
+             'offer', 'refuse', 'mirrors', 'shaft', 'close', 'last'):
     a = int(M[name] * SR)
     z = min(N, a + int(2.0 * SR))
     r = np.sqrt(np.mean(mix[a:z] ** 2)) if z > a else 0

@@ -1,51 +1,39 @@
-// The Seventh Color, cut as a trailer.
+// The Seventh Color, cut the way fantasy trailers were cut in 1985.
 //
 //   node tools/trailer/record-native.mjs        (full, 1920x1080)
 //   SC_PREVIEW=n   every nth frame, half size - the shape of the cut in minutes
+//   SC_DRY=1       re-time and rewrite beats.json without photographing a frame
 //   SC_UNTIL=name  stop after that shot
 //
-// The grammar is the one a film trailer uses, not the one a game uses.
+// The reference is the original Legend trailer, and the three things that
+// make that a different film from a modern one are all here.
 //
-//   THE INTERFACE IS OFF. `SCH` (a DEV hook) stops the game narrating
-//   itself - no dialogue panel, no choice list, no status strips over the
-//   mechanics. What is left is the picture, and four voices say the lines
-//   over it: a narrator, Darkness, Jack and Lili, generated with ElevenLabs
-//   by audio/voice-native.mjs. Every word any of them says is a line out of
-//   native/src/data.js, trimmed the way a trailer trims a script. Cards are
-//   down to four - the one nobody says, and the three the film wants both
-//   said AND written.
+//   IT DISSOLVES. Almost nothing in this cut is a cut. Every shot fades up
+//   through the one before it, because an optical dissolve is what a
+//   fairy tale looked like before hard cutting became the house style, and
+//   because these images - flat colour, slow drift - bleed into each other
+//   beautifully. The trailer keeps ONE hard cut, with two white frames on
+//   it, for the frame the horn breaks. A film with one cut in it makes that
+//   cut enormous.
 //
-//   THE VOICE SETS THE LENGTHS. audio/vo/vo.json carries each line's
-//   measured seconds; every shot below is long enough for the line laid on
-//   it, rounded up to the beat. A line may run over a cut - a sentence
-//   bridging two images is the oldest trick in the form - but never over a
-//   section boundary.
+//   IT WITHHOLDS. The previous pass played the whole story: the light
+//   restored, Darkness beaten, the last line of the game and the dawn
+//   behind it. A trailer for a forty-minute story cannot spend the story.
+//   This one stops at the threat. The light starts down the castle and the
+//   film cuts away from it; Darkness's last word is a taunt, not a defeat;
+//   nobody says how it ends. Every line past that point is still generated
+//   and still in vo.json, unused, because the temptation to put them back
+//   is exactly the thing to leave a note about.
 //
-//   EVERYTHING IS ON A GRID. One beat is 0.6522s (92bpm) and every shot is
-//   a whole number of them, so every cut lands on a beat and the score
-//   (audio/render-native.py) can put a hit on every cut. That is the whole
-//   difference between a montage and a trailer: the picture and the drum
-//   are the same event.
+//   IT IS SLOW. Seventy-five to the minute, four to six beats a shot, and
+//   the score is sustained rather than struck - no braams, no hit on every
+//   cut. The one impact in the film is the horn.
 //
-//   THE UNITS SHORTEN. Five and six beats through the setup, four and three
-//   through the winter, two and three down the road, one and two in the
-//   drop. Nothing else makes a cut feel like it is accelerating.
-//
-//   THREE STOPS. Silence before the horn breaks, silence before "you were
-//   never the night", and the black beat between the last two cards. A
-//   trailer is mostly loud, so the only way anything in it can be loud is
-//   for something to be quiet first.
-//
-// The resolution trick is the same as the game deserves: `SCX` scales the
-// backing store and the base matrix so every painter draws at eight times
-// 320x156, and the film is crisp line art rather than a six-times upscale
-// of a bitmap. It also means the pushes have real pixels to eat into, and
-// with the interface off they can be big - a portrait game photographs as
-// portraits, and a trailer frames faces.
-//
-// Frame-stepped, never real time: rAF, performance.now and setTimeout are a
-// virtual clock the recorder pumps. beats.json goes out beside the frames
-// with every cut's second, and the score is arranged to those numbers.
+// The rest is as before: `SCH` takes the game's interface off so the
+// pictures are clean, `SCX` scales the backing store and the base matrix so
+// 320x156 of vector work is crisp at 1080p, four ElevenLabs voices say the
+// lines (audio/voice-native.mjs), and vo.json's measured lengths decide how
+// long a shot has to be.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -59,23 +47,18 @@ const framesDir = path.join(outDir, 'frames');
 
 const FPS = 30, DT = 1 / FPS;
 const PREVIEW = Number(process.env.SC_PREVIEW || 0);
-// Re-times the film and rewrites beats.json without photographing a
-// frame. Where a line starts is metadata, not picture, and re-rendering
-// two and a half thousand stills to move a voice cue by three tenths of a
-// second is how an afternoon goes.
 const DRY = !!process.env.SC_DRY;
 const VW = 320, VH = 156, SCX = 8;
-// 92 to the minute. Chosen because 0.6522s is about as long as a card can
-// be on screen and still feel cut rather than held, and four of them is a
-// comfortable length for one to be read.
-const BPM = 92, BEAT = 60 / BPM;
+// Seventy-five. Slow enough that a five-beat shot is four seconds, which is
+// about as long as one of these images wants to be held, and slow enough
+// that a dissolve can be a whole beat without eating the shot.
+const BPM = 75, BEAT = 60 / BPM;
 const b = (n) => n * BEAT;
 
-// What the voices actually came out at. The cut is built on these numbers.
 const VO = JSON.parse(readFileSync(path.join(outDir, 'audio', 'vo', 'vo.json'), 'utf8'));
 const vos = [];
 
-if (!process.env.SC_DRY) rmSync(framesDir, { recursive: true, force: true });
+if (!DRY) rmSync(framesDir, { recursive: true, force: true });
 mkdirSync(framesDir, { recursive: true });
 mkdirSync(path.join(outDir, 'audio'), { recursive: true });
 
@@ -116,40 +99,99 @@ await page.evaluate(() => {
   document.body.style.background = '#000';
   const canvas = document.getElementById('c');
   canvas.style.willChange = 'transform';
+  const box = canvas.getBoundingClientRect();
+  const bar = Math.round(box.top);
   const el = (css) => { const n = document.createElement('div'); n.style.cssText = css; document.body.appendChild(n); return n; };
-  // Measured off the canvas rather than typed in: 72px at 1080, 36 at a
-  // half-size preview, and a preview that crops what the render will not is
-  // a preview that sends you fixing things that are not broken.
-  const bar = Math.round(canvas.getBoundingClientRect().top);
+
+  // THE DISSOLVE. A second canvas laid exactly over the first. At the top
+  // of a shot the outgoing frame is copied into it and then faded out over
+  // the incoming one - which is what an optical dissolve is, with the
+  // outgoing side frozen. Frozen is fine here: these images drift rather
+  // than move, and the overlay keeps drifting under its own transform while
+  // it fades, so both halves are still travelling.
+  const prev = document.createElement('canvas');
+  prev.width = canvas.width;
+  prev.height = canvas.height;
+  prev.style.cssText = `position:fixed;left:${box.left}px;top:${box.top}px;`
+    + `width:${box.width}px;height:${box.height}px;opacity:0;pointer-events:none;z-index:899`;
+  document.body.appendChild(prev);
+  const pctx = prev.getContext('2d');
+
+  // THE POLLEN. Half of what makes a 1985 fantasy frame look the way it
+  // does is that there is always something drifting through it - dust in a
+  // shaft of light, pollen in a forest, ash in a hall. The game does not
+  // draw any, so the film does: a few dozen specks on their own slow
+  // upward drift with a sine in the horizontal, each a soft dot rather
+  // than a hard pixel, over the picture and under the letterbox. Density
+  // is per shot, because a throne room does not have pollen in it.
+  const dust = document.createElement('canvas');
+  dust.width = Math.round(box.width);
+  dust.height = Math.round(box.height);
+  dust.style.cssText = `position:fixed;left:${box.left}px;top:${box.top}px;`
+    + `width:${box.width}px;height:${box.height}px;pointer-events:none;z-index:898`;
+  document.body.appendChild(dust);
+  const dctx = dust.getContext('2d');
+  // One soft dot, drawn once and stamped: a radial gradient per speck per
+  // frame is two and a half thousand frames of gradient allocation.
+  const DOT = document.createElement('canvas');
+  DOT.width = DOT.height = 64;
+  {
+    const g = DOT.getContext('2d').createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,246,214,1)');
+    g.addColorStop(0.35, 'rgba(255,240,200,0.45)');
+    g.addColorStop(1, 'rgba(255,236,190,0)');
+    const c = DOT.getContext('2d');
+    c.fillStyle = g;
+    c.fillRect(0, 0, 64, 64);
+  }
+  const MOTES = [];
+  for (let i = 0; i < 110; i++) {
+    MOTES.push({
+      x: Math.random(), y: Math.random(),
+      r: 2 + Math.random() * Math.random() * 12,      // a few big, mostly small
+      sp: 0.006 + Math.random() * 0.020,              // screens per second, upward
+      sw: 0.004 + Math.random() * 0.014,              // how far it wanders
+      ph: Math.random() * 7, a: 0.25 + Math.random() * 0.75,
+    });
+  }
+  const drawDust = (t, amount) => {
+    dctx.clearRect(0, 0, dust.width, dust.height);
+    if (amount <= 0) return;
+    dctx.globalCompositeOperation = 'lighter';
+    for (const m of MOTES) {
+      const y = (m.y - t * m.sp) % 1;
+      const x = m.x + Math.sin(t * 0.35 + m.ph) * m.sw;
+      const px = x * dust.width, py = (y < 0 ? y + 1 : y) * dust.height;
+      // Fade at the top and bottom edges so nothing pops in or out.
+      const edge = Math.min(1, Math.min(py, dust.height - py) / 90);
+      dctx.globalAlpha = m.a * amount * edge * (0.5 + 0.5 * Math.sin(t * 0.9 + m.ph * 2));
+      dctx.drawImage(DOT, px - m.r * 2, py - m.r * 2, m.r * 4, m.r * 4);
+    }
+    dctx.globalAlpha = 1;
+    dctx.globalCompositeOperation = 'source-over';
+  };
+
   el(`position:fixed;left:0;right:0;top:0;height:${bar}px;background:#000;z-index:900`);
   el(`position:fixed;left:0;right:0;bottom:0;height:${bar}px;background:#000;z-index:900`);
-  // A scrim for the cards that sit over the picture, black for the ones
-  // that do not, and white for the two frames where the light lands.
   const scrim = el('position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:901');
   const white = el('position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:903');
-  // The type. Uppercase, heavy, and letter-spaced wide enough to read as a
-  // caption on a poster rather than a subtitle on a video - which is the
-  // one typographic decision that separates the two kinds of film.
+  // The one card in the film, and the title of nothing: soft, wide, and
+  // faded rather than cut, like everything else here.
   const card = el('position:fixed;inset:0;display:flex;align-items:center;justify-content:center;'
-    + 'text-align:center;padding:0 9%;opacity:0;pointer-events:none;z-index:902;'
+    + 'text-align:center;padding:0 10%;opacity:0;pointer-events:none;z-index:902;'
     + "font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;"
-    + 'font-weight:700;text-transform:uppercase;letter-spacing:.19em;line-height:1.24;'
-    + 'color:#f3ead6;text-shadow:0 3px 40px rgba(0,0,0,.9)');
+    + 'font-weight:600;text-transform:uppercase;letter-spacing:.30em;line-height:1.3;'
+    + 'color:#f3ead6;text-shadow:0 0 60px rgba(0,0,0,.95)');
 
   const SC = window.SC;
 
   const DRIVERS = {
-    // Hold SPACE only while the heads are down. One scripted slip, because
-    // a creep that never nearly fails does not read as a creep.
     still: (s, r) => {
       const g = r.g;
       if (!g) return;
       const slip = s.slipAt && s.t > s.slipAt && s.t < s.slipAt + .3;
       SC.hold('act', g.spooked > 0 ? false : slip ? true : window.SCSAFE(g.t));
     },
-    // One-dimensional Lights Out. Sweep left to right and strike whenever
-    // the pane behind the cursor is still whole: that fixes it and never
-    // touches anything already finished to its left.
     crack: (s, r) => {
       const g = r.g;
       if (!g || s.t < (g.__next || 0)) return;
@@ -170,51 +212,46 @@ await page.evaluate(() => {
       if (g.cursor !== want) SC.key(g.cursor < want ? 'right' : 'left');
       else SC.key('act');
     },
-    // The route was searched for at stage time; the shaft opens at the one
-    // moment the patrol allows it, on the clock the search won at.
+    // The light is allowed to start down the castle and no further. `stop`
+    // is the sweep the film cuts away at - the trailer never shows it land.
     beam: (s, r) => {
       const g = r.g;
       if (!g) return;
       if (!g.__set) { g.__set = 1; g.mir = s.mir.map((m) => m.slice()); }
       if (!g.open && !g.win && s.t >= s.openAt) { g.t = s.openT; g.alarm = 0; g.open = 1; g.sweep = 0; }
-      // The mechanic hands the scene back a second after it is won, and
-      // what it hands back is the throne room with nobody in it. The film
-      // wants the frame the light is IN, held: clamped just under the
-      // threshold the update returns true on, the whole beam stays lit and
-      // Darkness stays ringed for as long as the shot needs.
-      if (g.win > 0.9) g.win = 0.9;
-    },
-    pick: (s, r) => {
-      if (r.choiceIndex === s.want || s.t < (r.__next || 0)) return;
-      r.__next = s.t + .3;
-      SC.key('right');
+      if (s.stop && g.sweep > s.stop) g.sweep = s.stop;
     },
   };
 
   window.__tick = (s) => {
+    // The snapshot has to happen BEFORE the step: at this instant the canvas
+    // still holds the last frame of the shot that just ended.
+    if (s.snap) {
+      pctx.clearRect(0, 0, prev.width, prev.height);
+      pctx.drawImage(canvas, 0, 0);
+    }
+    prev.style.opacity = s.pop;
+    prev.style.transformOrigin = `${s.pox}% ${s.poy}%`;
+    prev.style.transform = `scale(${s.ppush})`;
     scrim.style.opacity = s.scrim;
     white.style.opacity = s.white;
     card.textContent = s.text || '';
     card.style.opacity = s.card;
     card.style.fontSize = s.size + 'px';
     card.style.color = s.color;
-    card.style.transform = `scale(${s.tscale})`;
-    // Horizontally the push is about the shot's subject. Vertically it is
-    // about the middle now that nothing is written along the bottom edge -
-    // this game photographs as portraits and a trailer frames faces.
     canvas.style.transformOrigin = `${s.ox}% ${s.oy}%`;
     canvas.style.transform = `scale(${s.push})`;
+    drawDust(s.vt, s.dust);
     if (s.drv) DRIVERS[s.drv](s, SC.r);
     window.__pump(s.dtMs);
     const r = SC.r;
-    return { id: r.id, phase: r.phase, win: r.g ? (r.g.win || 0) : -1, near: r.g ? (r.g.near ?? -1) : -1 };
+    return { id: r.id, phase: r.phase, sweep: r.g ? +(r.g.sweep ?? -1).toFixed(2) : -1 };
   };
 });
 
 // --- the recorder side ----------------------------------------------------
 let frame = 0, vt = 0;
-const cuts = [];                    // every cut, for the score to hit
-const marks = [];                   // the named ones the score cares about
+const cuts = [], marks = [];
 const stage = (fn, arg) => page.evaluate(fn, arg);
 
 const ease = (u, kind) => (kind === 'lin' ? u
@@ -223,41 +260,53 @@ const ease = (u, kind) => (kind === 'lin' ? u
       : 1 - (1 - u) * (1 - u));
 const lerp = (a, b2, k) => a + (b2 - a) * k;
 
-// One shot. Either a card (`text`) or a picture, both cut hard in and hard
-// out; the only thing that ever fades is the head of the film and its tail.
-//
+// Where the outgoing shot's camera finished, so the frozen overlay can go
+// on travelling in the same direction while it fades.
+let out = { ox: 50, oy: 50, push: 1 };
+
+// One shot.
 //   beats   length, always a whole number of them
+//   dis     seconds of dissolve at the top of it (0 for the one hard cut)
 //   focus   [x, y] in the game's own 320x156, what the push is about
 //   push    [a, b] scale at the start and the end
-//   flash   a white frame or two at the top of the shot
+//   dip     [in, out] seconds of black at either end, for an act break
 async function shoot(s) {
   if (process.env.SC_UNTIL && cuts.some((c) => c.name === process.env.SC_UNTIL)) return;
   const at = +vt.toFixed(4);
-  cuts.push({ name: s.name, at, beats: s.beats, kind: s.text ? 'card' : 'shot', ...(s.mark ? { mark: s.mark } : {}) });
+  const dis = s.dis ?? 0.85;
+  cuts.push({ name: s.name, at, beats: s.beats, dis, kind: s.text ? 'card' : 'shot', ...(s.mark ? { mark: s.mark } : {}) });
   if (s.mark) marks.push({ name: s.mark, at });
-  // A line is placed at the cut it belongs to, plus whatever lead-in the
-  // shot asks for. The score reads these back and ducks the music under them.
-  if (s.vo) vos.push({ id: s.vo, at: +(at + (s.voAt ?? 0.12)).toFixed(4), dur: VO[s.vo].dur, who: VO[s.vo].who });
+  if (s.vo) vos.push({ id: s.vo, at: +(at + (s.voAt ?? 0.2)).toFixed(4), dur: VO[s.vo].dur, who: VO[s.vo].who });
   if (s.stage) await stage(s.stage, s.arg);
   const n = Math.round(b(s.beats) * FPS);
   const f0 = s.focus || [160, 78], f1 = s.focus1 || f0;
   const [p0, p1] = s.push || [1, 1];
-  const [t0, t1] = s.tscale || [1, 1];
+  const [dipIn, dipOut] = s.dip || [0, 0];
+  const o = out;
   let info = null;
   for (let i = 0; i < n; i++) {
     const t = i * DT, u = n > 1 ? i / (n - 1) : 0, k = ease(u, s.ease);
+    const dk = dis > 0 ? Math.min(1, t / dis) : 1;
     info = await page.evaluate((x) => window.__tick(x), {
       dtMs: DT * 1000,
-      // A card cuts in over one frame rather than popping, and holds. Its
-      // ground is the scrim: full black for the ones between images, a
-      // wash for the ones laid over a shot.
-      scrim: s.text ? Math.min(1, t / 0.04) * (s.over ?? 1) : (s.scrim ?? 0),
+      snap: i === 0,
+      // The overlay holds full opacity for nothing and fades on a curve
+      // that spends most of its time near the middle, which is what stops a
+      // dissolve reading as a wipe of brightness.
+      pop: dis > 0 ? Math.max(0, 1 - dk) ** 0.85 : 0,
+      pox: o.ox, poy: o.oy, ppush: o.push * (1 + 0.035 * dk),
+      scrim: Math.max(dipIn > 0 ? Math.max(0, 1 - t / dipIn) : 0,
+        dipOut > 0 ? Math.max(0, (t - (b(s.beats) - dipOut)) / dipOut) : 0),
       white: s.flash ? Math.max(0, 1 - t / (s.flash * DT)) : 0,
-      text: s.text || '', card: s.text ? Math.min(1, t / 0.10) : 0,
-      size: s.size || 62, color: s.color || '#f3ead6',
-      tscale: lerp(t0, t1, u),
+      text: s.text || '',
+      // A card fades up and down inside its own shot rather than cutting.
+      card: s.text ? Math.min(1, t / 0.7, Math.max(0, (b(s.beats) - t) / 0.7)) : 0,
+      size: s.size || 54, color: s.color || '#f3ead6',
       ox: lerp(f0[0], f1[0], k) / VW * 100, oy: lerp(f0[1], f1[1], k) / VH * 100,
       push: lerp(p0, p1, k),
+      // The pollen runs on the film's own clock, not the shot's, so it
+      // drifts continuously across a dissolve instead of restarting.
+      vt: vt, dust: s.dust ?? 0.5,
       drv: s.drv || null, t, ...(s.drvArg || {}),
     });
     if (!DRY && (!PREVIEW || frame % PREVIEW === 0)) {
@@ -265,12 +314,11 @@ async function shoot(s) {
     }
     frame++; vt += DT;
   }
-  console.log(`  ${(s.text ? '[card] ' + s.text.slice(0, 34) : s.name).padEnd(40)} ${at.toFixed(2)}s +${s.beats}b`);
+  out = { ox: f1[0] / VW * 100, oy: f1[1] / VH * 100, push: p1 };
+  console.log(`  ${(s.text ? '[card] ' + s.text.slice(0, 30) : s.name).padEnd(34)} ${at.toFixed(2)}s +${s.beats}b`
+    + `${dis ? ` /${dis}` : '  CUT'}${s.vo ? '  ' + s.vo : ''}`);
 }
 
-// Put the story where a shot needs it. Always a hard arrival - the game's
-// own dissolves and location cards are a game's grammar, and this film has
-// its own.
 const put = (id, patch) => stage(([id, patch]) => {
   const bt = window.SC.BEATS.find((x) => x.id === id);
   if (bt.card) { bt.__card = bt.card; delete bt.card; }
@@ -284,128 +332,106 @@ const intoGame = (id) => stage(([id]) => {
   r.g = window.SC.GAMES[bt.game].init(bt);
 }, [id]);
 
-const card = (name, text, beats, o = {}) => shoot({ name, text, beats, ...o });
-
 console.log(`recording The Seventh Color  (${BPM}bpm, one beat = ${BEAT.toFixed(4)}s)`);
 
 // =========================================================================
-// ACT ONE - what there was
-// The narrator over four pictures. No cards here: he is saying the words,
-// and a card that repeats a line being spoken is a subtitle with ambitions.
+// I. THE WORLD AS IT WAS
+// Fades up out of nothing, and from here to the horn there is not a single
+// cut in the film.
 // =========================================================================
 await put('prologue', { phase: 6, cut: 4.0 });
-await shoot({ name: 'bloom', beats: 7, vo: 'n1', voAt: 0.55, mark: 'open',
-  focus: [160, 72], push: [1.34, 1.02], ease: 'out' });
+await shoot({ name: 'bloom', beats: 6, dis: 0, dip: [1.6, 0], vo: 'n1', voAt: 1.1, mark: 'open', dust: 0.45,
+  focus: [160, 72], push: [1.3, 1.02], ease: 'out' });
 
 await put('jacks-glade', { phase: 0, line: 4 });
-await shoot({ name: 'glade', beats: 5, vo: 'n2',
-  focus: [150, 62], push: [1.26, 1.4], ease: 'lin' });
+await shoot({ name: 'glade', beats: 5, dis: 1.0, vo: 'n2', dust: 0.95,
+  focus: [150, 62], push: [1.22, 1.36], ease: 'lin' });
 
 await put('unicorn-stream', { phase: 0, line: 0 });
 await intoGame('unicorn-stream');
-await shoot({ name: 'herd', beats: 7, vo: 'n3', drv: 'still', drvArg: { slipAt: 99 },
-  focus: [232, 94], focus1: [200, 94], push: [1.5, 1.3], ease: 'lin' });
+await shoot({ name: 'herd', beats: 6, dis: 1.0, vo: 'n3', dust: 0.9, drv: 'still', drvArg: { slipAt: 99 },
+  focus: [206, 92], focus1: [232, 92], push: [1.5, 1.32], ease: 'lin' });
+// A horn, as close as the film gets to anything.
+await shoot({ name: 'horn', beats: 4, dis: 0.9, dust: 1.0, drv: 'still', drvArg: { slipAt: 99 },
+  focus: [264, 84], push: [2.5, 2.9], ease: 'lin' });
 
-// His hall, and the first thing in the film that is enjoying itself.
+// =========================================================================
+// II. WHAT WANTED IT
+// =========================================================================
 await put('shadow-council', { phase: 0, line: 0 });
-await shoot({ name: 'council', beats: 6, vo: 'd1', voAt: 0.45, mark: 'darkness1',
-  focus: [166, 58], push: [1.16, 1.36], ease: 'out' });
+await shoot({ name: 'council', beats: 6, dis: 1.1, vo: 'd1', voAt: 0.75, mark: 'darkness1', dust: 0.25,
+  focus: [166, 58], push: [1.12, 1.32], ease: 'out' });
 
-// =========================================================================
-// THE BREAK
-// =========================================================================
 await put('unicorn-stream', { phase: 0, line: 0 });
 await intoGame('unicorn-stream');
-await shoot({ name: 'creep', beats: 4, drv: 'still', drvArg: {}, mark: 'creep',
-  focus: [150, 96], focus1: [200, 96], push: [1.42, 1.6], ease: 'in' });
-await shoot({ name: 'reach', beats: 3, drv: 'still', drvArg: {},
-  focus: [232, 94], push: [1.7, 1.9], ease: 'in' });
+await shoot({ name: 'creep', beats: 4, dis: 1.0, dust: 0.9, drv: 'still', drvArg: {}, mark: 'creep',
+  focus: [150, 96], focus1: [200, 96], push: [1.4, 1.58], ease: 'in' });
+await shoot({ name: 'reach', beats: 3, dis: 0.7, dust: 1.0, drv: 'still', drvArg: {},
+  focus: [232, 94], push: [1.7, 1.95], ease: 'in' });
+
+// THE ONE CUT IN THE FILM.
 await shoot({
-  name: 'shatter', beats: 5, flash: 3, mark: 'horn',
+  name: 'shatter', beats: 5, dis: 0, flash: 3, mark: 'horn', dust: 0.15,
   stage: () => {
     const bt = window.SC.BEATS.find((x) => x.id === 'unicorn-stream');
     bt.cutscene.hold = 2.6;
     const r = window.SC.r;
     r.phase = window.SC.P.CUT; r.cut = 0; r.g = null;
   },
-  focus: [160, 72], push: [1.0, 1.26], ease: 'in',
+  focus: [160, 72], push: [1.0, 1.28], ease: 'in',
 });
-// And he is still amused about it, over the snow.
 await shoot({
-  name: 'snow', beats: 7, vo: 'd2', voAt: 0.5, mark: 'winter',
+  name: 'snow', beats: 6, dis: 1.2, vo: 'd2', voAt: 0.9, mark: 'winter', dust: 0.1,
   stage: () => {
     const bt = window.SC.BEATS.find((x) => x.id === 'winter-comes');
     bt.cutscene.hold = 3.0;
     window.SC.hard();
     window.SC.play('winter-comes', { phase: window.SC.P.CUT, cut: 5.2 });
   },
-  focus: [160, 86], push: [1.3, 1.06], ease: 'out',
+  focus: [160, 86], push: [1.28, 1.06], ease: 'out',
 });
 await put('winter-falls', { phase: 0, line: 1 });
-await shoot({ name: 'pond', beats: 4, focus: [110, 66], push: [1.24, 1.4], ease: 'lin' });
-await card('c1', 'she was already gone', 3, { size: 62, mark: 'gone' });
+await shoot({ name: 'pond', beats: 4, dis: 1.0, dust: 0.3, focus: [110, 66], push: [1.2, 1.36], ease: 'lin' });
+await shoot({ name: 'c1', text: 'she was already gone', beats: 4, dis: 1.0, size: 52, dust: 0, mark: 'gone' });
 
 // =========================================================================
-// ACT TWO - the road
+// III. THE ROAD
+// Shorter units, but still dissolves - the film gets quicker without ever
+// starting to cut.
 // =========================================================================
 await intoGame('winter-falls');
-await shoot({ name: 'ice', beats: 3, vo: 'g1', drv: 'crack', drvArg: { every: .26 },
-  focus: [160, 110], push: [1.5, 1.34], ease: 'lin', mark: 'road' });
+await shoot({ name: 'ice', beats: 3, dis: 0.75, vo: 'g1', voAt: 0.1, drv: 'crack', drvArg: { every: .26 },
+  focus: [160, 110], push: [1.46, 1.32], ease: 'lin', mark: 'road' });
 await put('hollow-armory', { phase: 0, line: 1 });
-await shoot({ name: 'gump', beats: 2, focus: [84, 70], push: [1.36, 1.46], ease: 'lin' });
+await shoot({ name: 'gump', beats: 3, dis: 0.75, dust: 0.7, focus: [84, 70], push: [1.32, 1.44], ease: 'lin' });
 await put('bog-road', { phase: 0, line: 1 });
 await intoGame('bog-road');
-await shoot({ name: 'bog', beats: 2, drv: 'lights', drvArg: { every: .22 },
-  focus: [160, 56], push: [1.4, 1.3], ease: 'lin' });
+await shoot({ name: 'bog', beats: 3, dis: 0.75, drv: 'lights', drvArg: { every: .22 },
+  focus: [160, 56], push: [1.36, 1.26], ease: 'lin' });
 await put('megs-looking-glass', { phase: 0, line: 2 });
-await shoot({ name: 'meg', beats: 2, focus: [274, 52], push: [1.38, 1.5], ease: 'lin' });
+await shoot({ name: 'meg', beats: 3, dis: 0.75, dust: 0.6, focus: [274, 52], push: [1.34, 1.48], ease: 'lin' });
 await put('root-door', { phase: 0, line: 1 });
-await shoot({ name: 'roots', beats: 2, focus: [160, 74], push: [1.3, 1.4], ease: 'lin' });
+await shoot({ name: 'roots', beats: 3, dis: 0.75, dust: 0.5, focus: [160, 74], push: [1.26, 1.38], ease: 'lin' });
 await put('gown-that-breathes', { phase: 0, line: 2 });
-await shoot({ name: 'hall', beats: 2, focus: [160, 60], push: [1.24, 1.36], ease: 'lin' });
+await shoot({ name: 'hall', beats: 3, dis: 0.8, dust: 0.3, focus: [160, 60], push: [1.2, 1.34], ease: 'lin' });
 
-// The offer, the refusal, and her answer to the same offer.
+// =========================================================================
+// IV. THE OFFER, AND WHAT IT IS ANSWERED WITH
+// Nobody wins anything here. Three people say three things and the film
+// leaves it standing.
+// =========================================================================
 await put('hidden-hand', { phase: 0, line: 0 });
-await shoot({ name: 'throne', beats: 6, vo: 'd3', mark: 'offer',
-  focus: [226, 56], push: [1.3, 1.5], ease: 'lin' });
-await shoot({ name: 'jack', beats: 5, vo: 'j1', voAt: 0.45,
-  focus: [96, 74], push: [1.4, 1.56], ease: 'lin' });
-await card('c2', 'dawn needs no throne', 3, { size: 64, color: '#e8b923', vo: 'j2', voAt: 0.35, mark: 'refuse' });
+await shoot({ name: 'throne', beats: 6, dis: 1.0, vo: 'd3', voAt: 0.6, mark: 'offer', dust: 0.2,
+  focus: [226, 56], push: [1.26, 1.46], ease: 'lin' });
+await shoot({ name: 'jack', beats: 5, dis: 0.9, vo: 'j1', voAt: 0.5, dust: 0.2,
+  focus: [96, 74], push: [1.36, 1.52], ease: 'lin' });
 await put('false-sacrifice', { phase: 0, line: 1 });
-await shoot({ name: 'lili', beats: 6, vo: 'l1', voAt: 0.40,
-  focus: [96, 76], push: [1.42, 1.58], ease: 'lin' });
+await shoot({ name: 'lili', beats: 6, dis: 0.9, vo: 'l1', voAt: 0.5, mark: 'refuse', dust: 0.2,
+  focus: [96, 76], push: [1.38, 1.54], ease: 'lin' });
 
-// =========================================================================
-// THE DROP
-// =========================================================================
-await put('megs-looking-glass', { phase: 0, line: 2 });
-await intoGame('megs-looking-glass');
-await shoot({ name: 'mirror', beats: 1, focus: [160, 70], push: [1.34, 1.4], ease: 'lin', mark: 'drop' });
-await put('winter-falls', { phase: 0, line: 1 });
-await intoGame('winter-falls');
-await shoot({ name: 'ice2', beats: 1, drv: 'crack', drvArg: { every: .18 },
-  focus: [200, 110], push: [1.66, 1.72], ease: 'lin' });
-await put('bog-road', { phase: 0, line: 1 });
-await intoGame('bog-road');
-await shoot({ name: 'bog2', beats: 1, drv: 'lights', drvArg: { every: .16 },
-  focus: [160, 56], push: [1.5, 1.56], ease: 'lin' });
-await shoot({
-  name: 'causeway', beats: 2,
-  stage: () => {
-    const bt = window.SC.BEATS.find((x) => x.id === 'edge-of-world');
-    bt.cutscene.hold = 3.1;
-    if (bt.card) { bt.__card = bt.card; delete bt.card; }
-    window.SC.hard();
-    window.SC.play('edge-of-world', { phase: window.SC.P.CUT, cut: 3.4 });
-  },
-  focus: [160, 78], push: [1.2, 1.34], ease: 'lin',
-});
-
-// The finale of the game, played. The route is searched for twice - once
-// with the patrol off the board for a route that works geometrically, then
-// frame by frame from every candidate second until one gets the whole beam
-// down before anybody walks into it - and he is mocking the trick right up
-// to the frame it works.
+// The route is real, searched for the way it always was - but the film
+// opens the shaft and then walks out of the room. `stop` holds the sweep
+// short of the wall it would otherwise reach.
 const beamPlan = await stage(() => {
   const bt = window.SC.BEATS.find((x) => x.id === 'final-beam');
   const G = window.SC.GAMES.dungeon;
@@ -451,41 +477,33 @@ console.log(`  beam: ${beamPlan.mir.length} bucklers, shaft opens at t=${beamPla
 await put('final-beam', { phase: 0, line: 1 });
 await intoGame('final-beam');
 await shoot({
-  name: 'castle', beats: 6, vo: 'd4', drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 99, openT: 0 },
-  focus: [160, 70], push: [1.34, 1.16], ease: 'lin', mark: 'mirrors',
+  name: 'castle', beats: 6, dis: 0.9, vo: 'd4', voAt: 0.55, mark: 'mirrors', dust: 0.18,
+  drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 99, openT: 0, stop: 0 },
+  focus: [160, 70], push: [1.3, 1.14], ease: 'lin',
 });
+// The light starts. The film does not stay to watch it arrive.
 await shoot({
-  name: 'beam', beats: 3, drv: 'beam',
-  drvArg: { mir: beamPlan.mir, openAt: 0.05, openT: beamPlan.openT },
-  focus: [160, 60], focus1: [110, 92], push: [1.16, 1.42], ease: 'in', mark: 'shaft',
+  name: 'shaft', beats: 4, dis: 0.8, mark: 'shaft', dust: 0.35,
+  drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 0.05, openT: beamPlan.openT, stop: 0.55 },
+  focus: [160, 62], focus1: [130, 74], push: [1.16, 1.44], ease: 'in',
+  dip: [0, 1.1],
 });
-await shoot({
-  name: 'land', beats: 4, flash: 4, mark: 'land',
-  drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 1e9, openT: 0 },
-  focus: [58, 96], focus1: [80, 88], push: [2.0, 1.55], ease: 'out',
-});
-await card('c3', 'you were never the night', 4, { size: 62, vo: 'j3a' });
-// The one black beat in the film.
-await shoot({ name: 'hold', beats: 1, text: ' ', size: 62, mark: 'hold' });
-await card('c4', 'you were only its shadow', 4, { size: 62, color: '#e8b923', vo: 'j3b', voAt: 0.2 });
 
 // =========================================================================
-// THE DAWN
+// V. THE MONOLOGUE
+// The last voice in this kind of trailer is the antagonist's, and what he
+// says is appetite rather than outcome. Three lines, all his, over the
+// rings the film opened on - so the picture comes back to where it started
+// while the words go somewhere the picture never does.
 // =========================================================================
+await put('prologue', { phase: 6, cut: 5.5 });
 await shoot({
-  name: 'dawn', beats: 8, vo: 'n4', voAt: 0.9, mark: 'dawn',
-  stage: () => {
-    const bt = window.SC.BEATS.find((x) => x.id === 'epilogue');
-    bt.cutscene.hold = 3.4;
-    window.SC.hard();
-    window.SC.play('epilogue', { phase: window.SC.P.CUT, cut: 7.6 });
-  },
-  focus: [160, 74], push: [1.36, 1.04], ease: 'out',
+  name: 'close1', beats: 7, dis: 0, dip: [1.3, 0], vo: 'd5', voAt: 1.0, mark: 'close',
+  focus: [160, 72], push: [1.02, 1.18], ease: 'lin', dust: 0.35,
 });
 await shoot({
-  name: 'last', beats: 7, vo: 'n5', voAt: 0.35, mark: 'named',
-  focus: [160, 74], push: [1.04, 1.18], ease: 'lin',
-  stage: () => { window.SC.set({ cut: 12.4 }); },
+  name: 'close2', beats: 8, dis: 1.6, dip: [0, 1.4], vo: 'd6', voAt: 1.3, mark: 'last',
+  focus: [160, 72], push: [1.3, 1.02], ease: 'out', dust: 0.2,
 });
 
 await browser.close();
@@ -493,4 +511,4 @@ const end = +vt.toFixed(4);
 writeFileSync(path.join(outDir, 'beats.json'), JSON.stringify({
   fps: FPS, bpm: BPM, beat: BEAT, cuts, marks, vo: vos, cues: { end }, duration: frame / FPS,
 }, null, 2));
-console.log(`wrote ${frame} frames to ${path.relative(root, framesDir)} @ ${FPS}fps (${(frame / FPS).toFixed(2)}s, ${cuts.length} cuts)`);
+console.log(`wrote ${frame} frames to ${path.relative(root, framesDir)} @ ${FPS}fps (${(frame / FPS).toFixed(2)}s, ${cuts.length} shots)`);

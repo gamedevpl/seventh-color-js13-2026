@@ -3,7 +3,7 @@
 // gets retimed constantly, and every hardcoded duration in this pipeline
 // eventually became a crossfade landing in the wrong place.
 //
-//   node tools/trailer/assemble.mjs [--game=snap|fireball] [out.mp4]
+//   node tools/trailer/assemble.mjs [--game=snap|fireball] [--no-subs] [out.mp4]
 //
 // Run order per game: build it with cheats (the recorders need the DEV
 // hooks), then frames, end card, audio, then this.
@@ -51,6 +51,13 @@ if (!game) {
 }
 
 const build = path.join(root, 'build', game.dir);
+// The spoken lines, burnt into the lower letterbox bar. They go on in the
+// FINAL pass, after the bloom: run through the bloom they would pick up a
+// halo and smear, which is a nice effect on a moon and an unreadable one
+// on a sentence. captions.srt is written alongside for anywhere that would
+// rather have real text - pass --no-subs for a clean picture.
+const subs = path.join(build, 'captions.ass');
+const burn = !process.argv.includes('--no-subs') && existsSync(subs);
 const framesDir = path.join(build, 'frames');
 const endcard = path.join(build, 'endcard', 'endcard.webm');
 const music = path.join(build, 'audio', game.music);
@@ -119,11 +126,11 @@ console.log(`  gameplay ${gameDur.toFixed(2)}s, crossfade at ${offset}s`);
 sh('ffmpeg', [
   '-y', '-i', gameplay, '-i', endcard30, '-i', music,
   '-filter_complex',
-  `[0:v]fade=t=in:st=0:d=${FADE_IN}:color=black[v0];`
+  `[0:v]fade=t=in:st=0:d=${FADE_IN}:color=black${burn ? `,ass='${subs.replace(/[\\:']/g, '\\$&')}'` : ''}[v0];`
   + `[v0][1:v]xfade=transition=fade:duration=${XFADE}:offset=${offset}[v]`,
   '-map', '[v]', '-map', '2:a',
   '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium',
   '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', out,
 ]);
 
-console.log(`${path.relative(root, out)}  ${probe(out).toFixed(2)}s`);
+console.log(`${path.relative(root, out)}  ${probe(out).toFixed(2)}s${burn ? '  (captions burnt in)' : ''}`);

@@ -16,14 +16,27 @@
 //   it, for the frame the horn breaks. A film with one cut in it makes that
 //   cut enormous.
 //
-//   IT WITHHOLDS. The previous pass played the whole story: the light
-//   restored, Darkness beaten, the last line of the game and the dawn
-//   behind it. A trailer for a forty-minute story cannot spend the story.
-//   This one stops at the threat. The light starts down the castle and the
-//   film cuts away from it; Darkness's last word is a taunt, not a defeat;
-//   nobody says how it ends. Every line past that point is still generated
-//   and still in vo.json, unused, because the temptation to put them back
-//   is exactly the thing to leave a note about.
+//   IT IS NOT IN STORY ORDER, and this is the whole thing. A pass that
+//   walks the game from its prologue to its castle, one shot a location,
+//   with a narrator explaining the premise, is a cinematic walkthrough no
+//   matter how well it dissolves - which is what the pass before this one
+//   was. This cut is associative instead: NINE images, each used two,
+//   three or four times at different sizes, arranged as a rhyme scheme
+//   rather than a route. The rings open the film and close it. The horn
+//   appears three times. Darkness appears five, each closer than the last.
+//   Nothing is named, no location is announced, and the burst in the
+//   middle works at six images in five seconds precisely because every one
+//   of them has already been seen.
+//
+//   IT WITHHOLDS. No beam landing, no Darkness beaten, no dawn, no ending.
+//   The light starts down the castle and the film walks out of the room.
+//   Those lines are still generated and still in vo.json, unused, because
+//   the temptation to put them back is exactly the thing to leave a note
+//   about.
+//
+//   THE ANTAGONIST CARRIES IT. Twenty-five of the thirty-six seconds of
+//   speech are his. The narrator says one sentence, at the top, and then
+//   gets out of the way; the last voice in the film is Darkness's.
 //
 //   IT IS SLOW. Seventy-five to the minute, four to six beats a shot, and
 //   the score is sustained rather than struck - no braams, no hit on every
@@ -334,104 +347,128 @@ const intoGame = (id) => stage(([id]) => {
 
 console.log(`recording The Seventh Color  (${BPM}bpm, one beat = ${BEAT.toFixed(4)}s)`);
 
-// =========================================================================
-// I. THE WORLD AS IT WAS
-// Fades up out of nothing, and from here to the horn there is not a single
-// cut in the film.
-// =========================================================================
-await put('prologue', { phase: 6, cut: 4.0 });
-await shoot({ name: 'bloom', beats: 6, dis: 0, dip: [1.6, 0], vo: 'n1', voAt: 1.1, mark: 'open', dust: 0.45,
-  focus: [160, 72], push: [1.3, 1.02], ease: 'out' });
-
-await put('jacks-glade', { phase: 0, line: 4 });
-await shoot({ name: 'glade', beats: 5, dis: 1.0, vo: 'n2', dust: 0.95,
-  focus: [150, 62], push: [1.22, 1.36], ease: 'lin' });
-
-await put('unicorn-stream', { phase: 0, line: 0 });
-await intoGame('unicorn-stream');
-await shoot({ name: 'herd', beats: 6, dis: 1.0, vo: 'n3', dust: 0.9, drv: 'still', drvArg: { slipAt: 99 },
-  focus: [206, 92], focus1: [232, 92], push: [1.5, 1.32], ease: 'lin' });
-// A horn, as close as the film gets to anything.
-await shoot({ name: 'horn', beats: 4, dis: 0.9, dust: 1.0, drv: 'still', drvArg: { slipAt: 99 },
-  focus: [264, 84], push: [2.5, 2.9], ease: 'lin' });
-
-// =========================================================================
-// II. WHAT WANTED IT
-// =========================================================================
-await put('shadow-council', { phase: 0, line: 0 });
-await shoot({ name: 'council', beats: 6, dis: 1.1, vo: 'd1', voAt: 0.75, mark: 'darkness1', dust: 0.25,
-  focus: [166, 58], push: [1.12, 1.32], ease: 'out' });
-
-await put('unicorn-stream', { phase: 0, line: 0 });
-await intoGame('unicorn-stream');
-await shoot({ name: 'creep', beats: 4, dis: 1.0, dust: 0.9, drv: 'still', drvArg: {}, mark: 'creep',
-  focus: [150, 96], focus1: [200, 96], push: [1.4, 1.58], ease: 'in' });
-await shoot({ name: 'reach', beats: 3, dis: 0.7, dust: 1.0, drv: 'still', drvArg: {},
-  focus: [232, 94], push: [1.7, 1.95], ease: 'in' });
-
-// THE ONE CUT IN THE FILM.
-await shoot({
-  name: 'shatter', beats: 5, dis: 0, flash: 3, mark: 'horn', dust: 0.15,
-  stage: () => {
-    const bt = window.SC.BEATS.find((x) => x.id === 'unicorn-stream');
-    bt.cutscene.hold = 2.6;
-    const r = window.SC.r;
-    r.phase = window.SC.P.CUT; r.cut = 0; r.g = null;
-  },
-  focus: [160, 72], push: [1.0, 1.28], ease: 'in',
+// The whole film is made of NINE images, and it is built by returning to
+// them rather than by moving past them. Each of these is a one-line
+// re-stage, because every one of them is used two, three or four times at
+// different sizes, and a trailer of this kind is a rhyme scheme.
+const RINGS = (cut) => put('prologue', { phase: 6, cut });
+const HERD = async () => { await put('unicorn-stream', { phase: 0, line: 0 }); await intoGame('unicorn-stream'); };
+const GLADE = () => put('jacks-glade', { phase: 0, line: 4 });
+const HALL = () => put('shadow-council', { phase: 0, line: 0 });
+const THRONE = () => put('hidden-hand', { phase: 0, line: 0 });
+const POND = () => put('winter-falls', { phase: 0, line: 1 });
+const DEFY = () => put('false-sacrifice', { phase: 0, line: 1 });
+const SNOW = (cut) => stage(([cut]) => {
+  const bt = window.SC.BEATS.find((x) => x.id === 'winter-comes');
+  bt.cutscene.hold = 3.0;
+  window.SC.hard();
+  window.SC.play('winter-comes', { phase: window.SC.P.CUT, cut });
+}, [cut]);
+const SHATTER = () => stage(() => {
+  const bt = window.SC.BEATS.find((x) => x.id === 'unicorn-stream');
+  bt.cutscene.hold = 2.6;
+  const r = window.SC.r;
+  window.SC.hard();
+  r.id = 'unicorn-stream'; r.phase = window.SC.P.CUT; r.cut = 0; r.g = null;
 });
-await shoot({
-  name: 'snow', beats: 6, dis: 1.2, vo: 'd2', voAt: 0.9, mark: 'winter', dust: 0.1,
-  stage: () => {
-    const bt = window.SC.BEATS.find((x) => x.id === 'winter-comes');
-    bt.cutscene.hold = 3.0;
-    window.SC.hard();
-    window.SC.play('winter-comes', { phase: window.SC.P.CUT, cut: 5.2 });
-  },
-  focus: [160, 86], push: [1.28, 1.06], ease: 'out',
-});
-await put('winter-falls', { phase: 0, line: 1 });
-await shoot({ name: 'pond', beats: 4, dis: 1.0, dust: 0.3, focus: [110, 66], push: [1.2, 1.36], ease: 'lin' });
-await shoot({ name: 'c1', text: 'she was already gone', beats: 4, dis: 1.0, size: 52, dust: 0, mark: 'gone' });
 
 // =========================================================================
-// III. THE ROAD
-// Shorter units, but still dissolves - the film gets quicker without ever
-// starting to cut.
+// I. INVOCATION
+// Four images and one sentence in twenty seconds. Nothing is explained,
+// nothing is named, and the picture returns to where it started before the
+// first voice has finished. This is the part that decides whether the film
+// is a trailer or a walkthrough: a walkthrough would have used these
+// twenty seconds to tell you the premise.
 // =========================================================================
-await intoGame('winter-falls');
-await shoot({ name: 'ice', beats: 3, dis: 0.75, vo: 'g1', voAt: 0.1, drv: 'crack', drvArg: { every: .26 },
-  focus: [160, 110], push: [1.46, 1.32], ease: 'lin', mark: 'road' });
-await put('hollow-armory', { phase: 0, line: 1 });
-await shoot({ name: 'gump', beats: 3, dis: 0.75, dust: 0.7, focus: [84, 70], push: [1.32, 1.44], ease: 'lin' });
-await put('bog-road', { phase: 0, line: 1 });
-await intoGame('bog-road');
-await shoot({ name: 'bog', beats: 3, dis: 0.75, drv: 'lights', drvArg: { every: .22 },
-  focus: [160, 56], push: [1.36, 1.26], ease: 'lin' });
-await put('megs-looking-glass', { phase: 0, line: 2 });
-await shoot({ name: 'meg', beats: 3, dis: 0.75, dust: 0.6, focus: [274, 52], push: [1.34, 1.48], ease: 'lin' });
-await put('root-door', { phase: 0, line: 1 });
-await shoot({ name: 'roots', beats: 3, dis: 0.75, dust: 0.5, focus: [160, 74], push: [1.26, 1.38], ease: 'lin' });
-await put('gown-that-breathes', { phase: 0, line: 2 });
-await shoot({ name: 'hall', beats: 3, dis: 0.8, dust: 0.3, focus: [160, 60], push: [1.2, 1.34], ease: 'lin' });
+await RINGS(4.0);
+await shoot({ name: 'rings1', beats: 9, dis: 0, dip: [2.2, 0], vo: 'n1', voAt: 2.2, mark: 'open',
+  focus: [160, 72], push: [1.5, 1.04], ease: 'out', dust: 0.5 });
+
+await HERD();
+await shoot({ name: 'hornbig', beats: 6, dis: 1.5, dust: 1.0, drv: 'still', drvArg: { slipAt: 99 },
+  focus: [264, 82], push: [3.2, 2.7], ease: 'lin', mark: 'horn1' });
+
+await GLADE();
+await shoot({ name: 'blind1', beats: 6, dis: 1.5, dust: 1.0,
+  focus: [222, 62], push: [2.1, 1.8], ease: 'lin' });
+
+await RINGS(9.0);
+await shoot({ name: 'rings2', beats: 5, dis: 1.4, dust: 0.4,
+  focus: [160, 72], push: [1.06, 1.3], ease: 'lin' });
 
 // =========================================================================
-// IV. THE OFFER, AND WHAT IT IS ANSWERED WITH
-// Nobody wins anything here. Three people say three things and the film
-// leaves it standing.
+// II. THE VOICE
+// He arrives out of black and does not leave again. From here the film is
+// his; the pictures are what he is talking about rather than where anyone
+// is going.
 // =========================================================================
-await put('hidden-hand', { phase: 0, line: 0 });
-await shoot({ name: 'throne', beats: 6, dis: 1.0, vo: 'd3', voAt: 0.6, mark: 'offer', dust: 0.2,
-  focus: [226, 56], push: [1.26, 1.46], ease: 'lin' });
-await shoot({ name: 'jack', beats: 5, dis: 0.9, vo: 'j1', voAt: 0.5, dust: 0.2,
-  focus: [96, 74], push: [1.36, 1.52], ease: 'lin' });
-await put('false-sacrifice', { phase: 0, line: 1 });
-await shoot({ name: 'lili', beats: 6, dis: 0.9, vo: 'l1', voAt: 0.5, mark: 'refuse', dust: 0.2,
-  focus: [96, 76], push: [1.38, 1.54], ease: 'lin' });
+await HALL();
+await shoot({ name: 'hall1', beats: 8, dis: 1.6, dip: [1.2, 0], vo: 'd1', voAt: 1.6, mark: 'voice',
+  focus: [166, 56], push: [1.05, 1.34], ease: 'out', dust: 0.22 });
 
-// The route is real, searched for the way it always was - but the film
-// opens the shaft and then walks out of the room. `stop` holds the sweep
-// short of the wall it would otherwise reach.
+await GLADE();
+await shoot({ name: 'forest', beats: 5, dis: 1.4, dust: 0.85,
+  focus: [160, 66], push: [1.0, 1.1], ease: 'lin' });
+
+await SNOW(4.6);
+await shoot({ name: 'snow1', beats: 7, dis: 1.6, vo: 'd2', voAt: 1.4, mark: 'winter',
+  focus: [160, 84], push: [1.34, 1.04], ease: 'out', dust: 0.15 });
+
+await POND();
+await shoot({ name: 'pond', beats: 5, dis: 1.4, dust: 0.3,
+  focus: [110, 64], push: [1.16, 1.34], ease: 'lin' });
+
+await THRONE();
+await shoot({ name: 'hall2', beats: 7, dis: 1.4, vo: 'd3', voAt: 1.2, mark: 'offer',
+  focus: [226, 54], push: [1.5, 1.86], ease: 'lin', dust: 0.2 });
+
+// =========================================================================
+// III. THE BURST
+// The only fast passage in the film, and the only cut. Six images in five
+// seconds, every one of them already seen - which is why they read at that
+// speed at all. A montage of NEW pictures this quick is noise.
+// =========================================================================
+await HERD();
+await shoot({ name: 'creep', beats: 3, dis: 0.9, dust: 0.9, drv: 'still', drvArg: {}, mark: 'creep',
+  focus: [150, 96], focus1: [206, 96], push: [1.44, 1.66], ease: 'in' });
+await shoot({ name: 'reach', beats: 2, dis: 0.5, dust: 1.0, drv: 'still', drvArg: {},
+  focus: [232, 92], push: [1.9, 2.2], ease: 'in' });
+
+await SHATTER();
+await shoot({ name: 'shatter', beats: 3, dis: 0, flash: 3, mark: 'horn', dust: 0.1,
+  focus: [160, 72], push: [1.0, 1.32], ease: 'in' });
+
+await HERD();
+await shoot({ name: 'f1', beats: 1, dis: 0.2, dust: 0.8, drv: 'still', drvArg: { slipAt: 99 },
+  focus: [206, 84], push: [2.9, 3.0], ease: 'lin', mark: 'flurry' });
+await SNOW(7.4);
+await shoot({ name: 'f2', beats: 1, dis: 0.2, dust: 0.1, focus: [160, 80], push: [1.5, 1.55], ease: 'lin' });
+await GLADE();
+await shoot({ name: 'f3', beats: 1, dis: 0.2, dust: 0.8, focus: [222, 60], push: [2.4, 2.5], ease: 'lin' });
+await POND();
+await shoot({ name: 'f4', beats: 1, dis: 0.2, dust: 0.3, focus: [150, 62], push: [1.7, 1.75], ease: 'lin' });
+await HALL();
+await shoot({ name: 'f5', beats: 1, dis: 0.2, dust: 0.2, focus: [166, 52], push: [2.2, 2.3], ease: 'lin' });
+await DEFY();
+await shoot({ name: 'f6', beats: 1, dis: 0.2, dust: 0.2, focus: [96, 74], push: [2.0, 2.1], ease: 'lin' });
+
+await THRONE();
+await shoot({ name: 'kneel', beats: 8, dis: 0.9, vo: 'd5', voAt: 0.6, mark: 'kneel',
+  focus: [226, 54], push: [2.3, 2.7], ease: 'lin', dust: 0.18 });
+
+// =========================================================================
+// IV. THE ANSWER
+// Two people say two things to him and the film holds on their faces for
+// as long as it held on his. Nobody wins anything.
+// =========================================================================
+await THRONE();
+await shoot({ name: 'jack', beats: 5, dis: 1.3, vo: 'j1', voAt: 0.9, mark: 'answer',
+  focus: [96, 74], push: [1.5, 1.72], ease: 'lin', dust: 0.2 });
+await DEFY();
+await shoot({ name: 'lili', beats: 6, dis: 1.3, vo: 'l1', voAt: 0.8,
+  focus: [96, 74], push: [1.5, 1.7], ease: 'lin', dust: 0.2 });
+
+// One flash of the thing that might answer him, unexplained and unfinished.
 const beamPlan = await stage(() => {
   const bt = window.SC.BEATS.find((x) => x.id === 'final-beam');
   const G = window.SC.GAMES.dungeon;
@@ -477,33 +514,23 @@ console.log(`  beam: ${beamPlan.mir.length} bucklers, shaft opens at t=${beamPla
 await put('final-beam', { phase: 0, line: 1 });
 await intoGame('final-beam');
 await shoot({
-  name: 'castle', beats: 6, dis: 0.9, vo: 'd4', voAt: 0.55, mark: 'mirrors', dust: 0.18,
-  drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 99, openT: 0, stop: 0 },
-  focus: [160, 70], push: [1.3, 1.14], ease: 'lin',
-});
-// The light starts. The film does not stay to watch it arrive.
-await shoot({
-  name: 'shaft', beats: 4, dis: 0.8, mark: 'shaft', dust: 0.35,
-  drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 0.05, openT: beamPlan.openT, stop: 0.55 },
-  focus: [160, 62], focus1: [130, 74], push: [1.16, 1.44], ease: 'in',
-  dip: [0, 1.1],
+  name: 'beam', beats: 4, dis: 1.1, mark: 'beam', dust: 0.4,
+  drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 0.05, openT: beamPlan.openT, stop: 0.42 },
+  focus: [160, 58], focus1: [140, 70], push: [1.3, 1.7], ease: 'in',
 });
 
+await THRONE();
+await shoot({ name: 'taunt', beats: 6, dis: 1.1, vo: 'd4', voAt: 0.7, mark: 'taunt',
+  focus: [226, 54], push: [2.6, 3.0], ease: 'lin', dust: 0.15 });
+
 // =========================================================================
-// V. THE MONOLOGUE
-// The last voice in this kind of trailer is the antagonist's, and what he
-// says is appetite rather than outcome. Three lines, all his, over the
-// rings the film opened on - so the picture comes back to where it started
-// while the words go somewhere the picture never does.
+// V. THE LAST WORD
+// Back to the first image in the film, and the last voice in it is his.
 // =========================================================================
-await put('prologue', { phase: 6, cut: 5.5 });
+await RINGS(6.0);
 await shoot({
-  name: 'close1', beats: 7, dis: 0, dip: [1.3, 0], vo: 'd5', voAt: 1.0, mark: 'close',
-  focus: [160, 72], push: [1.02, 1.18], ease: 'lin', dust: 0.35,
-});
-await shoot({
-  name: 'close2', beats: 8, dis: 1.6, dip: [0, 1.4], vo: 'd6', voAt: 1.3, mark: 'last',
-  focus: [160, 72], push: [1.3, 1.02], ease: 'out', dust: 0.2,
+  name: 'last', beats: 9, dis: 0, dip: [1.5, 1.7], vo: 'd6', voAt: 2.2, mark: 'last',
+  focus: [160, 72], push: [1.4, 1.02], ease: 'out', dust: 0.35,
 });
 
 await browser.close();

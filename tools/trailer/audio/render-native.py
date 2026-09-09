@@ -418,95 +418,88 @@ between = lambda a, z: [x for x in cut_times if a - 1e-6 <= x < z - 1e-6]
 D2, A2, D3, Fs3, A3, D4 = 73.42, 110.0, 146.83, 185.00, 220.0, 293.66
 D1, F3, Gs3, C4 = 36.71, 174.61, 207.65, 261.63
 E2, B2, E3, G3, B3 = 82.41, 123.47, 164.81, 196.00, 246.94
-
-# --- I. THE WORLD. A pad and a music box. No pulse at all for twenty
-# seconds - the sequencer arriving later is the film's first event.
-pad(0.4, M['darkness1'] + 1.0, [D2, A2, D3, Fs3], 0.085, bright=0.22, attack=3.0)
-choir(3.0, M['darkness1'] + 0.5, [D4, Fs3 * 2, A3 * 2], 0.030, attack=3.5)
-play('wonder', 1.4, M['darkness1'] - 0.2, rows=[0], gain=0.17, oct_shift=1,
-     det=0.004, room=1.4, sustain=2.6, every=2)
-
-# --- II. WHAT WANTED IT. The chord goes to the tritone the `shadow` track
-# is built on, and the sequencer starts under him - low, and shut.
-pad(M['darkness1'], M['horn'] - 0.1, [D1, D2, F3, Gs3], 0.10, bright=0.16, attack=2.2)
-arp(M['darkness1'] + 0.6, M['horn'] - 0.15, [D3, F3, Gs3, F3, D3, A2], 3.0, 0.085,
-    cut0=300, cut1=900, res=2.2, room=0.8)
-bass(M['darkness1'] + 0.6, M['horn'] - 0.15, D1, 1 / (BEAT * 2), 0.10)
-
-# The creep: the filter opens, the rate doubles, and the pad climbs a
-# semitone under it - the oldest way there is of saying something is coming.
-arp(M['creep'], M['horn'] - 0.1, [D3, F3, Gs3, C4, Gs3, F3], 6.0, 0.11,
-    cut0=700, cut1=3400, res=3.0, room=0.6)
-pad(M['creep'], M['horn'], [D1 * 2 ** (1 / 12), F3, Gs3, C4], 0.09, bright=0.34, attack=1.6)
-
-# --- THE ONE IMPACT.
-shock(M['horn'], 0.95)
-put(M['horn'] + 0.02, whoosh(2.6, 0.20), room=1.2)
-
-# --- III. THE WINTER. Cold, wide, and slow: a pad and a sequencer at two a
-# second with almost no filter on it.
-pad(M['winter'], M['road'] - 0.2, [E2, B2, E3, G3], 0.095, bright=0.20, attack=2.4)
-choir(M['winter'] + 1.0, M['road'] - 0.3, [B3, E3 * 2], 0.026, attack=2.6)
-arp(M['winter'] + 0.4, M['road'] - 0.2, [E3, B2, G3, B2], 2.0, 0.075,
-    cut0=420, cut1=1000, res=2.0, room=1.0)
-play('winter', M['winter'] + 0.4, M['road'] - 0.2, rows=[0], gain=0.30, det=0.003, room=1.0)
-roll(M['gone'] - 1.6, 1.6, 0.16, pitch=52)
-
-# --- IV. THE ROAD. The engine room. Eight to the second, the filter opening
-# right across the section, a bass on every other beat and a gated snare on
-# two and four. This is the part of the score that is a 1985 record.
 SEQ = [D3, A2, D3, F3, A3, F3, D3, C4]
-arp(M['road'], M['offer'] - 0.15, SEQ, 8.0, 0.085, cut0=500, cut1=2600, res=2.8, room=0.45)
-bass(M['road'], M['offer'] - 0.15, D2, 1 / BEAT, 0.115)
-pad(M['road'], M['offer'], [D2, A2, D3, F3], 0.075, bright=0.30, attack=1.2)
-play('trail', M['road'], M['offer'] - 0.2, rows=[0, 1], gain=0.30, oct2=0.14, det=0.005, room=0.55)
-t = M['road']
-while t < M['offer'] - 0.1:
-    put(t, kick(0.34), room=0.14)
-    put(t + BEAT, gated(0.22), room=0.5)
-    t += BEAT * 2
 
-# --- V. THE OFFER. Same pulse, darker chord, and `castle` over the top.
-arp(M['offer'], M['shaft'] - 0.1, SEQ, 8.0, 0.090, cut0=800, cut1=3000, res=3.2, room=0.45)
-bass(M['offer'], M['shaft'] - 0.1, D2, 1 / BEAT, 0.125)
-pad(M['offer'], M['shaft'], [D1, D2, F3, Gs3], 0.085, bright=0.26, attack=1.4)
-play('castle', M['offer'], M['refuse'], rows=[0, 1], gain=0.28, det=0.005, room=0.7)
-play('throne', M['refuse'], M['shaft'] - 0.1, rows=[1, 2], gain=0.30, det=0.006, room=0.6)
-t = M['offer']
-while t < M['shaft'] - 0.1:
-    put(t, kick(0.36), room=0.14)
-    put(t + BEAT, gated(0.26), room=0.5)
-    t += BEAT * 2
-choir(M['mirrors'], M['shaft'] + 0.6, [D3, F3, Gs3], 0.045, attack=1.6)
+# --- I. INVOCATION. Twenty seconds with no pulse in them at all. A pad, a
+# music box, and one sentence. The sequencer arriving later is the first
+# event in the film, and it can only be an event if nothing precedes it.
+pad(0.3, M['voice'] + 1.2, [D2, A2, D3, Fs3], 0.105, bright=0.22, attack=2.0)
+choir(2.2, M['voice'] + 0.8, [D4, Fs3 * 2, A3 * 2], 0.036, attack=2.6)
+play('wonder', 2.0, M['voice'] - 0.3, rows=[0], gain=0.165, oct_shift=1,
+     det=0.004, room=1.45, sustain=3.0, every=2)
+roll(M['horn1'] - 1.4, 1.4, 0.09, pitch=48)
 
-# --- VI. THE LIGHT STARTS, AND THE FILM LEAVES. Everything doubles for four
-# beats and then stops with the picture.
-# The bed has to come WITH it. The first pass ended the pad at the section
-# boundary and left the build as drums and a thin sequencer over nothing,
-# which measured five dB QUIETER than the road it was supposed to be
-# building out of - a climb that goes down.
-pad(M['shaft'] - 0.2, M['shaft'] + b_(3.9), [D1, D2, F3, Gs3, C4], 0.155, bright=0.42, attack=0.8)
-choir(M['shaft'], M['shaft'] + b_(3.9), [D3, F3, Gs3, C4], 0.070, attack=0.7)
-t = M['shaft']
-while t < M['shaft'] + b_(3.8):
+# --- II. THE VOICE. He arrives and the sequencer arrives with him: low,
+# shut, and three to the second. It does not stop again until the burst.
+pad(M['voice'], M['horn'] - 0.1, [D1, D2, F3, Gs3], 0.105, bright=0.17, attack=2.6)
+arp(M['voice'] + 0.8, M['creep'], [D3, F3, Gs3, F3, D3, A2], 3.0, 0.090,
+    cut0=280, cut1=1100, res=2.3, room=0.85)
+bass(M['voice'] + 0.8, M['creep'], D1, 1 / (BEAT * 2), 0.105)
+choir(M['winter'], M['offer'], [D3, F3, Gs3], 0.036, attack=2.4)
+# One soft timpani where the snow starts and one where he makes the offer.
+roll(M['winter'] - 1.2, 1.2, 0.13, pitch=50)
+roll(M['offer'] - 1.2, 1.2, 0.15, pitch=46)
+play('winter', M['winter'] + 0.6, M['offer'] - 0.4, rows=[0], gain=0.24, det=0.003, room=1.1)
+
+# --- III. THE BURST. The filter opens, the rate doubles, and then the one
+# impact in the film - and the only fast percussion, six hits on six
+# images, which stops as abruptly as it started.
+arp(M['creep'], M['horn'] - 0.05, [D3, F3, Gs3, C4, Gs3, F3], 6.0, 0.115,
+    cut0=800, cut1=3600, res=3.0, room=0.55)
+pad(M['creep'], M['horn'], [D1 * 2 ** (1 / 12), F3, Gs3, C4], 0.095, bright=0.36, attack=1.4)
+put(M['creep'], riser(M['horn'] - M['creep'], 0.24, 200, 3000), room=0.35)
+
+shock(M['horn'], 0.95)
+put(M['horn'] + 0.02, whoosh(2.8, 0.20), room=1.2)
+
+t = M['flurry']
+while t < M['kneel'] - 0.05:
+    put(t, kick(0.50), room=0.16)
+    put(t + BEAT * 0.5, gated(0.34), room=0.5)
+    t += BEAT
+arp(M['flurry'], M['kneel'] - 0.05, SEQ, 12.0, 0.115, cut0=1400, cut1=4000, res=3.4, room=0.4)
+bass(M['flurry'], M['kneel'] - 0.05, D2, 2 / BEAT, 0.145)
+pad(M['flurry'], M['kneel'] + 0.4, [D1, D2, F3, Gs3, C4], 0.115, bright=0.40, attack=0.5)
+
+# --- IV. HIS LINE, AND THE TWO ANSWERS TO IT. The pulse comes back at
+# half the burst's rate and stays there, and the chord warms for the only
+# two faces in the film that are not his.
+pad(M['kneel'], M['beam'], [D1, D2, F3, Gs3], 0.140, bright=0.26, attack=0.9)
+arp(M['kneel'] + 0.4, M['beam'], SEQ, 6.0, 0.105, cut0=700, cut1=2400, res=2.8, room=0.55)
+bass(M['kneel'] + 0.4, M['beam'], D2, 1 / BEAT, 0.140)
+choir(M['answer'], M['beam'], [D3, Fs3, A3], 0.048, attack=1.8)
+t = M['answer']
+while t < M['beam'] - 0.1:
+    put(t, kick(0.30), room=0.14)
+    put(t + BEAT, gated(0.20), room=0.5)
+    t += BEAT * 2
+play('trail', M['answer'], M['beam'] - 0.2, rows=[0], gain=0.26, oct2=0.14, det=0.005, room=0.6)
+
+# --- V. THE LIGHT, AND HIS LAST WORD. Everything doubles for the four
+# beats the light is travelling, drops out over his taunt, and the film
+# ends on the warmest chord in it with no pulse under it at all.
+pad(M['beam'] - 0.2, M['taunt'] + 0.6, [D1, D2, F3, Gs3, C4], 0.150, bright=0.44, attack=0.7)
+arp(M['beam'], M['taunt'], SEQ, 12.0, 0.140, cut0=1800, cut1=4600, res=3.6, room=0.4)
+bass(M['beam'], M['taunt'], D2, 2 / BEAT, 0.170)
+t = M['beam']
+while t < M['taunt'] - 0.05:
     put(t, kick(0.52), room=0.14)
     put(t + BEAT * 0.5, gated(0.40), room=0.55)
     t += BEAT
-arp(M['shaft'], M['shaft'] + b_(3.6), SEQ, 12.0, 0.145, cut0=1600, cut1=4600, res=3.6, room=0.4)
-bass(M['shaft'], M['shaft'] + b_(3.6), D2, 2 / BEAT, 0.175)
-put(M['shaft'] - 1.2, riser(1.2, 0.26, 300, 3200), room=0.3)
+put(M['beam'] - 1.2, riser(1.2, 0.26, 300, 3200), room=0.3)
+# Under the taunt: the pulse thins to a heartbeat and the chord holds.
+bass(M['taunt'], M['last'] - 0.2, D1, 1 / (BEAT * 2), 0.085)
+pad(M['taunt'], M['last'] + 0.4, [D1, D2, F3, Gs3], 0.105, bright=0.20, attack=1.2)
+roll(M['last'] - 1.6, 1.6, 0.17, pitch=44)
 
-# --- VII. THE MONOLOGUE. No pulse. The warmest chord in the film, the
-# theme over it, and him talking across all of it.
-pad(M['close'] - 0.4, DUR - 1.6, [D2, A2, D3, Fs3, A3], 0.165, bright=0.30, attack=3.0)
-choir(M['close'] + 0.6, DUR - 1.6, [D4, Fs3 * 2, A3 * 2, D3 * 2], 0.055, attack=3.0)
-play('wonder', M['close'] + 1.0, DUR - 1.6, rows=[0], gain=0.30, oct_shift=1,
-     det=0.004, room=1.3, sustain=2.4, every=2)
-play('wonder', M['last'] + 1.2, DUR - 1.6, gain=0.46, oct2=0.28, det=0.006, room=0.8)
-roll(END - 1.8, 1.8, 0.20, pitch=46)
-# The hand-over to the title: one swell, no strike. A trailer that has held
-# off hitting anything for ninety seconds does not start now.
-put(END - 0.6, riser(0.6, 0.14, 200, 1400), room=0.6)
+pad(M['last'] - 0.2, DUR - 1.6, [D2, A2, D3, Fs3, A3], 0.170, bright=0.30, attack=3.2)
+choir(M['last'] + 0.8, DUR - 1.6, [D4, Fs3 * 2, A3 * 2, D3 * 2], 0.058, attack=3.0)
+play('wonder', M['last'] + 1.2, DUR - 1.6, rows=[0], gain=0.30, oct_shift=1,
+     det=0.004, room=1.35, sustain=2.6, every=2)
+play('wonder', END - 1.0, DUR - 1.6, gain=0.44, oct2=0.28, det=0.006, room=0.85)
+# The hand-over to the title: one swell, no strike. A film that has held off
+# hitting anything since the horn does not start now.
+put(END - 0.7, riser(0.7, 0.15, 200, 1400), room=0.6)
 
 # =========================================================================
 # The voices, and the hole in the music they speak through.
@@ -586,8 +579,8 @@ with wave.open(out, 'wb') as fh:
     fh.writeframes((np.clip(stereo, -1, 1) * 32767).astype('<i2').tobytes())
 
 print('the arc, in dB over two seconds from each mark:')
-for name in ('open', 'darkness1', 'creep', 'horn', 'winter', 'gone', 'road',
-             'offer', 'refuse', 'mirrors', 'shaft', 'close', 'last'):
+for name in ('open', 'horn1', 'voice', 'winter', 'offer', 'creep', 'horn',
+             'flurry', 'kneel', 'answer', 'beam', 'taunt', 'last'):
     a = int(M[name] * SR)
     z = min(N, a + int(2.0 * SR))
     r = np.sqrt(np.mean(mix[a:z] ** 2)) if z > a else 0

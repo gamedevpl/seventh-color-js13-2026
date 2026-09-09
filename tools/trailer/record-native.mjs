@@ -276,6 +276,26 @@ let frame = 0, vt = 0;
 const cuts = [], marks = [];
 const stage = (fn, arg) => page.evaluate(fn, arg);
 
+// WHAT THE CAMERA CAN ACTUALLY SEE.
+//
+// A shot is a focus point and a scale, applied as a CSS transform about
+// that point, and the tempting model - focus plus or minus half a frame
+// over the scale - is WRONG. The canvas is fitted to the viewport's width,
+// so at 1920 across it is 936 tall inside a 1080 viewport, and the two
+// letterbox rows are inside the transform along with everything else. The
+// window is therefore asymmetric about the focus: there are twelve game
+// units of bar above the picture and twelve below, and they scale too.
+//
+// Believing the symmetric version cropped the horns off the antagonist's
+// face on three separate shots, which survived two full renders because
+// the frames looked plausible and nobody had measured where the horns
+// were. So: measure them (probe-native.mjs), and check the box here.
+const BAR = (VH * (1080 / 936) - VH) / 2;          // 12 units, top and bottom
+const view = (fx, fy, p) => [
+  fx - fx / p, fy - (fy + BAR) / p,
+  fx + (VW - fx) / p, fy + (VH + BAR - fy) / p,
+];
+
 const ease = (u, kind) => (kind === 'lin' ? u
   : kind === 'in' ? u * u
     : kind === 'io' ? (u < .5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u))
@@ -304,6 +324,20 @@ async function shoot(s) {
   const f0 = s.focus || [160, 78], f1 = s.focus1 || f0;
   const [p0, p1] = s.push || [1, 1];
   const [dipIn, dipOut] = s.dip || [0, 0];
+  // hold: [x0, y0, x1, y1] - a box, in the game's own coordinates, that
+  // this shot promises to keep in frame at both ends of its push.
+  if (s.hold) {
+    for (const [f, p] of [[f0, p0], [f1, p1]]) {
+      const [vx0, vy0, vx1, vy1] = view(f[0], f[1], p);
+      const off = [s.hold[0] < vx0 && 'left', s.hold[1] < vy0 && 'top',
+        s.hold[2] > vx1 && 'right', s.hold[3] > vy1 && 'bottom'].filter(Boolean);
+      if (off.length) {
+        console.error(`  !! ${s.name} at ${p}x cuts ${off.join('+')} - `
+          + `sees x ${vx0.toFixed(0)}..${vx1.toFixed(0)} y ${vy0.toFixed(0)}..${vy1.toFixed(0)}, `
+          + `needs x ${s.hold[0]}..${s.hold[2]} y ${s.hold[1]}..${s.hold[3]}`);
+      }
+    }
+  }
   const o = out;
   let info = null;
   for (let i = 0; i < n; i++) {
@@ -360,6 +394,15 @@ console.log(`recording The Seventh Color  (${BPM}bpm, one beat = ${BEAT.toFixed(
 // them rather than by moving past them. Each of these is a one-line
 // re-stage, because every one of them is used two, three or four times at
 // different sizes, and a trailer of this kind is a rhyme scheme.
+// What probe-native.mjs measures, so a shot can say what it is of and be
+// told when it is not.
+const HORNED = [205, 8, 246, 76];        // Darkness on his throne, horns in
+const HORNED_HALL = [132, 0, 187, 89];   // the same face at full scale
+const JACK_ICE = [56, 34, 91, 84];
+const LILI_GLADE = [198, 37, 234, 90];
+const LILI_THRONE = [82, 54, 109, 98];
+const MOON = [238, 6, 278, 46];
+
 const RINGS = (cut) => put('prologue', { phase: 6, cut });
 const HERD = async () => { await put('unicorn-stream', { phase: 0, line: 0 }); await intoGame('unicorn-stream'); };
 const GLADE = () => put('jacks-glade', { phase: 0, line: 4 });
@@ -393,7 +436,7 @@ await shoot({ name: 'hornbig', beats: 6, dis: 1.5, dust: 1.0, drv: 'still', drvA
 
 await GLADE();
 await shoot({ name: 'blind1', beats: 6, dis: 1.5, dust: 1.0,
-  focus: [222, 62], push: [2.1, 1.8], ease: 'lin' });
+  focus: [222, 62], push: [2.1, 1.8], ease: 'lin', hold: LILI_GLADE });
 
 await RINGS(9.0);
 await shoot({ name: 'rings2', beats: 5, dis: 1.4, dust: 0.4,
@@ -407,7 +450,7 @@ await shoot({ name: 'rings2', beats: 5, dis: 1.4, dust: 0.4,
 // =========================================================================
 await HALL();
 await shoot({ name: 'hall1', beats: 8, dis: 1.6, dip: [1.2, 0], vo: 'd1', voAt: 1.6, mark: 'voice',
-  focus: [166, 56], push: [1.05, 1.34], ease: 'out', dust: 0.22 });
+  focus: [166, 34], push: [1.05, 1.34], ease: 'out', dust: 0.22, hold: HORNED_HALL });
 
 await GLADE();
 await shoot({ name: 'forest', beats: 5, dis: 1.4, dust: 0.85,
@@ -419,11 +462,11 @@ await shoot({ name: 'snow1', beats: 7, dis: 1.6, vo: 'd2', voAt: 1.4, mark: 'win
 
 await POND();
 await shoot({ name: 'pond', beats: 5, dis: 1.4, dust: 0.3,
-  focus: [73, 58], push: [2.1, 2.5], ease: 'lin' });
+  focus: [73, 58], push: [2.1, 2.5], ease: 'lin', hold: JACK_ICE });
 
 await THRONE();
 await shoot({ name: 'hall2', beats: 7, dis: 1.4, vo: 'd3', voAt: 1.2, mark: 'offer',
-  focus: [224, 46], push: [1.25, 1.5], ease: 'lin', dust: 0.2 });
+  focus: [224, 42], push: [1.25, 1.5], ease: 'lin', dust: 0.2, hold: HORNED });
 
 // =========================================================================
 // III. THE BURST
@@ -445,19 +488,19 @@ await HERD();
 await shoot({ name: 'f1', beats: 1, dis: 0.2, dust: 0.8, drv: 'still', drvArg: { slipAt: 99 },
   focus: [206, 84], push: [2.9, 3.0], ease: 'lin', mark: 'flurry' });
 await POND();
-await shoot({ name: 'f2', beats: 1, dis: 0.2, dust: 0.5, focus: [258, 26], push: [3.6, 3.7], ease: 'lin' });
+await shoot({ name: 'f2', beats: 1, dis: 0.2, dust: 0.5, focus: [266, 12], push: [3.6, 3.7], ease: 'lin', hold: MOON });
 await GLADE();
-await shoot({ name: 'f3', beats: 1, dis: 0.2, dust: 0.8, focus: [220, 53], push: [4.2, 4.3], ease: 'lin' });
+await shoot({ name: 'f3', beats: 1, dis: 0.2, dust: 0.8, focus: [220, 53], push: [4.2, 4.3], ease: 'lin' });   // her blindfold only
 await POND();
 await shoot({ name: 'f4', beats: 1, dis: 0.2, dust: 0.3, focus: [74, 50], push: [3.4, 3.5], ease: 'lin' });
 await HALL();
 await shoot({ name: 'f5', beats: 1, dis: 0.2, dust: 0.2, focus: [160, 46], push: [2.6, 2.7], ease: 'lin' });
 await DEFY();
-await shoot({ name: 'f6', beats: 1, dis: 0.2, dust: 0.2, focus: [96, 74], push: [2.6, 2.7], ease: 'lin' });
+await shoot({ name: 'f6', beats: 1, dis: 0.2, dust: 0.2, focus: [96, 74], push: [2.6, 2.7], ease: 'lin', hold: LILI_THRONE });
 
 await THRONE();
 await shoot({ name: 'kneel', beats: 8, dis: 0.9, vo: 'd5', voAt: 0.6, mark: 'kneel',
-  focus: [226, 44], push: [1.45, 1.7], ease: 'lin', dust: 0.18 });
+  focus: [226, 34], push: [1.45, 1.7], ease: 'lin', dust: 0.18, hold: HORNED });
 
 // =========================================================================
 // IV. THE ANSWER
@@ -469,7 +512,7 @@ await shoot({ name: 'jack', beats: 5, dis: 1.3, vo: 'j1', voAt: 0.9, mark: 'answ
   focus: [96, 74], push: [1.5, 1.72], ease: 'lin', dust: 0.2 });
 await DEFY();
 await shoot({ name: 'lili', beats: 6, dis: 1.3, vo: 'l1', voAt: 0.8,
-  focus: [96, 74], push: [1.5, 1.7], ease: 'lin', dust: 0.2 });
+  focus: [96, 74], push: [1.5, 1.7], ease: 'lin', dust: 0.2, hold: LILI_THRONE });
 
 // One flash of the thing that might answer him, unexplained and unfinished.
 //
@@ -536,7 +579,7 @@ await shoot({
 
 await THRONE();
 await shoot({ name: 'taunt', beats: 6, dis: 1.1, vo: 'd4', voAt: 0.7, mark: 'taunt',
-  focus: [228, 42], push: [1.75, 2.0], ease: 'lin', dust: 0.15 });
+  focus: [228, 24], push: [1.75, 2.0], ease: 'lin', dust: 0.15, hold: HORNED });
 
 // =========================================================================
 // V. THE LAST WORD

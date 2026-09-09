@@ -1,3 +1,9 @@
+import { wake, music, spatial, join as sJoin, thud, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
+import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, rnd, lerp, wrapA, edgeDanger, ARENA, EDGE, WILD, burnTime } from './herd.js';
+import { net, open as netOpen, close as netClose, tick as netTick, ghost, spy } from './net.js';
+import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox, setDim } from './gl.js';
+import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
+import { lightning } from './lightning.js';
 // UNICORN FIREBALL. Run the plain as a unicorn of one colour, gather every
 // unicorn that shares it into a herd, and fight the other herds horn to
 // horn. Hold the button and the herd CHARGES: it tightens into a wedge and
@@ -7,145 +13,150 @@
 // explode - the bigger herd wins, and the loser's herd is thrown across
 // the plain, where the gathering starts again.
 
-import { gl, initGL, frameGL, mode as glMode, createMesh, updateMesh, drawMesh, perspective, lookAt, mul, modelTR, IDENT, pushBox, setDim } from './gl.js';
-import { buildAll, COL, RAINBOW, PIVOT, HIPS } from './uni.js';
-import { units, leaders, events, meadows, newWorld, step, charge, won, lost, alive, footprint, burnTime, nearEdge, ARENA, EDGE, WILD, now } from './herd.js';
-import { net, open as netOpen, close as netClose, tick as netTick, ghost, spy } from './net.js';
-import { wake, awake, music, join as sJoin, clang, thud, rise, riseOff, ignite as sIgnite, boom as sBoom, ouch, beat, clearBeat } from './snd.js';
 
+const now = () => last / 1000;
+document.title = 'UNICORN FIREBALL';
 const VW = 640, VH = 360;
 const FOG = [.07, .05, .13];
 const TAU = Math.PI * 2;
-const lerp = (a, b, k) => a + (b - a) * k;
-const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const dot = (x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); };
 const css = (c, a = 1) => `rgba(${c[0] * 255 | 0},${c[1] * 255 | 0},${c[2] * 255 | 0},${a})`;
 
 const glc = document.getElementById('c');
 glc.width = VW; glc.height = VH;
 initGL(glc);
 const wrap = document.createElement('div');
-wrap.style.position = 'relative';
-glc.parentNode.insertBefore(wrap, glc);
-wrap.appendChild(glc);
+wrap.style.position = 'absolute';
+glc.before(wrap);
+wrap.append(glc);
 const hud = document.createElement('canvas');
 hud.width = VW; hud.height = VH;
-hud.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none';
-wrap.appendChild(hud);
+hud.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+wrap.append(hud);
 const ctx = hud.getContext('2d');
+const label = (text, y, x = VW / 2) => ctx.fillText(text, x, y);
+const font = (size, bold) => { ctx.font = (bold ? 'bold ' : '') + size + 'px system-ui'; };
+const touch = navigator.maxTouchPoints;
+let rotated;
 function resize() {
-  const sc = Math.min(innerWidth / VW, innerHeight / VH);
+  rotated = touch && innerHeight > innerWidth;
+  const sc = Math.min(innerWidth / (rotated ? VH : VW), innerHeight / (rotated ? VW : VH));
+  wrap.style.rotate = rotated * 90 + 'deg';
   glc.style.width = VW * sc + 'px';
-  glc.style.height = VH * sc + 'px';
 }
 addEventListener('resize', resize);
 resize();
 
 // --- input ----------------------------------------------------------------
-// Keyboard: arrows or WASD steer and sprint, SPACE (held) charges, released
-// fires. Touch: the lower left and right thirds steer, the top strip is the
-// button - hold it to fold the herd in, lift the thumb to fire.
+// Keyboard: arrows or WASD steer and sprint; hold SPACE to charge and burn,
+// Touch: sides steer; both charge and drag steers. Height controls sprint/brake.
+// Side ownership stays fixed until release; height follows the fingers.
 const held = {};
 let acted = false, pick = 0;
 addEventListener('keydown', (e) => {
-  if (!held[e.key]) {
-    const l = e.key === 'ArrowLeft' || e.key === 'a', r = e.key === 'ArrowRight' || e.key === 'd';
-    if (mode === 'title') { if (l) pick--; if (r) pick++; }
-    else if (watching()) { if (l) watch--; if (r) watch++; }
+  const key = e.key.toLowerCase();
+  if (!held[key]) {
+    const turn = (key === 'arrowright' || key === 'd') - (key === 'arrowleft' || key === 'a');
+    if (mode === 'title') pick += turn;
+    else if (watching()) watch += turn;
   }
-  held[e.key] = true;
-  if (e.key === 'o' || e.key === 'O') goOnline();
-  if (e.key === 'Escape' && net.on) goHome();
-  if (e.key === ' ' || e.key === 'Enter') acted = true;
-  if (e.key === ' ') e.preventDefault();
+  held[key] = true;
+  if (key === 'o') goOnline();
+  if (key === 'escape' && net.on) goHome();
+  if (key === ' ' || key === 'enter') acted = true;
+  if (key === ' ') e.preventDefault();
 });
-addEventListener('keyup', (e) => { held[e.key] = false; });
+addEventListener('keyup', (e) => { held[e.key.toLowerCase()] = false; });
+const chargeHint = 'HOLD ' + (touch ? 'BOTH' : 'SPACE') + ': charge; LIT = NO BRAKES';
+hud.oncontextmenu = e => e.preventDefault();
 const pts = new Map();
-let tL = 0, tR = 0, tT = 0;
+let tL = 0, tR = 0, tT = 0, tB = 0, tF = 0;
 const at = (e) => {
   const r = hud.getBoundingClientRect();
-  return [(e.clientX - r.left) / r.width * VW, (e.clientY - r.top) / r.height * VH];
+  const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  return rotated ? [y * VW, (1 - x) * VH] : [x * VW, y * VH];
 };
 const scan = () => {
   tL = tR = tT = 0;
-  for (const [x, y] of pts.values()) {
-    if (y < VH * .3) { tT = 1; continue; }
-    if (x < VW / 2) tL = 1; else tR = 1;
+  let drag = 0, height = 0;
+  for (const [x, y, ox] of pts.values()) {
+    if (ox < VW / 2) tL = 1; else tR = 1;
+    drag += x - ox; height += y;
+  }
+  height /= pts.size;
+  tF = height < 140; tB = height > 280;
+  if (tL && tR) {
+    tT = !tF && !tB;
+    tL = drag < -8;
+    tR = drag > 8;
   }
 };
-hud.addEventListener('pointerdown', (e) => {
+hud.onpointerdown = (e) => {
+  e.preventDefault(); wake();
   const [x, y] = at(e);
-  pts.set(e.pointerId, [x, y]); scan();
-  if (mode === 'title') { if (y > VH * .58 && y < VH * .72) { pick += x < VW / 2 ? -1 : 1; return; } }
+  hud.setPointerCapture(e.pointerId);
+  if (mode === 'title' && y > 280 && y < 310) { goOnline(); return; }
+  if (net.on && mode === 'run' && y < 48 && x > 200 && x < 440) { goHome(); return; }
+  if (mode === 'title' && y > 208 && y < 280) { pick += x < VW / 2 ? -1 : 1; return; }
   if (watching()) { watch += x < VW / 2 ? -1 : 1; return; }
-  if (mode !== 'run') acted = true;
-});
-hud.addEventListener('pointermove', (e) => { if (pts.has(e.pointerId)) { pts.set(e.pointerId, at(e)); scan(); } });
+  if (mode !== 'run') { acted = true; return; }
+  if (y < 48) return;
+  pts.set(e.pointerId, [x, y, x]); scan();
+};
+hud.onpointermove = (e) => {
+  const p = pts.get(e.pointerId);
+  if (p) { [p[0], p[1]] = at(e); scan(); }
+};
 const drop = (e) => { pts.delete(e.pointerId); scan(); };
-hud.addEventListener('pointerup', drop);
-hud.addEventListener('pointercancel', drop);
+hud.onpointerup = hud.onpointercancel = hud.onlostpointercapture = drop;
+const clearInput = () => { for (const k in held) held[k] = false; pts.clear(); scan(); };
+addEventListener('blur', clearInput);
+addEventListener('resize', clearInput);
 // Yaw grows toward +z, and +z is the RIGHT of a camera looking along +x -
 // so LEFT lowers the yaw. The first build had this backwards, and the probe
 // happily asserted the backwards version, because it only checked that a
 // left thumb moved the yaw, not which way.
-const turnDir = () => (held.ArrowRight || held.d || (tR && !tL) ? 1 : 0) - (held.ArrowLeft || held.a || (tL && !tR) ? 1 : 0);
+const turnDir = () => (held.arrowright || held.d || tR ? 1 : 0) - (held.arrowleft || held.a || tL ? 1 : 0);
 const button = () => held[' '] || tT;
 
 // --- the plain ------------------------------------------------------------
 const U = buildAll();
-let groundM, tuftM, starM, postM;
+let groundM, tuftM, postM;
 function partM() { return createMesh(new Float32Array(0), true); }
 function buildPlain() {
+  // Restarting releases the previous GPU buffers instead of leaking a world.
+  for (const mesh of [groundM, tuftM, postM, particleM, arcM, trailM]) if (mesh) gl.deleteBuffer(mesh.b);
   const g = [];
   // The slab is tiled, not one box: fog is worked out per vertex, and a
   // single 600-unit quad has every vertex deep in it, so the whole plain
   // drew in fog colour even under your hooves while anything small drew
   // true - which is what made the mottling read as black sectors.
   for (let i = -12; i < 12; i++) for (let j = -12; j < 12; j++) pushBox(g, i * 25 + 12.5, -.5, j * 25 + 12.5, 25, 1, 25, .13, .16, .15);
-  // Mottling. A single flat slab is a colour, not a ground: with nothing
-  // on it the eye has nothing to measure speed against. The first pass
-  // laid down large patches a fifth darker or lighter, which on a real
-  // monitor read as black sectors with hard edges - a dark tone has no
-  // room for a fifth. These are small, many and within a few percent of
-  // the slab: texture, not geography.
-  for (let i = 0; i < 420; i++) {
-    const x = (Math.random() - .5) * ARENA * 2.1, z = (Math.random() - .5) * ARENA * 2.1;
-    const w = 2 + Math.random() * 5, v = .95 + Math.random() * .1;
-    pushBox(g, x, .02, z, w, .04, w * (.6 + Math.random()), .13 * v, .16 * v, .15 * v);
-  }
+  // Coloured meadow tufts provide ground detail; the budget goes to plasma.
   groundM = createMesh(g);
   // Each meadow glows faintly in its own colour: the map tells you where a
   // colour lives before a single unicorn does.
   const t = [];
   meadows.forEach((m, c) => {
     for (let i = 0; i < 90; i++) {
-      const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * 22;
-      const x = m[0] + Math.cos(a) * d, z = m[1] + Math.sin(a) * d, h = .3 + Math.random() * .6;
+      const a = rnd(TAU), d = Math.sqrt(rnd()) * 22;
+      const x = m[0] + Math.cos(a) * d, z = m[1] + Math.sin(a) * d, h = .3 + rnd(.6);
       const k = COL[c];
       pushBox(t, x, h / 2, z, .12, h, .12, k[0], k[1], k[2], .5);
     }
   });
-  // And a scatter of pale grass everywhere else, so the ground moves.
-  for (let i = 0; i < 500; i++) {
-    const x = (Math.random() - .5) * ARENA * 2.2, z = (Math.random() - .5) * ARENA * 2.2;
-    pushBox(t, x, .2, z, .1, .4, .1, .5, .55, .5, .3);
-  }
   tuftM = createMesh(t);
   // The edge: posts of light in a square.
   const p = [];
   for (let i = -ARENA; i <= ARENA; i += 14) for (const [x, z] of [[i, -ARENA], [i, ARENA], [-ARENA, i], [ARENA, i]]) {
     pushBox(p, x, 3, z, .3, 6, .3, .7, .6, 1, .35);
   }
-  postM = createMesh(p);
-  // Stars.
-  const s = [];
-  for (let i = 0; i < 260; i++) {
-    const a = Math.random() * TAU, e = .05 + Math.random() * .9, r = 900;
-    const x = Math.cos(a) * Math.cos(e) * r, y = Math.sin(e) * r, z = Math.sin(a) * Math.cos(e) * r;
-    const q = 1.5 + Math.random() * 3, b = .4 + Math.random() * .6;
-    pushBox(s, x, y, z, q, q, q, b, b, b * 1.1, .6);
+  for (const a of [-ARENA, ARENA]) {
+    pushBox(p, a, .1, 0, .6, .2, ARENA * 2, 1, .2, .3, .6);
+    pushBox(p, 0, .1, a, ARENA * 2, .2, .6, 1, .2, .3, .6);
   }
-  pushBox(s, -500, 260, -700, 26, 26, 26, .9, .85, .7, .5);
-  starM = createMesh(s);
+  postM = createMesh(p);
+
 }
 let camR = [1, 0, 0], camU = [0, 1, 0];
 // A soft disc: a fan, bright in the middle and gone at the rim, one per
@@ -155,9 +166,9 @@ const DISC = COL.map((c) => {
   const v = [], N = 18;
   for (let i = 0; i < N; i++) {
     const a = i / N * TAU, b = (i + 1) / N * TAU;
-    v.push(0, 0, 0, 0, 0, 1, c[0], c[1], c[2], .4,
-      Math.cos(a), Math.sin(a), 0, 0, 0, 1, c[0], c[1], c[2], 0,
-      Math.cos(b), Math.sin(b), 0, 0, 0, 1, c[0], c[1], c[2], 0);
+    v.push(0, 0, 0, 0, 0, 1, ...c, .4,
+      Math.cos(a), Math.sin(a), 0, 0, 0, 1, ...c, 0,
+      Math.cos(b), Math.sin(b), 0, 0, 0, 1, ...c, 0);
   }
   return createMesh(v);
 });
@@ -166,10 +177,9 @@ const DISC = COL.map((c) => {
 // shockwave; there is one ring now, and it is always the wild white-gold.
 const RINGM = (() => {
   const c = COL[WILD], v = [], N = 24;
-  const put = (a, r, al) => v.push(Math.cos(a) * r, Math.sin(a) * r, 0, 0, 0, 1, c[0], c[1], c[2], al);
+  const put = (a, r, al) => v.push(Math.cos(a) * r, Math.sin(a) * r, 0, 0, 0, 1, ...c, al);
   for (let i = 0; i < N; i++) {
     const a = i / N * TAU, b = (i + 1) / N * TAU;
-    put(a, .78, 0); put(b, .78, 0); put(b, .9, .5); put(a, .78, 0); put(b, .9, .5); put(a, .9, .5);
     put(a, .9, .5); put(b, .9, .5); put(b, 1, 0); put(a, .9, .5); put(b, 1, 0); put(a, 1, 0);
   }
   return createMesh(v);
@@ -190,17 +200,17 @@ function boomCloud(x, z, pw) {
     // place makes one saturated blob with a fringe; started a couple of
     // metres out along its own direction, the lobes stay separable and the
     // ball reads as a ball.
-    const a = Math.random() * TAU, e = Math.random() * 1.15;
-    const sp = (3 + Math.random() * 8) * (1 + pw * .05), d = 1.4 + Math.random() * (2 + pw * .16);
+    const a = rnd(TAU), e = rnd(1.15);
+    const sp = (3 + rnd(8)) * (1 + pw * .05), d = 1.4 + rnd() * (2 + pw * .16);
     const dx = Math.cos(a) * Math.cos(e), dy = Math.sin(e), dz = Math.sin(a) * Math.cos(e);
     PUFF.push({
       x: x + dx * d, y: .7 + dy * d * .8, z: z + dz * d,
       vx: dx * sp, vy: dy * sp * .6 + .8, vz: dz * sp,
       // A wide spread of sizes: a few slow boulders among a lot of small
       // fast ones is what a cloud looks like from outside.
-      r0: (1.4 + Math.random() * Math.random() * 5) + pw * .12,
-      t: -Math.random() * .3, life: 1.4 + Math.random() * 1.2,
-      col: Math.random() < .18 ? WILD : (Math.random() * 7) | 0,
+      r0: (1.4 + rnd() * rnd(5)) + pw * .12,
+      t: -rnd(.3), life: 1.4 + rnd(1.2),
+      col: rnd(7) | 0,
     });
   }
 }
@@ -209,79 +219,103 @@ let pcur = 0;
 function spawnP(p, v, col, life) { PART[pcur++ % PMAX] = { p: [...p], v, col, life, max: life }; }
 function burst(p, n, sp, col) {
   for (let i = 0; i < n; i++) {
-    const a = Math.random() * TAU, b = Math.random() * Math.PI - Math.PI / 2;
-    spawnP(p, [Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 3, Math.sin(a) * Math.cos(b) * sp], col || RAINBOW[(Math.random() * 7) | 0], .6 + Math.random() * .6);
+    const a = rnd(TAU), b = rnd(Math.PI) - Math.PI / 2;
+    spawnP(p, [Math.cos(a) * Math.cos(b) * sp, Math.sin(b) * sp + 3, Math.sin(a) * Math.cos(b) * sp], col || RAINBOW[rnd(7) | 0], .6 + rnd(.6));
   }
 }
-const PBUF = new Float32Array(PMAX * 120);
-let particleM;
-function particleVerts(dt) {
-  let n = 0;
+const PBUF = new Float32Array((PMAX + 9216) * 120);
+let particleM, glitterTick = 0;
+// All three effects use the same vertex layout, with different light levels.
+// Keep one writer, without allocating a temporary array for each vertex.
+function vertexWriter(buf, light, bias = 0) {
   const put = (x, y, z, c, a) => {
-    PBUF[n] = x; PBUF[n + 1] = y; PBUF[n + 2] = z; PBUF[n + 3] = 0; PBUF[n + 4] = 1; PBUF[n + 5] = 0;
-    PBUF[n + 6] = c[0] * 1.8; PBUF[n + 7] = c[1] * 1.8; PBUF[n + 8] = c[2] * 1.8; PBUF[n + 9] = a; n += 10;
+    const n = put.n;
+    buf[n] = x; buf[n + 1] = y; buf[n + 2] = z; buf[n + 4] = 1;
+    buf[n + 6] = c[0] * light + bias; buf[n + 7] = c[1] * light + bias; buf[n + 8] = c[2] * light + bias; buf[n + 9] = a;
+    put.n += 10;
   };
-  for (const pt of PART) {
-    if (!pt || pt.life <= 0) continue;
-    pt.life -= dt; pt.v[1] -= 9 * dt;
-    pt.p[0] += pt.v[0] * dt; pt.p[1] += pt.v[1] * dt; pt.p[2] += pt.v[2] * dt;
-    if (pt.p[1] < 0) { pt.p[1] = 0; pt.v[1] *= -.4; }
-    const f = pt.life / pt.max, sz = .14 + f * .2, a = f * .8, [x, y, z] = pt.p;
-    put(x - sz, y, z, pt.col, a); put(x + sz, y, z, pt.col, a); put(x, y + sz * 2.6, z, pt.col, 0);
-    put(x - sz, y, z, pt.col, a); put(x + sz, y, z, pt.col, a); put(x, y - sz * 2.6, z, pt.col, 0);
-    put(x, y - sz, z, pt.col, a); put(x, y + sz, z, pt.col, a); put(x + sz * 2.6, y, z, pt.col, 0);
-    put(x, y - sz, z, pt.col, a); put(x, y + sz, z, pt.col, a); put(x - sz * 2.6, y, z, pt.col, 0);
+  put.n = 0;
+  return put;
+}
+function particleVerts(dt) {
+  glitterTick++;
+  const put = vertexWriter(PBUF, 1.8), view = who(), t = now(), sources = units.concat(BOOMS);
+  for (let i = 0; i < PMAX + 9216; i++) {
+    const dust = i >= PMAX;
+    let pt = PART[i];
+    if (dust) {
+      // A recycled world-space field: no new particles or draw calls per frame.
+      if (!pt) pt = PART[i] = { p: [i % 96 * .875 + Math.sin(i) * 2, 0, (i / 96 | 0) * .875 + Math.cos(i) * 2], life: 0, spin: i, col: RAINBOW[i % 7] };
+      for (const j of [0, 2]) pt.p[j] -= Math.floor((pt.p[j] - view[j ? 'z' : 'x'] + 42) / 84) * 84;
+      pt.life *= Math.exp(-dt * 2);
+      if ((i + glitterTick) % 8 === 0) for (const u of sources) if (u.st === 0 || u.pw) {
+        const r = u.pw ? 8 + Math.sqrt(u.pw) * 3 : u.wave ? u.r + 4 : 3,
+          dx = pt.p[0] - u.x, dz = pt.p[2] - u.z,
+          k = (1 - Math.hypot(dx, dz, pt.p[1]) / r) * (u.pw ? (1 - u.t / 1.6) * 6 : u.sp / 10);
+        if (k > pt.life) { pt.life = k; pt.spin = Math.atan2(dx, dz) - t * 3 + (u.pw ? 0 : Math.PI / 2); }
+      }
+      pt.p[1] = .08 + Math.max(0, 8 - (t * .3 + i * 1.7) % 10) ** 2 + pt.life;
+    } else {
+      if (!pt || pt.life <= 0) continue;
+      pt.life -= dt; pt.v[1] -= 9 * dt;
+      for (let j = 0; j < 3; j++) pt.p[j] += pt.v[j] * dt;
+      if (pt.p[1] < 0) { pt.p[1] = 0; pt.v[1] *= -.4; }
+    }
+    if (dust && Math.max(Math.abs(pt.p[0]), Math.abs(pt.p[2])) > ARENA) continue;
+    // Rotating coloured flakes, with sparse brief specular glints.
+    const turn = dust ? t * (1.4 + Math.sin(i) * .6) + i : 0, nx = Math.cos(turn), nz = Math.sin(turn),
+      f = dust ? .02 + (nx * camR[0] + nz * camR[2]) ** 16 * .8 : pt.life / pt.max,
+      flash = dust ? Math.max(0, Math.sin(turn * .7 + i)) ** 64 * f * 8 : 0,
+      c = flash > .3 ? [1, 1, 1] : pt.col,
+      sz = dust ? Math.min(.025, Math.hypot(pt.p[0] - eye[0], pt.p[2] - eye[2]) * .001) : .14 + f * .2, a = (f + flash) * .8,
+      [px, y, pz] = pt.p, sway = dust ? pt.life : 0, angle = dust ? t * 3 + pt.spin : 0,
+      x = px + Math.sin(angle) * sway, z = pz + Math.cos(angle) * sway;
+    for (let glow = 0; glow < (flash > .1 ? 2 : 1); glow++) {
+      const r = sz * (glow ? 3 : 1), alpha = glow ? flash * .25 : a;
+      for (const sign of [-1, 1]) {
+        put(x - r * nx, y, z - r * nz, c, alpha); put(x + r * nx, y, z + r * nz, c, alpha); put(x, y + sign * sz * (glow ? 3 : 2.6), z, c, 0);
+      }
+    }
+
   }
-  return n;
+  return put.n;
 }
 
 // --- the charge, the arcs, and the rainbow's wake -------------------------
 // A charging herd crackles: bolts jump between its unicorns, more of them
 // and brighter as the charge fills, and the ground under the band lights
-// up. When it ignites, every unicorn carries a disc of its own colour, a
-// haze hangs over the centre of the band, and the band drags a WAKE - seven
+// up. Ignition turns the herd into merging plasma wisps and drags a WAKE - seven
 // stripes across its width, the width of the herd, rising off the ground -
 // which is the rainbow you see coming from the other side of the plain.
-const ARCMAX = 60, ABUF = new Float32Array(ARCMAX * 6 * 6 * 10);
+const ARCMAX = 60, ABUF = new Float32Array(ARCMAX * 16 * 12 * 10);
 const TBUF = new Float32Array(DEV ? 700000 : 200000);
 let arcM, trailM;
 function drawCharge(L, T, dt) {
-  const k = L.charge, wave = L.wave > 0;
+  const k = Math.max(L.charge, L.n >= 10 ? Math.min(.8, .35 + L.n / 100) : 0), wave = L.wave > 0;
   if (k < .04 && !wave) return;
-  // The ground, lit from within the band.
-  setDim(wave ? .18 : k * .8);
-  disc(WILD, L.cx, .05, L.cz, L.r * 1.4);
-  setDim(1);
   const herd = [];
   for (const u of units) if (u.st === 0 && (u === L || u.lead === L.lead)) herd.push(u);
   // Arcs. Rare and thin at first, a storm at the top of the charge.
-  if (herd.length > 1 && k > .1 && Math.random() < dt * (k * k * k * 150 + (wave ? 30 : 0)) && ARCS.length < ARCMAX) {
-    const a = herd[(Math.random() * herd.length) | 0];
-    let b = null, bd = 9;
-    for (let i = 0; i < 4; i++) {
-      const c = herd[(Math.random() * herd.length) | 0], d = Math.hypot(c.x - a.x, c.z - a.z);
-      if (c !== a && d < bd) { b = c; bd = d; }
-    }
-    const col = RAINBOW[(Math.random() * 7) | 0];
-    // Past two thirds the bolts also reach UP, to a point hanging over the
-    // band - the energy gathering above the herd before it lights.
-    if (b && (k < .66 || Math.random() < .5)) ARCS.push({ a: [a.x, .9, a.z], b: [b.x, .9, b.z], col, t: .15, w: .14 + .3 * k });
-    else ARCS.push({ a: [a.x, .9, a.z], b: [L.cx, 1.2 + L.r * .8, L.cz], col, t: .15, w: .1 + .24 * k });
-    spawnP([a.x, 1, a.z], [0, 2, 0], col, .3);
+  if (herd.length > 1 && k > .1 && rnd() < dt * (k * k * k * 150 + (wave ? 30 : 0)) && ARCS.length < ARCMAX) {
+    const a = herd[(rnd(herd.length)) | 0];
+    const b = herd[rnd(herd.length) | 0];
+    // Both ends stay on herd members, including at full charge.
+    if (b !== a) ARCS.push({ a: [a.x, .9, a.z], b: [b.x, .9, b.z], t: .15 });
   }
   if (!wave) return;
-  // Lit: each unicorn a lamp of its own colour, the band under a haze.
-  // The lamps ARE the herd now that its unicorns are not drawn, so they
-  // are small and dim: a line of coloured lights inside the tunnel, not a
-  // white wall at the head of it.
-  setDim(.13);
-  herd.forEach((u, i) => disc(i % 7, u.x, .8, u.z, 1.25));
-  setDim(.1);
-  for (let i = 0; i < 3; i++) disc(((T * 3 + i * 2) | 0) % 7, L.cx, 1 + i * .6 + L.r * .15, L.cz, L.r * (1.05 - i * .28));
+  // Every lit unicorn becomes a low plasma wisp. Overlap forms the core
+  // wherever the herd gathers; the ground clips the lower half of the glow.
+  for (const u of herd) {
+    const phase = T * 8 + u.seed;
+    setDim(1 + Math.sin(phase) ** 2);
+    for (let j = 0; j < 5; j++) {
+      const d = j && j - 1, a = phase - j,
+        yaw = u.yaw + Math.sin(a) * d * .2;
+      disc(j ? u.col : WILD, u.x - Math.cos(yaw) * d,
+        .5 + Math.sin(a) * .2, u.z - Math.sin(yaw) * d, j ? 2.4 - j * .4 : .6);
+    }
+  }
   setDim(1);
-  // Motes lifting off the band.
-  if (Math.random() < .6) { const u = herd[(Math.random() * herd.length) | 0]; spawnP([u.x, 1, u.z], [0, 2.5, 0], RAINBOW[(Math.random() * 7) | 0], .6); }
-  // Sample the wake.
   // Sample the wake. The LAST sample is the herd's position this frame,
   // rewritten every frame: pushing one every ninth of a second and leaving
   // it there made the front of the tunnel jump forward three units at a
@@ -298,117 +332,68 @@ function drawCharge(L, T, dt) {
 // bands the herd runs inside, red outermost, that dissolves behind it. It
 // is Rainbow Surfer's braid with the herd where the rider was.
 const ARCH = 9;                                   // segments per half-circle
-function trailVerts(T, dt, eye) {
-  let n = 0;
-  const put = (x, y, z, c, a) => {
-    TBUF[n] = x; TBUF[n + 1] = y; TBUF[n + 2] = z; TBUF[n + 3] = 0; TBUF[n + 4] = 1; TBUF[n + 5] = 0;
-    TBUF[n + 6] = c[0] * 1.4; TBUF[n + 7] = c[1] * 1.4; TBUF[n + 8] = c[2] * 1.4; TBUF[n + 9] = a; n += 10;
-  };
+function trailVerts(dt, eye) {
+  const put = vertexWriter(TBUF, 1.4);
   const quad = (p0, p1, p2, p3, c, a) => { put(...p0, c, a); put(...p1, c, a); put(...p2, c, a); put(...p0, c, a); put(...p2, c, a); put(...p3, c, a); };
   // A point on the arch of sample s: colour band c, angle index i, at the
-  // band's inner (e=0) or outer (e=1) edge.
-  const pt = (s, c, i, e, T) => {
-    const th = i / ARCH * Math.PI, R = s.r * (1.05 - c * .075 + e * .07) * (1 + Math.sin(T * 5 + i) * .03);
+  // band's surface. The live nose shrinks to the leader's plasma wisp.
+  const pt = (s, c, i) => {
+    const th = i / ARCH * Math.PI, R = (s.wave ? .8 : s.r * Math.sqrt(1 - s.t / .9)) * (1.05 - c * .075) * (1 + Math.sin(now() * 8 + i) * .06);
     const sx = -Math.sin(s.yaw), sz = Math.cos(s.yaw);
-    return [s.x + sx * Math.cos(th) * R, .15 + Math.sin(th) * R * .85, s.z + sz * Math.cos(th) * R];
+    return [s.x + sx * Math.cos(th) * R, .15 + Math.sin(th) * R * 1.1, s.z + sz * Math.cos(th) * R];
   };
   for (const [L, tr] of TRAIL) {
     for (const s of tr.s) s.t += dt;
     while (tr.s.length && tr.s[0].t > .9) tr.s.shift();
     if (!tr.s.length) { TRAIL.delete(L); continue; }
-    for (let i = 0; i + 1 < tr.s.length && n < TBUF.length - (DEV ? 16000 : 8000); i++) {
-      const s0 = tr.s[i], s1 = tr.s[i + 1];
+    for (let i = 0; i + 1 < tr.s.length && put.n < TBUF.length - 8000; i++) {
+      // Stretch only the live front to the leader; keep the wake on the herd path.
+      const s0 = tr.s[i], s1 = i + 2 === tr.s.length && L.wave
+        ? L : tr.s[i + 1];
       // Fade with age, and fade out again where the tunnel runs past the
       // camera - being inside your own rainbow is the point, being blinded
       // by it is not.
       const near = Math.min(1, Math.max(0, (Math.hypot(s1.x - eye[0], s1.z - eye[2]) - 5) / 9));
-      const f = (2 - s0.t / .9 - s1.t / .9) / 2 * near;
+      const f = (1 - s0.t / .9) * near;
       if (f <= 0) continue;
       for (let c = 0; c < 7; c++) {
         for (let k = 0; k < ARCH; k++) {
-          quad(pt(s0, c, k, 0, T), pt(s0, c, k + 1, 0, T), pt(s1, c, k + 1, 0, T), pt(s1, c, k, 0, T), RAINBOW[c], .26 * f);
-        }
-      }
-      // The trailer's rainbow, and only the trailer's - compiled out of the
-      // shipping build. Seven thin shells with a hole down the middle read
-      // as a croissant from every angle a film uses, so this fills the
-      // tunnel: more shells inside the innermost colour, running to white,
-      // additive, so a line of sight down the axis crosses all of them and
-      // the middle is the brightest part. The newest samples get it hardest
-      // and whitest - that is the fist on the front of the thing.
-      if (DEV && window.FBFX) {
-        const F = window.FBFX, SH = F.shells || 6;
-        const hn = tr.s.length > 2 ? i / (tr.s.length - 2) : 1, fist = Math.pow(hn, F.fistN || 7);
-        const P0 = (s, rf, j) => {
-          const th = j / ARCH * Math.PI, R = s.r * rf * (1 + fist * (F.bulge ?? .12));
-          const sx = -Math.sin(s.yaw), sz = Math.cos(s.yaw);
-          return [s.x + sx * Math.cos(th) * R, .15 + Math.sin(th) * R * .85, s.z + sz * Math.cos(th) * R];
-        };
-        for (let c = 0; c < SH; c++) {
-          const u = (c + 1) / SH, rf = .66 * (1 - u) + .05;
-          const w = Math.min(1, .3 + u * .55 + fist * .7);
-          const col = [RAINBOW[6][0] * (1 - w) + w, RAINBOW[6][1] * (1 - w) + w, RAINBOW[6][2] * (1 - w) + w];
-          const a = (F.core ?? .5) * (.13 + u * u * .5) * (1 + fist * (F.fist ?? 3)) * f;
-          for (let k = 0; k < ARCH; k++) {
-            quad(P0(s0, rf, k), P0(s0, rf, k + 1), P0(s1, rf, k + 1), P0(s1, rf, k), col, a);
-          }
+          quad(pt(s0, c, k), pt(s0, c, k + 1), pt(s1, c, k + 1), pt(s1, c, k), RAINBOW[c], (.1 + .1 * Math.sin(now() * 8 - s0.t * 18 + c + k) ** 8) * f);
         }
       }
     }
   }
-  return n;
+  return put.n;
 }
 // The arcs: jagged bolts, each a ribbon facing the camera, alive for a
 // few frames and gone.
 function arcVerts(dt) {
-  let n = 0;
-  const put = (x, y, z, c, a) => {
-    ABUF[n] = x; ABUF[n + 1] = y; ABUF[n + 2] = z; ABUF[n + 3] = 0; ABUF[n + 4] = 1; ABUF[n + 5] = 0;
-    ABUF[n + 6] = c[0] * 1.2 + .7; ABUF[n + 7] = c[1] * 1.2 + .7; ABUF[n + 8] = c[2] * 1.2 + .7; ABUF[n + 9] = a; n += 10;
-  };
-  for (let i = ARCS.length - 1; i >= 0; i--) {
-    const A = ARCS[i];
-    A.t -= dt;
-    if (A.t <= 0) { ARCS.splice(i, 1); continue; }
-    const a = A.t / .15, S = 6;
-    let px = A.a[0], py = A.a[1], pz = A.a[2];
-    for (let s = 1; s <= S; s++) {
-      const f = s / S, j = s < S ? (1 - Math.abs(2 * f - 1)) * .45 : 0;
-      const x = A.a[0] + (A.b[0] - A.a[0]) * f + (Math.random() - .5) * j, y = A.a[1] + (Math.random() - .3) * j * 1.6, z = A.a[2] + (A.b[2] - A.a[2]) * f + (Math.random() - .5) * j;
-      const w = A.w, ux = camU[0] * w, uy = camU[1] * w, uz = camU[2] * w;
-      put(px - ux, py - uy, pz - uz, A.col, a); put(px + ux, py + uy, pz + uz, A.col, a); put(x + ux, y + uy, z + uz, A.col, a);
-      put(px - ux, py - uy, pz - uz, A.col, a); put(x + ux, y + uy, z + uz, A.col, a); put(x - ux, y - uy, z - uz, A.col, a);
-      px = x; py = y; pz = z;
-    }
-  }
-  return n;
+  return lightning(ARCS, vertexWriter(ABUF, 1.2, .7), camU, dt);
 }
+
 const WILDC = COL[WILD];
 
 // --- state ----------------------------------------------------------------
 let mode = 'title', timer = 0, msg = '', msgT = 0, shake = 0, flash = 0, endT = 0;
-// A private window throws on the FIRST TOUCH of localStorage - the read as
-let victory = false;
+let victory = false, best = 0;
 const BOOMS = [], TRAIL = new Map(), ARCS = [];
 let eye = null, look = null, camYaw = 0;
 let msgCol = '#fff4d6';
 const say = (t, d = 2, c = '#fff4d6') => { msg = t; msgT = d; msgCol = c; };
 
-let listened = 0;
 function goOnline(room) {
-  if (net.on && !net.quiet) return;
-  if (!awake()) wake();
+  if (net.on) return;
+  wake();
   newRun(); mode = 'run'; say('', 0);
   netClose(); netOpen(room);
 }
-function goHome() { netClose(); listened = 0; newRun(1); mode = 'title'; }
+function goHome() { netClose(); newRun(1); mode = 'title'; }
 
+let impact = null;
 let watch = 0;
-const watching = () => net.on && !net.quiet && (net.me < 0 || leaders[net.me].st === 3);
+const watching = () => mode === 'run' && net.on && (net.me < 0 || leaders[net.me].st === 3);
 function who() {
-  if (!net.on || net.quiet) return leaders[0];
-  const m = net.me >= 0 ? leaders[net.me] : null;
-  if (m && m.st !== 3) return m;
+  if (!watching()) return leaders[Math.max(0, net.me)];
   // Watching. Left and right walk the herds still standing, so being out
   // is a seat in the stand rather than a black screen.
   const live = alive();
@@ -416,6 +401,7 @@ function who() {
 }
 
 function newRun(attract) {
+  clearInput();
   newWorld(((pick % 7) + 7) % 7);
   // On the title every herd is a rival's - the plain plays itself under
   // the words, and the colour you are picking plays too.
@@ -423,7 +409,7 @@ function newRun(attract) {
   buildPlain();
   particleM = partM(); arcM = partM(); trailM = partM();
   PART.length = 0; pcur = 0; BOOMS.length = 0; PUFF.length = 0; TRAIL.clear(); ARCS.length = 0;
-  timer = 0; msgT = 0; shake = 0; flash = 0; endT = 0; victory = false;
+  impact = null; timer = 0; msgT = 0; shake = 0; flash = 0; endT = 0; victory = false;
   eye = null; camYaw = who().yaw;
 }
 newRun(1);
@@ -433,100 +419,127 @@ newRun(1);
 // what changed since the last packet: a herd that lit, a heart that went.
 const pw = [], ph = [];
 function ghostSound(P) {
+  let boom;
   for (let i = 0; i < 7; i++) {
-    const L = leaders[i], near = Math.hypot(L.cx - P.cx, L.cz - P.cz) < 70;
-    if (L.wave && !pw[i] && near) { sIgnite(); if (L === P) say('RAINBOW', 1.5); }
-    if (pw[i] && !L.wave && L.hearts < ph[i]) { sBoom(pw[i]); shake = 1; flash = .5; boomCloud(L.cx, L.cz, pw[i]); }
+    const L = leaders[i];
+    if (L === P && L.wave && !pw[i]) say('RAINBOW!', 1.5);
+    if (pw[i] && !L.wave && L.hearts < ph[i]) boom = [L.cx, L.cz, pw[i] * 2];
     pw[i] = L.wave; ph[i] = L.hearts;
   }
+  if (boom) explode(...boom);
+}
+
+function sound(fn, power, u) {
+  const P = who(), dx = u.x - P.x, dz = u.z - P.z;
+  spatial(fn, power, dx * camR[0] + dz * camR[2], dz * camR[0] - dx * camR[2]);
+}
+
+function explode(x, z, pw) {
+  if (pw >= 62 && Math.hypot(x - who().x, z - who().z) < 35 && (mode !== 'end' || victory)) impact = { x, z, t: 2 };
+  sound(sBoom, pw, {x, z}); BOOMS.push({ x, z, t: 0, pw }); boomCloud(x, z, pw);
+  burst([x, 1.5, z], 120, 9 + pw * .4); shake = 1; flash = .4;
 }
 
 // --- the frame ------------------------------------------------------------
 let last = 0, lastPick = 0, lastSaid = '';
+// Visual time must advance on guests too, independently of host simulation.
+
 function frame(now_) {
-  const dt = Math.min(.05, (now_ - last) / 1000 || 0);
+  const realDt = (now_ - last) / 1000 || 0;
+  if (impact) { impact.t -= realDt; if (impact.t <= 0) impact = null; }
+  const dt = Math.min(.05, realDt) * (impact && !net.on ? .3 : 1);
   last = now_;
   const doAct = acted; acted = false;
-  timer += dt;
+  if (mode !== 'end') timer += realDt;
   if (mode === 'title' && pick !== lastPick) { lastPick = pick; newRun(1); }
 
+  if (net.dropped) goHome(); // The socket already preserves the OFFLINE status.
   const P = who();
   if (mode === 'title') {
-    if (awake()) { music(.2, 1); if (!listened) { listened = 1; netOpen(0, 1); } }
+    music(.2, 1);
     step(dt, { over: 1 });
     if (doAct) {
-      if (!awake()) wake();
-      else { netClose(); newRun(); mode = 'run'; say('GATHER YOUR COLOUR', 3); }
+      wake(); netClose(); newRun(); mode = 'run'; say('AUTO-RUN / red edge = death', 4);
     }
   } else if (mode === 'run') {
     const heat = Math.min(1, P.n / 12);
-    music(heat, 0);
+    let magic = 0, pan = 0;
+    for (const L of leaders) if (L.st === 0) {
+      const dx = L.cx - P.x, dz = L.cz - P.z,
+        k = (L.wave ? 1 : L.charge * .4) * Math.max(0, 1 - Math.hypot(dx, dz) / 70);
+      magic += k; pan += k * (dx * camR[0] + dz * camR[2]) / 30;
+    }
+    music(heat, 0, Math.min(1, magic), pan / (2 + magic), P.wave ? 1 : P.charge);
     const local = {
-      t: turnDir(), f: held.ArrowUp || held.w || (tL && tR) ? 1 : 0,
-      b: held.ArrowDown || held.s ? 1 : 0, c: button() ? 1 : 0,
+      t: turnDir(), f: held.arrowup || held.w || tF ? 1 : 0,
+      b: held.arrowdown || held.s || tB ? 1 : 0, c: button() ? 1 : 0,
     };
     // Offline this is always ours. Online it is ours only while we host;
-    // otherwise the plain arrives in packets and we animate what we are told.
-    const mine = netTick(dt, local);
+    // otherwise snapshots reconcile the world and we anticipate local movement.
+    const mine = netTick(realDt, local);
     if (net.news) { say(net.news.k ? 'RIDER JOINED' : 'RIDER LEFT', 2.5, css(COL[leaders[net.news.i].col])); net.news = null; }
     if (net.said !== lastSaid) { lastSaid = net.said; if (net.said) say(net.said, 3); }
-    if (P.chg && P.st === 0) rise(P.wave ? 1 : P.charge); else riseOff();
     if (mine) {
-      if (!net.on || net.quiet) { P.in = local; charge(P, local.c); }
-      step(dt, { arena: net.on });
-    } else { ghost(dt); ghostSound(P); }
-    if (!net.on && (won(0) || lost(0))) {
-      // The result is decided HERE and kept. The closing shot keeps the
-      // plain running, so asking `lost()` again while it plays could
-      // answer differently - which is exactly what happened to the first
-      // player to win one: the herd ran on, crossed the line during the
-      // end screen, and the screen changed its mind.
+      if (!net.on) { P.in = local; charge(P, local.c); }
+      // Catch up slow hosts in bounded physics steps; never slow the network clock.
+      for (let left = net.on ? Math.min(.25, realDt) : dt; left > 0; left -= .05) step(Math.min(.05, left), { arena: net.on });
+    } else { ghost(Math.min(.1, realDt), local); ghostSound(P); }
+    if (!net.on && (lost(0) || won(0))) {
+      // Latch the result before displaying the finished world.
       victory = won(0);
-      mode = 'end'; endT = 0; riseOff();
-      // And the rainbows go out with the run, so nothing is still being
-      // ridden by nobody.
-      for (const L of leaders) { L.wave = 0; L.chg = 0; L.charge = 0; }
+      try {
+        best = +localStorage.ufTime || 0;
+        if (victory && (!best || timer < best)) localStorage.ufTime = best = timer;
+      } catch {}
+      mode = 'end'; endT = 0;
+      if (!victory) impact = null;
+      // Stop decisions, but let existing motion, rainbows and debris settle.
+      for (const L of leaders) { L.ai = null; L.in = { b: 1, t: 0 }; }
     }
   } else {
     endT += dt;
     music(.2, 1);
-    step(dt, { over: 1 });
-    if (doAct && endT > 1) { newRun(1); mode = 'title'; listened = 0; }
+    // Continue the aftermath with combat disabled and the result latched.
+    step(dt, { over: 2 });
+    if (doAct && endT > 1.6) { newRun(1); mode = 'title'; }
   }
   msgT = Math.max(0, msgT - dt);
   shake = Math.max(0, shake - dt * 2.5);
   flash = Math.max(0, flash - dt * 2);
 
   // Events into sound and sparks.
+  // Coalesce herd hits per frame; blast takes priority without drowning the music.
+  let impactSound;
   for (const e of events) {
     if (e.k === 'join') { if (e.L === P) sJoin(P.n); burst([e.u.x, .8, e.u.z], 6, 2, COL[e.u.col]); }
-    else if (e.k === 'knock') { thud(); burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
-    else if (e.k === 'horn') { clang(); burst([e.x, 1, e.z], 5, 3, [1, .9, .6]); }
-    else if (e.k === 'graze') { clang(); burst([e.x, 1.5, e.z], 40, 7); }
+    else if (e.k === 'knock') { impactSound ||= e; burst([e.x, .6, e.z], 8, 4, COL[e.col]); }
+    else if (e.k === 'horn') { sound(thud, .5, e); burst([e.x, 1, e.z], 5, 3, [1, .9, .6]); }
+    else if (e.k === 'graze') { sound(thud, .5, e); burst([e.x, 1.5, e.z], 40, 7); }
     else if (e.k === 'ignite') {
       // The band lights: a flash, a fan of sparks the size of the herd, and
-      // the riser resolving into a chord.
-      sIgnite();
+      // the upward plasma zing.
       burst([e.L.cx, 1.2, e.L.cz], 40 + e.L.n * 6, 5 + e.L.r);
       if (e.L === P) { say('RAINBOW!', 1.5); flash = Math.max(flash, .35); }
     }
     else if (e.k === 'spend') { burst([e.u.x, .8, e.u.z], 5, 3, COL[e.u.col]); }
-    else if (e.k === 'lost') { thud(); burst([e.u.x, .8, e.u.z], 8, 5, COL[WILD]); }
+    else if (e.k === 'lost') { sound(thud, 1, e.u); burst([e.u.x, .8, e.u.z], 8, 5, COL[WILD]); }
     else if (e.k === 'fell') {
-      sBoom(3); shake = 1;
+      sound(sBoom, 3, e.L); shake = 1;
       if (e.L === P) say('OFF THE PLAIN', 2.5);
     }
-    else if (e.k === 'blast') { burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
-    else if (e.k === 'boom') { sBoom(e.pw); BOOMS.push({ x: e.x, z: e.z, t: 0, pw: e.pw }); boomCloud(e.x, e.z, e.pw); burst([e.x, 1.5, e.z], 120, 9 + e.pw * .4); shake = 1; flash = .4; }
-    else if (e.k === 'hurt') { if (e.L === P) { ouch(); say(P.hearts ? 'HEART LOST' : 'THE HERD IS GONE', 2); } }
-    else if (e.k === 'dead') { if (e.L !== P) say('A RIVAL FALLS', 2.5); }
+    else if (e.k === 'blast') { impactSound = e; burst([e.x, .8, e.z], 10, 6, COL[e.col]); if (e.L === P) shake = Math.max(shake, .3); }
+    else if (e.k === 'boom') explode(e.x, e.z, e.pw);
+    else if (e.k === 'hurt') { if (e.L === P) { ouch(); say(P.hearts ? 'HEART LOST' : 'HERD LOST', 2); } }
+    else if (e.k === 'dead') { if (e.L !== P) say('RIVAL LOST', 2.5); }
   }
+  if (impactSound) sound(thud, impactSound.k === 'blast' ? 2 : 1, impactSound);
   events.length = 0;
   for (const b of BOOMS) b.t += dt;
   while (BOOMS.length && BOOMS[0].t > 1.6) BOOMS.shift();
 
   // --- camera -------------------------------------------------------------
   let ex, ey, ez, lx, ly, lz;
+  const follow = net.on && !net.host ? 30 : 0;
   if (mode === 'title') {
     // A trackside camera circling the herd of the colour you are picking,
     // which plays itself under the words: the plain is live, not a still.
@@ -537,7 +550,7 @@ function frame(now_) {
     // Behind the herd, pulling back as it grows and further as it runs -
     // a charge should feel like the ground coming at you. The yaw eases
     // so a spin does not whip the world round.
-    camYaw += wrapA(P.yaw - camYaw) * Math.min(1, dt * 2.2);
+    camYaw += wrapA(P.yaw - camYaw) * Math.min(1, dt * (follow || 2.2));
     const sp = Math.min(1, P.spd / 33);
     // Lit, the shot opens right up: you are a hundred feet of rainbow now,
     // and a camera on your shoulder shows none of it.
@@ -548,34 +561,52 @@ function frame(now_) {
     lx = P.x + Math.cos(camYaw) * (6 + sp * 8); ly = 1 + lit * 2; lz = P.z + Math.sin(camYaw) * (6 + sp * 8);
     if (P.st === 3) { ex = P.x + 10; ey = 8; ez = P.z + 10; lx = P.x; lz = P.z; ly = 1; }
   }
+  if (impact) { ex = impact.x - 42; ey = 32; ez = impact.z + 42; lx = impact.x; lz = impact.z; ly = 3; }
   if (!eye) eye = [ex, ey, ez], look = [lx, ly, lz];
-  const k = Math.min(1, dt * 5);
-  eye[0] = lerp(eye[0], ex, k); eye[1] = lerp(eye[1], ey, k); eye[2] = lerp(eye[2], ez, k);
-  look[0] = lerp(look[0], lx, k); look[1] = lerp(look[1], ly, k); look[2] = lerp(look[2], lz, k);
-  // The trailer's tripod. Placed, not eased: the recorder animates its own
-  // moves one pumped frame at a time, and a lerp on top of that is lag.
-  if (DEV && window.FBCAM_) { eye = [...window.FBCAM_.e]; look = [...window.FBCAM_.l]; }
+  const k = Math.min(1, realDt * (follow || 5));
+  [ex, ey, ez].forEach((v, i) => eye[i] = lerp(eye[i], v, k));
+  [lx, ly, lz].forEach((v, i) => look[i] = lerp(look[i], v, k));
+  if (DEV && window.FBCAM_) {
+    for (let i = 0; i < 3; i++) { eye[i] = window.FBCAM_[i]; look[i] = window.FBCAM_[i + 3]; }
+  }
   const sh = shake * shake * .5;
-  const e2 = [eye[0] + (Math.random() - .5) * sh, eye[1] + (Math.random() - .5) * sh, eye[2] + (Math.random() - .5) * sh];
+  const e2 = eye.map(v => v + (rnd() - .5) * sh);
   const view = lookAt(e2, look);
   camR = [view[0], view[4], view[8]]; camU = [view[1], view[5], view[9]];
-  const vp = mul(perspective(DEV && window.FBCAM_ ? window.FBCAM_.fov : mode === 'title' ? .8 : 1.0, VW / VH, .1, 1500), view);
+  const vp = mul(perspective(mode === 'title' ? .8 : 1.0, VW / VH, .1, 1500), view);
 
   // --- draw ---------------------------------------------------------------
   frameGL(vp, e2, FOG);
   drawMesh(groundM, IDENT);
+  // Light lies on the meadow, before opaque shadows and unicorns.
+  glMode(1);
+  for (const L of leaders) {
+    const r = L.r * 4;
+    setDim(L.wave ? 1.4 : L.charge * .3);
+    drawMesh(DISC[WILD], [r,0,0,0, 0,0,r,0, 0,1,0,0, L.cx,.02,L.cz,1]);
+  }
+  setDim(1);
+  glMode(0);
   const T = now();
   for (const u of units) {
-    // A lit herd IS the rainbow: its unicorns are not drawn at all while
-    // it burns. They fade out as the charge tops out and fade back in when
-    // it goes out, so the change of state is a dissolve, not a cut.
+    // Lit unicorns render as plasma wisps in drawCharge; burnout restores
+    // their solid bodies at the same simulated positions.
     const L0 = u.lead >= 0 ? leaders[u.lead] : null;
-    const gone = L0 && L0.wave ? 1 : 0;
-    if (gone >= 1) continue;
+    if (L0 && L0.wave && u.st === 0) continue;
     const set = U[u.st === 3 ? WILD : u.col];
     const x = u.x, y = u.y, z = u.z, s = (u.hearts ? 1.25 : 1) * u.size, yaw = u.yaw;
     const bob = u.st ? 0 : Math.sin(u.ph * 2) * .05 * Math.min(1, u.sp / 5);
-    drawMesh(set.shadow, modelTR(x, 0, z, -yaw + Math.PI / 2, s));
+    const shadow = modelTR(x, 0, z, -yaw + Math.PI / 2, s);
+    let dx = 0, dz = 0, light = 1;
+    for (const L of leaders) {
+      const k = L.wave ? Math.max(0, 1 - Math.hypot(x - L.cx, z - L.cz) / (L.r * 4)) : 0;
+      dx += (x - L.cx) * k; dz += (z - L.cz) * k; light += k;
+    }
+    shadow[8] += dx / light * .15; shadow[10] += dz / light * .15;
+    shadow[12] += dx / light * .1; shadow[14] += dz / light * .1;
+    setDim(1 / light);
+    drawMesh(set.shadow, shadow);
+    setDim(1);
     const M = modelTR(x, y + bob, z, -yaw + Math.PI / 2, s);
     // Thrown: it tumbles about its long axis, and lands on its side. `up`
     // is the second and a half it spends rolling back onto its feet -
@@ -605,7 +636,7 @@ function frame(now_) {
   // Glow, all of it additive: tufts, stars, the edge, the charge and its
   // arcs, the rainbow and its wake, the rings of an explosion, the sparks.
   glMode(1);
-  drawMesh(tuftM, IDENT); drawMesh(postM, IDENT); drawMesh(starM, IDENT);
+  drawMesh(tuftM, IDENT); drawMesh(postM, IDENT);
   for (const L of leaders) if (L.st !== 3) drawCharge(L, T, dt);
   for (const b of BOOMS) {
     // The shockwave: one ring on the ground, thin and fast. Seven concentric rings
@@ -642,7 +673,7 @@ function frame(now_) {
   }
   setDim(1);
 
-  const tn = trailVerts(T, dt, e2);
+  const tn = trailVerts(dt, e2);
   updateMesh(trailM, TBUF, tn);
   if (tn) drawMesh(trailM, IDENT);
   const an = arcVerts(dt);
@@ -660,118 +691,101 @@ function frame(now_) {
   if (flash) { ctx.fillStyle = `rgba(255,255,255,${flash * .6})`; ctx.fillRect(0, 0, VW, VH); }
   // The edge: a red frame closing in from the screen's rim, under the
   // HUD so it never covers the radar - which is what you need most there.
-  if (mode === 'run' && nearEdge(P.x, P.z) && P.st !== 3) {
-    const w = (Math.max(Math.abs(P.x), Math.abs(P.z)) - (ARENA - EDGE)) / EDGE;
+  if (mode === 'run' && edgeDanger(P) && P.st !== 3) {
+    const w = Math.max(0, (Math.max(Math.abs(P.x), Math.abs(P.z)) - (ARENA - EDGE)) / EDGE);
     ctx.strokeStyle = `rgba(255,40,60,${.25 + .35 * w * (.7 + .3 * Math.sin(timer * 12))})`; ctx.lineWidth = 14 + 40 * w;
     ctx.strokeRect(0, 0, VW, VH); ctx.lineWidth = 1;
+    font(20, 1);
+    ctx.fillStyle = (timer * 5 | 0) % 2 ? '#ff5f6e' : '#ffb0b8';
+    label(P.wave ? 'EDGE! TURN NOW' : 'EDGE! BRAKE & TURN', VH * .18);
   }
   const pc = COL[P.col];
   if (mode === 'title') {
-    const sc = ctx.createLinearGradient(0, 0, 0, VH);
-    sc.addColorStop(0, 'rgba(5,4,14,.7)'); sc.addColorStop(.55, 'rgba(5,4,14,.25)'); sc.addColorStop(1, 'rgba(5,4,14,0)');
-    ctx.fillStyle = sc; ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = 'rgba(5,4,14,.6)'; ctx.fillRect(0, 0, VW, VH);
     // The title, once per colour, stacked: a rainbow made of the word.
-    ctx.font = 'bold 44px system-ui';
-    RAINBOW.forEach((c, i) => { ctx.fillStyle = css(c, .9); ctx.fillText('UNICORN FIREBALL', VW / 2 + (3 - i) * 1.5 - beat * (3 - i), 70 + (i - 3) * 2.5); });
-    ctx.fillStyle = '#f3ead6'; ctx.fillText('UNICORN FIREBALL', VW / 2, 70);
-    ctx.font = '15px system-ui';
+    font(44, 1);
+    RAINBOW.forEach((c, i) => { ctx.fillStyle = css(c, .9); label('UNICORN FIREBALL', 70 + (i - 3) * 2.5, VW / 2 + (3 - i) * 1.5 - beat * (3 - i)); });
+    ctx.fillStyle = '#f3ead6'; label('UNICORN FIREBALL', 70);
+    font(15);
     ctx.fillStyle = '#d8d0ea';
-    ctx.fillText('gather your colour into a herd, fight horn to horn', VW / 2, 132);
+    label('gather your colour - last herd wins', 132);
     ctx.fillStyle = '#ffb0b8';
-    ctx.fillText('hold SPACE to charge: held long enough, the herd BECOMES the rainbow', VW / 2, 160);
-    ctx.fillStyle = '#d8d0ea';
-    ctx.font = 'bold 15px system-ui';
-    ctx.fillStyle = pc;
+    label(chargeHint, 160);
+    font(12);
+    label(touch ? 'SIDES: steer / BOTH: drag' : 'WASD: steer', 182);
+    label((touch ? 'TOP/BOTTOM' : 'W/S') + ': sprint/brake', 200);
+    font(15, 1);
     ctx.fillStyle = css(pc);
-    ctx.beginPath(); ctx.arc(VW / 2, VH * .65, 14, 0, TAU); ctx.fill();
+    dot(VW / 2, VH * .65, 14);
     ctx.fillStyle = '#f3ead6';
-    ctx.fillText('<   your colour   >', VW / 2, VH * .65 + 34);
-    ctx.font = 'bold 18px system-ui';
+    label('< colour >', VH * .65 + 34);
+    font(18, 1);
     ctx.fillStyle = (timer * 2 | 0) % 2 ? '#fff' : '#c9b8ff';
-    ctx.fillText(awake() ? 'press SPACE to run' : 'press SPACE', VW / 2, VH - 42);
-    ctx.font = 'bold 14px system-ui'; ctx.fillStyle = '#8fe3c8';
-    ctx.fillText((net.on ? net.around ? net.around + ' online now' : 'nobody online yet' : 'go online') + ' - press O', VW / 2, VH - 62);
-    ctx.font = '12px system-ui'; ctx.fillStyle = '#9a90b8';
-    ctx.fillText('@gtanczyk | gamedev.pl | 2026', VW / 2, VH - 4);
+    label('PLAY SOLO', VH - 42);
+    font(14, 1); ctx.fillStyle = '#8fe3c8';
+    label(net.said || 'PLAY ONLINE', VH - 62);
+    font(12); ctx.fillStyle = '#9a90b8';
+    label('@gtanczyk | gamedev.pl', VH - 4);
   } else {
     // Your herd: a dot in your colour, the count, the hearts.
     ctx.textAlign = 'left';
-    ctx.fillStyle = css(pc); ctx.beginPath(); ctx.arc(24, 24, 11, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#f3ead6'; ctx.font = 'bold 26px system-ui'; ctx.fillText(P.n, 44, 24);
-    ctx.font = '18px system-ui'; ctx.fillStyle = '#ff6b8a';
-    ctx.fillText('♥'.repeat(P.hearts), 90, 23);
+    ctx.fillStyle = css(pc); dot(24, 24, 11);
+    ctx.fillStyle = '#f3ead6'; font(26, 1); label(P.n, 24, 44);
+    font(18); ctx.fillStyle = '#ff6b8a';
+    label('♥'.repeat(P.hearts), 23, 90);
     // The rivals, biggest first, so the threat is at the top.
-    ctx.textAlign = 'right'; ctx.font = 'bold 14px system-ui';
+    ctx.textAlign = 'right'; font(14, 1);
     leaders.filter((L) => L !== P).sort((a, b) => b.n - a.n).forEach((L, i) => {
       const y = 22 + i * 20, dead = L.st === 3;
-      ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); ctx.beginPath(); ctx.arc(VW - 100, y, 6, 0, TAU); ctx.fill();
-      if (L.man) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(VW - 100, y, 2.5, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = css(COL[L.col], dead ? .3 : 1); dot(VW - 18, y, 6);
+      if (L.man) { ctx.fillStyle = '#fff'; dot(VW - 18, y, 2.5); }
       ctx.fillStyle = dead ? '#666' : '#e8e0f4';
-      ctx.fillText(dead ? '-' : L.n + (L.wave ? ' ~' : L.chg ? ' !' : ''), VW - 112, y);
+      label(dead ? '-' : L.n + (L.wave ? ' ~' : L.chg ? ' !' : ''), y, VW - 30);
       // Its hearts, but only once it has lost one. Three hearts beside
       // every rival is a wall of pink that says nothing; the row you want
       // to find is the one that is DOWN to one, and it only reads as an
       // alarm if the quiet rows next to it are quiet.
-      if (!dead && L.hearts < 3) { ctx.fillStyle = '#ff6b8a'; ctx.font = '10px system-ui'; ctx.fillText('♥'.repeat(L.hearts), VW - 150, y); ctx.font = 'bold 14px system-ui'; }
+      if (!dead && L.hearts < 3) { ctx.fillStyle = '#ff6b8a'; font(10); label('♥'.repeat(L.hearts), y, VW - 68); font(14, 1); }
     });
-    // The radar: the whole plain in a square, one dot a herd, sized by it,
-    // ringed when it is lit and pipped when a person is riding it. It used
-    // to plot all seventy-seven unicorns, which at this size is a texture
-    // rather than information - what you need to find is a herd behind you.
-    const RX = VW - 78, RY = 10, RS = 68;
-    ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(RX, RY, RS, RS);
-    for (const L of leaders) {
-      if (L.st === 3) continue;
-      const x = RX + (L.cx / ARENA + 1) * RS / 2, y = RY + (L.cz / ARENA + 1) * RS / 2;
-      ctx.fillStyle = css(COL[L.col]);
-      ctx.beginPath(); ctx.arc(x, y, 1.6 + Math.sqrt(L.n) * .8, 0, TAU); ctx.fill();
-      if (L.man) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 1.3, 0, TAU); ctx.fill(); }
-      if (L.wave) { ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 2 + L.r * .4, 0, TAU); ctx.stroke(); }
-    }
-    ctx.strokeStyle = css(pc); ctx.strokeRect(RX + .5, RY + .5, RS - 1, RS - 1);
     ctx.textAlign = 'center';
     // The charge bar: how far the charge is from igniting, then how much
     // rainbow is left to burn.
     if (P.chg || P.wave) {
-      const k = P.wave ? P.burn / (2.5 + .12 * P.n) : P.charge;
+      const k = P.wave ? P.burn / burnTime(P) : P.charge;
       ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(VW / 2 - 80, VH - 30, 160, 10);
       const g = ctx.createLinearGradient(VW / 2 - 80, 0, VW / 2 + 80, 0);
       RAINBOW.forEach((c, i) => g.addColorStop(i / 6, css(c)));
       ctx.fillStyle = g; ctx.fillRect(VW / 2 - 80, VH - 30, 160 * k, 10);
-      ctx.font = 'bold 12px system-ui'; ctx.fillStyle = '#fff';
-      ctx.fillText(P.wave ? 'RAINBOW - herd ' + P.n : 'CHARGE ' + Math.round(P.charge * 100) + '%', VW / 2, VH - 42);
-    } else if (P.st === 0 && P.n >= 2 && timer < 40 && !P.cool) {
-      ctx.font = '12px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.5)';
-      ctx.fillText('hold SPACE to charge', VW / 2, VH - 26);
+      font(12, 1); ctx.fillStyle = '#fff';
+      label(P.wave ? 'NO BRAKES' : 'CHARGE ' + (P.charge * 100 | 0) + '%', VH - 42);
+    } else if (P.st === 0 && (P.cool || P.n >= 2 && timer < 40)) {
+      font(12); ctx.fillStyle = '#fff';
+      label(P.cool ? 'COOLDOWN' : chargeHint, VH - 26);
     }
-    if (nearEdge(P.x, P.z) && P.st !== 3 && mode === 'run') {
-      ctx.font = 'bold 20px system-ui';
-      ctx.fillStyle = (timer * 5 | 0) % 2 ? '#ff5f6e' : '#ffb0b8';
-      ctx.fillText('THE EDGE - TURN BACK', VW / 2, VH * .18);
+    if (P.heat > 0 && !P.wave && mode === 'run') { font(15, 1); ctx.fillStyle = '#ffb0b8'; label('UNSTABLE ' + (P.heat * 100 | 0) + '% - brake to cool', VH - 62); }
+    if (msgT && !impact) {
+      font(26, 1); ctx.globalAlpha = Math.min(1, msgT); ctx.fillStyle = msgCol;
+      label(msg, VH * .3); ctx.globalAlpha = 1;
     }
-    if (msgT) {
-      ctx.font = 'bold 26px system-ui'; ctx.globalAlpha = Math.min(1, msgT); ctx.fillStyle = msgCol;
-      ctx.fillText(msg, VW / 2, VH * .3); ctx.globalAlpha = 1;
-    }
-    ctx.font = '13px system-ui'; ctx.fillStyle = 'rgba(255,255,255,.6)';
-    ctx.fillText(Math.floor(timer / 60) + ':' + String(Math.floor(timer % 60)).padStart(2, '0'), VW / 2, 16);
+    font(13); ctx.fillStyle = 'rgba(255,255,255,.6)';
+    label(timer.toFixed(1) + 's', 16);
     if (net.on) {
-      ctx.font = 'bold 13px system-ui'; ctx.fillStyle = '#8fe3c8';
-      ctx.fillText(net.seats + ' riding - ESC leaves', VW / 2, 34);
+      font(13, 1); ctx.fillStyle = '#8fe3c8';
+      label((net.seats + ' riding') + ' - EXIT', 34);
       if (watching()) {
         const mine = net.me >= 0 ? leaders[net.me] : null;
-        ctx.font = 'bold 17px system-ui'; ctx.fillStyle = '#ffb0b8';
+        font(17, 1); ctx.fillStyle = '#ffb0b8';
         // A stone leader's burn byte carries the seconds until it rises.
-        ctx.fillText(mine ? 'DOWN - BACK IN ' + Math.max(1, Math.ceil(5 - mine.burn)) : 'NO SEAT - WATCHING', VW / 2, VH * .28);
+        label(mine ? 'BACK IN ' + Math.max(1, Math.ceil(5 - (mine.gone || 0))) : 'WATCHING', VH * .28);
       }
     }
-    if (mode === 'end') {
+    if (mode === 'end' && !impact && endT > 1.6) {
       ctx.fillStyle = 'rgba(5,4,14,.6)'; ctx.fillRect(0, VH * .3, VW, VH * .42);
-      ctx.font = 'bold 40px system-ui'; ctx.fillStyle = '#f3ead6';
-      ctx.fillText(victory ? 'THE PLAIN IS YOURS' : 'THE PLAIN FORGETS YOU', VW / 2, VH * .44);
-      ctx.font = '17px system-ui'; ctx.fillStyle = '#d8d0ea';
-      if (!victory) ctx.fillText('your herd has gone wild', VW / 2, VH * .56);
-      if (endT > 1) ctx.fillText('press SPACE', VW / 2, VH * .66);
+      font(40, 1); ctx.fillStyle = '#f3ead6';
+      label(victory ? 'VICTORY' : !alive().length ? 'DRAW' : 'DEFEAT', VH * .44);
+      font(17); ctx.fillStyle = '#d8d0ea';
+      label('BEST ' + (best ? best.toFixed(1) + 's' : '-'), VH * .54);
+      if (endT > 1) label('PLAY AGAIN', VH * .66);
     }
   }
   clearBeat();
@@ -779,7 +793,7 @@ function frame(now_) {
 }
 requestAnimationFrame(frame);
 
-if (DEV) window.FB = { units, leaders, events, net, spy, netOpen, goOnline, goHome, get victory() { return victory; }, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; }, get flash() { return flash; }, get shake() { return shake; },
+if (DEV) window.FB = { units, leaders, events, net, spy, netOpen, goOnline, goHome, get impact() { return impact; }, get victory() { return victory; }, step, charge, get mode() { return mode; }, get timer() { return timer; }, reset: (c, ai) => { pick = c; lastPick = c; newRun(ai); mode = 'run'; }, get flash() { return flash; }, get shake() { return shake; },
   // The trailer's pyrotechnics: the boom event's own effects at a point,
   // sized by `pw` the way a clash sizes them, without a clash.
   boom: (x, z, pw) => { BOOMS.push({ x, z, t: 0, pw }); boomCloud(x, z, pw); burst([x, 1.5, z], 120, 9 + pw * .4); shake = Math.max(shake, 1); flash = Math.max(flash, .4); } };

@@ -1,0 +1,10 @@
+import{readFileSync}from'node:fs';import assert from'node:assert/strict';
+const src=readFileSync('fireball/src/snd.js','utf8').replace(/export /g,'');
+const probe=new Function('drive',src+`;join(0);ac={currentTime:0};space={pan:{setTargetAtTime(){}}};const notes=[];tone=(...a)=>notes.push(a);hit=()=>{};music(1,0,1,0,drive);return {notes,nextT};`);
+const low=probe(.1),high=probe(.8),lit=probe(1),normal=probe(0);
+const bells=r=>r.notes.filter(n=>n[1]===.3&&n[2]==='triangle'&&n[3]===.06);
+assert.ok(bells(low).length&&bells(high).length);assert.ok(bells(high)[0][0]>bells(low)[0][0]);
+assert.equal(bells(lit).length,0);assert.ok(lit.nextT<normal.nextT);
+assert.ok(lit.notes.some(n=>n[2]==='triangle'&&Math.abs(n[3]-.07)<1e-9&&n[5]===-1));
+assert.ok(lit.notes.every(n=>Number.isFinite(n[0])));
+console.log('PASS silent-before-wake, rising charge bells, faster lit beat and stronger motif');

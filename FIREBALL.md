@@ -1,5 +1,322 @@
 # UNICORN FIREBALL — the fourth entry
 
+## Client steering and mobile intro (2026-09-09)
+
+ZIP: **13,283 / 13,312 bytes** in five deterministic builds. The saved
+Roadroller profile retains the previous memory budget; Fireball disables
+Terser sequence joining because that output compresses better. Other entries
+keep their minifier defaults. No effects or mechanics were removed.
+
+Protocol v3 adds an 8-bit input sequence and an acknowledgement per leader.
+Clients retain cumulative local turns in a 256-slot ring and apply only the
+unacknowledged difference over each authoritative heading. Between snapshots
+the heading target advances with local input. This prevents old snapshots
+from undoing a direction reversal. Stun/death clear the prediction prefix;
+reconnection and host migration discard obsolete history. Positions still
+reconcile with the host; combat, AI, movement constants and solo rules are
+unchanged. Both browsers must load this version; its room is separate from v2.
+
+The guest camera follows that heading faster. The browser test measures the
+rendered camera direction after settling it, rather than just the leader's
+first rotation. At simulated 200 ms RTT, the previous camera took 304–474 ms
+to react; the updated version measured 20–67 ms, with reversals at 19–84 ms.
+These are controlled local-relay measurements, not a guarantee for every
+network or device. Regression coverage includes acknowledgement wrap, stale
+snapshots, stun/death, host migration, low FPS and camera correction jumps.
+
+The reported client hopping was reproduced with a constant-speed host and
+20 Hz snapshots: apparent travel pulsed between 5.42 and 17.82 units/s at a
+target speed of 11. Position correction now uses damped velocity and integrates
+each unicorn once, instead of adding another local herd displacement after
+reconciliation. The same regression measures 10.34–11.41 units/s (91% less
+peak-to-peak ripple). Normal and rainbow travel, average speed, respawn and
+zero-duration frames are covered. This is client presentation only; it does
+not change the authoritative movement or collision simulation.
+
+Visual effects use the render clock: clients no longer freeze falling glitter
+or rainbow pulsation while waiting for a simulation clock they never advance.
+The mobile intro shows touch instructions and PLAY SOLO / PLAY ONLINE;
+disconnection and exit labels no longer assume a keyboard.
+
+## F32 — animated aftermath (2026-09-06)
+
+Victory/defeat latches the result, disables AI and applies braking. Existing
+rainbows retain momentum until natural burnout; tossed units, debris and
+ambient effects continue updating. The dedicated `over: 2` mode disables
+new horn/rainbow damage and edge deaths while preserving separation and
+motion. Title/online behavior keeps its previous simulation mode.
+
+Both result overlays wait at least 1.6 simulated seconds and until an active
+impact shot ends. Restart cannot interrupt the first 1.6 seconds. Defeat
+stays on the player's scene and does not start a spectator battle.
+
+F32 ZIP: **13,229 / 13,312 bytes**, 83 spare. Five O2 builds fit; worst
+13,238 bytes.
+
+## F31 — glitter vortices and glow (2026-09-06)
+
+Sparkle halo gain rises from .18 to .25; core geometry and flake size are
+unchanged. The strongest nearby moving unit sets a tangential swirl; lit
+herds affect a wider radius. Explosions push flakes radially outward before
+their displacement rotates and decays. Distance includes height, so hooves
+do not disturb high dust. This is a bounded visual displacement field, not
+fluid simulation; it reuses staggered updates, the particle pool and draw.
+
+The workbench includes an explosion button and the same vortex field.
+
+F31 selected ZIP: **13,225 / 13,312 bytes**, 87 spare. All five O2 builds
+fit; worst result 13,237 bytes.
+
+## F30 — arena focus (2026-09-06)
+
+Remove the minimap. The rival list moves 82 logical pixels to the right;
+colour markers leave a 12-pixel margin from the edge. Counts, online rider
+markers and damaged hearts move together. No replacement navigation HUD.
+
+## F29 — approved point reflections (2026-09-06)
+
+The workbench variant is ported at its default strength of 8. Coloured
+flakes retain their size; independently phased, short reflections add a
+white point and faint halo. No star rays. Core and halo share their vertex
+writer. A regression checks parity with the workbench candidate source.
+
+Selected F29 ZIP: **13,309 / 13,312 bytes** (3 spare). Particle time is
+read once per frame; Fireball viewport uses width=device-width and omits
+the redundant explicit initial scale. Other game shells are unchanged.
+
+## Glitter workbench — reflection study (2026-09-06)
+
+`npm run fireball:glitter` builds `build/glitter-workbench/index.html`.
+Two synchronized fields compare coloured flakes and an experimental sparse
+reflection with a white point and soft halo. Controls pause, slow time,
+orbit the camera, lift flakes and adjust reflection strength. The workbench
+uses the game WebGL shader and particle field. The candidate lives in
+`tools/workbench/glitter-effect.txt`; the approved variant is included in F29. No star arms or larger underlying flakes.
+
+## F28 — rare glitter star glints (2026-09-06)
+
+Restore the coloured glitter and its broad subtle reflection. Only one in
+sixteen flakes can produce a brighter white four-point star, briefly at its
+reflection peak. The accent uses the existing particle buffer; the ordinary
+flake size and camera-distance cap stay unchanged. Rays are bounded by the
+same distance cap and reach at most .2 world units. No extra draw call.
+
+F28 selected ZIP: **13,309 / 13,312 bytes** (3 spare). The five-roll guard
+failed before CSS refinement. Fireball applies touch/overscroll suppression
+to the root html element; the repeated body selector is omitted.
+
+## F27 — crisp glitter sparkle (2026-09-06)
+
+Rotating glitter uses a narrower reflection lobe (power 16 → 64), a brighter
+peak and a lower background glow. Strong reflections turn white, then fade
+within about 200 ms at a fixed camera angle. Flake geometry, camera size cap,
+9216-particle count, falling field and lift remain unchanged.
+
+Selected F27 ZIP: **13,280 / 13,312 bytes**, 32 spare. Five-roll guard PASS.
+
+## F26 — rival recruitment and tactics (2026-09-06)
+
+Rivals prioritize available recruits within 45 units until 30 followers,
+skip dazed recruits, and brake tight collection turns instead of orbiting.
+They favor wounded opponents, stop preferentially targeting the human, and
+avoid voluntary attacks above 1.2× their size. Incoming rainbows above 1.6×
+trigger a sidestep even at close range. Physics, damage, starting populations
+and recruitment radii remain shared with the player.
+
+Across 24 fixed all-AI starts, bands reaching 20+ rose from 42 to 55; tiny
+ignitions (<5 followers) fell from 10 to 1. All matches resolved. Median
+first 20+ was 50.5 → 51.5 seconds; median match 91.5 → 128 seconds. This
+measures AI behavior, not human win rate. `tools/bench-fireball-ai.mjs`
+reproduces the current sample; optional arguments select a simulation module
+and JSON output file.
+
+F26 selected ZIP: **13,267 / 13,312 bytes** (45 spare); five-roll guard
+PASS, worst 13,296 bytes.
+
+## F25 — rainbow drive and arch (2026-09-06)
+
+Horn and body contacts share a softer A-octave impact instead of metallic
+squeals. Rising pentatonic bells restore charging feedback. Local charge
+progressively accelerates the existing motif from 132 to 155.76 BPM; the lit
+state adds stronger kick, bass and octave lead. Rival melody keeps its
+attenuated stereo bus. Charging bells stop at ignition.
+
+The rainbow arch is taller (vertical scale .85 → 1.1), with an age-tapered,
+rounded tail and the existing narrow leader tip. Unicorn positions are
+unchanged. To recover bytes the title uses a flat scrim, the footer omits
+the year, and the sound generator reuses a fixed-length noise buffer.
+
+Selected F25 ZIP: **13,307 / 13,312 bytes** (5 spare). The five-roll
+worst-case guard still fails: 13,322 bytes; a fresh build may exceed the limit.
+
+## F24 — high falling glitter (2026-09-06)
+
+9216 flakes replace 900. The looping falling field reaches about 64 units
+above the ground, beyond the normal camera frame; its nonlinear descent slows
+near the floor before recycling overhead. Small flakes retain directional
+flashes. A .025 world-size ceiling and horizontal camera-distance cap prevent
+large foreground diamonds. Hoof/rainbow lift is refreshed in eight staggered
+groups; motion and sparkle still render every frame. The viewed herd is read
+once per frame, avoiding repeated spectator lookups.
+
+The title is assigned in JavaScript to reuse its existing text in compression;
+other games keep their HTML titles. DOM before/append preserve the canvas
+wrapper layout. `node tools/refine-fireball.mjs` refines the selected ZIP with
+1000 Zopfli iterations without changing its HTML. The selected final archive
+is 13,310 bytes; ordinary builds can still exceed 13k.
+
+## F23 — denser glitter and restrained stereo (2026-09-06)
+
+900 flakes replace 400, retaining the small rotating shape and directional
+flashes. Rainbow melody gain drops from .13 to .04 (about -10.2 dB), with a
+shorter .22 s decay; the separate ignition fanfare is removed. Nearby charging
+and lit herds share a softly panned melody bus, positioned relative to the
+camera with 100 ms smoothing and 70-unit distance falloff. It is a weighted
+stereo image, not individual 3D voices for every herd. Music stays centered.
+
+The shader's solid/glow branches are algebraically combined for the existing
+0/1 modes. Dust lift no longer clamps twice; its retained lift is nonnegative.
+The compressor uses its existing default ratio of 12:1.
+
+## F22 — branching lightning workbench (2026-09-06)
+
+`npm run fireball:lightning` builds `build/lightning-workbench/index.html`:
+a standalone GPU workbench with unicorns, camera motion, pause, a frozen
+channel and flash-rate control. It shares `fireball/src/lightning.js` with
+the game. The workbench itself is excluded from the submission ZIP.
+
+Lightning uses twelve irregular segments, a thin white core and cool blue
+halo, plus three thinner side leaders. Each short-lived channel keeps its
+shape through the return-stroke brightness pulses instead of changing every
+frame. Endpoints stay at the sampled unicorn positions; no overhead attractor.
+The decorative spark emitted on each arc was removed to recover bytes.
+
+The selected ZIP fits at 13,305 bytes. O2 compression varies: only two of five
+rolls fit; the worst-of-five packaging guard fails at 13,331. Preserve and
+verify the selected artifact; a fresh single roll is not guaranteed to fit.
+
+## F21 — glitter and rainbow melody (2026-09-06)
+
+400 small rotating glitter flakes occupy a recycled 84×84 field around the
+viewed herd, clipped to the arena. Flakes settle, lift under running units,
+and swirl higher across a rainbow's wider footprint. Their narrow flashes
+vary with orientation relative to the camera. This is a stylized glint,
+not a physically traced reflection. The pool and draw-call count stay bounded.
+
+The continuous sawtooth charge/rainbow riser is replaced by a beat-synchronized
+triangle-wave version of the main motif, one octave above its normal lead.
+Nearby rival rainbows also raise this layer; distance fades it out at 70 units.
+One shared layer keeps simultaneous herds harmonically aligned. Ignition
+quotes the opening motif instead of sweeping pitch upward.
+
+Space comes from numeric WebGL enums, equivalent box/camera arithmetic,
+shared HUD circles and diamond particles with fewer vertices. No textures,
+combat-rule changes or network protocol changes were added.
+
+## F20 — charge arcs and impact feedback (2026-09-06)
+
+Charging lightning now bridges actual herd members at every charge level;
+the floating overhead endpoint is removed. Every hostile horn contact emits
+feedback, including the first follower stagger. Rainbow knockdowns trigger
+a stronger crack and falling bass. Knockdowns in one frame share one impact
+voice, with rainbow hits taking priority. Rainbow base alpha rises from .06
+to .1 while retaining travelling highlights and the camera proximity fade.
+
+## F19 — living plasma and combined lighting (2026-09-06)
+
+Each wisp has a pulsing core and four coloured lobes: the rear lobes sway
+with staggered phases, forming a tapered, moving tail. Lightning bridges
+lit herd members. The rainbow breathes and carries narrow travelling waves
+of brightness across its colours, instead of staying uniformly white.
+The live nose tapers to the leader; the historical wake stays on the herd
+path. Unicorn positions, following and collision rules remain unchanged.
+
+Nearby rainbow lights contribute continuously to one approximate shadow:
+weighted directions combine and additional light reduces its opacity.
+Opposing equal lights cancel the directional extension. Light order no
+longer selects the shadow. This is stylized ground lighting and a blended
+slab shadow, not shadow mapping or lighting of the unicorn body.
+
+Ignition turns each active unicorn into a low plasma wisp at its own simulated
+position: a bright centre, its herd-coloured glow and a short trailing tail.
+Overlapping glows merge visually where the herd gathers; there is no separate
+core. The ground clips the lower glow, anchoring the plasma to the meadow.
+An upward ZIIIING replaces the ignition arpeggio. Burnout restores ordinary
+unicorns at their current positions. Knocked-down followers stay visible as
+solid bodies. Rainbow trails, following and collision rules are unchanged.
+This is additive overlap, not a thresholded metaball shader; no new meshes.
+
+Large clashes emerge from normal play. The last two leaders keep their
+positions and followers. There is no regrouping, countdown, reinforcement
+or forced finale. Solo player death immediately ends the run.
+
+Ordinary rainbow hits affect only unicorns inside the impact footprint:
+hitting a leader costs it a heart without scattering distant followers.
+Two approaching rainbows explode only when both fronts face their contact.
+Offset and side contacts exchange an impulse along the contact normal,
+weighted by mass (followers + leader) and relative closing speed, with
+restitution 0.5. Both remain lit and get 0.6 seconds of collision immunity.
+A smaller rainbow can redirect a larger one towards the edge.
+
+Head-on clashes keep the previous outcomes: below two 30+ armies, greater
+numbers win and the loser scatters and loses a heart. Two 30+ armies compare
+`(followers + 1) * max(11, speed)` and the loser is eliminated; equal power
+eliminates both. A frontal explosion can scatter a whole losing herd.
+
+Ignition commits the rainbow until burnout, a frontal clash or elimination.
+Release and braking cancel only the unlit run-up. Steering remains active;
+charged steering is stronger and AI predicts the boundary earlier, so the
+commitment is survivable. The title and HUD explicitly say NO BRAKES.
+
+At 10+ followers arcs jump spontaneously. At 35+ a six-second instability
+meter starts building while safely away from the edge; a full meter begins
+automatic charging. Down/S or the bottom-centre touch zone cools the herd.
+The normal charge button still works. Large impacts share a plasma cloud,
+shockwave and extended bass/noise tail; solo impacts also slow time briefly
+and move the camera to show both armies. Defeat always takes precedence
+over that cinematic effect.
+
+Rivals gather collectable kin and wild unicorns within 28 units before
+hunting, until their herd reaches 35. Incoming attacks and active rainbows
+still take priority. Aligned rivals start charging up to 70 units away;
+close-range charging still breaks the mutual-pursuit orbit. Above 20
+followers, accumulated energy shortens ignition: 35 followers light in
+about 2.08 seconds rather than 5.2; ten followers still need 3.2 seconds.
+Follower expenditure is unchanged. Overlapping grazing
+units cannot divide by zero while fleeing. Every follower, including adopted
+wild unicorns, becomes available for collection when its leader dies. The player's radar marker has a
+white ring and heading line. Rainbow trails have stronger colour, using the
+same geometry. A shared compressor contains overlapping combat sounds.
+Only impacts within 35 units can take over the camera.
+
+The game starts with one Space/Enter press or tap. The title explicitly
+explains auto-run, hold-to-ignite and commitment after ignition. Down/S or bottom
+centre brakes to a full stop before ignition and overrides sprint and the
+unlit charge. It cannot cancel an ignited rainbow.
+The fatal boundary has a continuous red ground line as well as posts. Pointer capture prevents
+stuck turns after releasing outside the canvas. Uppercase WASD works. Online
+and Exit have touch targets. Portrait mode displays a rotation prompt and
+pauses solo play; an online host keeps simulating behind that prompt.
+
+Online remains an arena with five-second respawns. A dropped connection
+returns to the title instead of assigning someone else's herd. Session
+cleanup is idempotent; migration carries stun and cooldown as well as health.
+The changed snapshot layout uses the `unicorn-fireball-v2` relay room to avoid
+mixing incompatible clients. The title no longer connects to count riders.
+
+The byte budget comes from shared simulation/HUD/effect code, a Fireball-only
+allowlist for property mangling, canvas-specific page CSS, simpler AI and
+background detail. Stars, decorative ground patches and the overlapping
+white haze are removed; meadow colours, edge markers and the rainbow trails
+remain. Restarted worlds release their old GPU buffers.
+
+Package: **13,310 bytes** after ZIP refinement, **13,345 worst-of-five** before refinement at O2, ceiling **13,312**.
+Validation and limitations are recorded in [FIREBALL-QA.md](FIREBALL-QA.md).
+
+## Historical design notes (F1–F10)
+
+The text below records earlier iterations; F19 above defines current play.
+
 Run the plain as a unicorn of one colour. Gather every unicorn that shares
 it into a herd. When the herd is big enough, hold the button: the herd
 spirals into you and *becomes* a rainbow fireball that you ride across the
@@ -776,10 +1093,35 @@ that the sound already told you):
 The autopilot matches went from 129 seconds to 93. Whether that is now
 "enough" only a person can say, and this log will keep saying so.
 
+## F10 — predictable fights and recovery
+
+Equal head-on rainbows now cost both leaders a heart. The tie is recorded
+before either herd is broken, and current herd size decides the winner.
+Glancing contact has its own collision timer: it neither cancels the charge
+nor lets the ordinary blast pass damage an opponent that is still lit.
+
+The edge warning looks two seconds along the herd's current velocity and
+tells the player to release and turn. The title explains the controls and
+the cost of a rainbow; the HUD shows recharging, and the radar includes
+unclaimed unicorns the player can gather. Losing window focus clears input.
+
+Host migration preserves existing seats instead of treating every rider as
+a new arrival and reviving them. Clients retain horizontal velocity and the
+respawn timer for takeover. Regression probes cover equal and unequal
+clashes, grazing, release, advance edge warnings, and a migrating rider
+keeping one heart without teleporting home. The online respawn probe reads
+the first revived state instead of health after several more seconds of combat.
+
+The space comes from shared math, font and vertex writers, shorter messages,
+and removing the unused glass shader and WebGL buffer options. The five O1
+packs measured **13,304 / 13,283 / 13,270 / 13,286 / 13,307 bytes**.
+
 ## The wall
 
-F9: **13,286 bytes** packed worst-of-5 at O1, limit 13,312, and **26
-remain**. The brains going for the player put it three bytes OVER, and it
+F10: **13,307 bytes** worst-of-5 at O1, with **5 bytes remaining**.
+
+F9 measured **13,286 bytes** packed worst-of-5 at O1, limit 13,312, with **26
+remaining**. The brains going for the player put it three bytes OVER, and it
 came back under on six ring meshes nothing had drawn since the second
 shockwave ring went, a billboard helper with no callers left, and the
 SPENT message. The ring was free; the shadow's own pass cost what the second
@@ -837,10 +1179,42 @@ rule - a slot is a person once a phone lands on it or its keys are
 touched, and a keyboard seat left alone goes back to the bots - was being
 written again in every party game.
 
+## Client movement anticipation
+
+Guests apply their own steering, charge presentation and a short movement step
+immediately after snapshot reconciliation. The standing herd moves together,
+using the same `move` kinematics as the host, including rainbow turn inertia.
+Incoming positions and headings continuously correct that anticipation; host
+snapshots decide ignition, hits, herd ownership, stun and death. Anticipation
+stops after 0.5 seconds without a snapshot. The v2 packet layout is unchanged.
+
+`node tools/test-fireball-prediction.mjs` runs two browsers with 100 ms delay in
+each direction and checks input-to-visible-turn time, convergence after release
+and death overriding held input. Local measurements were about 14–17 ms running
+and 55–61 ms in a rainbow. `node --test tools/test-fireball-prediction-rules.mjs`
+checks state authority and stale-packet behavior without rendering.
+
 ## Milestone log
+
+Solo results now retain the fastest victory as `ufTime` in local storage.
+The clock uses elapsed seconds and stops at the result; defeat and online play
+cannot improve the record. Blocked storage does not prevent playing.
+
+The production build uses the saved Roadroller 2.1 profile in `fireball/entry.json`
+instead of running stochastic optimization again. Five builds produced 13,309 B
+each, including the solo record and client anticipation (3 B below the limit). The profile's 256 MB
+budget yields about 195 MB of decoder arrays. `allowFreeVars` saves decoder bytes
+and is appropriate only for this standalone page: game code is bundled in an
+IIFE and accesses the canvas with `getElementById`, not the global `c` that the
+decoder overwrites. Do not reuse this profile for scripts embedded in another
+application. `--no-roadroller` and cheat builds retain their development paths;
+other games keep their existing optimization behavior. After source changes,
+run `npm run fireball:gate`; the saved profile is repeatable, not a guarantee that
+future changes fit.
 
 | gate | ceiling | packed | notes |
 | --- | ---: | ---: | --- |
+| F10 predictable fights and recovery | 13,312 | 13,307 (O1 worst-of-5) | fair ties, current herd power, safe glancing contact, host migration, predictive edge warning, recovery radar and controls; shared helpers and unused glass removed |
 | F9 the brains go for the player | 13,312 | 13,286 (O1 worst-of-5) | brains hunt people and the leader, flee only from 2.2x; six unused ring meshes and a dead helper cut to pay for it |
 | F8a the ring and the shadow | 13,312 | 13,293 (O1 worst-of-5) | the herd around its leader; the shadow drawn flat in its own pass |
 | F8 nine notes | 13,312 | 13,277 (O1 worst-of-5) | harder charge, no shrinking, followers a beat behind, bigger blast, bolder brains with a final; the edge as a frame; grazing rainbows deflect, head-on explodes; shadows; stagger before the knock |

@@ -9,7 +9,7 @@ Open `unicorn-fireball.html` through:
 
     https://htmlpreview.github.io/?https://raw.githubusercontent.com/gamedevpl/seventh-color-js13-2026/<branch>/play/unicorn-fireball.html
 
-Two tabs, press **O** in both, and you are on the same plain.
+Two tabs, press **O** or tap **Online** in both, and you are on the same plain.
 
 These files are generated, not written. Refresh them with:
 

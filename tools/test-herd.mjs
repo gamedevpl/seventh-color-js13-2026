@@ -56,10 +56,10 @@ check('boots to the title', (await st()).mode === 'title');
 check('silent before any gesture', (await page.evaluate(() => window.__oscs)) === 0);
 await page.keyboard.press('Space');
 await page.waitForTimeout(300);
-check('one press wakes the title and stays', (await st()).mode === 'title');
+check('one gesture starts the run', (await st()).mode === 'run');
 await page.keyboard.press('Space');
 await page.waitForTimeout(300);
-check('second press starts the run', (await st()).mode === 'run');
+check('SPACE in a running game stays in the run', (await st()).mode === 'run');
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-start.png') });
 
 // Gathering: walk the meadow for a few seconds.
@@ -104,11 +104,10 @@ await page.waitForTimeout(2600);
 s = await st();
 check('held long enough, the charge ignites', s.wave > 0, `rainbow ${s.wave} at charge ${s.charge.toFixed(2)}`);
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-wave.png') });
-await page.waitForTimeout(600);
 await page.keyboard.up('Space');
-await page.waitForTimeout(700);
+await page.waitForTimeout(100);
 s = await st();
-check('letting go puts the rainbow out', s.wave === 0 && !s.chg, `rainbow ${s.wave}`);
+check('letting go keeps an ignited rainbow running', s.wave > 0 && !!s.chg, `rainbow ${s.wave}`);
 await page.screenshot({ path: path.join(root, 'build/fireball/probe-land.png') });
 
 // What the rainbow costs, on an empty plain: the rivals are frozen at
@@ -158,16 +157,15 @@ const edge = await page.evaluate(async () => {
   out.fellCount = fellCount; out.deaths = deaths;
   return out;
 });
-check('running off the plain ends the run', edge.playerDied, `at ${edge.x},${edge.z}`);
+check('running off the plain eliminates the rider', edge.playerDied, `at ${edge.x},${edge.z}`);
 check('the brains keep off the edge', edge.fellCount <= edge.deaths * .25, `${edge.fellCount} of ${edge.deaths} deaths were falls`);
 
-// Touch. The lower halves steer, the top strip is the button: a pointer
-// held there must charge, and lifting it must fire. Checked against the
-// keyboard, which the section above already proved.
-const tap = async (x, y, ms) => {
+// Sides steer; both thumbs charge, release cancels before ignition.
+const tap = async (x, y, ms, dx = 0) => {
   const box = await page.evaluate(() => { const r = document.querySelector('canvas:last-of-type').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
   await page.mouse.move(box[0] + box[2] * x, box[1] + box[3] * y);
   await page.mouse.down();
+  await page.mouse.move(box[0] + box[2] * (x + dx), box[1] + box[3] * y);
   await page.waitForTimeout(ms);
   return async () => { await page.mouse.up(); };
 };
@@ -184,9 +182,13 @@ yaw1 = await page.evaluate(() => FB.leaders[0].yaw);
 await lift();
 check('a right thumb steers right (yaw rises)', yaw1 > yaw0 + .5, `yaw ${yaw0.toFixed(2)} -> ${yaw1.toFixed(2)}`);
 await page.waitForTimeout(3500);
-lift = await tap(.5, .12, 1200);
+const touchBox = await page.locator('canvas').last().boundingBox();
+const touchSession = await page.context().newCDPSession(page);
+await touchSession.send('Input.dispatchTouchEvent', {type:'touchStart',touchPoints:[.25,.75].map((x,id)=>({x:touchBox.x+touchBox.width*x,y:touchBox.y+touchBox.height*.65,id:id+1}))});
+await page.waitForTimeout(1200);
+lift = () => touchSession.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 s = await st();
-check('a thumb on the top strip charges', s.chg === 1 && s.charge > .25, `charge ${s.charge.toFixed(2)}`);
+check('both thumbs on the sides charge', s.chg === 1 && s.charge > .25, `charge ${s.charge.toFixed(2)}`);
 await lift();
 await page.waitForTimeout(300);
 s = await st();
@@ -250,12 +252,16 @@ await page.keyboard.up('ArrowUp');
 vic = await page.evaluate(() => ({ victory: FB.victory, st: FB.leaders[0].st, x: Math.round(FB.leaders[0].x) }));
 check('...and running on afterwards cannot undo it', vic.victory === true && vic.st !== 3, `victory ${vic.victory}, leader st ${vic.st} at x ${vic.x}`);
 
-// Balance: run whole matches through the sim with the player on autopilot.
+// Balance: fixed seeds keep the regression independent of prior render RNG.
+// Run whole matches through the sim with the player on autopilot.
 // The player brain is the rival brain, so this measures whether the rules
 // converge, not whether a human can win them.
 const raw = await page.evaluate(async (matches) => {
-  const out = [];
+  const out = [], random = Math.random;
+  try {
   for (let m = 0; m < matches; m++) {
+    let seed = m + 1;
+    Math.random = () => (seed = Math.imul(seed, 1664525) + 1013904223 >>> 0) / 4294967296;
     FB.reset(m % 7, true);
     let t = 0, ignitions = 0, answers = 0, litPairs = 0, clashes = 0, grazes = 0, maxHerd = 0;
     while (t < 420) {
@@ -273,6 +279,7 @@ const raw = await page.evaluate(async (matches) => {
     if (alive.length > 1) out.push({ stall: alive.map((L) => ({ col: L.col, n: L.n, hearts: L.hearts, chg: L.chg, charge: +L.charge.toFixed(2), cool: +L.cool.toFixed(1), stun: +L.stun.toFixed(1), st: L.st, d: Math.round(Math.hypot(L.x - alive[0].x, L.z - alive[0].z)) })) });
     out.push({ t: Math.round(t), ended: alive.length <= 1, playerWon: alive.length === 1 && alive[0] === FB.leaders[0], playerAlive: FB.leaders[0].st !== 3, ignitions, answers, litPairs, clashes, grazes, maxHerd });
   }
+  } finally { Math.random = random; }
   return out;
 }, matches);
 const results = raw.filter((r) => !r.stall);

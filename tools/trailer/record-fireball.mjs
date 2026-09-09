@@ -194,7 +194,7 @@ await page.evaluate(([RAINBOW]) => {
       e = camState.se.slice(); l = camState.sl.slice();
     }
     if (d.shake) { const j = d.shake; e = [e[0] + (Math.random() - .5) * j, e[1] + (Math.random() - .5) * j, e[2] + (Math.random() - .5) * j]; }
-    window.FBCAM_ = { e, l, fov: lerp(d.fov0 ?? .9, d.fov1 ?? d.fov0 ?? .9, k) };
+    window.FBCAM_ = [...e, ...l];
   };
 
   // Nobody dies on camera unless the shot says so, and everyone goes where

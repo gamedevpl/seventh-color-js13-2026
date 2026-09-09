@@ -4,6 +4,7 @@
 // distance fog. Same discipline as game one's draw.js: a thin layer the
 // call sites stay readable through, not an engine.
 
+// Standard WebGL enum values are numeric here to preserve the 13k budget.
 export let gl, canvas;
 
 // Two materials in one program. Solid geometry gets lambert + fog-toward-
@@ -11,46 +12,32 @@ export let gl, canvas;
 // toward nothing rather than toward fog, because additive blending adds -
 // mixing a distant glow toward the fog colour would brighten the horizon
 // instead of letting the light die away.
-// `add` lives in both stages, so it carries an explicit precision: default
+// The glow uniform `g` lives in both stages, with an explicit precision: default
 // float precision is highp in the vertex shader and mediump in the fragment
 // one, and a uniform whose precision disagrees across stages is a link error.
-const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam;
-uniform mediump float add,dim,gls;varying vec3 vc;varying float vf,va;
-void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;
-float l=.55+.45*max(dot(normalize((md*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
-vc=c*mix(l,1.,add);va=a*dim;vf=clamp((length(w.xyz-cam)-12.)/mix(58.,150.,max(add,gls)),0.,1.);}`;
-// Glass does NOT fog toward the fog colour - it fades its ALPHA instead.
-// It writes no depth, so a far piece of deck composites over a near one in
-// mesh order rather than depth order; fogged, that far sliver is close to
-// the background colour and therefore DARKER than the road it lands on, and
-// it paints a thin black curve across it. Keeping its colour means the
-// overlap is deck-over-deck - the same hue, so the seam disappears - while
-// the alpha fade still lets it die away with distance.
-// The trailer's shader, compiled in by --cheats only. Three things the
-// shipping one hardcodes become uniforms: the fog's start and range (a
-// crane over the plain sees nothing past seventy units otherwise), a
-// coloured flash with a direction of its own (the faces of a box that face
-// it brighten, the rest do not - a rainbow going off out of frame shows on
-// the animal's face), and a gain on every glow's alpha (see setDim).
-const VS_DEV = `attribute vec3 p,n,c;attribute float a;uniform mat4 vp,md;uniform vec3 cam,fl,fd;uniform vec2 fz;
-uniform mediump float add,dim,gls;varying vec3 vc;varying float vf,va;
-void main(){vec4 w=md*vec4(p,1.);gl_Position=vp*w;vec3 nn=normalize((md*vec4(n,0.)).xyz);
+const VS = `attribute vec3 p,n,c;attribute float a;uniform mat4 V,M;uniform vec3 e;
+uniform mediump float g,d;varying vec3 C;varying float F,A;
+void main(){vec4 w=M*vec4(p,1.);gl_Position=V*w;
+float l=.55+.45*max(dot(normalize((M*vec4(n,0.)).xyz),normalize(vec3(.4,1.,.3))),0.);
+C=c*mix(l,1.,g);A=a*d;F=clamp((length(w.xyz-e)-12.)/mix(58.,150.,g),0.,1.);}`;
+// Fireball draws solids and additive glow; the surfer's glass material is
+// unused here. Keeping only these two paths leaves room for the game rules.
+const VS_DEV = `attribute vec3 p,n,c;attribute float a;uniform mat4 V,M;uniform vec3 e,fl,fd;uniform vec2 fz;
+uniform mediump float g,d;varying vec3 C;varying float F,A;
+void main(){vec4 w=M*vec4(p,1.);gl_Position=V*w;vec3 nn=normalize((M*vec4(n,0.)).xyz);
 float l=.55+.45*max(dot(nn,normalize(vec3(.4,1.,.3))),0.);
-vc=c*mix(l,1.,add)+c*fl*max(dot(nn,normalize(fd)),0.)*(1.-add);va=a*dim;vf=clamp((length(w.xyz-cam)-fz.x)/mix(fz.y,fz.y*2.5862,max(add,gls)),0.,1.);}`;
-const FS = `precision mediump float;varying vec3 vc;varying float vf,va;
-uniform vec3 fog;uniform float add,gls;
-void main(){if(add>.5)gl_FragColor=vec4(vc,va*(1.-vf*.92));
-else if(gls>.5)gl_FragColor=vec4(vc,va*(1.-vf));
-else gl_FragColor=vec4(mix(vc,fog,vf),va);}`;
+C=c*mix(l,1.,g)+c*fl*max(dot(nn,normalize(fd)),0.)*(1.-g);A=a*d;
+F=clamp((length(w.xyz-e)-fz.x)/mix(fz.y,fz.y*2.5862,g),0.,1.);}`;
+const FS = `precision mediump float;varying vec3 C;varying float F,A;
+uniform vec3 f;uniform float g;
+void main(){gl_FragColor=vec4(mix(C,f,F*(1.-g)),A*(1.-F*.92*g));}`;
 
 let prog, loc = {};
 
 export function initGL(c) {
   canvas = c;
-  // preserveDrawingBuffer, because the HUD samples this canvas back with
-  // drawImage to build the radial blur. Without it the buffer is undefined
-  // by the time the 2D pass reads it.
-  gl = c.getContext('webgl', { antialias: true, preserveDrawingBuffer: true, stencil: true });
+  // The HUD is a separate overlay; it never reads the WebGL buffer back.
+  gl = c.getContext('webgl');
   const sh = (type, src) => {
     const s = gl.createShader(type);
     gl.shaderSource(s, src);
@@ -58,17 +45,17 @@ export function initGL(c) {
     return s;
   };
   prog = gl.createProgram();
-  gl.attachShader(prog, sh(gl.VERTEX_SHADER, DEV ? VS_DEV : VS));
-  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+  gl.attachShader(prog, sh(35633, DEV ? VS_DEV : VS));
+  gl.attachShader(prog, sh(35632, FS));
   gl.linkProgram(prog);
   gl.useProgram(prog);
-  for (const u of ['vp', 'md', 'cam', 'fog', 'add', 'dim', 'gls']) loc[u] = gl.getUniformLocation(prog, u);
-  gl.uniform1f(loc.dim, 1);
+  for (const u of ['V', 'M', 'e', 'f', 'g', 'd']) loc[u] = gl.getUniformLocation(prog, u);
+  gl.uniform1f(loc.d, 1);
   if (DEV) {
     for (const u of ['fl', 'fd', 'fz']) loc[u] = gl.getUniformLocation(prog, u);
     gl.uniform3f(loc.fl, 0, 0, 0); gl.uniform3f(loc.fd, 0, 1, 0); gl.uniform2f(loc.fz, 12, 58);
     // FBGL({ flash: [r,g,b], dir: [x,y,z], fog: [start, range], glow: k })
-    // - any subset. Defaults reproduce the shipping shader exactly.
+    // - any subset. The defaults reproduce the shipping shader exactly.
     window.FBGL = (o) => {
       if (o.flash) gl.uniform3fv(loc.fl, o.flash);
       if (o.dir) gl.uniform3fv(loc.fd, o.dir);
@@ -77,43 +64,35 @@ export function initGL(c) {
     };
   }
   for (const a of ['p', 'n', 'c', 'a']) loc[a] = gl.getAttribLocation(prog, a);
-  gl.enable(gl.DEPTH_TEST);
+  gl.enable(2929);
 }
 
 export function frameGL(vp, cam, fog) {
   mode(0);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(fog[0], fog[1], fog[2], 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
-  gl.uniformMatrix4fv(loc.vp, false, vp);
-  gl.uniform3fv(loc.cam, cam);
-  gl.uniform3fv(loc.fog, fog);
+  gl.clear(16384 | 256);
+  gl.uniformMatrix4fv(loc.V, false, vp);
+  gl.uniform3fv(loc.e, cam);
+  gl.uniform3fv(loc.f, fog);
 }
 
-// Three materials, one program.
-//   0 SOLID  lambert + fog, opaque, writes depth.
+// Two materials, one program.
+//   0 SOLID  lambert + fog, alpha blending, writes depth; dim softens shadows.
 //   1 GLOW   emissive, additive, depth TEST but no depth WRITE - glow layers
 //            still hide behind solid things but never occlude each other,
 //            they sum, and that summing is the bloom.
-//   2 GLASS  lambert + fog like solid, but alpha-blended and writing no
-//            depth, so overlapping pieces of track stack up and you can see
-//            the rest of the net through the deck you are riding.
 export function mode(m) {
-  gl.uniform1f(loc.add, m === 1 ? 1 : 0);
-  gl.uniform1f(loc.gls, m === 2 ? 1 : 0);
-  if (!m) { gl.disable(gl.BLEND); gl.depthMask(true); return; }
-  gl.enable(gl.BLEND);
-  gl.depthMask(false);
-  gl.blendFunc(gl.SRC_ALPHA, m === 1 ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
+  gl.uniform1f(loc.g, m);
+  gl.enable(3042);
+  gl.depthMask(!m);
+  gl.blendFunc(770, m ? 1 : 771);
 }
 
 // A blanket multiplier on every vertex alpha, so one mesh can be drawn a
 // second time as a faint ghost of itself - which is all a reflection is.
-// Every glow's alpha goes through `dim`, so a gain here is a gain on the
-// rainbow, the arcs, the explosions and the tufts at once - which is what
-// the trailer means by "more".
 let gain = 1;
-export const setDim = (v) => gl.uniform1f(loc.dim, DEV ? v * gain : v);
+export const setDim = (v) => gl.uniform1f(loc.d, DEV ? v * gain : v);
 
 // A planar reflection needs a MASK. A mirror image floating beside the
 // track - out over a gap, past the edge, in the empty air - is worse than
@@ -123,10 +102,10 @@ export const setDim = (v) => gl.uniform1f(loc.dim, DEV ? v * gain : v);
 // hidden behind the scenery marks nothing and reflects nothing.
 //   1 write the mask (the deck pass)   2 test it (the mirror pass)   0 off
 export function mask(m) {
-  if (!m) { gl.disable(gl.STENCIL_TEST); return; }
-  gl.enable(gl.STENCIL_TEST);
-  gl.stencilFunc(m === 1 ? gl.ALWAYS : gl.EQUAL, 1, 255);
-  gl.stencilOp(gl.KEEP, gl.KEEP, m === 1 ? gl.REPLACE : gl.KEEP);
+  if (!m) { gl.disable(2960); return; }
+  gl.enable(2960);
+  gl.stencilFunc(m === 1 ? 519 : 514, 1, 255);
+  gl.stencilOp(7680, 7680, m === 1 ? 7681 : 7680);
 }
 
 // Mirror through the plane (point q, unit normal n): x - 2(n.x - n.q)n.
@@ -146,33 +125,29 @@ export function reflector(q, n) {
 // frame (the braid); everything else is built once at round start.
 export function createMesh(arr, dynamic) {
   const b = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, b);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
-  return { b, n: arr.length / 10, dynamic };
+  gl.bindBuffer(34962, b);
+  gl.bufferData(34962, new Float32Array(arr), dynamic ? 35048 : 35044);
+  return { b, n: arr.length / 10 };
 }
 
 // Accepts a preallocated Float32Array plus a float count, so the per-frame
 // mesh (the rainbow) can be rebuilt with no allocation at all - a few
 // hundred KB of fresh arrays every frame is a GC hitch waiting to happen.
 export function updateMesh(m, arr, count) {
-  gl.bindBuffer(gl.ARRAY_BUFFER, m.b);
-  const n = count === undefined ? arr.length : count;
-  gl.bufferData(gl.ARRAY_BUFFER, ArrayBuffer.isView(arr) ? arr.subarray(0, n) : new Float32Array(arr), gl.DYNAMIC_DRAW);
-  m.n = n / 10;
+  gl.bindBuffer(34962, m.b);
+  // All three dynamic streams are preallocated Float32Arrays with an explicit count.
+  gl.bufferData(34962, arr.subarray(0, count), 35048);
+  m.n = count / 10;
 }
 
 export function drawMesh(m, model) {
-  gl.bindBuffer(gl.ARRAY_BUFFER, m.b);
-  gl.vertexAttribPointer(loc.p, 3, gl.FLOAT, false, 40, 0);
-  gl.vertexAttribPointer(loc.n, 3, gl.FLOAT, false, 40, 12);
-  gl.vertexAttribPointer(loc.c, 3, gl.FLOAT, false, 40, 24);
-  gl.vertexAttribPointer(loc.a, 1, gl.FLOAT, false, 40, 36);
-  gl.enableVertexAttribArray(loc.p);
-  gl.enableVertexAttribArray(loc.n);
-  gl.enableVertexAttribArray(loc.c);
-  gl.enableVertexAttribArray(loc.a);
-  gl.uniformMatrix4fv(loc.md, false, model);
-  gl.drawArrays(gl.TRIANGLES, 0, m.n);
+  gl.bindBuffer(34962, m.b);
+  ['p', 'n', 'c', 'a'].forEach((key, i) => {
+    gl.vertexAttribPointer(loc[key], i === 3 ? 1 : 3, 5126, false, 40, i * 12);
+    gl.enableVertexAttribArray(loc[key]);
+  });
+  gl.uniformMatrix4fv(loc.M, false, model);
+  gl.drawArrays(4, 0, m.n);
 }
 
 // --- the little linear algebra this game actually needs ------------------
@@ -185,19 +160,19 @@ export function perspective(fov, aspect, near, far) {
 
 // General up vector, because the camera rolls with the track now - a
 // corkscrew is only a corkscrew if the horizon turns with you.
-export function lookAt(eye, at, up = [0, 1, 0]) {
+export function lookAt(eye, at) {
   let zx = eye[0] - at[0], zy = eye[1] - at[1], zz = eye[2] - at[2];
   const zl = Math.hypot(zx, zy, zz);
   zx /= zl; zy /= zl; zz /= zl;
-  let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx;
-  const xl = Math.hypot(xx, xy, xz) || 1;
-  xx /= xl; xy /= xl; xz /= xl;
-  const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+  let xx = zz, xz = -zx;
+  const xl = Math.hypot(xx, xz) || 1;
+  xx /= xl; xz /= xl;
+  const yx = zy * xz, yy = zz * xx - zx * xz, yz = -zy * xx;
   return [
     xx, yx, zx, 0,
-    xy, yy, zy, 0,
+    0, yy, zy, 0,
     xz, yz, zz, 0,
-    -(xx * eye[0] + xy * eye[1] + xz * eye[2]),
+    -(xx * eye[0] + xz * eye[2]),
     -(yx * eye[0] + yy * eye[1] + yz * eye[2]),
     -(zx * eye[0] + zy * eye[1] + zz * eye[2]), 1,
   ];
@@ -232,18 +207,16 @@ export function modelFrame(p, X, Y, Z, s) {
 // `a` matters for additive boxes: front+back faces SUM, so alpha 1 clamps
 // any colour to white - a coloured glow box needs a low alpha.
 export function pushBox(v, cx, cy, cz, sx, sy, sz, r, g, b, a = 1) {
-  const x = sx / 2, y = sy / 2, z = sz / 2;
-  const F = [
-    [[1, 0, 0], [x, -y, -z, x, y, -z, x, y, z, x, -y, z]],
-    [[-1, 0, 0], [-x, -y, z, -x, y, z, -x, y, -z, -x, -y, -z]],
-    [[0, 1, 0], [-x, y, -z, -x, y, z, x, y, z, x, y, -z]],
-    [[0, -1, 0], [-x, -y, z, -x, -y, -z, x, -y, -z, x, -y, z]],
-    [[0, 0, 1], [-x, -y, z, x, -y, z, x, y, z, -x, y, z]],
-    [[0, 0, -1], [x, -y, -z, -x, -y, -z, -x, y, -z, x, y, -z]],
-  ];
-  for (const [n, q] of F) {
-    for (const i of [0, 1, 2, 0, 2, 3]) {
-      v.push(cx + q[i * 3], cy + q[i * 3 + 1], cz + q[i * 3 + 2], n[0], n[1], n[2], r, g, b, a);
+  const half = [sx / 2, sy / 2, sz / 2];
+  for (let axis = 0; axis < 3; axis++) for (const sign of [-1, 1]) {
+    for (const corner of [0, 1, 2, 0, 2, 3]) {
+      const p = [cx, cy, cz], n = [0, 0, 0];
+      n[axis] = sign;
+      for (let j = 0; j < 3; j++) {
+        const k = (axis + j) % 3;
+        p[k] += half[k] * (j ? j === 1 ? corner === 0 || corner === 3 ? -1 : 1 : corner < 2 ? -1 : 1 : sign);
+      }
+      v.push(...p, ...n, r, g, b, a);
     }
   }
 }

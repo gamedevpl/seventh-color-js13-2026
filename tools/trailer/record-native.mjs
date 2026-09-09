@@ -347,7 +347,7 @@ const intoGame = (id) => stage(([id]) => {
 
 console.log(`recording The Seventh Color  (${BPM}bpm, one beat = ${BEAT.toFixed(4)}s)`);
 
-// The whole film is made of NINE images, and it is built by returning to
+// The whole film is made of EIGHT images, and it is built by returning to
 // them rather than by moving past them. Each of these is a one-line
 // re-stage, because every one of them is used two, three or four times at
 // different sizes, and a trailer of this kind is a rhyme scheme.
@@ -358,12 +358,6 @@ const HALL = () => put('shadow-council', { phase: 0, line: 0 });
 const THRONE = () => put('hidden-hand', { phase: 0, line: 0 });
 const POND = () => put('winter-falls', { phase: 0, line: 1 });
 const DEFY = () => put('false-sacrifice', { phase: 0, line: 1 });
-const SNOW = (cut) => stage(([cut]) => {
-  const bt = window.SC.BEATS.find((x) => x.id === 'winter-comes');
-  bt.cutscene.hold = 3.0;
-  window.SC.hard();
-  window.SC.play('winter-comes', { phase: window.SC.P.CUT, cut });
-}, [cut]);
 const SHATTER = () => stage(() => {
   const bt = window.SC.BEATS.find((x) => x.id === 'unicorn-stream');
   bt.cutscene.hold = 2.6;
@@ -410,9 +404,9 @@ await GLADE();
 await shoot({ name: 'forest', beats: 5, dis: 1.4, dust: 0.85,
   focus: [160, 66], push: [1.0, 1.1], ease: 'lin' });
 
-await SNOW(4.6);
+await POND();
 await shoot({ name: 'snow1', beats: 7, dis: 1.6, vo: 'd2', voAt: 1.4, mark: 'winter',
-  focus: [160, 84], push: [1.34, 1.04], ease: 'out', dust: 0.15 });
+  focus: [258, 30], focus1: [196, 52], push: [2.0, 1.18], ease: 'out', dust: 1.0 });
 
 await POND();
 await shoot({ name: 'pond', beats: 5, dis: 1.4, dust: 0.3,
@@ -441,20 +435,20 @@ await shoot({ name: 'shatter', beats: 3, dis: 0, flash: 3, mark: 'horn', dust: 0
 await HERD();
 await shoot({ name: 'f1', beats: 1, dis: 0.2, dust: 0.8, drv: 'still', drvArg: { slipAt: 99 },
   focus: [206, 84], push: [2.9, 3.0], ease: 'lin', mark: 'flurry' });
-await SNOW(7.4);
-await shoot({ name: 'f2', beats: 1, dis: 0.2, dust: 0.1, focus: [160, 80], push: [1.5, 1.55], ease: 'lin' });
-await GLADE();
-await shoot({ name: 'f3', beats: 1, dis: 0.2, dust: 0.8, focus: [222, 60], push: [2.4, 2.5], ease: 'lin' });
 await POND();
-await shoot({ name: 'f4', beats: 1, dis: 0.2, dust: 0.3, focus: [150, 62], push: [1.7, 1.75], ease: 'lin' });
+await shoot({ name: 'f2', beats: 1, dis: 0.2, dust: 0.5, focus: [258, 26], push: [3.6, 3.7], ease: 'lin' });
+await GLADE();
+await shoot({ name: 'f3', beats: 1, dis: 0.2, dust: 0.8, focus: [220, 53], push: [4.2, 4.3], ease: 'lin' });
+await POND();
+await shoot({ name: 'f4', beats: 1, dis: 0.2, dust: 0.3, focus: [74, 50], push: [3.4, 3.5], ease: 'lin' });
 await HALL();
-await shoot({ name: 'f5', beats: 1, dis: 0.2, dust: 0.2, focus: [166, 52], push: [2.2, 2.3], ease: 'lin' });
+await shoot({ name: 'f5', beats: 1, dis: 0.2, dust: 0.2, focus: [160, 46], push: [2.6, 2.7], ease: 'lin' });
 await DEFY();
-await shoot({ name: 'f6', beats: 1, dis: 0.2, dust: 0.2, focus: [96, 74], push: [2.0, 2.1], ease: 'lin' });
+await shoot({ name: 'f6', beats: 1, dis: 0.2, dust: 0.2, focus: [96, 64], push: [2.4, 2.5], ease: 'lin' });
 
 await THRONE();
 await shoot({ name: 'kneel', beats: 8, dis: 0.9, vo: 'd5', voAt: 0.6, mark: 'kneel',
-  focus: [226, 54], push: [2.3, 2.7], ease: 'lin', dust: 0.18 });
+  focus: [230, 46], push: [1.6, 1.95], ease: 'lin', dust: 0.18 });
 
 // =========================================================================
 // IV. THE ANSWER
@@ -516,12 +510,12 @@ await intoGame('final-beam');
 await shoot({
   name: 'beam', beats: 4, dis: 1.1, mark: 'beam', dust: 0.4,
   drv: 'beam', drvArg: { mir: beamPlan.mir, openAt: 0.05, openT: beamPlan.openT, stop: 0.42 },
-  focus: [160, 58], focus1: [140, 70], push: [1.3, 1.7], ease: 'in',
+  focus: [215, 28], focus1: [176, 34], push: [3.3, 2.7], ease: 'in',
 });
 
 await THRONE();
 await shoot({ name: 'taunt', beats: 6, dis: 1.1, vo: 'd4', voAt: 0.7, mark: 'taunt',
-  focus: [226, 54], push: [2.6, 3.0], ease: 'lin', dust: 0.15 });
+  focus: [235, 40], push: [2.05, 2.3], ease: 'lin', dust: 0.15 });
 
 // =========================================================================
 // V. THE LAST WORD

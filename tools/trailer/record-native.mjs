@@ -55,7 +55,7 @@
 // 320x156 of vector work is crisp at 1080p, four ElevenLabs voices say the
 // lines (audio/voice-native.mjs), and vo.json's measured lengths decide how
 // long a shot has to be.
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright-core';
@@ -472,7 +472,16 @@ await shoot({ name: 'lili', beats: 6, dis: 1.3, vo: 'l1', voAt: 0.8,
   focus: [96, 74], push: [1.5, 1.7], ease: 'lin', dust: 0.2 });
 
 // One flash of the thing that might answer him, unexplained and unfinished.
-const beamPlan = await stage(() => {
+//
+// The route is SEARCHED, with sixty thousand random mirror layouts, so it
+// is the one thing in this recorder that does not come out the same twice.
+// That matters more than it looks: the shot after this one dissolves out
+// of whatever board this search left standing, so a re-photograph of that
+// shot against a fresh search puts five mirrors on one side of the
+// dissolve and three on the other. The plan is therefore found once and
+// kept - delete build/trailer-native/beam.json to look for another one.
+const planPath = path.join(outDir, 'beam.json');
+const beamPlan = existsSync(planPath) ? JSON.parse(readFileSync(planPath, 'utf8')) : await stage(() => {
   const bt = window.SC.BEATS.find((x) => x.id === 'final-beam');
   const G = window.SC.GAMES.dungeon;
   const cells = [];
@@ -512,7 +521,10 @@ if (!beamPlan) {
   await browser.close();
   process.exit(1);
 }
-console.log(`  beam: ${beamPlan.mir.length} bucklers, shaft opens at t=${beamPlan.openT.toFixed(2)}`);
+const searched = !existsSync(planPath);
+if (searched) writeFileSync(planPath, JSON.stringify(beamPlan));
+console.log(`  beam: ${beamPlan.mir.length} bucklers, shaft opens at t=${beamPlan.openT.toFixed(2)}`
+  + `${searched ? ' (searched)' : ' (kept)'}`);
 
 await put('final-beam', { phase: 0, line: 1 });
 await intoGame('final-beam');

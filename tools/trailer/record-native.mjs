@@ -4,6 +4,14 @@
 //   SC_PREVIEW=n   every nth frame, half size - the shape of the cut in minutes
 //   SC_DRY=1       re-time and rewrite beats.json without photographing a frame
 //   SC_UNTIL=name  stop after that shot
+//   SC_ONLY=a,b,c  re-photograph only those shots, leaving the rest of the
+//                  frames on disk. The simulation still runs every frame -
+//                  it has to, the game's state is sequential and each
+//                  dissolve reads the canvas the last shot left - so only
+//                  the screenshot is skipped, and that is where all the
+//                  time goes. Re-framing four shots costs four shots.
+//                  Whatever a re-photographed shot dissolves INTO must be
+//                  in the list too, or that dissolve keeps the old frames.
 //
 // The reference is the original Legend trailer, and the three things that
 // make that a different film from a modern one are all here.
@@ -61,6 +69,7 @@ const framesDir = path.join(outDir, 'frames');
 const FPS = 30, DT = 1 / FPS;
 const PREVIEW = Number(process.env.SC_PREVIEW || 0);
 const DRY = !!process.env.SC_DRY;
+const ONLY = process.env.SC_ONLY ? new Set(process.env.SC_ONLY.split(',').map((x) => x.trim())) : null;
 const VW = 320, VH = 156, SCX = 8;
 // Seventy-five. Slow enough that a five-beat shot is four seconds, which is
 // about as long as one of these images wants to be held, and slow enough
@@ -71,7 +80,7 @@ const b = (n) => n * BEAT;
 const VO = JSON.parse(readFileSync(path.join(outDir, 'audio', 'vo', 'vo.json'), 'utf8'));
 const vos = [];
 
-if (!DRY) rmSync(framesDir, { recursive: true, force: true });
+if (!DRY && !ONLY) rmSync(framesDir, { recursive: true, force: true });
 mkdirSync(framesDir, { recursive: true });
 mkdirSync(path.join(outDir, 'audio'), { recursive: true });
 
@@ -322,14 +331,14 @@ async function shoot(s) {
       vt: vt, dust: s.dust ?? 0.5,
       drv: s.drv || null, t, ...(s.drvArg || {}),
     });
-    if (!DRY && (!PREVIEW || frame % PREVIEW === 0)) {
+    if (!DRY && !(ONLY && !ONLY.has(s.name)) && (!PREVIEW || frame % PREVIEW === 0)) {
       await page.screenshot({ path: path.join(framesDir, `f${String(frame).padStart(6, '0')}.png`) });
     }
     frame++; vt += DT;
   }
   out = { ox: f1[0] / VW * 100, oy: f1[1] / VH * 100, push: p1 };
   console.log(`  ${(s.text ? '[card] ' + s.text.slice(0, 30) : s.name).padEnd(34)} ${at.toFixed(2)}s +${s.beats}b`
-    + `${dis ? ` /${dis}` : '  CUT'}${s.vo ? '  ' + s.vo : ''}`);
+    + `${dis ? ` /${dis}` : '  CUT'}${s.vo ? '  ' + s.vo : ''}${ONLY && !ONLY.has(s.name) ? '  (kept)' : ''}`);
 }
 
 const put = (id, patch) => stage(([id, patch]) => {
@@ -410,11 +419,11 @@ await shoot({ name: 'snow1', beats: 7, dis: 1.6, vo: 'd2', voAt: 1.4, mark: 'win
 
 await POND();
 await shoot({ name: 'pond', beats: 5, dis: 1.4, dust: 0.3,
-  focus: [110, 64], push: [1.16, 1.34], ease: 'lin' });
+  focus: [73, 58], push: [2.1, 2.5], ease: 'lin' });
 
 await THRONE();
 await shoot({ name: 'hall2', beats: 7, dis: 1.4, vo: 'd3', voAt: 1.2, mark: 'offer',
-  focus: [226, 54], push: [1.5, 1.86], ease: 'lin', dust: 0.2 });
+  focus: [224, 46], push: [1.25, 1.5], ease: 'lin', dust: 0.2 });
 
 // =========================================================================
 // III. THE BURST
@@ -444,11 +453,11 @@ await shoot({ name: 'f4', beats: 1, dis: 0.2, dust: 0.3, focus: [74, 50], push: 
 await HALL();
 await shoot({ name: 'f5', beats: 1, dis: 0.2, dust: 0.2, focus: [160, 46], push: [2.6, 2.7], ease: 'lin' });
 await DEFY();
-await shoot({ name: 'f6', beats: 1, dis: 0.2, dust: 0.2, focus: [96, 64], push: [2.4, 2.5], ease: 'lin' });
+await shoot({ name: 'f6', beats: 1, dis: 0.2, dust: 0.2, focus: [96, 74], push: [2.6, 2.7], ease: 'lin' });
 
 await THRONE();
 await shoot({ name: 'kneel', beats: 8, dis: 0.9, vo: 'd5', voAt: 0.6, mark: 'kneel',
-  focus: [230, 46], push: [1.6, 1.95], ease: 'lin', dust: 0.18 });
+  focus: [226, 44], push: [1.45, 1.7], ease: 'lin', dust: 0.18 });
 
 // =========================================================================
 // IV. THE ANSWER
@@ -515,7 +524,7 @@ await shoot({
 
 await THRONE();
 await shoot({ name: 'taunt', beats: 6, dis: 1.1, vo: 'd4', voAt: 0.7, mark: 'taunt',
-  focus: [235, 40], push: [2.05, 2.3], ease: 'lin', dust: 0.15 });
+  focus: [228, 42], push: [1.75, 2.0], ease: 'lin', dust: 0.15 });
 
 // =========================================================================
 // V. THE LAST WORD

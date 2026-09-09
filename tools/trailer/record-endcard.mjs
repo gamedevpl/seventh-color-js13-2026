@@ -21,6 +21,7 @@ const root = path.resolve(here, '..', '..');
 const GAMES = {
   snap: { page: 'endcard.html', dir: 'trailer' },
   fireball: { page: 'endcard-fireball.html', dir: 'trailer-fireball' },
+  native: { page: 'endcard-native.html', dir: 'trailer-native' },
 };
 const which = (process.argv.find((a) => a.startsWith('--game=')) || '--game=snap').split('=')[1];
 const game = GAMES[which];

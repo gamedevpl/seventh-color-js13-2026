@@ -107,11 +107,27 @@ snap.height = VH;
 const sctx = snap.getContext('2d');
 let lastKey = null, trans = 0, transMax = TRANS, card = null;
 
+// The trailer renders the whole game at a multiple of its own resolution.
+// Every painter in this game is vector work through one context, so scaling
+// the base matrix once - here and on the transition snapshot - makes the
+// type and the line art crisp at 1080p instead of a six-times upscale of a
+// 320-wide bitmap. Nothing else in the file has to know. DEV only; without
+// --cheats terser deletes the block and every guard that reads it.
+if (DEV && window.SCX) {
+  canvas.width = VW * window.SCX;
+  canvas.height = VH * window.SCX;
+  snap.width = VW * window.SCX;
+  snap.height = VH * window.SCX;
+  ctx.setTransform(window.SCX, 0, 0, window.SCX, 0, 0);
+  sctx.setTransform(window.SCX, 0, 0, window.SCX, 0, 0);
+  resize();
+}
+
 function cut(key, arriving) {
   if (key === lastKey) return;
   if (lastKey !== null) {
     sctx.clearRect(0, 0, VW, VH);
-    sctx.drawImage(canvas, 0, 0);
+    if (DEV && window.SCX) sctx.drawImage(canvas, 0, 0, VW, VH); else sctx.drawImage(canvas, 0, 0);
     card = arriving || null;
     transMax = trans = card ? CARD : TRANS;
   }
@@ -124,7 +140,7 @@ function cut(key, arriving) {
 function drawSnap(alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.drawImage(snap, 0, 0);
+  if (DEV && window.SCX) ctx.drawImage(snap, 0, 0, VW, VH); else ctx.drawImage(snap, 0, 0);
   ctx.restore();
 }
 
@@ -353,10 +369,28 @@ function frame(now) {
     }
   }
 
-  if (DEV && mode === 'play') {
+  if (DEV && mode === 'play' && !window.SCX) {
     rect(0, 149, 152, 7, { fill: '#000c' });
     text(`${currentBeat(round).id}  [shift+shift = skip]`, 4, 155, { fill: '#4a8a5a', font: '7px system-ui' });
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// The trailer's control surface: put the story wherever a shot needs it,
+// without pressing space thirty times to get there and without the audio
+// context (the film brings its own score). `hard` makes the next beat
+// change arrive with no dissolve and no card, for a cut the film is making
+// itself; leaving it alone lets the game's own transitions play, which is
+// most of what the film is made of. DEV only.
+if (DEV) window.SC = {
+  BEATS, P, GAMES,
+  get r() { return round; },
+  get mode() { return mode; },
+  play(id, o) { round = makeRound(BEATS, id); if (o) Object.assign(round, o); mode = 'play'; },
+  set(o) { Object.assign(round, o); },
+  game(o) { if (round.g && o) Object.assign(round.g, o); return round.g; },
+  hard() { lastKey = null; trans = 0; card = null; },
+  key(k) { if (k === 'act') acted = true; else if (k === 'left') left = true; else if (k === 'right') right = true; else if (k === 'up') up = true; else if (k === 'down') down = true; },
+  hold(k, v) { if (k === 'act') heldAct = v; else if (k === 'left') heldLeft = v; else if (k === 'right') heldRight = v; },
+};

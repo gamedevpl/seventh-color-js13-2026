@@ -209,6 +209,11 @@ const headUp = (u, t) => ((t / u[0] + u[2]) % 1) >= u[1];
 const rising = (u, t) => !headUp(u, t) && ((t / u[0] + u[2]) % 1) >= u[1] - .12;
 
 function stillInit() { return { near: 0, t: 0, spooked: 0, moving: false }; }
+// Whether the heads are down, for something that is not a player: the
+// trailer holds SPACE off this rather than off a spook, because a film of
+// somebody learning the rule the hard way for six seconds is a film of
+// somebody who cannot play. DEV only - deleted from the shipping build.
+if (DEV) window.SCSAFE = (t) => !HERD.some((u) => headUp(u, t));
 function stillUpdate(g, b, dt, input) {
   g.t += dt;
   g.spooked = Math.max(0, g.spooked - dt);

@@ -29,6 +29,13 @@ const GAMES = {
     dir: 'trailer-fireball', music: 'stampede.wav', out: 'unicorn-fireball-trailer.mp4', npm: 'fireball:trailer',
     bloom: { thresh: 120, gain: 2.4, sigma: 28, opacity: 0.75 },
   },
+  // The Seventh Color is flat canvas 2D - no additive anything - so it gets
+  // no bloom. What it does get is the one thing a 320x156 game needs at
+  // 1080p and neither of the others does: the recorder photographs it at
+  // eight times its own resolution, so this stage is only encoding.
+  native: {
+    dir: 'trailer-native', music: 'seventh.wav', out: 'the-seventh-color-trailer.mp4', npm: 'native:trailer',
+  },
 };
 const which = (process.argv.find((a) => a.startsWith('--game=')) || '--game=snap').split('=')[1];
 const game = GAMES[which];
